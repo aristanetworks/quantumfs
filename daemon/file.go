@@ -188,19 +188,18 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 	var updateMtime bool
 
-	result := func() fuse.Status {
-		defer fi.Lock().Unlock()
+	if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
+		result := func() fuse.Status {
+			defer fi.Lock().Unlock()
 
-		c.vlog("Got file lock")
+			c.vlog("Got file lock")
 
-		if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 			if attr.Size != fi.accessor.fileLength(c) {
 				updateMtime = true
 			}
 
 			if attr.Size == 0 {
 				fi.accessor.truncate(c, 0)
-				fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 				return fuse.OK
 			}
 			endBlkIdx, _ := fi.accessor.blockIdxInfo(c, attr.Size-1)
@@ -218,14 +217,15 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 			}
 
 			fi.self.dirty(c)
-			fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
+
+			return fuse.OK
+		}()
+
+		if result != fuse.OK {
+			return result
 		}
 
-		return fuse.OK
-	}()
-
-	if result != fuse.OK {
-		return result
+		fi.self.markSelfAccessed(c, quantumfs.PathUpdated)
 	}
 
 	return fi.parentSetChildAttr(c, fi.InodeCommon.id, attr, out, updateMtime)
@@ -462,30 +462,37 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
 	defer c.funcIn("File::Read").Out()
-	defer fi.Lock().Unlock()
 
-	// Ensure size and buf are consistent
-	buf = buf[:size]
-	size = uint32(len(buf))
+	var readCount int
+	readResult, status := func() (fuse.ReadResult, fuse.Status) {
+		defer fi.Lock().Unlock()
 
-	readCount := 0
-	err := operateOnBlocks(c, fi.accessor, offset, size,
-		func(c *ctx, blockIdx int, offset uint64) error {
-			read, err := fi.accessor.readBlock(c, blockIdx, offset,
-				buf[readCount:])
+		// Ensure size and buf are consistent
+		buf = buf[:size]
+		size = uint32(len(buf))
 
-			readCount += read
-			return err
-		})
+		err := operateOnBlocks(c, fi.accessor, offset, size,
+			func(c *ctx, blockIdx int, offset uint64) error {
+				read, err := fi.accessor.readBlock(c, blockIdx,
+					offset, buf[readCount:])
 
-	if err != nil {
-		return fuse.ReadResult(nil), fuse.EIO
+				readCount += read
+				return err
+			})
+
+		if err != nil {
+			return fuse.ReadResult(nil), fuse.EIO
+		}
+
+		return fuse.ReadResultData(buf[:readCount]), fuse.OK
+	}()
+
+	if status == fuse.OK {
+		fi.self.markSelfAccessed(c, quantumfs.PathRead)
+		c.vlog("Returning %d bytes", readCount)
 	}
 
-	fi.self.markSelfAccessed(c, quantumfs.PathRead)
-	c.vlog("Returning %d bytes", readCount)
-
-	return fuse.ReadResultData(buf[:readCount]), fuse.OK
+	return readResult, status
 }
 
 func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
