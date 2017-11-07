@@ -1087,6 +1087,28 @@ func TestDirectoryMvChildOntoOpenFileInSibling(t *testing.T) {
 	})
 }
 
+func TestDirectoryRenameNonNormalizedHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+
+		dir2 := workspace + "/dir2"
+		file2 := dir2 + "/file2"
+
+		utils.MkdirAll(dir1, 0777)
+		utils.MkdirAll(dir2, 0777)
+
+		fd, err := syscall.Creat(file1, syscall.O_CREAT)
+		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Close(fd))
+		test.AssertNoErr(syscall.Link(file1, file2))
+		test.AssertNoErr(syscall.Unlink(file1))
+		test.AssertNoErr(syscall.Rename(file2, file1))
+		test.AssertNoErr(syscall.Unlink(file1))
+	})
+}
+
 func TestSUIDPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -1733,7 +1755,6 @@ func TestDirectorySeekMiddle(t *testing.T) {
 }
 
 func TestDirectoryReadStaleDir(t *testing.T) {
-	t.Skip() // bug227468
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		dir := workspace + "/" + "testdir"
