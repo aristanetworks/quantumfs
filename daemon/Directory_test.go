@@ -1025,6 +1025,113 @@ func TestDirectoryMvChildFileOntoDir(t *testing.T) {
 	})
 }
 
+func TestDirectoryMvChildOntoOpenFileSameDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/dir"
+		file1 := dir + "/file1"
+		file2 := dir + "/file2"
+
+		test.AssertNoErr(utils.MkdirAll(dir, 0124))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		f, err := os.Open(file2)
+		test.AssertNoErr(err)
+		defer f.Close()
+		syncErr := test.SyncWorkspaceAsync(test.RelPath(workspace))
+		test.AssertNoErr(syscall.Rename(file1, file2))
+		test.AssertNoErr(<-syncErr)
+	})
+}
+
+func TestDirectoryMvChildOntoOpenFileInParentDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/dir"
+		file1 := dir + "/file1"
+		file2 := workspace + "/file2"
+
+		test.AssertNoErr(utils.MkdirAll(dir, 0124))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		f, err := os.Open(file2)
+		test.AssertNoErr(err)
+		defer f.Close()
+		syncErr := test.SyncWorkspaceAsync(test.RelPath(workspace))
+		test.AssertNoErr(syscall.Rename(file1, file2))
+		test.AssertNoErr(<-syncErr)
+	})
+}
+
+func TestDirectoryMvChildOntoOpenFileInSibling(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+		dir2 := workspace + "/dir2"
+		file2 := workspace + "/file2"
+
+		test.AssertNoErr(utils.MkdirAll(dir1, 0124))
+		test.AssertNoErr(utils.MkdirAll(dir2, 0124))
+		test.AssertNoErr(testutils.PrintToFile(file1, ""))
+		test.AssertNoErr(testutils.PrintToFile(file2, ""))
+
+		f, err := os.Open(file2)
+		test.AssertNoErr(err)
+		defer f.Close()
+		syncErr := test.SyncWorkspaceAsync(test.RelPath(workspace))
+		test.AssertNoErr(syscall.Rename(file1, file2))
+		test.AssertNoErr(<-syncErr)
+	})
+}
+
+func TestDirectoryRenameNonNormalizedHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir1 := workspace + "/dir1"
+		file1 := dir1 + "/file1"
+
+		dir2 := workspace + "/dir2"
+		file2 := dir2 + "/file2"
+
+		utils.MkdirAll(dir1, 0777)
+		utils.MkdirAll(dir2, 0777)
+
+		fd, err := syscall.Creat(file1, syscall.O_CREAT)
+		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Close(fd))
+		test.AssertNoErr(syscall.Link(file1, file2))
+		test.AssertNoErr(syscall.Unlink(file1))
+		test.AssertNoErr(syscall.Rename(file2, file1))
+		test.AssertNoErr(syscall.Unlink(file1))
+	})
+}
+
+func TestDirectoryRenameHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir1 := workspace + "/dir1"
+		file0 := dir1 + "/file0"
+		file1 := dir1 + "/file1"
+
+		dir2 := workspace + "/dir2"
+		file2 := dir2 + "/file2"
+
+		utils.MkdirAll(dir1, 0777)
+		utils.MkdirAll(dir2, 0777)
+
+		fd, err := syscall.Creat(file0, syscall.O_CREAT)
+		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Close(fd))
+		test.AssertNoErr(syscall.Link(file0, file1))
+		test.AssertNoErr(syscall.Rename(file0, file2))
+		test.AssertNoErr(syscall.Unlink(file2))
+		test.AssertNoErr(syscall.Unlink(file1))
+	})
+}
+
 func TestSUIDPerms(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -1667,5 +1774,49 @@ func TestDirectorySeekMiddle(t *testing.T) {
 		test.Assert(res0+res1 == 1,
 			"The offsets should result in 0 or 1. Got %d and %d.",
 			res0, res1)
+	})
+}
+
+func TestDirectoryReadStaleDir(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/" + "testdir"
+		test.AssertNoErr(syscall.Mkdir(dir, 0777))
+
+		// The kernel uses the batch size of 25 when reading dentries of
+		// a directory, therefore, we should use a larger number to make
+		// sure not every file is read in the first readdirnames
+		const nFiles = 26
+
+		for i := 0; i < nFiles; i++ {
+			test.AssertNoErr(CreateSmallFile(
+				fmt.Sprintf("%s/f%d", dir, i), ""))
+			test.AssertNoErr(CreateSmallFile(
+				fmt.Sprintf("%s/g%d", dir, i), ""))
+		}
+
+		f, err := os.Open(dir)
+		test.AssertNoErr(err)
+		defer f.Close()
+
+		_, err = f.Readdirnames(1)
+		test.AssertNoErr(err)
+
+		for i := 0; i < nFiles; i++ {
+			test.AssertNoErr(
+				syscall.Unlink(fmt.Sprintf("%s/f%d", dir, i)))
+			test.AssertNoErr(syscall.Symlink(
+				fmt.Sprintf("%s/g%d", dir, i),
+				fmt.Sprintf("%s/f%d", dir, i)))
+		}
+		_, err = f.Readdirnames(100)
+		test.AssertNoErr(err)
+
+		for i := 0; i < nFiles; i++ {
+			_, err = os.Readlink(fmt.Sprintf("%s/f%d", dir, i))
+			test.AssertNoErr(err)
+			test.AssertNoErr(syscall.Unlink(
+				fmt.Sprintf("%s/f%d", dir, i)))
+		}
 	})
 }
