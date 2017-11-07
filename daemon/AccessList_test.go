@@ -685,3 +685,31 @@ func TestAccessListClear(t *testing.T) {
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
+
+func TestAccessListHardLinkLegs(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dirB := "/dirA/dirB"
+		fileA := "/dirA/fileA"
+		fileB := "/dirA/fileB"
+		fileC := "/dirA/dirB/fileC"
+		fileD := "/dirA/dirB/fileD"
+
+		test.AssertNoErr(os.MkdirAll(workspace+dirB, 0777))
+		test.MakeFile(workspace+fileA)
+		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileB))
+		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileC))
+		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileD))
+
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		expectedAccessList := quantumfs.NewPathsAccessed()
+		expectedAccessList.Paths[fileA] = quantumfs.PathRead
+		expectedAccessList.Paths[fileB] = quantumfs.PathRead
+		expectedAccessList.Paths[fileC] = quantumfs.PathRead
+		expectedAccessList.Paths[fileD] = quantumfs.PathRead
+
+		ioutil.ReadFile(workspace+fileD)
+
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+	})
+}
