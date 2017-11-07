@@ -119,6 +119,7 @@ func (wsdb *workspaceDB) reconnector() {
 
 		if conn != nil {
 			conn.Close()
+			conn = nil
 		}
 
 		err := fmt.Errorf("Not an error")
