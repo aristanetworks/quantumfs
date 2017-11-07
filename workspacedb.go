@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"runtime/debug"
 
+	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -15,7 +16,7 @@ import (
 // path, but different lifetimes. For example, if a workspace path were deleted and
 // then recreated, the old workspace and new workspace would have different
 // WorkspaceNonces and therefore be distinguishable.
-type WorkspaceNonce uint64
+type WorkspaceNonce wsdb.WorkspaceNonce
 
 type WorkspaceState struct {
 	RootId    ObjectKey
