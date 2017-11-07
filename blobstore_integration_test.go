@@ -23,7 +23,7 @@ type storeIntegrationTests struct {
 	bls blobstore.BlobStore
 }
 
-func checkSetupIntg(s *storeIntegrationTests) {
+func checkSetupInteg(s *storeIntegrationTests) {
 	if s.bls == nil {
 		s.T().Skip("Blobstore was not setup")
 	}
@@ -43,7 +43,7 @@ func (s *storeIntegrationTests) SetupSuite() {
 }
 
 func (s *storeIntegrationTests) SetupTest() {
-	checkSetupIntg(s)
+	checkSetupInteg(s)
 }
 
 func (s *storeIntegrationTests) TestInsert() {
@@ -154,7 +154,7 @@ func (s *storeIntegrationTests) TestMetadataUnknownKey() {
 	s.Require().Equal(blobstore.ErrKeyNotFound, verr.Code, "Invalid Error Code from Metadata")
 }
 
-func TestStoreIntg(t *testing.T) {
+func TestStoreInteg(t *testing.T) {
 	suite.Run(t, &storeIntegrationTests{})
 }
 

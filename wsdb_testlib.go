@@ -50,44 +50,24 @@ func (s *wsdbCommonUnitTest) TestEmptyDB() {
 	s.req.NoError(err1, "NumTypespaces failed: %s", err1)
 	s.req.Equal(1, tsCount, "Empty DB has incorrect count of typespaces")
 
-	tsIter.Reset()
-	nsIter.Reset()
-	wsIter.Reset()
-
 	tsList, err2 := s.wsdb.TypespaceList(unitTestEtherCtx)
 	s.req.NoError(err2, "TypespaceList failed: %s", err2)
 	s.req.Equal([]string{wsdb.NullSpaceName}, tsList,
 		"Empty DB has incorrect list of typespaces")
 
-	tsIter.Reset()
-	nsIter.Reset()
-	wsIter.Reset()
-
 	nsCount, err1 := s.wsdb.NumNamespaces(unitTestEtherCtx, wsdb.NullSpaceName)
 	s.req.NoError(err1, "NumNamespace failed: %s", err1)
 	s.req.Equal(1, nsCount, "Empty DB has incorrect count of namespaces")
-
-	tsIter.Reset()
-	nsIter.Reset()
-	wsIter.Reset()
 
 	nsList, err2 := s.wsdb.NamespaceList(unitTestEtherCtx, wsdb.NullSpaceName)
 	s.req.NoError(err2, "NamespaceList failed: %s", err2)
 	s.req.Equal([]string{wsdb.NullSpaceName}, nsList,
 		"Empty DB has incorrect list of namespaces")
 
-	tsIter.Reset()
-	nsIter.Reset()
-	wsIter.Reset()
-
 	wsCount, err3 := s.wsdb.NumWorkspaces(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName)
 	s.req.NoError(err3, "NumWorkspaces failed: %s", err3)
 	s.req.Equal(1, wsCount, "Empty DB has incorrect count of workspaces")
-
-	tsIter.Reset()
-	nsIter.Reset()
-	wsIter.Reset()
 
 	wsList, err4 := s.wsdb.WorkspaceList(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName)

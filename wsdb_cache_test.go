@@ -338,10 +338,6 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 	// inserted namespaces into cache with default age
 	suite.cache.enableCqlRefresh(unitTestEtherCtx, "remoteTS")
 
-	tsIter.Reset()
-	nsIter.Reset()
-	wsIter.Reset()
-
 	nsList, err2 := suite.common.wsdb.NamespaceList(unitTestEtherCtx, "remoteTS")
 	suite.Require().NoError(err2, "NamespaceList failed: %s", err2)
 	suite.Require().Contains(nsList, wsdb.NullSpaceName,
@@ -349,18 +345,10 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 	suite.Require().Contains(nsList, "remoteNS",
 		"Incorrect namespaces in cache")
 
-	tsIter.Reset()
-	nsIter.Reset()
-	wsIter.Reset()
-
 	wsCount, err3 := suite.common.wsdb.NumWorkspaces(unitTestEtherCtx, "remoteTS", "remoteNS")
 	suite.Require().NoError(err3, "NumWorkspaces failed: %s", err3)
 	suite.Require().Equal(1, wsCount,
 		"Incorrect number of workspaces in cache: %d", wsCount)
-
-	tsIter.Reset()
-	nsIter.Reset()
-	wsIter.Reset()
 
 	wsMap, err4 := suite.common.wsdb.WorkspaceList(unitTestEtherCtx, "remoteTS", "remoteNS")
 	suite.Require().NoError(err4, "WorkspaceList failed: %s", err4)
@@ -412,19 +400,11 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 	suite.cache.enableCqlRefresh(unitTestEtherCtx, "remoteTS")
 	suite.cache.enableCqlRefresh(unitTestEtherCtx, "remoteTS", "remoteNS")
 
-	tsIter.Reset()
-	nsIter.Reset()
-	wsIter.Reset()
-
 	wsCount, err2 := suite.common.wsdb.NumWorkspaces(unitTestEtherCtx, "remoteTS",
 		"remoteNS")
 	suite.Require().NoError(err2, "NumWorkspaces failed: %s", err2)
 	suite.Require().Equal(2, wsCount,
 		"Incorrect number of workspaces in cache: %d", wsCount)
-
-	tsIter.Reset()
-	nsIter.Reset()
-	wsIter.Reset()
 
 	// cache must now contain
 	// typespaces: remoteTS
