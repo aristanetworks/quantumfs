@@ -704,7 +704,6 @@ func TestAccessListHardLinkLegs(t *testing.T) {
 		expectedAccessList := quantumfs.NewPathsAccessed()
 		expectedAccessList.Paths[fileA] = quantumfs.PathRead
 		expectedAccessList.Paths[fileB] = quantumfs.PathRead
-		expectedAccessList.Paths[fileC] = quantumfs.PathRead
 
 		ioutil.ReadFile(workspace+fileB)
 
@@ -716,10 +715,18 @@ func TestAccessListHardLinkLegs(t *testing.T) {
 
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 
+		ioutil.ReadFile(workspace+fileD)
+		expectedAccessList.Paths[fileC] = quantumfs.PathRead
+		expectedAccessList.Paths[fileD] |= quantumfs.PathRead
+
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+
+if false {
 		test.AssertNoErr(os.Remove(workspace+fileC))
 		expectedAccessList.Paths[fileC] = quantumfs.PathRead |
 			quantumfs.PathDeleted
 
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+}
 	})
 }

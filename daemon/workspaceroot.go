@@ -812,7 +812,8 @@ func (wsr *WorkspaceRoot) markHardlinkAccessed(c *ctx, fileId quantumfs.FileId,
 func (wsr *WorkspaceRoot) markHardlinkPath(c *ctx, path string,
 	fileId quantumfs.FileId) {
 
-	defer c.FuncIn("WorkspaceRoot::markHardlinkPath", "%s", path).Out()
+	defer c.FuncIn("WorkspaceRoot::markHardlinkPath", "%s %d", path,
+		fileId).Out()
 	defer wsr.linkLock.Lock().Unlock()
 
 	list, exists := wsr.linkPaths[fileId]
