@@ -148,15 +148,6 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 }
 
 // Needs inode lock for write
-func (dir *Directory) addChild_(c *ctx, inode InodeId,
-	child quantumfs.DirectoryRecord) {
-
-	defer c.funcIn("Directory::addChild_").Out()
-	defer dir.childRecordLock.Lock().Unlock()
-	dir.children.loadChild(c, child, inode)
-}
-
-// Needs inode lock for write
 func (dir *Directory) delChild_(c *ctx,
 	name string) (toOrphan quantumfs.DirectoryRecord) {
 
@@ -635,7 +626,6 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.children.loadChild(c, entry, inodeNum)
 	}()
-	dir.updateSize_(c)
 
 	c.qfs.setInode(c, inodeNum, newEntity)
 	c.qfs.addUninstantiated(c, uninstantiated, inodeNum)
