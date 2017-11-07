@@ -369,9 +369,24 @@ func TestWorkspaceAccessAfterDeletion(t *testing.T) {
 		test.AssertNoErr(api.DeleteWorkspace(test.RelPath(workspace)))
 
 		test.WaitFor("File to no longer exist", func() bool {
-			var stat syscall.Stat_t
-			err := syscall.Stat(filename, &stat)
-			return err == nil
+			_, err := os.Stat(filename)
+			return os.IsNotExist(err)
 		})
+	})
+}
+
+func TestWorkspaceAttributeChange(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		var stat1 syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(workspace, &stat1))
+
+		test.AssertNoErr(syscall.Chmod(workspace, 0111))
+
+		var stat2 syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(workspace, &stat2))
+
+		test.Assert(stat1.Mode == stat2.Mode,
+			"WSR Permissions shouldn't have changed")
 	})
 }
