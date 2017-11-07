@@ -549,6 +549,10 @@ func (inode *InodeCommon) treeLock() *TreeLock {
 	return inode.treeLock_
 }
 
+func (inode *InodeCommon) generation() uint64 {
+	return 0
+}
+
 func (inode *InodeCommon) LockTree() *TreeLock {
 	inode.treeLock_.lock.Lock()
 	return inode.treeLock_
