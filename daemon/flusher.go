@@ -304,9 +304,7 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 	}
 
 	// consume any leftover triggers
-	for range dq.trigger {
-		trigger := <-dq.trigger
-
+	for trigger := range dq.trigger {
 		if trigger.finished != nil {
 			trigger.finished <- empty
 		}
