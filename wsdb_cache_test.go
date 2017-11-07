@@ -519,7 +519,9 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsMap, _ = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, "ts1", "ns1")
+		var err error
+		wsMap, err = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, "ts1", "ns1")
+		suite.Require().NoError(err, "WorkspaceList returned error for ts1/ns1: %v", err)
 	}()
 
 	// wait for fetch to stall
@@ -589,8 +591,10 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsMap, _ = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, wsdb.NullSpaceName,
+		var err error
+		wsMap, err = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, wsdb.NullSpaceName,
 			wsdb.NullSpaceName)
+		suite.Require().NoError(err, "WorkspaceList returned error for _/_/: %v", err)
 	}()
 
 	// wait for fetch to stall
@@ -652,8 +656,10 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsMap, _ = suite.common.wsdb.WorkspaceList(unitTestEtherCtx,
+		var err error
+		wsMap, err = suite.common.wsdb.WorkspaceList(unitTestEtherCtx,
 			wsdb.NullSpaceName, wsdb.NullSpaceName)
+		suite.Require().NoError(err, "WorkspaceList returned error for _/_/: %v", err)
 	}()
 
 	// wait for fetch to stall
@@ -734,7 +740,9 @@ func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsMap, _ = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, "ts2", "ns2")
+		var err error
+		wsMap, err = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, "ts2", "ns2")
+		suite.Require().NoError(err, "WorkspaceList returned error for ts2/ns2: %v", err)
 	}()
 
 	// wait for fetch to stall
@@ -787,7 +795,9 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsMap, _ = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, "ts", "parentNS")
+		var err error
+		wsMap, err = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, "ts", "parentNS")
+		suite.Require().NoError(err, "WorkspaceList returned error for ts/parentNS: %v", err)
 	}()
 
 	// wait for fetch to stall
@@ -838,8 +848,10 @@ func (suite *wsdbCacheTestSuite) TestCacheAncestorDeleteDuringRefresh() {
 	wsWg.Add(1)
 	go func() {
 		defer wsWg.Done()
-		wsMap, _ = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, "ts",
+		var err error
+		wsMap, err = suite.common.wsdb.WorkspaceList(unitTestEtherCtx, "ts",
 			"parentNS")
+		suite.Require().NoError(err, "WorkspaceList returned error for ts/parentNS: %v", err)
 	}()
 
 	// wait for fetch to stall
