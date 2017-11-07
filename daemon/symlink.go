@@ -6,6 +6,8 @@ package daemon
 // This file holds the Symlink type, which represents symlinks
 
 import (
+	"fmt"
+
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
@@ -31,10 +33,6 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	utils.Assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
 
 	if dirRecord != nil {
-		buf := c.dataStore.Get(&(c.Ctx), key)
-		pointedTo := buf.Get()
-		size := len(pointedTo)
-		dirRecord.SetSize(uint64(size))
 		dirRecord.SetPermissions(modeToPermissions(0777, 0))
 	}
 	return &symlink, nil
@@ -43,6 +41,9 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 type Symlink struct {
 	InodeCommon
 	key quantumfs.ObjectKey
+
+	// String to hold not-yet-flushed pointed to data, if len > 0
+	dirtyPointsTo string
 }
 
 func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
@@ -130,7 +131,15 @@ func (link *Symlink) Symlink(c *ctx, pointedTo string, linkName string,
 func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 	defer c.funcIn("Symlink::Readlink").Out()
 
+	defer link.Lock().Unlock()
+
 	link.self.markSelfAccessed(c, quantumfs.PathRead)
+
+	// If we have an unflushed pointsTo, then use it
+	if link.dirtyPointsTo != "" {
+		return []byte(link.dirtyPointsTo), fuse.OK
+	}
+
 	data := c.dataStore.Get(&c.Ctx, link.key)
 	if data == nil {
 		return nil, fuse.EIO
@@ -202,9 +211,41 @@ func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeI
 
 func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.funcIn("Symlink::flush").Out()
+
 	link.parentSyncChild(c, func() (quantumfs.ObjectKey, quantumfs.ObjectType) {
+		if link.dirtyPointsTo == "" {
+			// use existing key
+			return link.key, quantumfs.ObjectTypeSymlink
+		}
+
+		buf := newBuffer(c, []byte(link.dirtyPointsTo),
+			quantumfs.KeyTypeMetadata)
+
+		key, err := buf.Key(&c.Ctx)
+		if err != nil {
+			panic(fmt.Sprintf("Failed to upload block: %v", err))
+		}
+		link.key = key
+
+		link.dirtyPointsTo = ""
+
 		return link.key, quantumfs.ObjectTypeSymlink
 	})
 
 	return link.key
+}
+
+func (link *Symlink) setLink(c *ctx, pointTo string) {
+	defer c.FuncIn("Symlink::setLink", "%s", pointTo).Out()
+
+	defer link.Lock().Unlock()
+
+	link.dirtyPointsTo = pointTo
+
+	// queue the symlink in the dirty queue at the front, regardless of
+	// whether it's already in the queue to ensure it's flushed before its
+	// parent, thus ensuring a consistent uploaded metadata tree
+	defer c.qfs.flusher.lock.Lock().Unlock()
+	c.vlog("Queueing symlink %d on dirty list at the front", link.id)
+	link.dirtyElement__ = c.qfs.queueDirtyInodeNow_(c, link.self)
 }
