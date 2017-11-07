@@ -30,6 +30,7 @@ func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
 	requestCtx := &ctx{
 		Ctx: quantumfs.Ctx{
 			Qlog:      c.Qlog,
+			Prefix:    c.Prefix,
 			RequestId: reqId,
 		},
 		qfs:         c.qfs,
@@ -74,20 +75,19 @@ func (c *ctx) forgetCtx() *ctx {
 
 // local daemon package specific log wrappers
 func (c *ctx) elog(format string, args ...interface{}) {
-	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 0, "ERROR: "+format,
-		args...)
+	c.Ctx.Elog(qlog.LogDaemon, format, args...)
 }
 
 func (c *ctx) wlog(format string, args ...interface{}) {
-	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 1, format, args...)
+	c.Ctx.Wlog(qlog.LogDaemon, format, args...)
 }
 
 func (c *ctx) dlog(format string, args ...interface{}) {
-	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 2, format, args...)
+	c.Ctx.Dlog(qlog.LogDaemon, format, args...)
 }
 
 func (c *ctx) vlog(format string, args ...interface{}) {
-	c.Qlog.Log(qlog.LogDaemon, uint64(c.RequestId), 3, format, args...)
+	c.Ctx.Vlog(qlog.LogDaemon, format, args...)
 }
 
 func (c *ctx) funcIn(funcName string) quantumfs.ExitFuncLog {
