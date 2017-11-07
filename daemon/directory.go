@@ -1129,6 +1129,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	overwrittenInodeId := dst.childInodeNum(newName)
 	overwrittenInode := c.qfs.inodeNoInstantiate(c, overwrittenInodeId)
 
+	if childInode != nil {
+		childInode.parentCheckLinkReparent(c, dir)
+	}
+	if overwrittenInode != nil {
+		overwrittenInode.parentCheckLinkReparent(c, dst)
+	}
+
 	if childInode != nil && overwrittenInode != nil {
 		firstChild, lastChild := getLockOrder(childInode, overwrittenInode)
 		defer firstChild.getParentLock().Lock().Unlock()
