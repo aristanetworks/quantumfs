@@ -142,6 +142,12 @@ func (th *TestHelper) EndTest() {
 	exception := recover()
 
 	defer th.ShutdownLogger()
+	defer func() {
+		if th.qfs != nil {
+			close(th.qfs.toBeReleased)
+		}
+	}()
+
 	th.finishApi()
 	th.putApi()
 
@@ -245,7 +251,7 @@ func (th *TestHelper) defaultConfig() QuantumFsConfig {
 // StartDefaultQuantumFs start the qfs daemon with default config.
 func (th *TestHelper) StartDefaultQuantumFs(startChan chan struct{}) {
 	config := th.defaultConfig()
-	th.startQuantumFs(config, startChan)
+	th.startQuantumFs(config, startChan, false)
 }
 
 // If the filesystem panics, abort it and unmount it to prevent the test binary from
@@ -285,7 +291,7 @@ func (th *TestHelper) serveSafely(qfs *QuantumFs, startChan chan<- struct{}) {
 }
 
 func (th *TestHelper) startQuantumFs(config QuantumFsConfig,
-	startChan chan struct{}) {
+	startChan chan struct{}, logPrefix bool) {
 
 	if err := utils.MkdirAll(config.CachePath, 0777); err != nil {
 		th.T.Fatalf("Unable to setup test ramfs path")
@@ -299,6 +305,10 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig,
 
 		th.Log("Instantiating quantumfs instance %d...", instanceNum)
 		qfs = NewQuantumFsLogs(config, th.Logger)
+		if logPrefix {
+			qfs.c.Ctx.Prefix = fmt.Sprintf("[%d]: ", instanceNum)
+		}
+		qfs.syncAllRetries = 5
 		th.qfsInstances = append(th.qfsInstances, qfs)
 	}()
 
@@ -363,7 +373,7 @@ func (th *TestHelper) RestartQuantumFs() error {
 		return err
 	}
 	th.fuseConnections = nil
-	th.startQuantumFs(config, nil)
+	th.startQuantumFs(config, nil, false)
 	return nil
 }
 
@@ -504,6 +514,14 @@ func (th *TestHelper) SyncAllWorkspaces() {
 
 func (th *TestHelper) SyncWorkspace(workspace string) {
 	th.AssertNoErr(th.getApi().SyncWorkspace(workspace))
+}
+
+func (th *TestHelper) SyncWorkspaceAsync(workspace string) chan error {
+	chanErr := make(chan error)
+	go func() {
+		chanErr <- th.getApi().SyncWorkspace(workspace)
+	}()
+	return chanErr
 }
 
 func (th *TestHelper) GetWorkspaceDB() quantumfs.WorkspaceDB {

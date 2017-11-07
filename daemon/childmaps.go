@@ -252,21 +252,19 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 	return result
 }
 
-func (cmap *ChildMap) renameChild(c *ctx, oldName string,
-	newName string) (oldId InodeId, oldRecord quantumfs.DirectoryRecord) {
-
+func (cmap *ChildMap) renameChild(c *ctx, oldName string, newName string) {
 	defer c.FuncIn("ChildMap::renameChild", "oldName %s newName %s", oldName,
 		newName).Out()
 
 	if oldName == newName {
 		c.vlog("Names are identical")
-		return quantumfs.InodeIdInvalid, nil
+		return
 	}
 
 	inodeId, exists := cmap.children[oldName]
 	if !exists {
 		c.vlog("oldName doesn't exist")
-		return quantumfs.InodeIdInvalid, nil
+		return
 	}
 
 	record := cmap.getRecord(c, inodeId, oldName)
@@ -277,12 +275,12 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 
 	// record whether we need to cleanup a file we're overwriting
 	cleanupInodeId, needCleanup := cmap.children[newName]
-	var cleanupRecord quantumfs.DirectoryRecord
 	if needCleanup {
 		// we have to cleanup before we move, to allow the case where we
 		// rename a hardlink to an existing one with the same inode
-		cleanupRecord = cmap.delRecord(cleanupInodeId, newName)
+		cmap.delRecord(cleanupInodeId, newName)
 		delete(cmap.children, newName)
+		c.vlog("cleanupInodeId %d", cleanupInodeId)
 	}
 
 	delete(cmap.children, oldName)
@@ -293,13 +291,6 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string,
 	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
 		hardlink.creationTime = quantumfs.NewTime(time.Now())
 	}
-
-	if needCleanup {
-		c.vlog("cleanupInodeId %d", cleanupInodeId)
-		return cleanupInodeId, cleanupRecord
-	}
-
-	return quantumfs.InodeIdInvalid, nil
 }
 
 func (cmap *ChildMap) inodeNum(name string) InodeId {

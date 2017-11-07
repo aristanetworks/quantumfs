@@ -596,17 +596,7 @@ func (api *ApiHandle) refreshWorkspace(c *ctx, buf []byte) int {
 	}
 	c.vlog("Refreshing workspace %s", cmd.Workspace)
 
-	workspace := strings.Split(cmd.Workspace, "/")
-	wsr, cleanup, ok := c.qfs.getWorkspaceRoot(c, workspace[0],
-		workspace[1], workspace[2])
-	defer cleanup()
-	if !ok {
-		c.vlog("Workspace not found: %s", cmd.Workspace)
-		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"Workspace %s does not exist or is not active",
-			cmd.Workspace)
-	}
-	wsr.refresh(c)
+	c.qfs.refreshWorkspace(c, cmd.Workspace)
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Refresh Succeeded")
 }
@@ -804,8 +794,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	parent := p.(*Directory)
 	target := dst[len(dst)-1]
 
-	defer parent.Lock().Unlock()
-	if record := parent.children.recordByName(c, target); record != nil {
+	if parent.childExists(c, target) == fuse.Status(syscall.EEXIST) {
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"Inode %s should not exist", target)
 	}
@@ -813,9 +802,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	c.vlog("Api::insertInode put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
 
-	parent.duplicateInode_(c, target, permissions, 0, 0, size,
-		quantumfs.UID(uid), quantumfs.GID(gid), type_, key)
+	func() {
+		defer parent.Lock().Unlock()
+		parent.duplicateInode_(c, target, permissions, 0, 0, size,
+			quantumfs.UID(uid), quantumfs.GID(gid), type_, key)
+	}()
 
+	parent.updateSize(c, fuse.OK)
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Insert Inode Succeeded")
 }
 
