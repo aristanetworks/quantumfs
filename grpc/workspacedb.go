@@ -99,6 +99,8 @@ type workspaceDB struct {
 
 // Run in a separate goroutine to trigger reconnection when the connection has failed
 func (wsdb *workspaceDB) reconnector() {
+	var conn *grpc.ClientConn
+
 	for {
 		// Wait for a notification
 		<-wsdb.triggerReconnect
@@ -115,7 +117,10 @@ func (wsdb *workspaceDB) reconnector() {
 			}),
 		}
 
-		var conn *grpc.ClientConn
+		if conn != nil {
+			conn.Close()
+			conn = nil
+		}
 
 		err := fmt.Errorf("Not an error")
 		for err != nil {

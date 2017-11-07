@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -42,6 +43,7 @@ type Directory struct {
 	// held.
 	childRecordLock utils.DeferableMutex
 	children        *ChildMap
+	_generation     uint64
 }
 
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
@@ -117,6 +119,10 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	return &dir, uninstantiated
 }
 
+func (dir *Directory) generation() uint64 {
+	return atomic.LoadUint64(&dir._generation)
+}
+
 func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	defer c.funcIn("Directory::updateSize").Out()
 
@@ -127,6 +133,7 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	}
 	// We think we've made a change to this directory, so we should mark it dirty
 	dir.self.dirty(c)
+	atomic.AddUint64(&dir._generation, 1)
 
 	// The parent of a WorkspaceRoot is a workspacelist and we have nothing to
 	// update.
@@ -915,16 +922,24 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return result
 		}
 
-		buf := newBuffer(c, []byte(pointedTo), quantumfs.KeyTypeMetadata)
-		key, err := buf.Key(&c.Ctx)
-		if err != nil {
-			c.elog("Failed to upload block: %v", err)
-			return fuse.EIO
-		}
+		inode := dir.create_(c, name, 0777, 0777, 0, newSymlink,
+			quantumfs.ObjectTypeSymlink, quantumfs.EmptyBlockKey, out)
 
-		dir.create_(c, name, 0777, 0777, 0, newSymlink,
-			quantumfs.ObjectTypeSymlink, key, out)
-		c.vlog("Created new symlink with key: %s", key.String())
+		link := inode.(*Symlink)
+
+		// Set the symlink link data
+		link.setLink(c, pointedTo)
+		func() {
+			defer dir.childRecordLock.Lock().Unlock()
+
+			// Update the record's size
+			record := dir.children.record(inode.inodeNum())
+			record.SetSize(uint64(len(pointedTo)))
+		}()
+
+		// Update the outgoing entry size
+		out.Attr.Size = uint64(len(pointedTo))
+
 		return fuse.OK
 	}()
 
@@ -1114,6 +1129,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	overwrittenInodeId := dst.childInodeNum(newName)
 	overwrittenInode := c.qfs.inodeNoInstantiate(c, overwrittenInodeId)
 
+	if childInode != nil {
+		childInode.parentCheckLinkReparent(c, dir)
+	}
+	if overwrittenInode != nil {
+		overwrittenInode.parentCheckLinkReparent(c, dst)
+	}
+
 	if childInode != nil && overwrittenInode != nil {
 		firstChild, lastChild := getLockOrder(childInode, overwrittenInode)
 		defer firstChild.getParentLock().Lock().Unlock()
@@ -1195,7 +1217,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.deleteChild(c, oldName, true)
+		dir.children.deleteChild(c, oldName, false)
 	}()
 
 	// This is the same entry just moved, so we can use the same
@@ -1754,6 +1776,7 @@ type directorySnapshotSource interface {
 	getChildSnapshot(c *ctx) []directoryContents
 	inodeNum() InodeId
 	treeLock() *TreeLock
+	generation() uint64
 }
 
 func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapshot {
@@ -1766,7 +1789,8 @@ func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapsho
 			inodeNum:  src.inodeNum(),
 			treeLock_: src.treeLock(),
 		},
-		src: src,
+		_generation: src.generation(),
+		src:         src,
 	}
 
 	utils.Assert(ds.treeLock() != nil, "directorySnapshot treeLock nil at init")
@@ -1776,8 +1800,9 @@ func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapsho
 
 type directorySnapshot struct {
 	FileHandleCommon
-	children []directoryContents
-	src      directorySnapshotSource
+	children    []directoryContents
+	_generation uint64
+	src         directorySnapshotSource
 }
 
 func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
@@ -1808,7 +1833,11 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 
 		details.NodeId = child.attr.Ino
 		c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
-		fillEntryOutCacheData(c, details)
+		if ds._generation == ds.src.generation() {
+			fillEntryOutCacheData(c, details)
+		} else {
+			clearEntryOutCacheData(c, details)
+		}
 		details.Attr = child.attr
 
 		processed++
