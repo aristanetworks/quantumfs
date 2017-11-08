@@ -25,23 +25,34 @@ type copyItem struct {
 	fileinfo           os.FileInfo
 }
 
+var overwriteDst = false
+
 // Use InsertInode to copy a directory tree from one workspace to another, possibly
 // at different paths.
 func cp() {
-	if flag.NArg() != 3 {
+	if flag.NArg() < 3 {
 		fmt.Println("Too few arguments to cp")
 		os.Exit(exitBadArgs)
 	}
 
-	srcRoot, err := filepath.Abs(flag.Arg(1))
-	if err != nil {
-		panic(fmt.Sprintf("Error making src absolute: %s/%v\n", flag.Arg(1),
-			err))
+	src := flag.Arg(1)
+	dst := flag.Arg(2)
+	if flag.NArg() == 4 {
+		if flag.Arg(1) == "-o" {
+			overwriteDst = true
+		}
+
+		src = flag.Arg(2)
+		dst = flag.Arg(3)
 	}
-	dstRoot, err := filepath.Abs(flag.Arg(2))
+
+	srcRoot, err := filepath.Abs(src)
 	if err != nil {
-		panic(fmt.Sprintf("Error making dst absolute: %s/%v\n", flag.Arg(2),
-			err))
+		panic(fmt.Sprintf("Error making src absolute: %s/%v\n", src, err))
+	}
+	dstRoot, err := filepath.Abs(dst)
+	if err != nil {
+		panic(fmt.Sprintf("Error making dst absolute: %s/%v\n", dst, err))
 	}
 
 	// Find the workspace name of the destination
@@ -157,6 +168,16 @@ func insertPaths(jobs chan copyItem, wg *sync.WaitGroup) {
 			quantumfs.ExtendedKeyLength)
 		if err != nil {
 			panic(fmt.Sprintf("LGetXattr error on %s: %v\n", src, err))
+		}
+
+		if overwriteDst {
+			// Speculatively unlink the destination, if we fail to unlink
+			// then InsertInode() below will fail if the failure is
+			// fatal, such as we didn't have permission to unlink the
+			// file which exists these, but will succeed if the failure
+			// can be ignored, such as the destination file didn't exist
+			// at all.
+			os.Remove(rootPrefix + dst)
 		}
 
 		err = api.InsertInode(workspacePrefix+dst, string(key), stat.Mode,
