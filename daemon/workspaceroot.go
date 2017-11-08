@@ -792,11 +792,10 @@ func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 	c.vlog("WorkspaceRoot::markSelfAccessed doing nothing")
 }
 
-func (wsr *WorkspaceRoot) getList() quantumfs.PathsAccessed {
+func (wsr *WorkspaceRoot) getList(c *ctx) quantumfs.PathsAccessed {
 	defer wsr.linkLock.Lock().Unlock()
 
-	_, list := wsr.accessList.generate(wsr.hardlinks)
-	return list
+	return wsr.accessList.generate(c, wsr.hardlinks)
 }
 
 func (wsr *WorkspaceRoot) clearList() {
