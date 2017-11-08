@@ -185,4 +185,10 @@ type WorkspaceDB interface {
 	//  	remotely so the local instance is out of date
 	AdvanceWorkspace(c ether.Ctx, typespace string, namespace string, workspace string,
 		nonce WorkspaceNonce, currentRootID ObjectKey, newRootID ObjectKey) (ObjectKey, error)
+
+	SetWorkspaceImmutable(c ether.Ctx, typespace string, namespace string,
+		workspace string) error
+
+	WorkspaceIsImmutable(c ether.Ctx, typespace string, namespace string,
+		workspace string) (bool, error)
 }
