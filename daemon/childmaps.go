@@ -88,7 +88,7 @@ func (cmap *ChildMap) setRecord(c *ctx, inodeId InodeId,
 
 	// Build the hardlink path list if we just set a hardlink record
 	if record.Type() == quantumfs.ObjectTypeHardlink {
-		cmap.dir.markHardlinkPath(c, record.Filename(), record.FileId())
+		cmap.dir.self.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
 }
 

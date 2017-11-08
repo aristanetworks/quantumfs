@@ -1754,7 +1754,7 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 	defer dir.InodeCommon.parentLock.RLock().RUnlock()
 	parent := dir.InodeCommon.parent_(c)
 	parentDir := asDirectory(parent)
-	parentDir.markHardlinkPath(c, path, fileId)
+	parentDir.self.markHardlinkPath(c, path, fileId)
 }
 
 func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
