@@ -1,4 +1,5 @@
 COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb
+COMMANDS386=qfs-386 qparse-386
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
 PKGS_TO_TEST+=quantumfs/thirdparty_backends quantumfs/systemlocal
 PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
@@ -21,12 +22,12 @@ version := $(shell git describe --dirty --match "v[0-9]*" 2>/dev/null || echo "v
 RPM_VERSION := $(shell echo "$(version)" | sed -e "s/^v//" -e "s/-/_/g")
 RPM_RELEASE := 1
 
-.PHONY: all vet $(COMMANDS) $(PKGS_TO_TEST)
+.PHONY: all vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST)
 
-all: lockcheck cppstyle vet $(COMMANDS) $(PKGS_TO_TEST) wsdbservice qfsclient
+all: lockcheck cppstyle vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) wsdbservice qfsclient
 
 clean:
-	rm -f $(COMMANDS) qfs-386 quantumfsd-static *.rpm
+	rm -f $(COMMANDS) $(COMMANDS386) quantumfsd-static *.rpm
 
 fetch:
 	go get -u google.golang.org/grpc
@@ -65,8 +66,8 @@ $(COMMANDS): encoding/metadata.capnp.go
 quantumfsd-static: quantumfsd
 	go build -gcflags '-e' -o quantumfsd-static -ldflags "-X main.version=$(version) -extldflags -static" github.com/aristanetworks/quantumfs/cmd/quantumfsd
 
-qfs-386: qfs
-	GOARCH=386 go build -gcflags '-e' -o qfs-386 -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/qfs
+$(COMMANDS386): encoding/metadata.capnp.go
+	GOARCH=386 go build -gcflags '-e' -o $@ -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$(subst -386,,$@)
 
 wsdbservice:
 	go build -gcflags '-e' -o cmd/wsdbservice/wsdbservice -ldflags "-X main.version=$(version) -extldflags -static" github.com/aristanetworks/quantumfs/cmd/wsdbservice
