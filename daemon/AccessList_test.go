@@ -724,3 +724,35 @@ func TestAccessListHardLinkLegs(t *testing.T) {
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
+
+func TestAccessListHardLinkRename(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		fileA := "/fileA"
+		fileB := "/fileB"
+		fileC := "/fileC"
+
+		test.MakeFile(workspace + fileA)
+		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileB))
+
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		expectedAccessList := quantumfs.NewPathsAccessed()
+		expectedAccessList.Paths[fileB] = quantumfs.PathDeleted
+		expectedAccessList.Paths[fileC] = quantumfs.PathCreated
+
+		test.AssertNoErr(os.Rename(workspace+fileB, workspace+fileC))
+
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+
+		ioutil.ReadFile(workspace + fileA)
+
+		expectedAccessList.Paths[fileA] = quantumfs.PathRead
+		// TODO: after BUG229575, fileB should not longer be in the list
+		expectedAccessList.Paths[fileB] = quantumfs.PathRead |
+			quantumfs.PathDeleted
+		expectedAccessList.Paths[fileC] = quantumfs.PathRead |
+			quantumfs.PathCreated
+
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+	})
+}
