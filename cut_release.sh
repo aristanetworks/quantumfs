@@ -23,4 +23,4 @@ gut sync
 
 git tag -a $version
 make clean
-make rpm
+TIMEOUT_SEC=1800 make rpm
