@@ -21,10 +21,10 @@ func NewAccessList() *accessList {
 	}
 }
 
-// Note: We need a useless boolean return here to split this function into two lines
-func (al *accessList) generate(hardlinks map[quantumfs.FileId]linkEntry) (a bool,
-	list quantumfs.PathsAccessed) {
+func (al *accessList) generate(c *ctx,
+	hardlinks map[quantumfs.FileId]linkEntry) quantumfs.PathsAccessed {
 
+	defer c.funcIn("accessList::generate").Out()
 	defer al.lock.Lock().Unlock()
 
 	// make a copy of the regular files map first
@@ -36,15 +36,17 @@ func (al *accessList) generate(hardlinks map[quantumfs.FileId]linkEntry) (a bool
 	for k, v := range al.hardlinks {
 		hardlink := hardlinks[k]
 		for _, path := range hardlink.paths {
+			path = "/" + path
+
 			if current, exists := rtn[path]; exists {
-				rtn["/" + path] = current | v
+				rtn[path] = current | v
 			} else {
-				rtn["/" + path] = v
+				rtn[path] = v
 			}
 		}
 	}
 
-	return false, quantumfs.PathsAccessed {
+	return quantumfs.PathsAccessed {
 		Paths:	rtn,
 	}
 }
