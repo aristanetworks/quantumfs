@@ -58,10 +58,8 @@ func main() {
 
 	walkFlags = flag.NewFlagSet("Walker daemon", flag.ExitOnError)
 
-	etherCfg := walkFlags.String("ether", "",
-		"datastore config file")
-	wsdbCfg := walkFlags.String("wsdb", "",
-		"hostname for workspaceDB service")
+	etherCfg := walkFlags.String("cfg", "",
+		"datastore and workspacedb config file")
 	logdir := walkFlags.String("logdir", "", "dir for logging")
 	influxServer := walkFlags.String("influxServer", "", "influxdb server's IP")
 	influxPort := walkFlags.Uint("influxPort", 0, "influxdb server's port")
@@ -87,7 +85,7 @@ func main() {
 		os.Exit(exitBadConfig)
 	}
 
-	if *etherCfg == "" || *wsdbCfg == "" {
+	if *etherCfg == "" {
 		walkFlags.Usage()
 		os.Exit(exitBadConfig)
 	}
@@ -102,7 +100,7 @@ func main() {
 	}
 
 	c := getWalkerDaemonContext(*influxServer, uint16(*influxPort), *influxDBName,
-		*etherCfg, *wsdbCfg, *logdir, *numWalkers)
+		*etherCfg, *logdir, *numWalkers)
 
 	// Start heart beat messaging.
 	timer := time.Tick(heartBeatInterval)
