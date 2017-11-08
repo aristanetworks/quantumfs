@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 package daemon
@@ -33,15 +33,15 @@ func (al *accessList) generate(c *ctx,
 		rtn["/"+k] = v
 	}
 
-	for k, v := range al.hardlinks {
-		hardlink := hardlinks[k]
+	for fileId, pathFlags := range al.hardlinks {
+		hardlink := hardlinks[fileId]
 		for _, path := range hardlink.paths {
 			path = "/" + path
 
 			if current, exists := rtn[path]; exists {
-				rtn[path] = current | v
+				rtn[path] = current | pathFlags
 			} else {
-				rtn[path] = v
+				rtn[path] = pathFlags
 			}
 		}
 	}
@@ -53,6 +53,8 @@ func (al *accessList) generate(c *ctx,
 
 func (al *accessList) markHardlinkAccessed(c *ctx, fileId quantumfs.FileId,
 	op quantumfs.PathFlags) {
+
+	defer c.funcIn("accessList::markHardlinkAccessed").Out()
 
 	utils.Assert(!utils.BitFlagsSet(uint(op),
 		quantumfs.PathCreated|quantumfs.PathDeleted),
@@ -73,13 +75,15 @@ func (al *accessList) markHardlinkAccessed(c *ctx, fileId quantumfs.FileId,
 	}
 
 	newFlags, deleteEntry := updatePathFlags(c, pathFlags, op)
-	// TODO: Perhaps support hardlink deletion at some point
+	// TODO: Perhaps support hardlink deletion at some point (BUG229575)
 	if !deleteEntry {
 		al.hardlinks[fileId] = newFlags
 	}
 }
 
 func (al *accessList) markAccessed(c *ctx, path string, op quantumfs.PathFlags) {
+
+	defer c.funcIn("accessList::markAccessed").Out()
 
 	utils.Assert(!utils.BitFlagsSet(uint(op),
 		quantumfs.PathCreated|quantumfs.PathDeleted),
@@ -95,6 +99,7 @@ func (al *accessList) markAccessed(c *ctx, path string, op quantumfs.PathFlags) 
 	}
 
 	newFlags, deleteEntry := updatePathFlags(c, pathFlags, op)
+	c.vlog("updatePathFlags result %d %d %v", pathFlags, newFlags, deleteEntry)
 	if deleteEntry {
 		delete(al.paths, path)
 	} else {
@@ -112,7 +117,7 @@ func (al *accessList) clear() {
 func updatePathFlags(c *ctx, pathFlags quantumfs.PathFlags,
 	op quantumfs.PathFlags) (newFlags quantumfs.PathFlags, deleteEntry bool) {
 
-	c.vlog("Updating existing entry: %x", pathFlags)
+	defer c.FuncIn("accesslist::updatePathFlags", "%x", pathFlags).Out()
 
 	pathFlags |= op & (quantumfs.PathRead | quantumfs.PathUpdated)
 
@@ -152,5 +157,4 @@ func updatePathFlags(c *ctx, pathFlags quantumfs.PathFlags,
 	}
 
 	return pathFlags, false
-	//wsr.accessList.Paths[path] = pathFlags
 }
