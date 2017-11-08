@@ -1208,7 +1208,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	func() {
 		defer dst.childRecordLock.Lock().Unlock()
 		dst.orphanChild_(c, newName, overwrittenInode)
-		dst.insertEntry_(c, newEntry, childInodeId, childInode)
+		dst.children.loadChild(c, newEntry, childInodeId)
+
+		// being inserted means you're dirty and need to be synced
+		if childInode != nil {
+			childInode.dirty(c)
+		}
+		dst.self.dirty(c)
 	}()
 
 	func() {
