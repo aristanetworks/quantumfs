@@ -26,8 +26,7 @@ type WorkspaceRoot struct {
 	publishedRootId quantumfs.ObjectKey
 	nonce           quantumfs.WorkspaceNonce
 
-	listLock   utils.DeferableMutex
-	accessList quantumfs.PathsAccessed
+	accessList	*accessList
 
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
 	// tree.
@@ -37,13 +36,13 @@ type WorkspaceRoot struct {
 	linkLock    utils.DeferableRwMutex
 	hardlinks   map[quantumfs.FileId]linkEntry
 	inodeToLink map[InodeId]quantumfs.FileId
-	linkPaths   map[quantumfs.FileId][]string
 }
 
 type linkEntry struct {
 	record  *quantumfs.DirectRecord
 	nlink   uint32
 	inodeId InodeId
+	paths	[]string
 }
 
 func newLinkEntry(record_ *quantumfs.DirectRecord) linkEntry {
@@ -96,7 +95,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.workspace = workspace
 	wsr.publishedRootId = rootId
 	wsr.nonce = nonce
-	wsr.accessList = quantumfs.NewPathsAccessed()
+	wsr.accessList = NewAccessList()
 
 	treeLock := TreeLock{lock: &wsr.realTreeLock,
 		name: typespace + "/" + namespace + "/" + workspace}
@@ -107,7 +106,6 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 		wsr.hardlinks = loadHardlinks(c,
 			workspaceRoot.HardlinkEntry())
 		wsr.inodeToLink = make(map[InodeId]quantumfs.FileId)
-		wsr.linkPaths = make(map[quantumfs.FileId][]string)
 	}()
 	uninstantiated := initDirectory(c, workspace, &wsr.Directory, &wsr,
 		workspaceRoot.BaseLayer(), inodeNum, parent.inodeNum(),
@@ -753,12 +751,7 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, op quantumfs.PathFla
 	defer c.FuncIn("WorkspaceRoot::markAccessed",
 		"path %s CRUD %x", path, op).Out()
 
-	utils.Assert(!utils.BitFlagsSet(uint(op),
-		quantumfs.PathCreated|quantumfs.PathDeleted),
-		"Cannot create and delete simultaneously")
-
-	defer wsr.listLock.Lock().Unlock()
-	wsr.markAccessed_(c, path, op)
+	wsr.accessList.markAccessed(c, path, op)
 }
 
 func (wsr *WorkspaceRoot) markHardlinkAccessed(c *ctx, fileId quantumfs.FileId,
@@ -767,24 +760,7 @@ func (wsr *WorkspaceRoot) markHardlinkAccessed(c *ctx, fileId quantumfs.FileId,
 	defer c.FuncIn("WorkspaceRoot::markHardlinkAccessed",
 		"fileId %d CRUD %x", fileId, op).Out()
 
-	utils.Assert(!utils.BitFlagsSet(uint(op),
-		quantumfs.PathCreated|quantumfs.PathDeleted),
-		"Cannot create and delete simultaneously")
-
-	paths := func () []string {
-		defer wsr.linkLock.Lock().Unlock()
-		rtn, exists := wsr.linkPaths[fileId]
-		
-		utils.Assert(exists, "markHardlinkAccessed link has no paths, %d",
-			fileId)
-
-		return rtn
-	} ()
-
-	defer wsr.listLock.Lock().Unlock()
-	for _, path := range paths {
-		wsr.markAccessed_(c, path, op)
-	}
+	wsr.accessList.markHardlinkAccessed(c, fileId, op)
 }
 
 func (wsr *WorkspaceRoot) markHardlinkPath(c *ctx, path string,
@@ -794,9 +770,10 @@ func (wsr *WorkspaceRoot) markHardlinkPath(c *ctx, path string,
 		fileId).Out()
 	defer wsr.linkLock.Lock().Unlock()
 
-	list, exists := wsr.linkPaths[fileId]
-	if !exists {
-		list = make([]string, 0)
+	list := make([]string, 0)
+	link, exists := wsr.hardlinks[fileId]
+	if exists {
+		list = link.paths
 	}
 
 	// ensure there are no duplicates (like from renames, etc)
@@ -807,63 +784,8 @@ func (wsr *WorkspaceRoot) markHardlinkPath(c *ctx, path string,
 		}
 	}
 
-	list = append(list, path)
-	wsr.linkPaths[fileId] = list
-}
-
-func (wsr *WorkspaceRoot) markAccessed_(c *ctx, path string,
-	op quantumfs.PathFlags) {
-
-	path = "/" + path
-	pathFlags, exists := wsr.accessList.Paths[path]
-	if !exists {
-		c.vlog("Creating new entry")
-		wsr.accessList.Paths[path] = op
-		return
-
-	}
-
-	c.vlog("Updating existing entry: %x", pathFlags)
-
-	pathFlags |= op & (quantumfs.PathRead | quantumfs.PathUpdated)
-
-	if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathCreated) &&
-		utils.BitFlagsSet(uint(op), quantumfs.PathDeleted) {
-
-		// Entries which were created and are then subsequently
-		// deleted are removed from the accessed list under the
-		// assumption they are temporary files and of no interest.
-		c.vlog("Nullifying entry")
-		delete(wsr.accessList.Paths, path)
-		return
-	} else if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathDeleted) &&
-		utils.BitFlagsSet(uint(op), quantumfs.PathCreated) {
-
-		if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathIsDir) {
-			// Directories which are deleted and then recreated are not
-			// recorded as either created or deleted. However, if it was
-			// read, that is maintained.
-			if utils.BitFlagsSet(uint(pathFlags), quantumfs.PathRead) {
-				c.vlog("Keeping delete->create directory as read")
-				pathFlags = pathFlags &^ quantumfs.PathDeleted
-			} else {
-				c.vlog("Unmarking directory with delete->create")
-				delete(wsr.accessList.Paths, path)
-				return
-			}
-		} else {
-			// Files which are deleted then recreated are recorded as
-			// being neither deleted nor created, but instead truncated
-			// (updated). This simplifies the case where some program
-			// unlinked and then created/moved a file into place.
-			c.vlog("Removing deleted from recreated file")
-			pathFlags = quantumfs.PathUpdated
-		}
-	} else {
-		// Here we only have a delete or create and simply record them.
-		pathFlags |= op & (quantumfs.PathCreated | quantumfs.PathDeleted)
-	}
-	wsr.accessList.Paths[path] = pathFlags
+	link.paths = append(link.paths, path)
+	wsr.hardlinks[fileId] = link
 }
 
 func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
@@ -871,13 +793,14 @@ func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 }
 
 func (wsr *WorkspaceRoot) getList() quantumfs.PathsAccessed {
-	defer wsr.listLock.Lock().Unlock()
-	return wsr.accessList
+	defer wsr.linkLock.Lock().Unlock()
+
+	_, list := wsr.accessList.generate(wsr.hardlinks)
+	return list
 }
 
 func (wsr *WorkspaceRoot) clearList() {
-	defer wsr.listLock.Lock().Unlock()
-	wsr.accessList = quantumfs.NewPathsAccessed()
+	wsr.accessList.clear()
 }
 
 func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
