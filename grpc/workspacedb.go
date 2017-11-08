@@ -5,6 +5,7 @@ package grpc
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -167,6 +168,18 @@ func (wsdb *workspaceDB) reconnect() {
 }
 
 func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
+	defer func() {
+		exception := recover()
+		if exception != nil {
+			// Log
+			stackTrace := debug.Stack()
+			fmt.Printf("Panic in grpc::waitForWorkspaceUpdates:\n%s\n",
+				utils.BytesToString(stackTrace))
+			// Swallow and continue. The next wsdb request will attempt
+			// to reconnect.
+		}
+	}()
+
 	stream, err := wsdb.server.ListenForUpdates(context.TODO(), &rpc.Void{})
 	if err != nil {
 		wsdb.reconnect()
