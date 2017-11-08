@@ -382,7 +382,7 @@ func newEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 	// initializing the backends, this can be solved.
 	err := eWsdb.wsdb.CreateWorkspace(ether.DefaultCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.EmptyWorkspaceKey.Value())
+		quantumfs.NullSpaceName, 0, quantumfs.EmptyWorkspaceKey.Value())
 	if err != nil {
 		panic(fmt.Sprintf("Failed wsdb setup: %s", err.Error()))
 	}
@@ -480,8 +480,8 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 		return nil, convertWsdbError(err)
 	}
 	result := make(map[string]quantumfs.WorkspaceNonce, len(list))
-	for _, name := range list {
-		result[name] = 0
+	for name := range list {
+		result[name] = quantumfs.WorkspaceNonce(list[name])
 	}
 	return result, nil
 }
@@ -497,12 +497,14 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 		EtherWorkspaceDebugLog, typespace, namespace, workspace).Out()
 	defer w.lock.RLock().RUnlock()
 
-	key, err := w.wsdb.Workspace((*wsApiCtx)(c), typespace, namespace, workspace)
+	key, nonce, err := w.wsdb.Workspace((*wsApiCtx)(c), typespace,
+		namespace, workspace)
 	if err != nil {
 		return quantumfs.ZeroKey, 0, convertWsdbError(err)
 	}
 
-	return quantumfs.NewObjectKeyFromBytes(key), 0, nil
+	return quantumfs.NewObjectKeyFromBytes(key),
+		quantumfs.WorkspaceNonce(nonce), nil
 }
 
 func (w *etherWsdbTranslator) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
@@ -529,8 +531,8 @@ func (w *etherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace str
 		dstTypespace, dstNamespace, dstWorkspace).Out()
 	defer w.lock.Lock().Unlock()
 
-	err := w.wsdb.BranchWorkspace((*wsApiCtx)(c), srcTypespace, srcNamespace,
-		srcWorkspace, dstTypespace, dstNamespace, dstWorkspace)
+	_, _, err := w.wsdb.BranchWorkspace((*wsApiCtx)(c), srcTypespace,
+		srcNamespace, srcWorkspace, dstTypespace, dstNamespace, dstWorkspace)
 	if err != nil {
 		return convertWsdbError(err)
 	}
@@ -572,7 +574,8 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 		currentRootId.String(), newRootId.String())
 
 	key, err := w.wsdb.AdvanceWorkspace((*wsApiCtx)(c), typespace, namespace,
-		workspace, currentRootId.Value(), newRootId.Value())
+		workspace, wsdb.WorkspaceNonce(nonce), currentRootId.Value(),
+		newRootId.Value())
 	if err != nil {
 		return quantumfs.ZeroKey, convertWsdbError(err)
 	}

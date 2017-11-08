@@ -5,6 +5,7 @@ package grpc
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -99,6 +100,8 @@ type workspaceDB struct {
 
 // Run in a separate goroutine to trigger reconnection when the connection has failed
 func (wsdb *workspaceDB) reconnector() {
+	var conn *grpc.ClientConn
+
 	for {
 		// Wait for a notification
 		<-wsdb.triggerReconnect
@@ -115,7 +118,10 @@ func (wsdb *workspaceDB) reconnector() {
 			}),
 		}
 
-		var conn *grpc.ClientConn
+		if conn != nil {
+			conn.Close()
+			conn = nil
+		}
 
 		err := fmt.Errorf("Not an error")
 		for err != nil {
@@ -162,6 +168,18 @@ func (wsdb *workspaceDB) reconnect() {
 }
 
 func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
+	defer func() {
+		exception := recover()
+		if exception != nil {
+			// Log
+			stackTrace := debug.Stack()
+			fmt.Printf("Panic in grpc::waitForWorkspaceUpdates:\n%s\n",
+				utils.BytesToString(stackTrace))
+			// Swallow and continue. The next wsdb request will attempt
+			// to reconnect.
+		}
+	}()
+
 	stream, err := wsdb.server.ListenForUpdates(context.TODO(), &rpc.Void{})
 	if err != nil {
 		wsdb.reconnect()
