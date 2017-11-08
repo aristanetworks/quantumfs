@@ -9,15 +9,15 @@ import (
 )
 
 type accessList struct {
-	lock		utils.DeferableMutex
-	hardlinks	map[quantumfs.FileId]quantumfs.PathFlags
-	paths		map[string]quantumfs.PathFlags
+	lock      utils.DeferableMutex
+	hardlinks map[quantumfs.FileId]quantumfs.PathFlags
+	paths     map[string]quantumfs.PathFlags
 }
 
 func NewAccessList() *accessList {
-	return &accessList {
-		hardlinks:	make(map[quantumfs.FileId]quantumfs.PathFlags),
-		paths:		make(map[string]quantumfs.PathFlags),
+	return &accessList{
+		hardlinks: make(map[quantumfs.FileId]quantumfs.PathFlags),
+		paths:     make(map[string]quantumfs.PathFlags),
 	}
 }
 
@@ -30,7 +30,7 @@ func (al *accessList) generate(c *ctx,
 	// make a copy of the regular files map first
 	rtn := make(map[string]quantumfs.PathFlags)
 	for k, v := range al.paths {
-		rtn["/" + k] = v
+		rtn["/"+k] = v
 	}
 
 	for k, v := range al.hardlinks {
@@ -46,8 +46,8 @@ func (al *accessList) generate(c *ctx,
 		}
 	}
 
-	return quantumfs.PathsAccessed {
-		Paths:	rtn,
+	return quantumfs.PathsAccessed{
+		Paths: rtn,
 	}
 }
 
@@ -59,7 +59,7 @@ func (al *accessList) markHardlinkAccessed(c *ctx, fileId quantumfs.FileId,
 		"Cannot create and delete simultaneously")
 
 	// This code pathway shouldn't ever see Created or Deleted flags
-	if op & (quantumfs.PathCreated | quantumfs.PathDeleted) != 0 {
+	if op&(quantumfs.PathCreated|quantumfs.PathDeleted) != 0 {
 		c.elog("Creation / Deletion accesslist update in hardlink pathway")
 	}
 
@@ -154,4 +154,3 @@ func updatePathFlags(c *ctx, pathFlags quantumfs.PathFlags,
 	return pathFlags, false
 	//wsr.accessList.Paths[path] = pathFlags
 }
-
