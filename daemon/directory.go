@@ -1217,7 +1217,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.deleteChild(c, oldName, true)
+		dir.children.deleteChild(c, oldName, false)
 	}()
 
 	// This is the same entry just moved, so we can use the same
