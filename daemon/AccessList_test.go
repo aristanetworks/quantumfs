@@ -711,22 +711,16 @@ func TestAccessListHardLinkLegs(t *testing.T) {
 
 		// Individual legs should still get created / deleted entries alone
 		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileD))
-		expectedAccessList.Paths[fileD] = quantumfs.PathCreated
-
-		test.assertWorkspaceAccessList(expectedAccessList, workspace)
-
-		ioutil.ReadFile(workspace+fileD)
 		expectedAccessList.Paths[fileC] = quantumfs.PathRead
-		expectedAccessList.Paths[fileD] |= quantumfs.PathRead
+		expectedAccessList.Paths[fileD] = quantumfs.PathRead |
+			quantumfs.PathCreated
 
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 
-if false {
 		test.AssertNoErr(os.Remove(workspace+fileC))
 		expectedAccessList.Paths[fileC] = quantumfs.PathRead |
 			quantumfs.PathDeleted
 
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
-}
 	})
 }
