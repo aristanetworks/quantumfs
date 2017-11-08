@@ -696,7 +696,7 @@ func TestAccessListHardLinkLegs(t *testing.T) {
 		fileD := "/dirA/dirB/fileD"
 
 		test.AssertNoErr(os.MkdirAll(workspace+dirB, 0777))
-		test.MakeFile(workspace+fileA)
+		test.MakeFile(workspace + fileA)
 		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileB))
 		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileC))
 
@@ -705,7 +705,7 @@ func TestAccessListHardLinkLegs(t *testing.T) {
 		expectedAccessList.Paths[fileA] = quantumfs.PathRead
 		expectedAccessList.Paths[fileB] = quantumfs.PathRead
 
-		ioutil.ReadFile(workspace+fileB)
+		ioutil.ReadFile(workspace + fileB)
 
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 
@@ -717,7 +717,7 @@ func TestAccessListHardLinkLegs(t *testing.T) {
 
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 
-		test.AssertNoErr(os.Remove(workspace+fileC))
+		test.AssertNoErr(os.Remove(workspace + fileC))
 		expectedAccessList.Paths[fileC] = quantumfs.PathRead |
 			quantumfs.PathDeleted
 

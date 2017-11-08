@@ -26,7 +26,7 @@ type WorkspaceRoot struct {
 	publishedRootId quantumfs.ObjectKey
 	nonce           quantumfs.WorkspaceNonce
 
-	accessList	*accessList
+	accessList *accessList
 
 	// The RWMutex which backs the treeLock for all the inodes in this workspace
 	// tree.
@@ -42,7 +42,7 @@ type linkEntry struct {
 	record  *quantumfs.DirectRecord
 	nlink   uint32
 	inodeId InodeId
-	paths	[]string
+	paths   []string
 }
 
 func newLinkEntry(record_ *quantumfs.DirectRecord) linkEntry {
