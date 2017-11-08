@@ -88,7 +88,7 @@ func (cmap *ChildMap) setRecord(c *ctx, inodeId InodeId,
 
 	// Build the hardlink path list if we just set a hardlink record
 	if record.Type() == quantumfs.ObjectTypeHardlink {
-		cmap.dir.self.markHardlinkPath(c, record.Filename(), record.FileId())
+		cmap.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
 }
 
@@ -287,9 +287,11 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string, newName string) {
 	cmap.children[newName] = inodeId
 	record.SetFilename(newName)
 
-	// if this is a hardlink, we must update its creationTime
+	// if this is a hardlink, we must update its creationTime and the accesslist
+	// path
 	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
 		hardlink.creationTime = quantumfs.NewTime(time.Now())
+		cmap.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
 }
 
