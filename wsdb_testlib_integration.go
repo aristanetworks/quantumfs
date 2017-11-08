@@ -191,3 +191,51 @@ func (s *wsdbCommonIntegTest) TestIntegWorkspaceNonce() {
 	s.req.Equal(nonceWS2, wsList["ws2"],
 		"Mismatch nonce for workspace ws2")
 }
+
+func (s *wsdbCommonIntegTest) TestIntegSetWorkspaceImmutable() {
+	_, _, err := s.db.BranchWorkspace(integTestEtherCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Error branching null workspace: %v", err)
+
+	err = s.db.SetWorkspaceImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Error in SetWorkspaceImmtable for ts1/ns1/ws1: %v", err)
+}
+
+func (s *wsdbCommonIntegTest) TestIntegSetWorkspaceImmutableError() {
+	err := s.db.SetWorkspaceImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
+	s.req.Error(err, "Success in SetWorkspaceImmtable for ts1/ns1/ws1")
+}
+
+func (s *wsdbCommonIntegTest) TestIntegWorkspaceIsImmutable() {
+	_, _, err := s.db.BranchWorkspace(integTestEtherCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Error branching null workspace: %v", err)
+
+	immutable, err := s.db.WorkspaceIsImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Success in WorkspaceIsImmutable for ts1/ns1/ws1")
+	s.req.Equal(false, immutable, "immutable should be false for ts1/ns1/ws1")
+
+	err = s.db.SetWorkspaceImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Error in SetWorkspaceImmtable for ts1/ns1/ws1: %v", err)
+
+	immutable, err = s.db.WorkspaceIsImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Success in WorkspaceIsImmutable for ts1/ns1/ws1")
+	s.req.Equal(true, immutable, "immutable should be true for ts1/ns1/ws1")
+}
+
+func (s *wsdbCommonIntegTest) TestIntegWorkspaceIsImmutableError() {
+	_, err := s.db.WorkspaceIsImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
+	s.req.Error(err, "Success in WorkspaceIsImmutable for ts1/ns1/ws1")
+}
+
+func (s *wsdbCommonIntegTest) TestIntegDeleteImmutableSet() {
+	_, _, err := s.db.BranchWorkspace(integTestEtherCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
+		wsdb.NullSpaceName, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Error branching null workspace: %v", err)
+
+	err = s.db.SetWorkspaceImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Error in SetWorkspaceImmtable for ts1/ns1/ws1: %v", err)
+
+	err = s.db.DeleteWorkspace(integTestEtherCtx, "ts1", "ns1", "ws1")
+	s.req.NoError(err, "Failed in deleting ts1/ns1/ws1 workspace")
+}

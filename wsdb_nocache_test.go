@@ -101,6 +101,26 @@ func (suite *wsdbNoCacheTestSuite) TestNoCacheCreateWorkspaceSameKey() {
 	suite.common.TestCreateWorkspaceSameKey()
 }
 
+func (suite *wsdbNoCacheTestSuite) TestNoCacheSetWorkspaceImmutable() {
+	suite.common.TestSetWorkspaceImmutable()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheSetWorkspaceImmutableError() {
+	suite.common.TestSetWorkspaceImmutableError()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheWorkspaceIsImmutable() {
+	suite.common.TestWorkspaceIsImmutable()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheWorkspaceIsImmutableError() {
+	suite.common.TestWorkspaceIsImmutableError()
+}
+
+func (suite *wsdbNoCacheTestSuite) TestNoCacheDeleteImmutableSet() {
+	suite.common.TestDeleteImmutableSet()
+}
+
 func (suite *wsdbNoCacheTestSuite) TearDownTest() {
 	resetCqlStore()
 }

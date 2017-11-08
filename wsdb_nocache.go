@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/aristanetworks/ether"
@@ -326,6 +327,53 @@ func (nc *noCacheWsdb) WorkspaceLastWriteTime(c ether.Ctx, typespace string,
 	return ts, nil
 }
 
+func (nc *noCacheWsdb) SetWorkspaceImmutable(c ether.Ctx, typespace string,
+	namespace string, workspace string) error {
+
+	defer c.FuncIn("noCacheWsdb::SetWorkspaceImmutable", "%s/%s/%s", typespace,
+		namespace, workspace).Out()
+
+	_, _, present, err := nc.wsdbKeyGet(c, typespace, namespace, workspace)
+	if err != nil {
+		return wsdb.NewError(wsdb.ErrFatal,
+			"during Get in SetWorkspaceImmutable %s/%s/%s : %s",
+			typespace, namespace, workspace, err.Error())
+	}
+	if !present {
+		return wsdb.NewError(wsdb.ErrWorkspaceNotFound,
+			"in SetWorkspaceImmutable workspace: %s/%s/%s",
+			typespace, namespace, workspace)
+	}
+
+	err = nc.wsdbImmutablePut(c, typespace, namespace, workspace, true)
+	if err != nil {
+		return wsdb.NewError(wsdb.ErrFatal,
+			"during Put in SetWorkspaceImmutable %s/%s/%s : %s",
+			typespace, namespace, workspace, err.Error())
+	}
+	return nil
+}
+
+func (nc *noCacheWsdb) WorkspaceIsImmutable(c ether.Ctx, typespace string,
+	namespace string, workspace string) (bool, error) {
+
+	defer c.FuncIn("noCacheWsdb::WorkspaceIsImmutable", "%s/%s/%s", typespace,
+		namespace, workspace).Out()
+
+	immutable, present, err := nc.wsdbImmutableGet(c, typespace, namespace, workspace)
+	if err != nil {
+		return false, wsdb.NewError(wsdb.ErrFatal,
+			"during Get in WorkspaceIsImmutable %s/%s/%s(%s) : %s",
+			typespace, namespace, workspace, err.Error())
+	}
+	if !present {
+		return false, wsdb.NewError(wsdb.ErrWorkspaceNotFound,
+			"in WorkspaceIsImmutable workspace: %s/%s/%s",
+			typespace, namespace, workspace)
+	}
+	return immutable, nil
+}
+
 // --- helper routines ---
 
 func (nc *noCacheWsdb) wsdbTypespaceExists(c ether.Ctx, typespace string) (bool, error) {
@@ -522,6 +570,49 @@ VALUES (?,?,?,?,?)`, nc.keyspace)
 
 	query := nc.store.session.Query(qryStr, typespace,
 		namespace, workspace, key, nonce)
+
+	return query.Exec()
+}
+
+func (nc *noCacheWsdb) wsdbImmutableGet(c ether.Ctx, typespace string,
+	namespace string, workspace string) (immutable bool, present bool, err error) {
+
+	defer c.FuncIn("noCacheWsdb::wsdbImmutableGet", "%s/%s/%s", typespace,
+		namespace, workspace).Out()
+
+	qryStr := fmt.Sprintf(`
+SELECT immutable
+FROM %s.workspacedb
+WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace)
+
+	query := nc.store.session.Query(qryStr, typespace,
+		namespace, workspace)
+
+	err = query.Scan(&immutable)
+	if err != nil {
+		switch err {
+		case gocql.ErrNotFound:
+			return false, false, nil
+		default:
+			return false, false, err
+		}
+	}
+	return immutable, true, nil
+}
+func (nc *noCacheWsdb) wsdbImmutablePut(c ether.Ctx, typespace string,
+	namespace string, workspace string, immutable bool) error {
+
+	defer c.FuncIn("noCacheWsdb::wsdbImmutablePut", "%s/%s/%s immutable: %s",
+		typespace, namespace, workspace,
+		strconv.FormatBool(immutable)).Out()
+
+	qryStr := fmt.Sprintf(`
+UPDATE %s.workspacedb
+SET immutable = ?
+WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace)
+
+	query := nc.store.session.Query(qryStr, immutable, typespace,
+		namespace, workspace)
 
 	return query.Exec()
 }

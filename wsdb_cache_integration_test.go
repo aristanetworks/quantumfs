@@ -62,6 +62,26 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegWorkspaceNonce() {
 	suite.common.TestIntegWorkspaceNonce()
 }
 
+func (suite *wsdbCacheIntegTestSuite) TestCacheIntegSetWorkspaceImmutable() {
+	suite.common.TestIntegSetWorkspaceImmutable()
+}
+
+func (suite *wsdbCacheIntegTestSuite) TestCacheIntegSetWorkspaceImmutableError() {
+	suite.common.TestIntegSetWorkspaceImmutableError()
+}
+
+func (suite *wsdbCacheIntegTestSuite) TestCacheIntegWorkspaceIsImmutable() {
+	suite.common.TestIntegWorkspaceIsImmutable()
+}
+
+func (suite *wsdbCacheIntegTestSuite) TestCacheIntegWorkspaceIsImmutableError() {
+	suite.common.TestIntegWorkspaceIsImmutableError()
+}
+
+func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteImmutableSet() {
+	suite.common.TestIntegDeleteImmutableSet()
+}
+
 func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
 	_, _, err := suite.common.db.BranchWorkspace(integTestEtherCtx, qwsdb.NullSpaceName,
 		qwsdb.NullSpaceName, qwsdb.NullSpaceName,

@@ -9,6 +9,7 @@ package cql
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 
 	"github.com/aristanetworks/ether/qubit/wsdb"
@@ -319,4 +320,54 @@ func (s *wsdbCommonUnitTest) TestCreateWorkspaceSameKey() {
 	err := s.wsdb.CreateWorkspace(unitTestEtherCtx, wsdb.NullSpaceName, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, 0, []byte{1, 2, 3})
 	s.req.NoError(err, "Failed in creating workspace")
+}
+
+func (s *wsdbCommonUnitTest) TestSetWorkspaceImmutable() {
+	mockWsdbKeyGet(s.mockSess, "some", "test", "a", []byte{1, 2, 3}, 0, nil)
+	mockWsdbImmutablePut(s.mockSess, "some", "test", "a", true, nil)
+	err := s.wsdb.SetWorkspaceImmutable(unitTestEtherCtx, "some", "test", "a")
+	s.req.NoError(err, "Error while setting Immutable for some/test/a workspace")
+}
+
+func (s *wsdbCommonUnitTest) TestSetWorkspaceImmutableError() {
+	mockWsdbKeyGet(s.mockSess, "some", "test", "a", []byte{1, 2, 3}, 0, nil)
+	mockWsdbImmutablePut(s.mockSess, "some", "test", "a", true,
+		fmt.Errorf("some gocql error"))
+	err := s.wsdb.SetWorkspaceImmutable(unitTestEtherCtx, "some", "test", "a")
+	s.req.Error(err, "Success while setting Immutable for some/test/a workspace")
+	s.req.IsType(&wsdb.Error{},
+		err, "Invalid error type %T", err)
+}
+
+func (s *wsdbCommonUnitTest) TestWorkspaceIsImmutable() {
+	mockWsdbImmutableGet(s.mockSess, "some", "test", "a", true, nil)
+	immutable, err := s.wsdb.WorkspaceIsImmutable(unitTestEtherCtx, "some", "test", "a")
+	s.req.NoError(err, "Error while getting Immutable for some/test/a workspace")
+	s.req.Equal(true, immutable, "Immutable for some/test/a should be true")
+
+	mockWsdbKeyGet(s.mockSess, "some", "test", "b", []byte{1, 2, 3}, 0, nil)
+	mockWsdbImmutableGet(s.mockSess, "some", "test", "b", false, nil)
+	immutable, err = s.wsdb.WorkspaceIsImmutable(unitTestEtherCtx, "some", "test", "b")
+	s.req.NoError(err, "Error while getting Immutable for some/test/b workspace")
+	s.req.Equal(false, immutable, "Immutable for some/test/b should be false")
+}
+
+func (s *wsdbCommonUnitTest) TestWorkspaceIsImmutableError() {
+	mockWsdbImmutableGet(s.mockSess, "some", "test", "a", true,
+		fmt.Errorf("gocql error"))
+	_, err := s.wsdb.WorkspaceIsImmutable(unitTestEtherCtx, "some", "test", "a")
+	s.req.Error(err, "Success while getting Immutable for some/test/a workspace")
+	s.req.IsType(&wsdb.Error{},
+		err, "Invalid error type %T", err)
+}
+
+func (s *wsdbCommonUnitTest) TestDeleteImmutableSet() {
+	mockWsdbKeyGet(s.mockSess, "some", "test", "a", []byte{1, 2, 3}, 0, nil)
+	mockWsdbImmutablePut(s.mockSess, "some", "test", "a", true, nil)
+	err := s.wsdb.SetWorkspaceImmutable(unitTestEtherCtx, "some", "test", "a")
+	s.req.NoError(err, "Error while setting Immutable for some/test/a workspace")
+
+	mockWsdbKeyDel(s.mockSess, "some", "test", "a", nil)
+	err = s.wsdb.DeleteWorkspace(unitTestEtherCtx, "some", "test", "a")
+	s.req.NoError(err, "Failed in deleting some/test/a workspace")
 }

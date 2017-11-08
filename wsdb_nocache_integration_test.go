@@ -70,6 +70,26 @@ func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegWorkspaceNonce() {
 	suite.common.TestIntegWorkspaceNonce()
 }
 
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegSetWorkspaceImmutable() {
+	suite.common.TestIntegSetWorkspaceImmutable()
+}
+
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegSetWorkspaceImmutableError() {
+	suite.common.TestIntegSetWorkspaceImmutableError()
+}
+
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegWorkspaceIsImmutable() {
+	suite.common.TestIntegWorkspaceIsImmutable()
+}
+
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegWorkspaceIsImmutableError() {
+	suite.common.TestIntegWorkspaceIsImmutableError()
+}
+
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegDeleteImmutableSet() {
+	suite.common.TestIntegDeleteImmutableSet()
+}
+
 func (suite *wsdbNoCacheIntegTestSuite) TearDownTest() {
 	confFile, err := EtherConfFile()
 	suite.Require().NoError(err, "error in getting ether configuration file")

@@ -6,6 +6,7 @@ package cql
 import (
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/aristanetworks/ether"
@@ -227,6 +228,27 @@ func (cw *cacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	cw.cache.InsertEntities(c, typespace, namespace, workspace, nonce.String())
 
 	return key, nil
+}
+
+func (cw *cacheWsdb) SetWorkspaceImmutable(c ether.Ctx, typespace string, namespace string,
+	workspace string) error {
+
+	defer c.FuncIn("cacheWsdb::SetWorkspaceImmutable", "%s/%s/%s", typespace, namespace,
+		workspace).Out()
+
+	return cw.base.SetWorkspaceImmutable(c, typespace, namespace, workspace)
+}
+
+func (cw *cacheWsdb) WorkspaceIsImmutable(c ether.Ctx, typespace string, namespace string,
+	workspace string) (bool, error) {
+
+	defer c.FuncIn("cacheWsdb::WorkspaceIsImmutable", "%s/%s/%s", typespace, namespace,
+		workspace).Out()
+
+	immutable, err := cw.base.WorkspaceIsImmutable(c, typespace, namespace, workspace)
+	c.Vlog("cacheWsdb::WorkspaceIsImmutable %s/%s/%s immutable:%s", typespace,
+		namespace, workspace, strconv.FormatBool(immutable))
+	return immutable, err
 }
 
 // wsdbFetcherImpl implements fetcher interface in entity cache

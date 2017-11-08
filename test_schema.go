@@ -69,7 +69,7 @@ func SetupTestSchema(confFile string) error {
 	}
 
 	queryStr = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.workspacedb "+
-		"( typespace text, namespace text, workspace text, key blob, nonce bigint, "+
+		"( typespace text, namespace text, workspace text, key blob, nonce bigint, immutable boolean,"+
 		"PRIMARY KEY ( typespace, namespace, workspace ))",
 		cfg.Cluster.KeySpace)
 	query = session.Query(queryStr)

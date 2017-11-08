@@ -252,6 +252,26 @@ func (suite *wsdbCacheTestSuite) TestCacheAdvanceNotExist() {
 	suite.common.TestAdvanceNotExist()
 }
 
+func (suite *wsdbCacheTestSuite) TestCacheSetWorkspaceImmutable() {
+	suite.common.TestSetWorkspaceImmutable()
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheSetWorkspaceImmutableError() {
+	suite.common.TestSetWorkspaceImmutableError()
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheWorkspaceIsImmutable() {
+	suite.common.TestWorkspaceIsImmutable()
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheWorkspaceIsImmutableError() {
+	suite.common.TestWorkspaceIsImmutableError()
+}
+
+func (suite *wsdbCacheTestSuite) TestCacheDeleteImmutableSet() {
+	suite.common.TestDeleteImmutableSet()
+}
+
 func (suite *wsdbCacheTestSuite) TestCacheAfterEmptyDB() {
 
 	// disable fetches from DB so that cache state is unchanged

@@ -419,6 +419,38 @@ VALUES (?,?,?,?,?)`
 	}
 }
 
+func mockWsdbImmutableGet(sess *MockSession, typespace string,
+	namespace string, workspace string, immutable bool, err error) {
+
+	query := new(MockQuery)
+	qScanFunc := newMockQueryScanStrings(err, []interface{}{immutable})
+	query.On("Scan", mock.AnythingOfType("*bool")).Return(qScanFunc)
+
+	sess.On("Query", `
+SELECT immutable
+FROM ether.workspacedb
+WHERE typespace = ? AND namespace = ? AND workspace = ?`,
+		typespace, namespace, workspace).Return(query)
+}
+
+func mockWsdbImmutablePut(sess *MockSession, typespace string,
+	namespace string, workspace string, immutable bool, err error) {
+
+	query := new(MockQuery)
+	stmt := `
+UPDATE ether.workspacedb
+SET immutable = ?
+WHERE typespace = ? AND namespace = ? AND workspace = ?`
+
+	sess.On("Query", stmt, immutable, typespace, namespace,
+		workspace).Return(query)
+	if err == nil {
+		query.On("Exec").Return(nil)
+	} else {
+		query.On("Exec").Return(err)
+	}
+}
+
 func newMockQueryScanByteSlice(err error,
 	val []byte, nonce int64) func(dest ...interface{}) error {
 
