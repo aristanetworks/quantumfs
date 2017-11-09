@@ -391,7 +391,7 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 			}
 		}
 
-		dst = rootdir + "/var/run/netns"
+		dst = rootdir + "/var/run"
 		if err := utils.MkdirAll(dst, 0666); err != nil {
 			return fmt.Errorf("Creating directory %s error: %s",
 				dst, err.Error())
