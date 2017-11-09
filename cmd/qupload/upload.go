@@ -425,6 +425,10 @@ func uploadCompleted(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB, ws string,
 			return err
 		}
 	}
+	err = SetImmutable(qctx, wsdb, ws)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -448,4 +452,12 @@ func (up *Uploader) byPass(c *Ctx, cli *params) error {
 	}
 	fmt.Printf("ByPass Completed: %v -> %v\n", ws, referenceWS)
 	return nil
+}
+
+func SetImmutable(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
+	wsname string) error {
+
+	wsParts := strings.Split(wsname, "/")
+	return wsdb.SetWorkspaceImmutable(qctx, wsParts[0], wsParts[1],
+		wsParts[2])
 }
