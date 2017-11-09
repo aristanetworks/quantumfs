@@ -685,3 +685,74 @@ func TestAccessListClear(t *testing.T) {
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
+
+func TestAccessListHardLinkLegs(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dirB := "/dirA/dirB"
+		fileA := "/dirA/fileA"
+		fileB := "/dirA/fileB"
+		fileC := "/dirA/dirB/fileC"
+		fileD := "/dirA/dirB/fileD"
+
+		test.AssertNoErr(os.MkdirAll(workspace+dirB, 0777))
+		test.MakeFile(workspace + fileA)
+		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileB))
+		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileC))
+
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		expectedAccessList := quantumfs.NewPathsAccessed()
+		expectedAccessList.Paths[fileA] = quantumfs.PathRead
+		expectedAccessList.Paths[fileB] = quantumfs.PathRead
+
+		ioutil.ReadFile(workspace + fileB)
+
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+
+		// Individual legs should still get created / deleted entries alone
+		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileD))
+		expectedAccessList.Paths[fileC] = quantumfs.PathRead
+		expectedAccessList.Paths[fileD] = quantumfs.PathRead |
+			quantumfs.PathCreated
+
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+
+		test.AssertNoErr(os.Remove(workspace + fileC))
+		expectedAccessList.Paths[fileC] = quantumfs.PathRead |
+			quantumfs.PathDeleted
+
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+	})
+}
+
+func TestAccessListHardLinkRename(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		fileA := "/fileA"
+		fileB := "/fileB"
+		fileC := "/fileC"
+
+		test.MakeFile(workspace + fileA)
+		test.AssertNoErr(syscall.Link(workspace+fileA, workspace+fileB))
+
+		workspace = test.AbsPath(test.branchWorkspace(workspace))
+		expectedAccessList := quantumfs.NewPathsAccessed()
+		expectedAccessList.Paths[fileB] = quantumfs.PathDeleted
+		expectedAccessList.Paths[fileC] = quantumfs.PathCreated
+
+		test.AssertNoErr(os.Rename(workspace+fileB, workspace+fileC))
+
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+
+		ioutil.ReadFile(workspace + fileA)
+
+		expectedAccessList.Paths[fileA] = quantumfs.PathRead
+		// TODO: after BUG229575, fileB should not longer be in the list
+		expectedAccessList.Paths[fileB] = quantumfs.PathRead |
+			quantumfs.PathDeleted
+		expectedAccessList.Paths[fileC] = quantumfs.PathRead |
+			quantumfs.PathCreated
+
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+	})
+}

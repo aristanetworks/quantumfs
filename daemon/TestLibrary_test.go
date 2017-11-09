@@ -431,7 +431,7 @@ func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 func (th *testHelper) getAccessList(workspace string) *quantumfs.PathsAccessed {
 	wsr, cleanup := th.GetWorkspaceRoot(workspace)
 	defer cleanup()
-	accessed := wsr.getList()
+	accessed := wsr.getList(&th.qfs.c)
 	return &accessed
 }
 
