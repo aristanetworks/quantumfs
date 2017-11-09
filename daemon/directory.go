@@ -86,7 +86,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
 
-	cmap, uninstantiated := newChildMap(c, wsr, dir.baseLayerId)
+	cmap, uninstantiated := newChildMap(c, dir, dir.baseLayerId)
 	dir.children = cmap
 
 	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
@@ -145,15 +145,6 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 		defer dir.childRecordLock.Lock().Unlock()
 		return dir.children.count()
 	})
-}
-
-// Needs inode lock for write
-func (dir *Directory) addChild_(c *ctx, inode InodeId,
-	child quantumfs.DirectoryRecord) {
-
-	defer c.funcIn("Directory::addChild_").Out()
-	defer dir.childRecordLock.Lock().Unlock()
-	dir.children.loadChild(c, child, inode)
 }
 
 // Needs inode lock for write
@@ -630,7 +621,12 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	inodeNum := c.qfs.newInodeId()
 	newEntity, uninstantiated := constructor(c, name, key, 0, inodeNum, dir.self,
 		mode, rdev, entry)
-	dir.addChild_(c, inodeNum, entry)
+
+	func() {
+		defer dir.childRecordLock.Lock().Unlock()
+		dir.children.loadChild(c, entry, inodeNum)
+	}()
+
 	c.qfs.setInode(c, inodeNum, newEntity)
 	c.qfs.addUninstantiated(c, uninstantiated, inodeNum)
 	c.qfs.increaseLookupCount(c, inodeNum)
@@ -1212,7 +1208,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	func() {
 		defer dst.childRecordLock.Lock().Unlock()
 		dst.orphanChild_(c, newName, overwrittenInode)
-		dst.insertEntry_(c, newEntry, childInodeId, childInode)
+		dst.children.loadChild(c, newEntry, childInodeId)
+
+		// being inserted means you're dirty and need to be synced
+		if childInode != nil {
+			childInode.dirty(c)
+		}
+		dst.self.dirty(c)
 	}()
 
 	func() {
@@ -1236,21 +1238,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	result = fuse.OK
 	return
-}
-
-// Needs to hold childRecordLock
-func (dir *Directory) insertEntry_(c *ctx, entry quantumfs.DirectoryRecord,
-	inodeNum InodeId, childInode Inode) {
-
-	defer c.FuncIn("DirectoryRecord::insertEntry_", "inode %d", inodeNum).Out()
-
-	dir.children.loadChild(c, entry, inodeNum)
-
-	// being inserted means you're dirty and need to be synced
-	if childInode != nil {
-		childInode.dirty(c)
-	}
-	dir.self.dirty(c)
 }
 
 func (dir *Directory) GetXAttrSize(c *ctx,
@@ -1750,6 +1737,24 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	go c.qfs.noteChildCreated(dir.inodeNum(), name)
 
 	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
+}
+
+func (dir *Directory) markHardlinkPath(c *ctx, path string,
+	fileId quantumfs.FileId) {
+
+	defer c.funcIn("Directory::markHardlinkPath").Out()
+
+	if dir.InodeCommon.isWorkspaceRoot() {
+		dir.wsr.markHardlinkPath(c, path, fileId)
+		return
+	}
+
+	path = dir.name() + "/" + path
+
+	defer dir.InodeCommon.parentLock.RLock().RUnlock()
+	parent := dir.InodeCommon.parent_(c)
+	parentDir := asDirectory(parent)
+	parentDir.markHardlinkPath(c, path, fileId)
 }
 
 func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {

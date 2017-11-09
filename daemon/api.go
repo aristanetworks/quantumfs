@@ -667,7 +667,7 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
 			"WorkspaceRoot %s does not exist or is not active", wsr)
 	}
 
-	accessList := workspace.getList()
+	accessList := workspace.getList(c)
 	return api.queueAccesslistResponse(accessList)
 }
 
