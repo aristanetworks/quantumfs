@@ -610,7 +610,7 @@ func (w *etherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
 	defer c.FuncIn(qlog.LogWorkspaceDb, EtherWorkspaceIsImmutableLog,
 		EtherWorkspaceIsImmutableDebugLog, typespace, namespace,
 		workspace).Out()
-	defer w.lock.Lock().Unlock()
+	defer w.lock.RLock().RUnlock()
 	immutable, err := w.wsdb.WorkspaceIsImmutable((*wsApiCtx)(c), typespace,
 		namespace, workspace)
 
