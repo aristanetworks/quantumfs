@@ -374,3 +374,19 @@ func TestWorkspaceAccessAfterDeletion(t *testing.T) {
 		})
 	})
 }
+
+func TestWorkspaceAttributeChange(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		var stat1 syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(workspace, &stat1))
+
+		test.AssertNoErr(syscall.Chmod(workspace, 0111))
+
+		var stat2 syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(workspace, &stat2))
+
+		test.Assert(stat1.Mode == stat2.Mode,
+			"WSR Permissions shouldn't have changed")
+	})
+}

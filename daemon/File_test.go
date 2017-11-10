@@ -731,3 +731,33 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 			"File isn't medium file: %s", record.Type())
 	})
 }
+
+func TestOpenOrphaningFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		dir := test.NewWorkspace() + "/dir"
+		test.AssertNoErr(syscall.Mkdir(dir, 0777))
+
+		for i := 0; i < 1000; i++ {
+			name := fmt.Sprintf("%s/file_%d", dir, i)
+			test.AssertNoErr(CreateSmallFile(name, ""))
+			go func() {
+				f0, err := os.OpenFile(name, os.O_RDWR, 0777)
+				test.AssertNoErr(err)
+				defer f0.Close()
+
+				c := make(chan error)
+				go func() {
+					pname := fmt.Sprintf("/proc/self/fd/%d",
+						f0.Fd())
+					f1, err := os.OpenFile(pname, os.O_RDWR,
+						0777)
+					defer f1.Close()
+					c <- err
+				}()
+
+				test.AssertNoErr(syscall.Unlink(name))
+				test.AssertNoErr(<-c)
+			}()
+		}
+	})
+}
