@@ -837,8 +837,8 @@ func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
 }
 
 // Returns true if the count became zero or was previously zero
-func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
-	defer qfs.c.FuncIn("Mux::shouldForget", "inode %d count %d", inodeId,
+func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
+	defer c.FuncIn("Mux::shouldForget", "inode %d count %d", inodeId,
 		count).Out()
 
 	if inodeId == quantumfs.InodeIdApi || inodeId == quantumfs.InodeIdRoot {
@@ -848,19 +848,19 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
-		qfs.c.dlog("inode %d has not been instantiated", inodeId)
+		c.dlog("inode %d has not been instantiated", inodeId)
 		return true
 	}
 
 	if lookupCount < count {
-		qfs.c.elog("lookupCount less than zero %d %d", lookupCount, count)
+		c.elog("lookupCount less than zero %d %d", lookupCount, count)
 	}
 
 	lookupCount -= count
 	qfs.lookupCounts[inodeId] = lookupCount
 	if lookupCount == 0 {
 		if count > 1 {
-			qfs.c.dlog("Forgetting inode with lookupCount of %d", count)
+			c.dlog("Forgetting inode with lookupCount of %d", count)
 		}
 		return true
 	} else {
@@ -1354,7 +1354,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
 
-	if !qfs.shouldForget(InodeId(nodeID), nlookup) {
+	if !qfs.shouldForget(c, InodeId(nodeID), nlookup) {
 		// The kernel hasn't completely forgotten this Inode. Keep it around
 		// a while longer.
 		c.dlog("inode %d lookup not zero yet", nodeID)
