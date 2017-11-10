@@ -371,6 +371,12 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
+	// BUG229656
+	if qfs.workspaceIsMutable(c, wsr) {
+		c.wlog("Refreshing mutable workspaces not supported")
+		return
+	}
+
 	defer wsr.LockTree().Unlock()
 
 	err := qfs.flusher.syncWorkspace_(c, name)
