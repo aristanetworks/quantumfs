@@ -3,8 +3,7 @@
 # Arista Networks, Inc. Confidential and Proprietary.
 
 # This script creates a new QuantumFS release. This includes creating the tag,
-# prompting for release notes and building the RPM. You must ensure the current
-# branch/working tree is precisely what you want to release.
+# prompting for release notes and building the RPM.
 #
 # The remaining manual steps include:
 # - Testing the release for suitability
