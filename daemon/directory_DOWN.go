@@ -263,7 +263,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
 		reload(c, dir.wsr, rc, inode, record)
 	}
-	status := c.qfs.invalidateInode(c, childId)
+	status := c.qfs.invalidateInode(childId)
 	utils.Assert(status == fuse.OK,
 		"invalidating %d failed with %d", childId, status)
 }
@@ -302,7 +302,7 @@ func (dir *Directory) hideEntry_DOWN_(c *ctx, childId InodeId,
 			utils.RandomNumberGenerator.Uint64())
 	}
 	dir.children.renameChild(c, oldName, hiddenName)
-	c.qfs.noteDeletedInode(c, dir.inodeNum(), childId, oldName)
+	c.qfs.noteDeletedInode(dir.inodeNum(), childId, oldName)
 }
 
 func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,

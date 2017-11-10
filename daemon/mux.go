@@ -39,7 +39,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
 		fileHandles:            make(map[FileHandleId]FileHandle),
-		inodeNum:               uint64(quantumfs.GenerateUniqueFileId()),
+		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
@@ -348,7 +348,7 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	for _, record := range c.qfs.metaInodeDeletionRecords {
 		c.vlog("Noting deletion of %s inode %d (parent %d)",
 			record.name, record.inodeId, record.parentId)
-		if e := c.qfs.noteDeletedInode(c, record.parentId, record.inodeId,
+		if e := c.qfs.noteDeletedInode(record.parentId, record.inodeId,
 			record.name); e != fuse.OK {
 			c.vlog("noteDeletedInode for wsr with inode %d failed", e)
 		}
@@ -1314,23 +1314,19 @@ func sanitizeFuseNotificationResult(err fuse.Status) fuse.Status {
 	return err
 }
 
-func (qfs *QuantumFs) invalidateInode(c *ctx, inodeId InodeId) fuse.Status {
-	c.vlog("CHECK3 invalidateInode %d", inodeId)
-
+func (qfs *QuantumFs) invalidateInode(inodeId InodeId) fuse.Status {
 	return sanitizeFuseNotificationResult(
 		qfs.server.InodeNotify(uint64(inodeId), 0, -1))
 }
 
-func (qfs *QuantumFs) noteDeletedInode(c *ctx, parentId InodeId, childId InodeId,
+func (qfs *QuantumFs) noteDeletedInode(parentId InodeId, childId InodeId,
 	name string) fuse.Status {
 
-	c.vlog("CHECK3 noteDeleted %d, parent %d", childId, parentId)
 	return sanitizeFuseNotificationResult(
 		qfs.server.DeleteNotify(uint64(parentId), uint64(childId), name))
 }
 
 func (qfs *QuantumFs) noteChildCreated(parentId InodeId, name string) fuse.Status {
-	qfs.c.vlog("CHECK3 HELLO %s in %d", name, parentId)
 	return sanitizeFuseNotificationResult(
 		qfs.server.EntryNotify(uint64(parentId), name))
 }

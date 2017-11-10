@@ -198,7 +198,7 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 			}
 		}
 
-		status := c.qfs.invalidateInode(c, entry.inodeId)
+		status := c.qfs.invalidateInode(entry.inodeId)
 		utils.Assert(status == fuse.OK,
 			"invalidating %d failed with %d", entry.inodeId, status)
 	}
@@ -236,7 +236,7 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 	} else {
 		srcInode.MvChild(c, newParent, oldName, remoteRecord.Filename())
 	}
-	c.qfs.noteDeletedInode(c, srcInode.inodeNum(), inodeId, oldName)
+	c.qfs.noteDeletedInode(srcInode.inodeNum(), inodeId, oldName)
 	c.qfs.noteChildCreated(newParent.inodeNum(), remoteRecord.Filename())
 }
 
@@ -252,7 +252,7 @@ func (wsr *WorkspaceRoot) moveDentries_(c *ctx, rc *RefreshContext) {
 			inode := c.qfs.inodeNoInstantiate(c, loadRecord.inodeId)
 			if inode != nil {
 				reload(c, wsr, rc, inode, loadRecord.remoteRecord)
-				status := c.qfs.invalidateInode(c, loadRecord.inodeId)
+				status := c.qfs.invalidateInode(loadRecord.inodeId)
 				utils.Assert(status == fuse.OK,
 					"invalidating %d failed with %d",
 					loadRecord.inodeId, status)
