@@ -146,10 +146,7 @@ func detachInode(c *ctx, inode Inode, staleRecord *FileRemoveRecord) {
 	dir := asDirectory(inode)
 	defer dir.childRecordLock.Lock().Unlock()
 	staleRecord.toOrphan = dir.children.deleteChild(c, staleRecord.name, false)
-	status := c.qfs.noteDeletedInode(c, dir.id, staleRecord.inodeId,
-		staleRecord.name)
-	utils.Assert(status == fuse.OK, "noting %d deleted failed with %d",
-		staleRecord.inodeId, status)
+	c.qfs.noteDeletedInode(dir.id, staleRecord.inodeId, staleRecord.name)
 }
 
 // The reason we cannot unlink the stale dentries at this point is that
