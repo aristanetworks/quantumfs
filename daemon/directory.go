@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -42,6 +43,7 @@ type Directory struct {
 	// held.
 	childRecordLock utils.DeferableMutex
 	children        *ChildMap
+	_generation     uint64
 }
 
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
@@ -84,7 +86,7 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
 
-	cmap, uninstantiated := newChildMap(c, wsr, dir.baseLayerId)
+	cmap, uninstantiated := newChildMap(c, dir, dir.baseLayerId)
 	dir.children = cmap
 
 	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
@@ -117,6 +119,10 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	return &dir, uninstantiated
 }
 
+func (dir *Directory) generation() uint64 {
+	return atomic.LoadUint64(&dir._generation)
+}
+
 func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	defer c.funcIn("Directory::updateSize").Out()
 
@@ -127,6 +133,7 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	}
 	// We think we've made a change to this directory, so we should mark it dirty
 	dir.self.dirty(c)
+	atomic.AddUint64(&dir._generation, 1)
 
 	// The parent of a WorkspaceRoot is a workspacelist and we have nothing to
 	// update.
@@ -138,15 +145,6 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 		defer dir.childRecordLock.Lock().Unlock()
 		return dir.children.count()
 	})
-}
-
-// Needs inode lock for write
-func (dir *Directory) addChild_(c *ctx, inode InodeId,
-	child quantumfs.DirectoryRecord) {
-
-	defer c.funcIn("Directory::addChild_").Out()
-	defer dir.childRecordLock.Lock().Unlock()
-	dir.children.loadChild(c, child, inode)
 }
 
 // Needs inode lock for write
@@ -623,7 +621,12 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	inodeNum := c.qfs.newInodeId()
 	newEntity, uninstantiated := constructor(c, name, key, 0, inodeNum, dir.self,
 		mode, rdev, entry)
-	dir.addChild_(c, inodeNum, entry)
+
+	func() {
+		defer dir.childRecordLock.Lock().Unlock()
+		dir.children.loadChild(c, entry, inodeNum)
+	}()
+
 	c.qfs.setInode(c, inodeNum, newEntity)
 	c.qfs.addUninstantiated(c, uninstantiated, inodeNum)
 	c.qfs.increaseLookupCount(c, inodeNum)
@@ -915,16 +918,24 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return result
 		}
 
-		buf := newBuffer(c, []byte(pointedTo), quantumfs.KeyTypeMetadata)
-		key, err := buf.Key(&c.Ctx)
-		if err != nil {
-			c.elog("Failed to upload block: %v", err)
-			return fuse.EIO
-		}
+		inode := dir.create_(c, name, 0777, 0777, 0, newSymlink,
+			quantumfs.ObjectTypeSymlink, quantumfs.EmptyBlockKey, out)
 
-		dir.create_(c, name, 0777, 0777, 0, newSymlink,
-			quantumfs.ObjectTypeSymlink, key, out)
-		c.vlog("Created new symlink with key: %s", key.String())
+		link := inode.(*Symlink)
+
+		// Set the symlink link data
+		link.setLink(c, pointedTo)
+		func() {
+			defer dir.childRecordLock.Lock().Unlock()
+
+			// Update the record's size
+			record := dir.children.record(inode.inodeNum())
+			record.SetSize(uint64(len(pointedTo)))
+		}()
+
+		// Update the outgoing entry size
+		out.Attr.Size = uint64(len(pointedTo))
+
 		return fuse.OK
 	}()
 
@@ -1114,6 +1125,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	overwrittenInodeId := dst.childInodeNum(newName)
 	overwrittenInode := c.qfs.inodeNoInstantiate(c, overwrittenInodeId)
 
+	if childInode != nil {
+		childInode.parentCheckLinkReparent(c, dir)
+	}
+	if overwrittenInode != nil {
+		overwrittenInode.parentCheckLinkReparent(c, dst)
+	}
+
 	if childInode != nil && overwrittenInode != nil {
 		firstChild, lastChild := getLockOrder(childInode, overwrittenInode)
 		defer firstChild.getParentLock().Lock().Unlock()
@@ -1190,12 +1208,18 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	func() {
 		defer dst.childRecordLock.Lock().Unlock()
 		dst.orphanChild_(c, newName, overwrittenInode)
-		dst.insertEntry_(c, newEntry, childInodeId, childInode)
+		dst.children.loadChild(c, newEntry, childInodeId)
+
+		// being inserted means you're dirty and need to be synced
+		if childInode != nil {
+			childInode.dirty(c)
+		}
+		dst.self.dirty(c)
 	}()
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.deleteChild(c, oldName, true)
+		dir.children.deleteChild(c, oldName, false)
 	}()
 
 	// This is the same entry just moved, so we can use the same
@@ -1214,21 +1238,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	result = fuse.OK
 	return
-}
-
-// Needs to hold childRecordLock
-func (dir *Directory) insertEntry_(c *ctx, entry quantumfs.DirectoryRecord,
-	inodeNum InodeId, childInode Inode) {
-
-	defer c.FuncIn("DirectoryRecord::insertEntry_", "inode %d", inodeNum).Out()
-
-	dir.children.loadChild(c, entry, inodeNum)
-
-	// being inserted means you're dirty and need to be synced
-	if childInode != nil {
-		childInode.dirty(c)
-	}
-	dir.self.dirty(c)
 }
 
 func (dir *Directory) GetXAttrSize(c *ctx,
@@ -1730,6 +1739,24 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
 }
 
+func (dir *Directory) markHardlinkPath(c *ctx, path string,
+	fileId quantumfs.FileId) {
+
+	defer c.funcIn("Directory::markHardlinkPath").Out()
+
+	if dir.InodeCommon.isWorkspaceRoot() {
+		dir.wsr.markHardlinkPath(c, path, fileId)
+		return
+	}
+
+	path = dir.name() + "/" + path
+
+	defer dir.InodeCommon.parentLock.RLock().RUnlock()
+	parent := dir.InodeCommon.parent_(c)
+	parentDir := asDirectory(parent)
+	parentDir.markHardlinkPath(c, path, fileId)
+}
+
 func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
 		dir.name_).Out()
@@ -1754,6 +1781,7 @@ type directorySnapshotSource interface {
 	getChildSnapshot(c *ctx) []directoryContents
 	inodeNum() InodeId
 	treeLock() *TreeLock
+	generation() uint64
 }
 
 func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapshot {
@@ -1766,7 +1794,8 @@ func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapsho
 			inodeNum:  src.inodeNum(),
 			treeLock_: src.treeLock(),
 		},
-		src: src,
+		_generation: src.generation(),
+		src:         src,
 	}
 
 	utils.Assert(ds.treeLock() != nil, "directorySnapshot treeLock nil at init")
@@ -1776,8 +1805,9 @@ func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapsho
 
 type directorySnapshot struct {
 	FileHandleCommon
-	children []directoryContents
-	src      directorySnapshotSource
+	children    []directoryContents
+	_generation uint64
+	src         directorySnapshotSource
 }
 
 func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
@@ -1808,7 +1838,11 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 
 		details.NodeId = child.attr.Ino
 		c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
-		fillEntryOutCacheData(c, details)
+		if ds._generation == ds.src.generation() {
+			fillEntryOutCacheData(c, details)
+		} else {
+			clearEntryOutCacheData(c, details)
+		}
 		details.Attr = child.attr
 
 		processed++

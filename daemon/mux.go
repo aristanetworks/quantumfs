@@ -504,6 +504,12 @@ func (qfs *QuantumFs) uninstantiateInode(c *ctx, inodeNum InodeId) {
 	qfs.uninstantiateInode_(c, inodeNum)
 }
 
+// Queue an Inode to be flushed because it is dirty, at the front of the queue
+// flusher lock must be locked when calling this function
+func (qfs *QuantumFs) queueDirtyInodeNow_(c *ctx, inode Inode) *list.Element {
+	return qfs.flusher.queue_(c, inode, false, false)
+}
+
 // Queue an Inode to be flushed because it is dirty
 // flusher lock must be locked when calling this function
 func (qfs *QuantumFs) queueDirtyInode_(c *ctx, inode Inode) *list.Element {
@@ -1255,12 +1261,11 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 	// The default cases will be inode such as file, symlink, hardlink etc, they
 	// get workspaceroots from their parents.
 	default:
+		defer inode.getParentLock().RLock().RUnlock()
 		// if inode is already forgotten, the workspace doesn't process it.
-		if inode.isOrphaned() {
+		if inode.isOrphaned_() {
 			return true
 		}
-		// Otherwise, go up to its parent which must be a directory/workspace
-		defer inode.getParentLock().RLock().RUnlock()
 		parent := inode.parent_(c)
 		switch parent.(type) {
 		default:
