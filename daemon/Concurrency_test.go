@@ -144,7 +144,8 @@ func TestConcurrentHardlinkNormalization(t *testing.T) {
 
 		test.AssertNoErr(testutils.PrintToFile(workspace0+fileA,
 			string(dataA)))
-os.MkdirAll(workspace0+"/dirA/dirB", 0777)
+
+		test.AssertNoErr(os.MkdirAll(workspace0+"/dirA/dirB", 0777))
 		test.AssertNoErr(syscall.Link(workspace0+fileA, workspace0+fileB))
 		test.AssertNoErr(syscall.Link(workspace0+fileA, workspace0+fileC))
 
@@ -152,16 +153,15 @@ os.MkdirAll(workspace0+"/dirA/dirB", 0777)
 		_, err := os.Stat(workspace1+fileA)
 		test.AssertNoErr(err)
 
-		//test.AssertNoErr(os.Remove(workspace1+fileB))
+		test.AssertNoErr(os.Remove(workspace1+fileB))
 		test.AssertNoErr(os.Remove(workspace0+fileA))
 
 		test.waitForPropagate(workspace0+fileB, []byte{})
-		//test.waitForPropagate(workspace1+fileA, []byte{})
+		test.waitForPropagate(workspace1+fileA, []byte{})
 
-		//test.assertNoFile(workspace0+fileA)
-		//test.assertNoFile(workspace0+fileB)
-		test.Assert(false, "asdf")
-		//test.CheckLink(workspace0+fileC, dataA, 1)
+		test.assertNoFile(workspace0+fileA)
+		test.assertNoFile(workspace0+fileB)
+		test.CheckLink(workspace0+fileC, dataA, 1)
 	})
 }
 
