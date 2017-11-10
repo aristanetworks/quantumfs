@@ -22,6 +22,7 @@ commit=$2
 
 gut sync
 gut switch $commit
+git reset --hard
 
 git tag -a $version
 make clean
