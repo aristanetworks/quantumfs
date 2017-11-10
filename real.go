@@ -4,6 +4,7 @@
 package cql
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -25,6 +26,7 @@ func NewRealCluster(clusterCfg ClusterConfig) Cluster {
 	// setting hence it is not provided in ClusterConfig
 	cl := os.Getenv("CQL_CL")
 	if cl != "" {
+		fmt.Fprintf(os.Stderr, "** WARNING: CQL_CL=%s **\n", cl)
 		// ParseConsistency will panic if illegal values are used
 		c.Consistency = gocql.ParseConsistency(cl)
 	}
