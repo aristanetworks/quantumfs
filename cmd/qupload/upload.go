@@ -6,6 +6,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -63,7 +64,7 @@ type Uploader struct {
 	wsDB      quantumfs.WorkspaceDB
 	exInfo    *exs.ExcludeInfo
 
-	topDirRecord quantumfs.DirectoryRecord
+	topDirID quantumfs.ObjectKey
 
 	dirEntryTrackers map[string]*dirEntryTracker
 	dirStateMutex    utils.DeferableMutex
@@ -135,7 +136,7 @@ func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
 		}
 
 		if tracker.root {
-			up.topDirRecord = record
+			up.topDirID = record.ID()
 			return nil
 		}
 		// we flushed current dir which could be the last
@@ -310,42 +311,55 @@ func (up *Uploader) upload(c *Ctx, cli *params,
 	conc := cli.conc
 
 	start := time.Now()
-	// launch walker in same task group so that
-	// error in walker will exit workers and vice versa
-	var group *errgroup.Group
-	group, c.eCtx = errgroup.WithContext(context.Background())
-	piChan := make(chan *pathInfo)
 
-	// workers
-	for i := uint(0); i < conc; i++ {
-		group.Go(func() error {
-			return up.pathWorker(c, piChan)
-		})
-	}
-	// walker
-	group.Go(func() error {
-		err := filepath.Walk(root,
-			func(path string, info os.FileInfo, err error) error {
-				return up.pathWalker(c, piChan, path,
-					root, info, err)
-			})
-		close(piChan)
-		return err
-	})
-
-	err := group.Wait()
+	fd, err := os.Open(root)
 	if err != nil {
 		return quantumfs.ObjectKey{}, err
 	}
+	defer fd.Close()
 
-	if up.topDirRecord == nil {
+	_, err = fd.Readdir(1)
+	if err == io.EOF {
+		// empty folder case
+		up.topDirID = quantumfs.EmptyDirKey
+	} else {
+		// launch walker in same task group so that
+		// error in walker will exit workers and vice versa
+		var group *errgroup.Group
+		group, c.eCtx = errgroup.WithContext(context.Background())
+		piChan := make(chan *pathInfo)
+
+		// workers
+		for i := uint(0); i < conc; i++ {
+			group.Go(func() error {
+				return up.pathWorker(c, piChan)
+			})
+		}
+		// walker
+		group.Go(func() error {
+			err := filepath.Walk(root,
+				func(path string, info os.FileInfo, err error) error {
+					return up.pathWalker(c, piChan, path,
+						root, info, err)
+				})
+			close(piChan)
+			return err
+		})
+
+		err := group.Wait()
+		if err != nil {
+			return quantumfs.ObjectKey{}, err
+		}
+	}
+
+	if up.topDirID == quantumfs.ZeroKey {
 		up.dumpUploadState()
 		panic("workspace root dir not written yet but all " +
 			"writes to workspace completed. This is unexpected. " +
 			"Use debug dump to diagnose.")
 	}
 
-	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirRecord.ID(),
+	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirID,
 		up.dataStore, up.hardlinks)
 	if wsrErr != nil {
 		return quantumfs.ObjectKey{}, wsrErr
