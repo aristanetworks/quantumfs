@@ -265,3 +265,16 @@ func TestSymlinks(t *testing.T) {
 		})
 	})
 }
+
+func TestEmptyDirectory(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		directory := workspace + "/dirA"
+		test.AssertNoErr(os.MkdirAll(directory, 0777))
+
+		test.checkQuploadMatches(workspace, func() {
+			test.AssertNoErr(os.Remove(directory))
+		})
+	})
+}
