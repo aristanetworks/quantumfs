@@ -29,6 +29,7 @@ const TimeToLive = "cql.TTL"
 type cqlBlobStore struct {
 	store    *cqlStore
 	keyspace string
+	cfName   string
 
 	insertStats stats.OpStats
 	getStats    stats.OpStats
@@ -44,6 +45,7 @@ func newCqlBS(cluster Cluster, cfg *Config) (blobstore.BlobStore, error) {
 	cbs := &cqlBlobStore{
 		store:       &store,
 		keyspace:    cfg.Cluster.KeySpace,
+		cfName:      "blobStore",
 		insertStats: inmem.NewOpStatsInMem("insertBlobStore"),
 		getStats:    inmem.NewOpStatsInMem("getBlobStore"),
 	}
@@ -89,9 +91,9 @@ func (b *cqlBlobStore) Insert(c ether.Ctx, key []byte, value []byte,
 
 	defer c.FuncIn(InsertLog, KeyTTLLog, keyHex, ttl).Out()
 	queryStr := fmt.Sprintf(`INSERT
-INTO %s.blobStore (key, value)
+INTO %s.%s (key, value)
 VALUES (?, ?)
-USING TTL %s`, b.keyspace, ttl)
+USING TTL %s`, b.keyspace, b.cfName, ttl)
 	query := b.store.session.Query(queryStr, key, value)
 
 	b.store.sem.P()
@@ -128,8 +130,8 @@ func (b *cqlBlobStore) Get(c ether.Ctx, key []byte) ([]byte, map[string]string, 
 	var value []byte
 	var ttl int
 	queryStr := fmt.Sprintf(`SELECT value, ttl(value)
-FROM %s.blobStore
-WHERE key = ?`, b.keyspace)
+FROM %s.%s
+WHERE key = ?`, b.keyspace, b.cfName)
 	query := b.store.session.Query(queryStr, key)
 
 	start := time.Now()
@@ -177,8 +179,8 @@ func (b *cqlBlobStore) Metadata(c ether.Ctx, key []byte) (map[string]string, err
 	defer c.FuncIn(MetadataLog, KeyLog, keyHex).Out()
 	var ttl int
 	queryStr := fmt.Sprintf(`SELECT ttl(value)
-FROM %s.blobStore
-WHERE key = ?`, b.keyspace)
+FROM %s.%s
+WHERE key = ?`, b.keyspace, b.cfName)
 	query := b.store.session.Query(queryStr, key)
 
 	b.store.sem.P()

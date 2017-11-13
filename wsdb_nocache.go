@@ -23,6 +23,7 @@ import (
 type noCacheWsdb struct {
 	store    *cqlStore
 	keyspace string
+	cfName   string
 }
 
 func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
@@ -37,6 +38,7 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 	wsdbInst := &noCacheWsdb{
 		store:    &store,
 		keyspace: cfg.Cluster.KeySpace,
+		cfName:   "workspacedb",
 	}
 
 	return wsdbInst, nil
@@ -381,8 +383,8 @@ func (nc *noCacheWsdb) wsdbTypespaceExists(c ether.Ctx, typespace string) (bool,
 
 	qryStr := fmt.Sprintf(`
 SELECT typespace
-FROM %s.workspacedb
-WHERE typespace = ? LIMIT 1`, nc.keyspace)
+FROM %s.%s
+WHERE typespace = ? LIMIT 1`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace)
 
@@ -406,7 +408,7 @@ func (nc *noCacheWsdb) fetchDBTypespaces(c ether.Ctx) (int, []string, error) {
 
 	qryStr := fmt.Sprintf(`
 SELECT distinct typespace
-FROM %s.workspacedb`, nc.keyspace)
+FROM %s.%s`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr)
 	iter := query.Iter()
@@ -432,8 +434,8 @@ func (nc *noCacheWsdb) wsdbNamespaceExists(c ether.Ctx, typespace string,
 
 	qryStr := fmt.Sprintf(`
 SELECT namespace
-FROM %s.workspacedb
-WHERE typespace = ? AND namespace = ? LIMIT 1`, nc.keyspace)
+FROM %s.%s
+WHERE typespace = ? AND namespace = ? LIMIT 1`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace, namespace)
 
@@ -458,8 +460,8 @@ func (nc *noCacheWsdb) fetchDBNamespaces(c ether.Ctx,
 
 	qryStr := fmt.Sprintf(`
 SELECT namespace
-FROM %s.workspacedb
-WHERE typespace = ?`, nc.keyspace)
+FROM %s.%s
+WHERE typespace = ?`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace)
 	iter := query.Iter()
@@ -489,8 +491,8 @@ func (nc *noCacheWsdb) fetchDBWorkspaces(c ether.Ctx, typespace string,
 
 	qryStr := fmt.Sprintf(`
 SELECT workspace, nonce
-FROM %s.workspacedb
-WHERE typespace = ? AND namespace = ?`, nc.keyspace)
+FROM %s.%s
+WHERE typespace = ? AND namespace = ?`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace,
 		namespace)
@@ -520,8 +522,8 @@ func (nc *noCacheWsdb) wsdbKeyGet(c ether.Ctx, typespace string,
 
 	qryStr := fmt.Sprintf(`
 SELECT key, nonce
-FROM %s.workspacedb
-WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace)
+FROM %s.%s
+WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace,
 		namespace, workspace)
@@ -547,8 +549,8 @@ func (nc *noCacheWsdb) wsdbKeyDel(c ether.Ctx, typespace string,
 
 	qryStr := fmt.Sprintf(`
 DELETE
-FROM %s.workspacedb
-WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace)
+FROM %s.%s
+WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace,
 		namespace, workspace)
@@ -564,9 +566,9 @@ func (nc *noCacheWsdb) wsdbKeyPut(c ether.Ctx, typespace string,
 		namespace, workspace, hex.EncodeToString(key), nonce).Out()
 
 	qryStr := fmt.Sprintf(`
-INSERT INTO %s.workspacedb
+INSERT INTO %s.%s
 (typespace, namespace, workspace, key, nonce)
-VALUES (?,?,?,?,?)`, nc.keyspace)
+VALUES (?,?,?,?,?)`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace,
 		namespace, workspace, key, nonce)
@@ -582,8 +584,8 @@ func (nc *noCacheWsdb) wsdbImmutableGet(c ether.Ctx, typespace string,
 
 	qryStr := fmt.Sprintf(`
 SELECT immutable
-FROM %s.workspacedb
-WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace)
+FROM %s.%s
+WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace,
 		namespace, workspace)
@@ -607,9 +609,9 @@ func (nc *noCacheWsdb) wsdbImmutablePut(c ether.Ctx, typespace string,
 		strconv.FormatBool(immutable)).Out()
 
 	qryStr := fmt.Sprintf(`
-UPDATE %s.workspacedb
+UPDATE %s.%s
 SET immutable = ?
-WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace)
+WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, immutable, typespace,
 		namespace, workspace)
@@ -625,8 +627,8 @@ func (nc *noCacheWsdb) wsdbKeyLastWriteTime(c ether.Ctx, typespace string,
 
 	qryStr := fmt.Sprintf(`
 SELECT WRITETIME(key)
-FROM %s.workspacedb
-WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace)
+FROM %s.%s
+WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace,
 		namespace, workspace)
