@@ -34,21 +34,8 @@ type cqlBlobStore struct {
 	getStats    stats.OpStats
 }
 
-// NewCqlBlobStore initializes a blobstore.BlobStore to be used with a CQL cluster.
-func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
-	// This function is traversed only in the non-mock code path. In the mock path
-	// initCqlStore is directly used. Also ensures that an active session exists with
-	// the CQL cluster.
-
-	cfg, err := readCqlConfig(confName)
-	if err != nil {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
-			"error in reading cql config file %s", err.Error())
-	}
-
-	cluster := NewRealCluster(cfg.Cluster)
-	var store cqlStore
-	store, err = initCqlStore(cluster)
+func newCqlBS(cluster Cluster, cfg *Config) (blobstore.BlobStore, error) {
+	store, err := initCqlStore(cluster)
 	if err != nil {
 		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
 			"error in initializing cql store %s", err.Error())
@@ -61,6 +48,20 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 		getStats:    inmem.NewOpStatsInMem("getBlobStore"),
 	}
 	return cbs, nil
+
+}
+
+// NewCqlBlobStore initializes a blobstore.BlobStore to be used with a CQL cluster.
+func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
+	cfg, err := readCqlConfig(confName)
+	if err != nil {
+		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
+			"error in reading cql config file %s", err.Error())
+	}
+
+	cluster := NewRealCluster(cfg.Cluster)
+
+	return newCqlBS(cluster, cfg)
 }
 
 // InsertLog can be used in external tool for log parsing

@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/ether/blobstore"
-	"github.com/aristanetworks/ether/utils/stats/inmem"
 	"github.com/gocql/gocql"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -33,20 +32,16 @@ func (s *storeTests) SetupTest() {
 	mocksession := &MockSession{}
 	mocksession.On("Close").Return()
 	mockcc.On("CreateSession").Return(mocksession, nil)
-	store, err := initCqlStore(mockcc)
-	s.Require().NoError(err, "initCqlStore Failed: ", err)
 
-	s.bls = &cqlBlobStore{
-		store:       &store,
-		keyspace:    "ether",
-		insertStats: inmem.NewOpStatsInMem("insertBlobStore"),
-		getStats:    inmem.NewOpStatsInMem("getBlobStore"),
+	mockCfg := &Config{
+		Cluster: ClusterConfig{
+			KeySpace: "ether",
+		},
 	}
-	s.Require().NoError(err)
 
-	_, ok := s.bls.store.session.(*MockSession)
-	s.Require().Equal(true, ok,
-		fmt.Sprintf("SetupTest has wrong type of session %T", s.bls.store.session))
+	cqlBS, err := newCqlBS(mockcc, mockCfg)
+	s.Require().NoError(err, "Failed %q newCqlBS", err)
+	s.bls = cqlBS.(*cqlBlobStore)
 }
 
 func (s *storeTests) TestNewCqlStoreFailure() {
