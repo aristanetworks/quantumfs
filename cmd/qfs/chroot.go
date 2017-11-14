@@ -370,8 +370,9 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 
 	if !os.SameFile(rootdirInfo, fsrootInfo) {
 		// pivot_root will only work when root directory is a mountpoint
-		if err := syscall.Mount(rootdir, rootdir, "",
-			syscall.MS_BIND|syscall.MS_REC, ""); err != nil {
+		err := syscall.Mount(rootdir, rootdir, "",
+			syscall.MS_PRIVATE|syscall.MS_BIND|syscall.MS_REC, "")
+		if err != nil {
 
 			return fmt.Errorf("Recursively bindmounting %s error: %s",
 				rootdir, err.Error())
