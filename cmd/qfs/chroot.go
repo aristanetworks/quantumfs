@@ -337,6 +337,13 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 		return fmt.Errorf("Unshare error: %s", err.Error())
 	}
 
+	// pivot_root will only work when current root directory is a private
+	// mountpoint
+	err := syscall.Mount("/", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, "")
+	if err != nil {
+		return fmt.Errorf("Remounting / privated error: %s", err.Error())
+	}
+
 	var buf syscall.Statfs_t
 	if err := syscall.Statfs("/sys", &buf); err != nil {
 		return fmt.Errorf("Getting filesystem stat of /sys error:%s",
@@ -371,9 +378,8 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 	if !os.SameFile(rootdirInfo, fsrootInfo) {
 		// pivot_root will only work when root directory is a mountpoint
 		err := syscall.Mount(rootdir, rootdir, "",
-			syscall.MS_PRIVATE|syscall.MS_BIND|syscall.MS_REC, "")
+			syscall.MS_BIND|syscall.MS_REC, "")
 		if err != nil {
-
 			return fmt.Errorf("Recursively bindmounting %s error: %s",
 				rootdir, err.Error())
 		}
