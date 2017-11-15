@@ -1329,7 +1329,6 @@ func (store *constDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 	return fmt.Errorf("Cannot set in constant datastore")
 }
 
-// The ZeroKey should be the equivalent of an uninitialized ObjectKey
 var ZeroKey ObjectKey
 
 func calcMaxNumExtendedAttributes(maxSize int) int {
