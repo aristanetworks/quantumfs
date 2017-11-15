@@ -177,7 +177,9 @@ func insertPaths(jobs chan copyItem, wg *sync.WaitGroup) {
 			// file which exists these, but will succeed if the failure
 			// can be ignored, such as the destination file didn't exist
 			// at all.
-			os.Remove(rootPrefix + dst)
+			if err = os.Remove(rootPrefix + dst); err != nil {
+				fmt.Printf("Failed removing %s\n", rootPrefix+dst)
+			}
 		}
 
 		err = api.InsertInode(workspacePrefix+dst, string(key), stat.Mode,
