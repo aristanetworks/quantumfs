@@ -338,7 +338,8 @@ func (up *Uploader) upload(c *Ctx, cli *params,
 		return quantumfs.ObjectKey{}, err
 	}
 
-	if up.topDirID.IsEqualTo(quantumfs.ZeroKey) {
+	var emptyKey quantumfs.ObjectKey
+	if up.topDirID.IsEqualTo(emptyKey) {
 		c.Wlog("Empty workspace root detected.")
 		up.topDirID = quantumfs.EmptyDirKey
 	}
