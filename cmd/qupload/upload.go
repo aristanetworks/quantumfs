@@ -63,7 +63,7 @@ type Uploader struct {
 	wsDB      quantumfs.WorkspaceDB
 	exInfo    *exs.ExcludeInfo
 
-	topDirRecord quantumfs.DirectoryRecord
+	topDirID  quantumfs.ObjectKey
 
 	dirEntryTrackers map[string]*dirEntryTracker
 	dirStateMutex    utils.DeferableMutex
@@ -135,7 +135,7 @@ func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
 		}
 
 		if tracker.root {
-			up.topDirRecord = record
+			up.topDirID = record.ID()
 			return nil
 		}
 		// we flushed current dir which could be the last
@@ -263,7 +263,7 @@ func (up *Uploader) pathWalker(c *Ctx, piChan chan<- *pathInfo,
 		// whose parent directory state tracking has already been
 		// setup. Hence empty directory is handled by worker to maintain
 		// separation of concerns between walker and worker
-		if expectedDirRecords > 0 {
+		if expectedDirRecords > 0 || path == root {
 			up.setupDirEntryTracker(path, root, info, expectedDirRecords)
 			return nil
 		}
@@ -338,14 +338,12 @@ func (up *Uploader) upload(c *Ctx, cli *params,
 		return quantumfs.ObjectKey{}, err
 	}
 
-	if up.topDirRecord == nil {
-		up.dumpUploadState()
-		panic("PANIC: workspace root dir not written yet but all " +
-			"writes to workspace completed. This is unexpected. " +
-			"Use debug dump to diagnose.")
+	if up.topDirID.IsEqualTo(quantumfs.ZeroKey) {
+		c.Wlog("Empty workspace root detected.")
+		up.topDirID = quantumfs.EmptyDirKey
 	}
 
-	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirRecord.ID(),
+	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirID,
 		up.dataStore, up.hardlinks)
 	if wsrErr != nil {
 		return quantumfs.ObjectKey{}, wsrErr
