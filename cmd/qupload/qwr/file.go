@@ -59,6 +59,7 @@ func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 	if isHardlink {
 		exists, dirRecord := hl.IncrementHardLink(finfo)
 		if exists {
+			atomic.AddUint64(&DataBytesWritten, uint64(finfo.Size()))
 			// return a new thin record
 			// representing the path for existing
 			// hardlink
