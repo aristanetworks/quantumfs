@@ -138,6 +138,7 @@ func TestConcurrentHardlinkWrites(t *testing.T) {
 }
 
 func TestConcurrentHardlinkNormalization(t *testing.T) {
+	t.Skip() // BUG229656
 	runDualQuantumFsTest(t, func(test *testHelper) {
 		workspace0, workspace1 := test.setupDual()
 
