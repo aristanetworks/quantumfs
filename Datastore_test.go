@@ -117,3 +117,11 @@ func TestFileIdUniqueness(t *testing.T) {
 		}
 	})
 }
+
+func TestZeroKey(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		var emptyKey ObjectKey
+		test.Assert(ZeroKey.IsEqualTo(emptyKey),
+			"ZeroKey is not zero")
+	})
+}
