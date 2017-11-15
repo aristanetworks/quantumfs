@@ -341,7 +341,7 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 	// mountpoint
 	err := syscall.Mount("/", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, "")
 	if err != nil {
-		return fmt.Errorf("Remounting / privated error: %s", err.Error())
+		return fmt.Errorf("Remounting / private error: %s", err.Error())
 	}
 
 	var buf syscall.Statfs_t
