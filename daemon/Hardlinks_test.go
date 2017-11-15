@@ -221,6 +221,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		workspace := test.NewWorkspace()
 
 		data := GenData(2000)
+		testCtx := test.newCtx()
 
 		testFile := workspace + "/testFile"
 		err := testutils.PrintToFile(testFile, string(data))
@@ -242,7 +243,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		wsrInode := test.getInodeNum(workspace)
 		dirInode := test.getInodeNum(dirName)
 		linkInode := test.getInodeNum(linkFile)
-		test.qfs.increaseLookupCount(test.newCtx(), linkInode)
+		test.qfs.increaseLookupCount(testCtx, linkInode)
 
 		// Check that the directory parent uninstantiated, even if the
 		// Hardlink itself cannot be.
@@ -260,7 +261,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		test.WaitFor("WSR to be held by instantiated hardlink",
 			func() bool { return test.TestLogContains(msg) })
 
-		test.qfs.shouldForget(linkInode, 1)
+		test.qfs.shouldForget(testCtx, linkInode, 1)
 	})
 }
 
