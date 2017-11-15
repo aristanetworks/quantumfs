@@ -271,7 +271,7 @@ func TestEmptyDirectory(t *testing.T) {
 		workspace := test.NewWorkspace()
 
 		test.checkQuploadMatches(workspace, func() {
-			test.AssertNoErr(testutils.PrintToFile("/somefile",
+			test.AssertNoErr(testutils.PrintToFile(workspace+"/somefile",
 				"random file"))
 		})
 	})
