@@ -341,7 +341,7 @@ func (up *Uploader) upload(c *Ctx, cli *params,
 	var emptyKey quantumfs.ObjectKey
 	if up.topDirID.IsEqualTo(emptyKey) {
 		// check if the root directory is empty
-		if up.exInfo.RecordCount(root, 0) != 0 {
+		if up.exInfo != nil && up.exInfo.RecordCount(root, 0) != 0 {
 			up.dumpUploadState()
 			panic("PANIC: workspace root dir not written yet but all " +
 				"writes to workspace completed." +
