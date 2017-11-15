@@ -63,7 +63,7 @@ type Uploader struct {
 	wsDB      quantumfs.WorkspaceDB
 	exInfo    *exs.ExcludeInfo
 
-	topDirID  quantumfs.ObjectKey
+	topDirID quantumfs.ObjectKey
 
 	dirEntryTrackers map[string]*dirEntryTracker
 	dirStateMutex    utils.DeferableMutex
