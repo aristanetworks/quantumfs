@@ -583,19 +583,41 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 	return quantumfs.NewObjectKeyFromBytes(key), nil
 }
 
+const EtherSetImmutableLog = "EtherWsdbTranslator::SetWorkspaceImmutable"
+const EtherSetImmutableDebugLog = "%s/%s/%s"
+
 func (w *etherWsdbTranslator) SetWorkspaceImmutable(c *quantumfs.Ctx,
 	typespace string, namespace string, workspace string) error {
 
+	defer c.FuncIn(qlog.LogWorkspaceDb, EtherSetImmutableLog,
+		EtherSetImmutableDebugLog, typespace, namespace, workspace).Out()
 	defer w.lock.Lock().Unlock()
-	return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
-		"Ether does not support setting workspaces immutable")
+	err := w.wsdb.SetWorkspaceImmutable((*wsApiCtx)(c), typespace, namespace,
+		workspace)
+
+	if err != nil {
+		return convertWsdbError(err)
+	}
+	return nil
 }
+
+const EtherWorkspaceIsImmutableLog = "EtherWsdbTranslator::WorkspaceIsImmutable"
+const EtherWorkspaceIsImmutableDebugLog = "%s/%s/%s"
 
 func (w *etherWsdbTranslator) WorkspaceIsImmutable(c *quantumfs.Ctx,
 	typespace string, namespace string, workspace string) (bool, error) {
 
+	defer c.FuncIn(qlog.LogWorkspaceDb, EtherWorkspaceIsImmutableLog,
+		EtherWorkspaceIsImmutableDebugLog, typespace, namespace,
+		workspace).Out()
 	defer w.lock.RLock().RUnlock()
-	return false, nil
+	immutable, err := w.wsdb.WorkspaceIsImmutable((*wsApiCtx)(c), typespace,
+		namespace, workspace)
+
+	if err != nil {
+		return false, convertWsdbError(err)
+	}
+	return immutable, nil
 }
 
 func (wsdb *etherWsdbTranslator) SetCallback(
