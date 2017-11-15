@@ -371,15 +371,33 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
-	// BUG229656
-	if qfs.workspaceIsMutable(c, wsr) {
-		c.wlog("Refreshing mutable workspaces not supported")
+	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+		parts[0], parts[1], parts[2])
+
+	if err != nil {
+		c.elog("Unable to get workspace rootId")
+		return
+	}
+	if nonce != wsr.nonce {
+		c.dlog("Not refreshing workspace %s due to mismatching "+
+			"nonces %d vs %d", name, wsr.nonce, nonce)
+		return
+	}
+
+	published := func() bool {
+		defer wsr.RLockTree().RUnlock()
+		return wsr.publishedRootId.IsEqualTo(rootId)
+	}()
+
+	if published {
+		c.dlog("Not refreshing workspace %s as there has been no updates",
+			name)
 		return
 	}
 
 	defer wsr.LockTree().Unlock()
 
-	err := qfs.flusher.syncWorkspace_(c, name)
+	err = qfs.flusher.syncWorkspace_(c, name)
 	if err != nil {
 		c.elog("Unable to syncWorkspace: %s", err.Error())
 		return
@@ -390,6 +408,24 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 
 func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 	defer c.funcIn("Mux::forceMerge").Out()
+
+	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+		wsr.typespace, wsr.namespace, wsr.workspace)
+
+	if err != nil {
+		c.elog("Unable to get workspace rootId")
+		return err
+	}
+
+	if nonce != wsr.nonce {
+		c.wlog("Nothing to merge, new workspace")
+		return nil
+	}
+
+	if wsr.publishedRootId.IsEqualTo(rootId) {
+		c.dlog("Not merging as there are no updates upstream")
+		return nil
+	}
 
 	newRootId := publishWorkspaceRoot(c,
 		wsr.baseLayerId, wsr.hardlinks)
@@ -948,16 +984,10 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	}
 
 	wsr := inode.(*WorkspaceRoot)
-	wsr.realTreeLock.Lock()
-	defer wsr.realTreeLock.Unlock()
+	wsr.realTreeLock.RLock()
+	defer wsr.realTreeLock.RUnlock()
 
-	err = qfs.flusher.syncWorkspace_(c, workspace)
-	if err != nil {
-		return err
-	}
-
-	wsr.refresh_(c)
-	return nil
+	return qfs.flusher.syncWorkspace_(c, workspace)
 }
 
 func logRequestPanic(c *ctx) {
