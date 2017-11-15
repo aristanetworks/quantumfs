@@ -30,6 +30,7 @@ type dirtyInode struct {
 type triggerCmd struct {
 	flushAll bool
 	finished chan struct{}
+	ctx      *ctx
 }
 
 type FlushCmd int
@@ -90,6 +91,7 @@ func (dq *DirtyQueue) PushFront_(v interface{}) *list.Element {
 }
 
 func (dq *DirtyQueue) kicker(c *ctx) {
+	defer c.FuncIn("DirtyQueue::kicker", "%s", dq.treelock.name).Out()
 	defer logRequestPanic(c)
 
 	// When we think we have no inodes try periodically anyways to ensure sanity
@@ -128,11 +130,13 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 					dq.trigger <- triggerCmd{
 						flushAll: false,
 						finished: doneChan,
+						ctx:      c,
 					}
 				case FLUSHALL:
 					dq.trigger <- triggerCmd{
 						flushAll: true,
 						finished: doneChan,
+						ctx:      c,
 					}
 				case RETURN:
 					c.elog("RETURN with non-empty dirty queue")
@@ -263,13 +267,14 @@ func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 }
 
 func (dq *DirtyQueue) flusher(c *ctx) {
-	defer c.FuncIn("DirtyQueue::flush", "%s", dq.treelock.name).Out()
+	defer c.FuncIn("DirtyQueue::flusher", "%s", dq.treelock.name).Out()
 	defer logRequestPanic(c)
 	done := false
 	var empty struct{}
 
 	for !done {
 		trigger := <-dq.trigger
+		c = trigger.ctx
 		c.vlog("trigger, flushAll: %v", trigger.flushAll)
 
 		// NOTE: When we are triggered, the treelock *must* already
@@ -330,6 +335,7 @@ func NewFlusher() *Flusher {
 // If sync all is specified, no treelock should be locked already
 func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 	defer c.FuncIn("Flusher::sync", "%s", workspace).Out()
+
 	doneChannels := make([]chan error, 0)
 	var err error
 	func() {
@@ -349,6 +355,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 				dq.trigger <- triggerCmd{
 					flushAll: true,
 					finished: nil,
+					ctx:      c,
 				}
 			} else {
 				err = dq.TryCommand(c, FLUSHALL)
@@ -431,10 +438,8 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	treelock := inode.treeLock()
 	dq := flusher.dqs[treelock]
 	if launch {
-		nc := c.flusherCtx()
-
-		go dq.flusher(nc)
-		go dq.kicker(nc)
+		go dq.flusher(c)
+		go dq.kicker(c.flusherCtx())
 	}
 
 	dq.TryCommand(c, KICK)
