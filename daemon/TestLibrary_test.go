@@ -779,7 +779,7 @@ func (test *testHelper) waitForPropagate(file string, data []byte) {
 		fd, err := os.Open(file)
 		defer fd.Close()
 		if len(data) == 0 {
-			return err != os.ErrNotExist
+			return os.IsNotExist(err)
 		}
 
 		readData, err := ioutil.ReadFile(file)
