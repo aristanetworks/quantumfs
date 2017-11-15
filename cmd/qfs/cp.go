@@ -73,7 +73,7 @@ func cp() {
 		}
 	}
 
-	dstWorkspacePrefix := strings.Join(dstParts[i+1:], "/")
+	dstWorkspacePrefix := strings.Join(dstParts[i+2:], "/")
 
 	toProcess := make(chan copyItem, 10000)
 	wg := sync.WaitGroup{}
