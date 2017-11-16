@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -69,6 +70,8 @@ type Uploader struct {
 	dirStateMutex    utils.DeferableMutex
 
 	hardlinks *qwr.Hardlinks
+
+	dataBytesWritten	uint64
 }
 
 func NewUploader() Uploader {
@@ -144,18 +147,16 @@ func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
 	}
 }
 
-func (up *Uploader) processPath(c *Ctx, msg *pathInfo) (quantumfs.DirectoryRecord,
-	error) {
+func (up *Uploader) processPath(c *Ctx,
+	msg *pathInfo) (rtn quantumfs.DirectoryRecord, written uint64, err error) {
 
 	if !msg.info.IsDir() {
 		// WriteFile() will detect the file type based on
 		// stat information and setup appropriate data
 		// and metadata for the file in storage
 		c.Vlog("Writing %s", msg.path)
-		record, err := qwr.WriteFile(c.Qctx, up.dataStore, msg.info,
+		return qwr.WriteFile(c.Qctx, up.dataStore, msg.info,
 			msg.path, up.hardlinks)
-
-		return record, err
 	} else {
 		// walker walks non-empty directories to generate
 		// worker handles empty directory
@@ -172,11 +173,12 @@ func (up *Uploader) processPath(c *Ctx, msg *pathInfo) (quantumfs.DirectoryRecor
 				stat.Ctim.Nsec)),
 			quantumfs.EmptyDirKey)
 
-		return record, nil
+		return record, 0, nil
 	}
 }
 
 func (up *Uploader) pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
+
 	var msg *pathInfo
 
 	for {
@@ -189,10 +191,11 @@ func (up *Uploader) pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
 			}
 		}
 
-		record, err := up.processPath(c, msg)
+		record, written, err := up.processPath(c, msg)
 		if err != nil {
 			return err
 		}
+		atomic.AddUint64(&up.dataBytesWritten, written)
 
 		err = up.handleDirRecord(c.Qctx, record, filepath.Dir(msg.path),
 			func(path string,
@@ -364,13 +367,13 @@ func (up *Uploader) upload(c *Ctx, cli *params,
 
 	fmt.Printf("\nUpload completed. Total: %d bytes "+
 		"(Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
-		qwr.DataBytesWritten+qwr.MetadataBytesWritten,
-		qwr.DataBytesWritten,
-		(qwr.DataBytesWritten*100)/
-			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+		up.dataBytesWritten+qwr.MetadataBytesWritten,
+		up.dataBytesWritten,
+		(up.dataBytesWritten*100)/
+			(up.dataBytesWritten+qwr.MetadataBytesWritten),
 		qwr.MetadataBytesWritten,
 		(qwr.MetadataBytesWritten*100)/
-			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+			(up.dataBytesWritten+qwr.MetadataBytesWritten),
 		time.Since(start).Seconds(), ws)
 	return wsrKey, nil
 }

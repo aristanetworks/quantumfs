@@ -74,7 +74,8 @@ func (hl *Hardlinks) IncrementHardLink(finfo os.FileInfo) (incSuccess bool,
 }
 
 func (hl *Hardlinks) SetHardLink(finfo os.FileInfo,
-	record *quantumfs.DirectRecord) quantumfs.DirectoryRecord {
+	record *quantumfs.DirectRecord) (rtn quantumfs.DirectoryRecord,
+	newLink bool) {
 
 	// need locks to protect the map
 	defer hl.hardLinkInfoMutex.Lock().Unlock()
@@ -89,7 +90,7 @@ func (hl *Hardlinks) SetHardLink(finfo os.FileInfo,
 		hlinfo.nlinks++
 		hl.hardLinkInfoMap[stat.Ino] = hlinfo
 
-		return existingHl
+		return existingHl, false
 	}
 
 	hl.hardLinkInfoMap[stat.Ino] = &HardLinkInfo{
@@ -105,7 +106,7 @@ func (hl *Hardlinks) SetHardLink(finfo os.FileInfo,
 	newDirRecord.SetFileId(record.FileId())
 	newDirRecord.SetExtendedAttributes(quantumfs.EmptyBlockKey)
 
-	return newDirRecord
+	return newDirRecord, true
 }
 
 func (hl *Hardlinks) writeHardLinkInfo(qctx *quantumfs.Ctx,
