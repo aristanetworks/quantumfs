@@ -235,7 +235,8 @@ func merge() {
 		fmt.Println("Failed to find API:", err)
 		os.Exit(exitApiNotFound)
 	}
-	if err := api.Merge3Way(base, remote, local); err != nil {
+	err = api.Merge3Way(base, remote, local, quantumfs.PreferRemote)
+	if err != nil {
 		fmt.Println("Operation failed:", err)
 		os.Exit(exitBadArgs)
 	}
