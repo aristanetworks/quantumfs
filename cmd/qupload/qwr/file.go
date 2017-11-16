@@ -13,11 +13,9 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-var MetadataBytesWritten uint64
-
 type fileObjectWriter func(*quantumfs.Ctx, string, os.FileInfo,
-	quantumfs.DataStore) (key quantumfs.ObjectKey, bytesWritten uint64,
-	err error)
+	quantumfs.DataStore) (key quantumfs.ObjectKey, dataBytesWritten uint64,
+	metadataBytesWritten uint64, err error)
 
 func fileObjectInfo(path string,
 	finfo os.FileInfo) (quantumfs.ObjectType, fileObjectWriter, error) {
@@ -48,7 +46,7 @@ func fileObjectInfo(path string,
 func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 	finfo os.FileInfo,
 	path string, hl *Hardlinks) (record quantumfs.DirectoryRecord,
-	bytesWritten uint64, err error) {
+	dataWritten uint64, metadataWritten uint64, err error) {
 
 	stat := finfo.Sys().(*syscall.Stat_t)
 
@@ -62,22 +60,23 @@ func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 			// return a new thin record
 			// representing the path for existing
 			// hardlink
-			return dirRecord, 0, nil
+			return dirRecord, 0, 0, nil
 		}
 	}
 
 	// detect object type specific writer
 	objType, objWriter, err := fileObjectInfo(path, finfo)
 	if err != nil {
-		return nil, 0, fmt.Errorf("WriteFile object type detect "+
+		return nil, 0, 0, fmt.Errorf("WriteFile object type detect "+
 			"failed: %v", err)
 	}
 
 	// use writer to write file blocks and file type
 	// specific metadata
-	fileKey, bytesWritten, werr := objWriter(qctx, path, finfo, ds)
+	fileKey, dataWritten, metadataWritten, werr := objWriter(qctx, path, finfo,
+		ds)
 	if werr != nil {
-		return nil, 0, fmt.Errorf("WriteFile object writer %d "+
+		return nil, 0, 0, fmt.Errorf("WriteFile object writer %d "+
 			"for %q failed: %v\n",
 			objType, path, werr)
 	}
@@ -94,13 +93,14 @@ func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 		fileKey)
 
 	// write xattrs if any
-	xattrsKey, xerr := WriteXAttrs(qctx, path, ds)
+	xattrsKey, xattrWritten, xerr := WriteXAttrs(qctx, path, ds)
 	if xerr != nil {
-		return nil, 0, xerr
+		return nil, 0, 0, xerr
 	}
 	if !xattrsKey.IsEqualTo(quantumfs.EmptyBlockKey) {
 		dirRecord.SetExtendedAttributes(xattrsKey)
 	}
+	metadataWritten += xattrWritten
 
 	// initialize hardlink info from dirRecord
 	// must be last step as it needs a fully setup
@@ -113,11 +113,12 @@ func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 
 		// If this isn't a new hardlink, don't double count the contents
 		if !newLink {
-			bytesWritten = 0
+			dataWritten = 0
+			metadataWritten = 0
 		}
 	}
 
-	return dirRecord, bytesWritten, nil
+	return dirRecord, dataWritten, metadataWritten, nil
 }
 
 // caller ensures that file has at least readLen bytes without EOF

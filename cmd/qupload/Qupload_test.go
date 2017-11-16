@@ -50,7 +50,7 @@ func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 				continue
 			}
 
-			record, _, err := up.processPath(&c, msg)
+			record, _, _, err := up.processPath(&c, msg)
 			th.AssertNoErr(err)
 
 			checkedRoot = true
