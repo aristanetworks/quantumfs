@@ -60,6 +60,8 @@ func printUsage() {
 	fmt.Println("         - make <workspace> irreversibly immutable")
 	fmt.Println("  advanceWSDB <workspace> <referenceWorkspace>")
 	fmt.Println("  refresh <workspace>")
+	fmt.Println("  merge <base> <remote> <local>")
+	fmt.Println("          - Three-way workspace merge")
 	fmt.Println("  syncWorkspace <workspace>")
 }
 
@@ -101,6 +103,8 @@ func main() {
 		setWorkspaceImmutable()
 	case "refresh":
 		refresh()
+	case "merge":
+		merge()
 	case "advanceWSDB":
 		advanceWSDB()
 	case "syncWorkspace":
@@ -213,6 +217,26 @@ func refresh() {
 	}
 	if err := api.Refresh(workspace); err != nil {
 		fmt.Println("Operations failed:", err)
+		os.Exit(exitBadArgs)
+	}
+}
+
+func merge() {
+	if flag.NArg() != 4 {
+		fmt.Println("Too few arguments for merge command")
+		os.Exit(exitBadArgs)
+	}
+	base := flag.Arg(1)
+	remote := flag.Arg(2)
+	local := flag.Arg(3)
+
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
+	if err := api.Merge3Way(base, remote, local); err != nil {
+		fmt.Println("Operation failed:", err)
 		os.Exit(exitBadArgs)
 	}
 }
