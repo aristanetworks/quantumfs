@@ -10,12 +10,15 @@ import (
 )
 
 func symlinkFileWriter(qctx *quantumfs.Ctx, path string, finfo os.FileInfo,
-	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
+	ds quantumfs.DataStore) (quantumfs.ObjectKey, uint64, error) {
 
 	pointedTo, err := os.Readlink(path)
 	if err != nil {
-		return quantumfs.ZeroKey, err
+		return quantumfs.ZeroKey, 0, err
 	}
-	return writeBlock(qctx, []byte(pointedTo),
+
+	rtn, err := writeBlock(qctx, []byte(pointedTo),
 		quantumfs.KeyTypeMetadata, ds)
+
+	return rtn, 0, err
 }

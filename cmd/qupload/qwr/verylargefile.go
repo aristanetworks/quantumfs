@@ -12,13 +12,13 @@ import (
 
 func vlFileWriter(qctx *quantumfs.Ctx, path string,
 	finfo os.FileInfo,
-	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
+	ds quantumfs.DataStore) (quantumfs.ObjectKey, uint64, error) {
 
 	var mbfKeys []quantumfs.ObjectKey
 
 	file, oerr := os.Open(path)
 	if oerr != nil {
-		return quantumfs.ZeroKey, oerr
+		return quantumfs.ZeroKey, 0, oerr
 	}
 	defer file.Close()
 
@@ -28,6 +28,7 @@ func vlFileWriter(qctx *quantumfs.Ctx, path string,
 	}
 
 	remainingSize := uint64(finfo.Size())
+	totalWritten := uint64(0)
 	for parts > 0 {
 		var readSize uint64
 		if remainingSize > quantumfs.MaxLargeFileSize() {
@@ -36,10 +37,12 @@ func vlFileWriter(qctx *quantumfs.Ctx, path string,
 			readSize = remainingSize
 		}
 
-		mbfKey, err := mbFileBlocksWriter(qctx, file, readSize, ds)
+		mbfKey, bytesWritten, err := mbFileBlocksWriter(qctx, file, readSize,
+			ds)
 		if err != nil {
-			return quantumfs.ZeroKey, err
+			return quantumfs.ZeroKey, 0, err
 		}
+		totalWritten += bytesWritten
 		mbfKeys = append(mbfKeys, mbfKey)
 		remainingSize -= readSize
 
@@ -55,8 +58,8 @@ func vlFileWriter(qctx *quantumfs.Ctx, path string,
 	vlfKey, vlfErr := writeBlock(qctx, vlf.Bytes(),
 		quantumfs.KeyTypeMetadata, ds)
 	if vlfErr != nil {
-		return quantumfs.ZeroKey, vlfErr
+		return quantumfs.ZeroKey, 0, vlfErr
 	}
 	atomic.AddUint64(&MetadataBytesWritten, uint64(len(vlf.Bytes())))
-	return vlfKey, vlfErr
+	return vlfKey, totalWritten, vlfErr
 }
