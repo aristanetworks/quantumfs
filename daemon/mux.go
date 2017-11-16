@@ -984,10 +984,16 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	}
 
 	wsr := inode.(*WorkspaceRoot)
-	wsr.realTreeLock.RLock()
-	defer wsr.realTreeLock.RUnlock()
+	wsr.realTreeLock.Lock()
+	defer wsr.realTreeLock.Unlock()
 
-	return qfs.flusher.syncWorkspace_(c, workspace)
+	err = qfs.flusher.syncWorkspace_(c, workspace)
+	if err != nil {
+		return err
+	}
+
+	wsr.refresh_(c)
+	return nil
 }
 
 func logRequestPanic(c *ctx) {
