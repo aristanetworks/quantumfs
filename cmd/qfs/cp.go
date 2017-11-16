@@ -179,7 +179,8 @@ func insertPaths(jobs chan copyItem, wg *sync.WaitGroup) {
 			// at all.
 			err = os.Remove(rootPrefix + dst)
 			if err != nil && !os.IsNotExist(err) {
-				fmt.Printf("Failed removing %s\n", rootPrefix+dst)
+				fmt.Printf("Failed removing %s: %v\n",
+					rootPrefix+dst, err)
 			}
 		}
 
