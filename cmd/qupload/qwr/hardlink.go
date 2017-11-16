@@ -5,7 +5,6 @@ package qwr
 
 import (
 	"os"
-	"sync/atomic"
 	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
@@ -110,14 +109,15 @@ func (hl *Hardlinks) SetHardLink(finfo os.FileInfo,
 }
 
 func (hl *Hardlinks) writeHardLinkInfo(qctx *quantumfs.Ctx,
-	ds quantumfs.DataStore) (*quantumfs.HardlinkEntry, error) {
+	ds quantumfs.DataStore) (rtn *quantumfs.HardlinkEntry, bytesWritten uint64,
+	err error) {
 
 	// entryIdx indexes into the metadata block
 	entryNum := len(hl.hardLinkInfoMap)
 	entryNum, hle := quantumfs.NewHardlinkEntry(entryNum)
 	hleKey := quantumfs.EmptyDirKey
 	entryIdx := 0
-	var err error
+	totalWritten := uint64(0)
 	for _, hlinfo := range hl.hardLinkInfoMap {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
@@ -127,10 +127,9 @@ func (hl *Hardlinks) writeHardLinkInfo(qctx *quantumfs.Ctx,
 			hleKey, err = writeBlock(qctx, hle.Bytes(),
 				quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
-			atomic.AddUint64(&MetadataBytesWritten,
-				uint64(len(hle.Bytes())))
+			totalWritten += uint64(len(hle.Bytes()))
 
 			entryNum, hle = quantumfs.NewHardlinkEntry(entryNum)
 			entryIdx = 0
@@ -149,5 +148,5 @@ func (hl *Hardlinks) writeHardLinkInfo(qctx *quantumfs.Ctx,
 
 	// last HardLinkEntry is embedded into
 	// workspace root
-	return hle, nil
+	return hle, totalWritten, nil
 }
