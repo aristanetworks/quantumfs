@@ -428,9 +428,31 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 
 	rtnRecord := newerRecord.Clone()
 
-	// We only take fields from the older record when the newer record and base
-	// have the same value, indicating no change from that branch
-	if base != nil && local.FileId() == remote.FileId() {
+	if base == nil {
+		// Without a base we cannot be any cleverer than newest wins.
+		return rtnRecord, nil
+	}
+
+	if local.FileId() != remote.FileId() {
+		// At least one of the sides replaced the base as a deletion followed
+		// by a creation. Stay consistent with the deletion-modification
+		// scenario and keep the newly created file.
+		if local.FileId() == base.FileId() {
+			// The remote recreated
+			return remote.Clone(), nil
+		} else if remote.FileId() == base.FileId() {
+			// The local recreated
+			return local.Clone(), nil
+		} else {
+			// Both recreated, keep the most recently created
+			return newerRecord.Clone(), nil
+		}
+	} else {
+		// local.FileId() == remote.FileId()
+		//
+		// We only take fields from the older record when the newer record and base
+		// have the same value, indicating no change from that branch
+
 		if base.ID() == newerRecord.ID() {
 			rtnRecord.SetID(olderRecord.ID())
 			// type and size must match the content set via ID
