@@ -294,7 +294,8 @@ type Api interface {
 	// Local takes precedence if remote and local have a conflict and matching
 	// modification times. It is also the workspace who is Advanced to the
 	// resulting ID.
-	Merge3Way(base string, remote string, local string) error
+	Merge3Way(base string, remote string, local string,
+		conflictPreference int) error
 
 	// Get the list of accessed file from workspaceroot
 	GetAccessed(wsr string) (*PathsAccessed, error)
@@ -417,11 +418,20 @@ type BranchRequest struct {
 	Dst string
 }
 
+// How to handle conflicts when both sides of the merge have differences versus
+// the base.
+const (
+	PreferNewer  = 0 // Most like filesystem semantics
+	PreferRemote = 1
+	PreferLocal  = 2
+)
+
 type MergeRequest struct {
 	CommandCommon
-	BaseWorkspace   string
-	RemoteWorkspace string
-	LocalWorkspace  string
+	BaseWorkspace      string
+	RemoteWorkspace    string
+	LocalWorkspace     string
+	ConflictPreference int // One of Prefer* above
 }
 
 type RefreshRequest struct {
@@ -561,10 +571,12 @@ func (api *apiImpl) Branch(src string, dst string) error {
 }
 
 func (api *apiImpl) Merge(remote string, local string) error {
-	return api.Merge3Way(NullWorkspaceName, remote, local)
+	return api.Merge3Way(NullWorkspaceName, remote, local, PreferNewer)
 }
 
-func (api *apiImpl) Merge3Way(base string, remote string, local string) error {
+func (api *apiImpl) Merge3Way(base string, remote string, local string,
+	prefer int) error {
+
 	if !isWorkspaceNameValid(base) {
 		return fmt.Errorf("\"%s\" (as base) must be an empty string or "+
 			"contain precisely two \"/\"\n", base)
@@ -580,10 +592,11 @@ func (api *apiImpl) Merge3Way(base string, remote string, local string) error {
 	}
 
 	cmd := MergeRequest{
-		CommandCommon:   CommandCommon{CommandId: CmdMergeWorkspaces},
-		BaseWorkspace:   base,
-		RemoteWorkspace: remote,
-		LocalWorkspace:  local,
+		CommandCommon:      CommandCommon{CommandId: CmdMergeWorkspaces},
+		BaseWorkspace:      base,
+		RemoteWorkspace:    remote,
+		LocalWorkspace:     local,
+		ConflictPreference: prefer,
 	}
 	return api.processCmd(cmd, nil)
 }
