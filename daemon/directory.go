@@ -224,7 +224,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
 	attr.Ctimensec = entry.ContentTime().Nanoseconds()
 
-	c.dlog("fillAttrWithDirectoryRecord type %x permissions %o links %d",
+	c.dlog("type %x permissions %o links %d",
 		fileType, entry.Permissions(), attr.Nlink)
 
 	attr.Mode = fileType | permissionsToMode(entry.Permissions())
@@ -1300,7 +1300,7 @@ func getRecordExtendedAttributes(c *ctx,
 	fuse.Status) {
 
 	if attrKey.IsEqualTo(quantumfs.EmptyBlockKey) {
-		c.vlog("Directory::getRecordExtendedAttributes returning new object")
+		c.vlog("getRecordExtendedAttributes returning new object")
 		return nil, fuse.ENOENT
 	}
 

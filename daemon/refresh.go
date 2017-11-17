@@ -249,6 +249,7 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 
 // The caller must hold the tree lock
 func (wsr *WorkspaceRoot) moveDentries_(c *ctx, rc *RefreshContext) {
+	defer c.funcIn("WorkspaceRoot::moveDentries_").Out()
 	wsName := wsr.typespace + "/" + wsr.namespace + "/" + wsr.workspace
 	for _, loadRecord := range rc.fileMap {
 		if loadRecord.moved {
