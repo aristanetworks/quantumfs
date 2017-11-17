@@ -20,5 +20,5 @@ func symlinkFileWriter(qctx *quantumfs.Ctx, path string, finfo os.FileInfo,
 	rtn, err := writeBlock(qctx, []byte(pointedTo),
 		quantumfs.KeyTypeMetadata, ds)
 
-	return rtn, 0, 0, err
+	return rtn, 0, uint64(len(pointedTo)), err
 }
