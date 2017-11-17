@@ -71,8 +71,8 @@ type Uploader struct {
 
 	hardlinks *qwr.Hardlinks
 
-	dataBytesWritten	uint64
-	metadataBytesWritten	uint64
+	dataBytesWritten     uint64
+	metadataBytesWritten uint64
 }
 
 func NewUploader() Uploader {
