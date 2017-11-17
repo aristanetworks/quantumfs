@@ -10,16 +10,18 @@
 # - Pushing the release tag. Use the command: git push origin <tagname>
 # - Publishing the resulting RPM
 
-if [ -z "$1" ]; then
-        echo "Usage: $0 <version>"
-        echo "ie $0 0.2.1"
+if [ -z "$2" ]; then
+        echo "Usage: $0 <versionName> <commitID>"
+        echo "ie $0 0.2.1 f66159e18"
         exit
 fi
 
 version="v$1"
+commit=$2
 
-gut switch master
 gut sync
+gut switch $commit
+git reset --hard
 
 git tag -a $version
 make clean
