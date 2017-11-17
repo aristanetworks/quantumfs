@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils/excludespec"
 	"golang.org/x/net/context"
@@ -315,6 +316,9 @@ func TestUploadBytes(t *testing.T) {
 				dataWritten = data
 				metadataWritten = metadata
 			}
+			test.TestCtx().Vlog(qlog.LogTest,
+				"Qupload iteration %d: %d %d", i, data,
+				metadataWritten)
 
 			test.Assert(data == dataWritten,
 				"Number of data bytes changed: %d vs %d", data,
