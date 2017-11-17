@@ -290,18 +290,21 @@ func TestUploadBytes(t *testing.T) {
 		// create a whole bunch of hardlinks and files to generate
 		// as much possibility for concurrency issues as possible
 		for i := 0; i < 100; i++ {
-			file := workspace+fmt.Sprintf("/file%d", i)
-			test.AssertNoErr(testutils.PrintToFile(file, fmt.Sprintf(""+
-				"%d", i)))
+			prefix := workspace+fmt.Sprintf("/iter%d", i)
+			test.AssertNoErr(testutils.PrintToFile(prefix+"_file",
+				fmt.Sprintf("%d", i)))
 
-			for j := 0; j < 10; j++ {
-				syscall.Link(file, workspace+
-					fmt.Sprintf("/link%d_%d", i, j))
+			for j := 0; j < 4; j++ {
+				syscall.Link(prefix+"_file", prefix+
+					fmt.Sprintf("_link%d_%d", i, j))
 			}
+
+			test.AssertNoErr(os.Symlink(prefix, prefix+"_symlink"))
+			test.AssertNoErr(os.Mkdir(prefix+"_dir", 0777))
 		}
 
 		var dataWritten, metadataWritten uint64
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 4; i++ {
 			data, metadata := test.checkQuploadMatches(workspace,
 				func() {
 					test.AssertNoErr(testutils.PrintToFile(""+
