@@ -28,6 +28,8 @@ func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]linkEntry,
 	remote map[quantumfs.FileId]linkEntry, local map[quantumfs.FileId]linkEntry,
 	prefer int) *hardlinkTracker {
 
+	defer c.funcIn("newHardlinkTracker").Out()
+
 	rtn := hardlinkTracker{
 		allRecords: make(map[quantumfs.FileId]*quantumfs.DirectRecord),
 		merged:     make(map[quantumfs.FileId]linkEntry),
@@ -138,6 +140,8 @@ func loadWorkspaceRoot(c *ctx,
 	key quantumfs.ObjectKey) (hardlinks map[quantumfs.FileId]linkEntry,
 	directory quantumfs.ObjectKey, err error) {
 
+	defer c.funcIn("loadWorkspaceRoot").Out()
+
 	buffer := c.dataStore.Get(&c.Ctx, key)
 	if buffer == nil {
 		return nil, key,
@@ -185,6 +189,8 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 
 func loadRecords(c *ctx,
 	key quantumfs.ObjectKey) (map[string]quantumfs.DirectoryRecord, error) {
+
+	defer c.funcIn("loadRecords").Out()
 
 	rtn := make(map[string]quantumfs.DirectoryRecord)
 
