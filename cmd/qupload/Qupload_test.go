@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -101,12 +102,15 @@ func TestFileMatches(t *testing.T) {
 	})
 }
 
-func (test *testHelper) checkQuploadMatches(workspace string, triggerErr func()) {
+func (test *testHelper) checkQuploadMatches(workspace string,
+	triggerErr func()) (dataWritten uint64, metadataWritten uint64) {
+
 	workspaceB := "test/test/quploaded"
 
 	up := NewUploader()
 
 	// setup exclude to ignore the api file
+	os.Remove(test.TempDir+"/exInfo")
 	test.AssertNoErr(testutils.PrintToFile(test.TempDir+"/exInfo",
 		"api"))
 	var err error
@@ -160,6 +164,8 @@ func (test *testHelper) checkQuploadMatches(workspace string, triggerErr func())
 				output)
 		}
 	}
+
+	return up.dataBytesWritten, up.metadataBytesWritten
 }
 
 func TestFilesAndDir(t *testing.T) {
@@ -274,5 +280,45 @@ func TestEmptyDirectory(t *testing.T) {
 			test.AssertNoErr(testutils.PrintToFile(workspace+"/somefile",
 				"random file"))
 		})
+	})
+}
+
+func TestUploadBytes(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		// create a whole bunch of hardlinks and files to generate
+		// as much possibility for concurrency issues as possible
+		for i := 0; i < 100; i++ {
+			file := workspace+fmt.Sprintf("/file%d", i)
+			test.AssertNoErr(testutils.PrintToFile(file, fmt.Sprintf(""+
+				"%d", i)))
+
+			for j := 0; j < 10; j++ {
+				syscall.Link(file, workspace+
+					fmt.Sprintf("/link%d_%d", i, j))
+			}
+		}
+
+		var dataWritten, metadataWritten uint64
+		for i := 0; i < 10; i++ {
+			data, metadata := test.checkQuploadMatches(workspace,
+				func() {
+					test.AssertNoErr(testutils.PrintToFile(""+
+						workspace+"/wrongfile", "some data"))
+				})
+
+			if i == 0 {
+				dataWritten = data
+				metadataWritten = metadata
+			}
+
+			test.Assert(data == dataWritten,
+				"Number of data bytes changed: %d vs %d", data,
+				dataWritten)
+			test.Assert(metadata == metadataWritten,
+				"Number of metadata bytes changed: %d vs %d",
+				metadata, metadataWritten)
+		}
 	})
 }
