@@ -112,7 +112,7 @@ func (up *Uploader) dumpUploadState() {
 }
 
 func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
-	record quantumfs.DirectoryRecord, path string) error {
+	record quantumfs.DirectoryRecord, path string) (err error) {
 
 	defer up.dirStateMutex.Lock().Unlock()
 
@@ -129,7 +129,8 @@ func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
 			return nil
 		}
 		qctx.Vlog(qlog.LogTool, "Writing %s", path)
-		record, written, err := qwr.WriteDirectory(qctx, path, tracker.info,
+		var written uint64
+		record, written, err = qwr.WriteDirectory(qctx, path, tracker.info,
 			tracker.records, up.dataStore)
 		if err != nil {
 			return err
