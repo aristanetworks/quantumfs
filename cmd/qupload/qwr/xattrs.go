@@ -23,7 +23,7 @@ func WriteXAttrs(qctx *quantumfs.Ctx, path string,
 	}
 
 	if sizeofXAttrs == 0 {
-		return quantumfs.EmptyBlockKey, 0,nil
+		return quantumfs.EmptyBlockKey, 0, nil
 	}
 
 	var xattrs []byte

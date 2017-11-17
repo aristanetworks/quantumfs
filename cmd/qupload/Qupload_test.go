@@ -115,7 +115,7 @@ func (test *testHelper) checkQuploadMatches(workspace string,
 	up := NewUploader()
 
 	// setup exclude to ignore the api file
-	os.Remove(test.TempDir+"/exInfo")
+	os.Remove(test.TempDir + "/exInfo")
 	test.AssertNoErr(testutils.PrintToFile(test.TempDir+"/exInfo",
 		"api"))
 	var err error
@@ -295,7 +295,7 @@ func TestUploadBytes(t *testing.T) {
 		// create a whole bunch of hardlinks and files to generate
 		// as much possibility for concurrency issues as possible
 		for i := 0; i < 20; i++ {
-			prefix := workspace+fmt.Sprintf("/iter%d", i)
+			prefix := workspace + fmt.Sprintf("/iter%d", i)
 			test.AssertNoErr(testutils.PrintToFile(prefix+"_file",
 				fmt.Sprintf("%d", i)))
 
@@ -316,7 +316,7 @@ func TestUploadBytes(t *testing.T) {
 						workspace+"/wrongfile", "some data"))
 				})
 			// Make sure to remove the "wrongfile"
-			test.AssertNoErr(os.Remove(workspace+"/wrongfile"))
+			test.AssertNoErr(os.Remove(workspace + "/wrongfile"))
 
 			if i == 0 {
 				dataWritten = data
