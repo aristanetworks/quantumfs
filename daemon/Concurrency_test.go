@@ -134,7 +134,6 @@ func TestConcurrentHardlinkWrites(t *testing.T) {
 }
 
 func TestConcurrentHardlinkNormalization(t *testing.T) {
-	t.Skip() // BUG229656
 	runDualQuantumFsTest(t, func(test *testHelper) {
 		workspace0, workspace1 := test.setupDual()
 
@@ -151,6 +150,7 @@ func TestConcurrentHardlinkNormalization(t *testing.T) {
 		test.AssertNoErr(syscall.Link(workspace0+fileA, workspace0+fileC))
 
 		test.waitForPropagate(workspace1+fileB, dataA)
+		test.waitForPropagate(workspace1+fileC, dataA)
 		_, err := os.Stat(workspace1 + fileA)
 		test.AssertNoErr(err)
 
