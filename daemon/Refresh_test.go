@@ -1593,3 +1593,46 @@ func TestRefreshDualInstances(t *testing.T) {
 		test.assertNoFile(workspace0 + "/" + name)
 	})
 }
+
+func TestRefreshDirReCreate(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		ctx := test.TestCtx()
+		dir1 := workspace + "/dir1"
+		dir2 := workspace + "/dir2"
+		filename := "testfile"
+		content1 := "original content"
+		content2 := "CONTENT2"
+
+		test.AssertNoErr(syscall.Mkdir(dir1, 0777))
+		CreateSmallFile(dir1+"/"+filename, content1)
+		test.SyncWorkspace(test.RelPath(workspace))
+		newRootId1 := test.getRootId(workspace)
+
+		test.AssertNoErr(syscall.Mkdir(dir2, 0777))
+		test.moveFile(workspace, "dir1/"+filename, "dir2/"+filename)
+		test.AssertNoErr(testutils.OverWriteFile(
+			dir2+"/"+filename, content2))
+		test.AssertNoErr(syscall.Rmdir(dir1))
+		test.AssertNoErr(syscall.Mkdir(dir1, 0777))
+
+		file, err := os.OpenFile(dir2+"/"+filename, os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+		test.verifyContentStartsWith(file, content2)
+
+		test.SyncWorkspace(test.RelPath(workspace))
+		newRootId2 := test.getRootId(workspace)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		test.verifyContentStartsWith(file, content1)
+		test.AssertNoErr(file.Close())
+
+		file, err = os.OpenFile(dir1+"/"+filename, os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+		test.verifyContentStartsWith(file, content1)
+		test.removeFile(workspace, "dir1/"+filename)
+		test.AssertNoErr(syscall.Rmdir(dir1))
+		test.AssertNoErr(file.Close())
+	})
+}
