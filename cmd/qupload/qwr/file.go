@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -48,6 +49,7 @@ func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 	path string, hl *Hardlinks) (record quantumfs.DirectoryRecord,
 	dataWritten uint64, metadataWritten uint64, err error) {
 
+	qctx.Vlog(qlog.LogTest, "WriteFile %s", path)
 	stat := finfo.Sys().(*syscall.Stat_t)
 
 	// process hardlink first since we can
