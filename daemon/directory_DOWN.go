@@ -330,7 +330,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 			moved := remoteRecord == nil ||
 				remoteRecord.FileId() != localRecord.FileId()
 			rc.attachLocalRecord(c, dir.inodeNum(), childId, moved,
-				localRecord)
+				localRecord, remoteRecord)
 		} else {
 			rc.addStaleEntry(c, dir.inodeNum(), childId, localRecord)
 		}
