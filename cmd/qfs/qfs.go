@@ -64,7 +64,7 @@ func printUsage() {
 	fmt.Println("          - Three-way workspace merge")
 	fmt.Println("          -n - Prefer newer in conflicts (default)")
 	fmt.Println("          -l - Prefer local in conflicts")
-	fmt.Println("          -p - Prefer remote in conflicts")
+	fmt.Println("          -r - Prefer remote in conflicts")
 	fmt.Println("  syncWorkspace <workspace>")
 }
 
@@ -250,7 +250,7 @@ func merge() {
 				prefer = quantumfs.PreferNewer
 			case 'l':
 				prefer = quantumfs.PreferLocal
-			case 'p':
+			case 'r':
 				prefer = quantumfs.PreferRemote
 			}
 		}
