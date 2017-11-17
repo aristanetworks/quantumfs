@@ -972,9 +972,12 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFBLK) ||
 			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFCHR) {
 
+			zeroSpecial := quantumfs.NewObjectKey(0+
+				quantumfs.KeyTypeEmbedded,
+				[quantumfs.ObjectKeyLength - 1]byte{})
 			dir.create_(c, name, input.Mode, input.Umask, input.Rdev,
 				newSpecial, quantumfs.ObjectTypeSpecial,
-				quantumfs.ZeroKey, out)
+				zeroSpecial, out)
 		} else if utils.BitFlagsSet(uint(input.Mode), syscall.S_IFREG) {
 			dir.create_(c, name, input.Mode, input.Umask, 0,
 				newSmallFile, quantumfs.ObjectTypeSmallFile,
