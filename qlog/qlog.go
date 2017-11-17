@@ -79,32 +79,55 @@ const (
 	QlogReqId
 	TestReqId
 	RefreshReqId
-	MinSpecialReqId
+	MinFixedReqId
 )
 
 const (
+	MinSpecialReqId     = uint64(0xb) << 48
 	FlusherRequestIdMin = uint64(0xb) << 48
 	RefreshRequestIdMin = uint64(0xc) << 48
 	ForgetRequstIdMin   = uint64(0xd) << 48
+	UnusedRequestIdMin  = uint64(0xe) << 48
 )
 
 const TimeFormat = "2006-01-02T15:04:05.000000000"
 
 func SpecialReq(reqId uint64) string {
-	switch reqId {
-	default:
-		return "UNKNOWN"
-	case MuxReqId:
-		return "[Mux]"
-	case FlushReqId:
-		return "[Flush]"
-	case QlogReqId:
-		return "[Qlog]"
-	case TestReqId:
-		return "[Test]"
-	case RefreshReqId:
-		return "[Refresh]"
+	if reqId > MinFixedReqId {
+		switch reqId {
+		default:
+			return "UNKNOWN"
+		case MuxReqId:
+			return "[Mux]"
+		case FlushReqId:
+			return "[Flush]"
+		case QlogReqId:
+			return "[Qlog]"
+		case TestReqId:
+			return "[Test]"
+		case RefreshReqId:
+			return "[Refresh]"
+		}
 	}
+
+	var format string
+	var offset uint64
+	switch {
+	default:
+		format = "%d"
+		offset = 0
+	case FlusherRequestIdMin <= reqId && reqId < RefreshRequestIdMin:
+		format = "[Flush%d]"
+		offset = FlusherRequestIdMin
+	case RefreshRequestIdMin <= reqId && reqId < ForgetRequstIdMin:
+		format = "[Refresh%d]"
+		offset = RefreshRequestIdMin
+	case ForgetRequstIdMin <= reqId && reqId < UnusedRequestIdMin:
+		format = "[Forget%d]"
+		offset = ForgetRequstIdMin
+	}
+
+	return fmt.Sprintf(format, reqId-offset)
 }
 
 var logSubsystem = []string{}

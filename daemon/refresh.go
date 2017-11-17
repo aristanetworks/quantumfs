@@ -68,11 +68,21 @@ func (rc *RefreshContext) addStaleEntry(c *ctx, parentId InodeId, inodeId InodeI
 }
 
 func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
-	inodeId InodeId, moved bool, localRecord quantumfs.DirectoryRecord) {
+	inodeId InodeId, moved bool, localRecord quantumfs.DirectoryRecord,
+	remoteRecord quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("RefreshContext::attachLocalRecord", "name %s inode %d",
 		localRecord.Filename(), inodeId).Out()
-	loadRecord := rc.fileMap[localRecord.FileId()]
+	loadRecord, found := rc.fileMap[localRecord.FileId()]
+	if !found {
+		utils.Assert(localRecord.Type() == quantumfs.ObjectTypeDirectory,
+			"Did not find loadRecord for %d", localRecord.FileId())
+		// The dentry has been re-created, update its fileId to match the new
+		// incarnation
+		localRecord.SetFileId(remoteRecord.FileId())
+		loadRecord = rc.fileMap[remoteRecord.FileId()]
+		moved = false
+	}
 	loadRecord.localRecord = localRecord
 	loadRecord.inodeId = inodeId
 	loadRecord.parentId = parentId
