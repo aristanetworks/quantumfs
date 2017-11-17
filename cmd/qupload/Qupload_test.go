@@ -6,12 +6,14 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -106,7 +108,9 @@ func TestFileMatches(t *testing.T) {
 func (test *testHelper) checkQuploadMatches(workspace string,
 	triggerErr func()) (dataWritten uint64, metadataWritten uint64) {
 
-	workspaceB := "test/test/quploaded"
+	// give it a random suffix to ensure multiple calls don't collide
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	workspaceB := fmt.Sprintf("test/test/quploaded_%d", r.Uint32())
 
 	up := NewUploader()
 
@@ -290,7 +294,7 @@ func TestUploadBytes(t *testing.T) {
 
 		// create a whole bunch of hardlinks and files to generate
 		// as much possibility for concurrency issues as possible
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 20; i++ {
 			prefix := workspace+fmt.Sprintf("/iter%d", i)
 			test.AssertNoErr(testutils.PrintToFile(prefix+"_file",
 				fmt.Sprintf("%d", i)))
@@ -311,6 +315,8 @@ func TestUploadBytes(t *testing.T) {
 					test.AssertNoErr(testutils.PrintToFile(""+
 						workspace+"/wrongfile", "some data"))
 				})
+			// Make sure to remove the "wrongfile"
+			test.AssertNoErr(os.Remove(workspace+"/wrongfile"))
 
 			if i == 0 {
 				dataWritten = data
@@ -321,11 +327,11 @@ func TestUploadBytes(t *testing.T) {
 				metadataWritten)
 
 			test.Assert(data == dataWritten,
-				"Number of data bytes changed: %d vs %d", data,
-				dataWritten)
+				"Number of data bytes changed: %d vs %d",
+				dataWritten, data)
 			test.Assert(metadata == metadataWritten,
 				"Number of metadata bytes changed: %d vs %d",
-				metadata, metadataWritten)
+				metadataWritten, metadata)
 		}
 	})
 }
