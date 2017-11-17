@@ -655,7 +655,7 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 	iterator = localAccessor
 	otherRecord = remote
 	other = remoteAccessor
-	if localAccessor.fileLength(c) > remoteAccessor.fileLength(c) {
+	if local.Size() > remote.Size() {
 		iteratorRecord = remote
 		iterator = remoteAccessor
 		otherRecord = local
