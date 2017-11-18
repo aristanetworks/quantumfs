@@ -110,14 +110,17 @@ func (cw *cacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 			return nil, err
 		}
 
-		// If nonceStr is longer than 1, then panic
+		var nonce wsdb.WorkspaceNonce
+		// There should be exactlty 1 nonce for a ts/ns/ws
 		if len(nonceStr) != 1 {
-			panic(fmt.Sprintf("%d nonces for %s/%s/%s", len(nonceStr),
-				typespace, namespace, ws))
-		}
-		nonce, err := wsdb.StringToNonce(nonceStr[0])
-		if err != nil {
-			panic(fmt.Sprintf("Nonce is not a valid int64: %s", err.Error()))
+			nonce = wsdb.WorkspaceNonce(0)
+			c.Elog("cacheWsdb::WorkspaceList %d nonces for %s/%s/%s", len(nonceStr),
+				typespace, namespace, ws)
+		} else {
+			nonce, err = wsdb.StringToNonce(nonceStr[0])
+			if err != nil {
+				panic(fmt.Sprintf("Nonce is not a valid int64: %s", err.Error()))
+			}
 		}
 		wsMap[ws] = wsdb.WorkspaceNonce(nonce)
 	}
