@@ -111,7 +111,7 @@ func (cw *cacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 		}
 
 		// If nonceStr is longer than 1, then panic
-		if len(nonceStr) > 1 {
+		if len(nonceStr) != 1 {
 			panic(fmt.Sprintf("%d nonces for %s/%s/%s", len(nonceStr),
 				typespace, namespace, ws))
 		}

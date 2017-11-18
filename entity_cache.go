@@ -500,7 +500,7 @@ func newEntityGroup(parent *entityGroup, parentEntity string,
 	newGroup.fetchInProgress = false
 	newGroup.parent = parent
 	newGroup.parentEntity = parentEntity
-	newGroup.expiresAt = time.Now()
+	newGroup.expiresAt = time.Date(0, time.January, 0, 0, 0, 0, 0, time.UTC)
 	newGroup.cache = ec
 	newGroup.detached = false
 	newGroup.concLocalInserts = make(map[string]bool)
@@ -512,9 +512,10 @@ func newEntityGroup(parent *entityGroup, parentEntity string,
 // called under rwMutex read lock
 func (g *entityGroup) refreshNeeded(c ether.Ctx) bool {
 	defer c.FuncIn("cache::refreshNeeded",
-		"p:%s c:%d e:%s d:%s",
+		"p:%s c:%d e:%s now:%s d:%s",
 		g.parentEntity, g.entityCount,
-		g.expiresAt.Format(time.UnixDate),
+		g.expiresAt.Format(time.RFC3339Nano),
+		time.Now().Format(time.RFC3339Nano),
 		strconv.FormatBool(g.detached)).Out()
 
 	if g.cache.neverExpires {
@@ -537,6 +538,7 @@ func (g *entityGroup) refreshNeeded(c ether.Ctx) bool {
 			// upgrade
 			g.fetchInProgress = true
 		}
+		c.Vlog("cache::refreshNeeded swapped:%s", strconv.FormatBool(swapped))
 		return swapped
 	}
 
@@ -553,6 +555,10 @@ func (g *entityGroup) checkInsertEntity(c ether.Ctx, entity string, local bool) 
 	_, exists := g.entities[entity]
 
 	if !exists {
+		c.Vlog("cache::checkInsertEntity entity does not exist for "+
+			"e:%s l:%s p:%s c:%d d:%s",
+			entity, strconv.FormatBool(local), g.parentEntity,
+			g.entityCount, strconv.FormatBool(g.detached))
 		newGroup := newEntityGroup(g, entity, g.cache)
 		g.entities[entity] = newGroup
 		g.entityCount++
