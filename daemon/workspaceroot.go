@@ -59,7 +59,7 @@ func newLinkEntry(record_ *quantumfs.DirectRecord) linkEntry {
 func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	typespace string, namespace string) {
 
-	defer c.FuncIn("fillWorkspaceAttrFake", "inode %d typespace %s namespace %s",
+	defer c.FuncIn("fillWorkspaceAttrFake", "inode %d %s/%s",
 		inodeNum, typespace, namespace).Out()
 
 	fillAttr(attr, inodeNum, 27)
@@ -266,7 +266,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx,
 	fileId quantumfs.FileId, inodeId InodeId) InodeId {
 
-	defer c.FuncIn("WorkspaceRoot::getHardlinkInodeId", "fileId %d, inodeId %d",
+	defer c.FuncIn("WorkspaceRoot::getHardlinkInodeId", "%d inode %d",
 		fileId, inodeId).Out()
 	defer wsr.linkLock.Lock().Unlock()
 
@@ -518,7 +518,7 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 // Workspace must be synced first, with the tree locked exclusively across both the
 // sync and this refresh
 func (wsr *WorkspaceRoot) refresh_(c *ctx) {
-	defer c.funcIn("WorkspaceRoot::refresh").Out()
+	defer c.funcIn("WorkspaceRoot::refresh_").Out()
 
 	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
 		wsr.typespace, wsr.namespace, wsr.workspace)
@@ -757,8 +757,8 @@ func (wsr *WorkspaceRoot) markAccessed(c *ctx, path string, op quantumfs.PathFla
 func (wsr *WorkspaceRoot) markHardlinkAccessed(c *ctx, fileId quantumfs.FileId,
 	op quantumfs.PathFlags) {
 
-	defer c.FuncIn("WorkspaceRoot::markHardlinkAccessed",
-		"fileId %d CRUD %x", fileId, op).Out()
+	defer c.FuncIn("WorkspaceRoot::markHardlinkAccessed", "%d %x",
+		fileId, op).Out()
 
 	wsr.accessList.markHardlinkAccessed(c, fileId, op)
 }
@@ -808,7 +808,7 @@ func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func (wsr *WorkspaceRoot) flushCanFail(c *ctx) (quantumfs.ObjectKey, bool) {
-	defer c.funcIn("WorkspaceRoot::flush").Out()
+	defer c.funcIn("WorkspaceRoot::flushCanFail").Out()
 
 	wsr.Directory.flush(c)
 	success := wsr.publish(c)
