@@ -19,20 +19,20 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// SkipKey is used as a return value from WalkFunc to indicate that
-// the key named in the call is to be skipped. It is not returned
+// SkipError is used as a return value from WalkFunc to indicate that
+// the directory named in the call is to be skipped. It is not returned
 // as an error by any function.
-var SkipKey = errors.New("skip this key")
+var SkipError = errors.New("skip this key")
 
 // WalkFunc is the type of the function called for each data block under the
 // Workspace.
 //
 // NOTE
-// Walker in this package honors SkipKey only when walkFunc is called for a
+// Walker in this package honors SkipError only when walkFunc is called for a
 // directory.
 //
 // This is a key difference from path/filepath.Walk,
-// in which if filepath.Walkunc returns SkipKey when invoked on a
+// in which if filepath.Walkunc returns SkipError when invoked on a
 // non-directory file, Walk skips the remaining files in the
 // containing directory.
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
@@ -142,7 +142,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 		if err = handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
 			keyChan); err != nil {
-			if err == SkipKey {
+			if err == SkipError {
 				return nil
 			}
 			return err
@@ -267,13 +267,13 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"DirectoryEntry buffer %s", key.String())
 
-		// When wf returns SkipKey for a DirectoryEntry, we can skip all the
+		// When wf returns SkipError for a DirectoryEntry, we can skip all the
 		// DirectoryRecord in that DirectoryEntry
 		if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
 			// TODO(sid): See how this works with chain DirectoryEntries.
 			//            Since we check only the first of the many
 			//            chained DiretoryEntries.
-			if err == SkipKey {
+			if err == SkipError {
 				return nil
 			}
 			return err
