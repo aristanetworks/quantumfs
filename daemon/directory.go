@@ -949,6 +949,7 @@ func (dir *Directory) Readlink(c *ctx) ([]byte, fuse.Status) {
 }
 
 var zeroSpecial quantumfs.ObjectKey
+
 func init() {
 	zeroSpecial = quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded,
 		[quantumfs.ObjectKeyLength - 1]byte{})
