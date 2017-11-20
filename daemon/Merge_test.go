@@ -788,36 +788,43 @@ func TestMergeSkipDirectories(t *testing.T) {
 				test.AssertNoErr(utils.MkdirAll(
 					bws+"/merge1/merge2/skip", 0777))
 				test.AssertNoErr(testutils.PrintToFile(
-					bws+"/merge1/merge2/skip/skipped", "skipped"))
-				test.AssertNoErr(utils.MkdirAll(bws+"/merge3/merge4", 0777))
+					bws+"/merge1/merge2/skip/skipped",
+					"skipped"))
+				test.AssertNoErr(utils.MkdirAll(
+					bws+"/merge3/merge4", 0777))
 			}, func(branchA string, branchB string) mergeTestCheck {
 				test.AssertNoErr(testutils.PrintToFile(
 					branchA+"/merge1/local1", "local1"))
 				test.AssertNoErr(testutils.PrintToFile(
 					branchA+"/merge1/merge2/local2", "local2"))
 				test.AssertNoErr(testutils.PrintToFile(
-					branchA+"/merge1/merge2/skip/local3", "local3"))
+					branchA+"/merge1/merge2/skip/local3",
+					"local3"))
 
 				test.AssertNoErr(testutils.PrintToFile(
 					branchB+"/merge1/remote1", "remote1"))
 				test.AssertNoErr(testutils.PrintToFile(
 					branchB+"/merge1/merge2/remote2", "remote2"))
 				test.AssertNoErr(testutils.PrintToFile(
-					branchB+"/merge1/merge2/skip/remote3", "remote3"))
+					branchB+"/merge1/merge2/skip/remote3",
+					"remote3"))
 				test.AssertNoErr(testutils.PrintToFile(
 					branchB+"/merge3/merge4/remote4", "remote4"))
 
 				return func(merged string) {
-					test.assertFileExists(merged + "/merge1/local1")
-					test.assertFileExists(merged + "/merge1/merge2/local2")
 					test.assertFileExists(
-						merged + "/merge1/merge2/skip/local3")
+						merged + "/merge1/local1")
+					test.assertFileExists(
+						merged + "/merge1/merge2/local2")
+					test.assertFileExists(merged +
+						"/merge1/merge2/skip/local3")
 
-					test.assertFileExists(merged + "/merge1/remote1")
+					test.assertFileExists(
+						merged + "/merge1/remote1")
 					test.assertFileExists(
 						merged + "/merge1/merge2/remote2")
-					test.assertNoFile(
-						merged + "/merge1/merge2/skip/remote3")
+					test.assertNoFile(merged +
+						"/merge1/merge2/skip/remote3")
 					test.assertFileExists(
 						merged + "/merge3/merge4/remote4")
 				}
