@@ -1373,8 +1373,6 @@ func calcMaxBlocksLargeFile(maxSize int) int {
 }
 
 func init() {
-	ZeroKey = NewObjectKey(KeyTypeEmbedded, [ObjectKeyLength - 1]byte{})
-
 	if MaxBlockSize > 1024*1024*1024 || MaxBlockSize < 32*1024 {
 		// if a MaxBlockSize beyond this range is needed then
 		// notions like max medium file type size is 32MB etc needs
