@@ -323,7 +323,7 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	defer logRequestPanic(c)
 	parts := strings.Split(name, "/")
 
-	wsrLineage, err := qfs.getWorkspaceRootLineageNoInstantiate(c,
+	wsrLineage, err := qfs.getWsrLineageNoInstantiate(c,
 		parts[0], parts[1], parts[2])
 	if err != nil {
 		c.elog("getting wsrLineage failed: %s", err.Error())
@@ -371,15 +371,33 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
-	// BUG229656
-	if qfs.workspaceIsMutable(c, wsr) {
-		c.wlog("Refreshing mutable workspaces not supported")
+	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+		parts[0], parts[1], parts[2])
+
+	if err != nil {
+		c.elog("Unable to get workspace rootId")
+		return
+	}
+	if nonce != wsr.nonce {
+		c.dlog("Not refreshing workspace %s due to mismatching "+
+			"nonces %d vs %d", name, wsr.nonce, nonce)
+		return
+	}
+
+	published := func() bool {
+		defer wsr.RLockTree().RUnlock()
+		return wsr.publishedRootId.IsEqualTo(rootId)
+	}()
+
+	if published {
+		c.dlog("Not refreshing workspace %s as there has been no updates",
+			name)
 		return
 	}
 
 	defer wsr.LockTree().Unlock()
 
-	err := qfs.flusher.syncWorkspace_(c, name)
+	err = qfs.flusher.syncWorkspace_(c, name)
 	if err != nil {
 		c.elog("Unable to syncWorkspace: %s", err.Error())
 		return
@@ -390,6 +408,24 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 
 func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 	defer c.funcIn("Mux::forceMerge").Out()
+
+	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+		wsr.typespace, wsr.namespace, wsr.workspace)
+
+	if err != nil {
+		c.elog("Unable to get workspace rootId")
+		return err
+	}
+
+	if nonce != wsr.nonce {
+		c.wlog("Nothing to merge, new workspace")
+		return nil
+	}
+
+	if wsr.publishedRootId.IsEqualTo(rootId) {
+		c.dlog("Not merging as there are no updates upstream")
+		return nil
+	}
 
 	newRootId := publishWorkspaceRoot(c,
 		wsr.baseLayerId, wsr.hardlinks)
@@ -931,8 +967,7 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	defer c.funcIn(SyncWorkspaceLog).Out()
 
 	parts := strings.Split(workspace, "/")
-	ids, err := qfs.getWorkspaceRootLineageNoInstantiate(c, parts[0], parts[1],
-		parts[2])
+	ids, err := qfs.getWsrLineageNoInstantiate(c, parts[0], parts[1], parts[2])
 	if err != nil {
 		return errors.New("Unable to get WorkspaceRoot for Sync")
 	}
@@ -1127,10 +1162,10 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 }
 
 // Returns the inode id of the root, the typespace, the namespace and the workspace
-func (qfs *QuantumFs) getWorkspaceRootLineageNoInstantiate(c *ctx,
+func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	typespace, namespace, workspace string) (ids []InodeId, err error) {
 
-	defer c.FuncIn("QuantumFs::getWorkspaceRootLineageNoInstantiate", "%s/%s/%s",
+	defer c.FuncIn("QuantumFs::getWsrLineageNoInstantiate", "%s/%s/%s",
 		typespace, namespace, workspace).Out()
 	ids = append(ids, quantumfs.InodeIdRoot)
 	inode := qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
@@ -1178,13 +1213,13 @@ func (qfs *QuantumFs) getWorkspaceRootLineageNoInstantiate(c *ctx,
 	return
 }
 
-func (qfs *QuantumFs) getWorkspaceRootLineage(c *ctx,
+func (qfs *QuantumFs) getWsrLineage(c *ctx,
 	typespace, namespace, workspace string) (ids []InodeId, cleanup func()) {
 
-	defer c.FuncIn("QuantumFs::getWorkspaceRootLineage", "%s/%s/%s",
+	defer c.FuncIn("QuantumFs::getWsrLineage", "%s/%s/%s",
 		typespace, namespace, workspace).Out()
 
-	// In order to run getWorkspaceRootLineage, we must set a proper value for
+	// In order to run getWsrLineage, we must set a proper value for
 	// the variable nLookup. If the function is called internally, it needs to
 	// reduce the increased lookupCount, so set nLookup to 1. Only if it is
 	// triggered by kernel, should lookupCount be increased by one, and nLookup
@@ -1240,8 +1275,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).Out()
-	ids, cleanup := qfs.getWorkspaceRootLineage(c,
-		typespace, namespace, workspace)
+	ids, cleanup := qfs.getWsrLineage(c, typespace, namespace, workspace)
 	defer cleanup()
 	if len(ids) != 4 {
 		c.vlog("Workspace inode not found")
