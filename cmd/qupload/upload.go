@@ -63,7 +63,7 @@ type Uploader struct {
 	wsDB      quantumfs.WorkspaceDB
 	exInfo    *exs.ExcludeInfo
 
-	topDirRecord quantumfs.DirectoryRecord
+	topDirID quantumfs.ObjectKey
 
 	dirEntryTrackers map[string]*dirEntryTracker
 	dirStateMutex    utils.DeferableMutex
@@ -119,7 +119,7 @@ func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
 		tracker, ok := up.dirEntryTrackers[path]
 		if !ok {
 			up.dumpUploadState()
-			panic(fmt.Sprintf("Directory state tracker must "+
+			panic(fmt.Sprintf("PANIC: Directory state tracker must "+
 				"exist for %q", path))
 		}
 
@@ -135,7 +135,7 @@ func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
 		}
 
 		if tracker.root {
-			up.topDirRecord = record
+			up.topDirID = record.ID()
 			return nil
 		}
 		// we flushed current dir which could be the last
@@ -267,6 +267,11 @@ func (up *Uploader) pathWalker(c *Ctx, piChan chan<- *pathInfo,
 			up.setupDirEntryTracker(path, root, info, expectedDirRecords)
 			return nil
 		}
+
+		// We have an empty root directory - ensure we don't push it to queue
+		if checkPath == "/" {
+			return nil
+		}
 	}
 
 	// This section is an optimization for scenario where qupload
@@ -338,14 +343,21 @@ func (up *Uploader) upload(c *Ctx, cli *params,
 		return quantumfs.ObjectKey{}, err
 	}
 
-	if up.topDirRecord == nil {
-		up.dumpUploadState()
-		panic("workspace root dir not written yet but all " +
-			"writes to workspace completed. This is unexpected. " +
-			"Use debug dump to diagnose.")
+	var emptyKey quantumfs.ObjectKey
+	if up.topDirID.IsEqualTo(emptyKey) {
+		// check if the root directory is empty
+		if up.exInfo != nil && up.exInfo.RecordCount(root, 0) != 0 {
+			up.dumpUploadState()
+			panic("PANIC: workspace root dir not written yet but all " +
+				"writes to workspace completed." +
+				"Use debug dump to diagnose.")
+		}
+
+		c.Wlog("Empty workspace root detected.")
+		up.topDirID = quantumfs.EmptyDirKey
 	}
 
-	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirRecord.ID(),
+	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirID,
 		up.dataStore, up.hardlinks)
 	if wsrErr != nil {
 		return quantumfs.ObjectKey{}, wsrErr
