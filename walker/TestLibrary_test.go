@@ -158,7 +158,7 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 		}
 
 		if skipDirTest && info.IsDir() && strings.HasSuffix(path, "/dir1") {
-			return filepath.SkipDir
+			return filepath.SkipError
 		}
 
 		if path == workspace+"/api" || info.IsDir() {
