@@ -812,17 +812,19 @@ func TestMergeSkipDirectories(t *testing.T) {
 					branchB+"/merge3/merge4/remote4", "remote4"))
 
 				return func(merged string) {
-					test.assertFileExists(merged + "/merge1/local1")
+					test.assertFileExists(
+						merged + "/merge1/local1")
 					test.assertFileExists(
 						merged + "/merge1/merge2/local2")
-					test.assertFileExists(
-						merged + "/merge1/merge2/skip/local3")
+					test.assertFileExists(merged +
+						"/merge1/merge2/skip/local3")
 
-					test.assertFileExists(merged + "/merge1/remote1")
+					test.assertFileExists(
+						merged + "/merge1/remote1")
 					test.assertFileExists(
 						merged + "/merge1/merge2/remote2")
-					test.assertNoFile(
-						merged + "/merge1/merge2/skip/remote3")
+					test.assertNoFile(merged +
+						"/merge1/merge2/skip/remote3")
 					test.assertFileExists(
 						merged + "/merge3/merge4/remote4")
 				}
