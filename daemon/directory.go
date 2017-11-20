@@ -948,6 +948,13 @@ func (dir *Directory) Readlink(c *ctx) ([]byte, fuse.Status) {
 	return nil, fuse.EINVAL
 }
 
+var zeroSpecial quantumfs.ObjectKey
+
+func init() {
+	zeroSpecial = quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded,
+		[quantumfs.ObjectKeyLength - 1]byte{})
+}
+
 func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -974,7 +981,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 
 			dir.create_(c, name, input.Mode, input.Umask, input.Rdev,
 				newSpecial, quantumfs.ObjectTypeSpecial,
-				quantumfs.ZeroKey, out)
+				zeroSpecial, out)
 		} else if utils.BitFlagsSet(uint(input.Mode), syscall.S_IFREG) {
 			dir.create_(c, name, input.Mode, input.Umask, 0,
 				newSmallFile, quantumfs.ObjectTypeSmallFile,

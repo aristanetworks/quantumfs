@@ -57,6 +57,13 @@ func fillApiAttr(c *ctx, attr *fuse.Attr) {
 	attr.Blksize = 4096
 }
 
+func isKeyValid(key string) bool {
+	if length := len(key); length != quantumfs.ExtendedKeyLength {
+		return false
+	}
+	return true
+}
+
 func (api *ApiInode) dirty(c *ctx) {
 	c.vlog("ApiInode::dirty doing nothing")
 	// Override the InodeCommon dirty because the Api can never be changed on the
@@ -736,6 +743,12 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
+	}
+
+	if !isKeyValid(cmd.Key) {
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"key \"%s\" should be %d bytes",
+			cmd.Key, quantumfs.ExtendedKeyLength)
 	}
 
 	dst := strings.Split(cmd.DstPath, "/")
