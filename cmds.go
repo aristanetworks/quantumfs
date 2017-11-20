@@ -694,11 +694,6 @@ func (api *apiImpl) InsertInode(dst string, key string, permissions uint32,
 		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n", dst)
 	}
 
-	if !isKeyValid(key) {
-		return fmt.Errorf("\"%s\" should be %d bytes",
-			key, ExtendedKeyLength)
-	}
-
 	cmd := InsertInodeRequest{
 		CommandCommon: CommandCommon{CommandId: CmdInsertInode},
 		DstPath:       dst,
@@ -785,13 +780,6 @@ func isWorkspaceNameValid(wsr string) bool {
 
 func isWorkspacePathValid(dst string) bool {
 	if slashes := strings.Count(dst, "/"); slashes < 2 {
-		return false
-	}
-	return true
-}
-
-func isKeyValid(key string) bool {
-	if length := len(key); length != ExtendedKeyLength {
 		return false
 	}
 	return true

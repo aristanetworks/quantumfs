@@ -465,8 +465,9 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 	} else {
 		// local.FileId() == remote.FileId()
 		//
-		// We only take fields from the older record when the newer record and base
-		// have the same value, indicating no change from that branch
+		// We only take fields from the older record when the newer record
+		// and base have the same value, indicating no change from that
+		// branch
 
 		rtnRecord := newer.Clone()
 
