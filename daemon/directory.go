@@ -42,7 +42,7 @@ type Directory struct {
 	// via qfs.inode() from a context where the Inode lock is already
 	// held.
 	childRecordLock utils.DeferableMutex
-	children        *ChildMap
+	children        *ChildContainer
 	_generation     uint64
 }
 
@@ -86,8 +86,8 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.wsr = wsr
 	dir.baseLayerId = baseLayerId
 
-	cmap, uninstantiated := newChildMap(c, dir, dir.baseLayerId)
-	dir.children = cmap
+	container, uninstantiated := newChildContainer(c, dir, dir.baseLayerId)
+	dir.children = container
 
 	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 
@@ -380,7 +380,8 @@ func (dir *Directory) publish_(c *ctx) {
 	defer c.FuncIn("Directory::publish_", "%s", dir.name_).Out()
 
 	oldBaseLayer := dir.baseLayerId
-	dir.baseLayerId = publishDirectoryRecords(c, dir.children.records())
+	dir.baseLayerId = publishDirectoryRecords(c,
+		dir.children.publishableRecords(c))
 
 	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
 		dir.baseLayerId.String())
@@ -1298,6 +1299,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	if newType != quantumfs.ObjectTypeInvalid {
 		entry.SetType(newType)
 	}
+	dir.children.makePublishable(c, entry.Filename())
 }
 
 func getRecordExtendedAttributes(c *ctx,

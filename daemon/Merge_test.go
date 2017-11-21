@@ -296,6 +296,7 @@ func TestMergeOneLeft(t *testing.T) {
 }
 
 func TestMergeRename(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		MergeTester(test, nil, func(branchA string,
 			branchB string) mergeTestCheck {

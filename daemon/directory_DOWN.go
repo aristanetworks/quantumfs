@@ -62,7 +62,8 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.loadChild(c, newRecord, quantumfs.InodeIdInvalid)
+		return dir.children.loadPublishableChild(c, newRecord,
+			quantumfs.InodeIdInvalid)
 	}()
 
 	dir.self.markAccessed(c, newName,
@@ -222,7 +223,7 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 
 	// Allocate a new inode for regular files or return an already
 	// existing inode for hardlinks to existing inodes
-	inodeId = dir.children.loadChild(c, remoteRecord, inodeId)
+	inodeId = dir.children.loadPublishableChild(c, remoteRecord, inodeId)
 	status := c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
 	utils.Assert(status == fuse.OK,
 		"marking %s created failed with %d", remoteRecord.Filename(),

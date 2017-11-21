@@ -1638,7 +1638,6 @@ func TestRefreshDirReCreate(t *testing.T) {
 }
 
 func TestRefreshDualInstancesMultiDirty(t *testing.T) {
-	t.Skip() // BUG229811
 	runDualQuantumFsTest(t, func(test *testHelper) {
 		workspace0 := test.NewWorkspace()
 		c := test.TestCtx()
@@ -1672,6 +1671,11 @@ func TestRefreshDualInstancesMultiDirty(t *testing.T) {
 
 		test.waitForNRefresh(workspaceName, 1)
 
+		test.WaitFor(file2fullname0+" to appear ", func() bool {
+			file, err := os.OpenFile(file2fullname0, os.O_RDONLY, 0777)
+			defer file.Close()
+			return err == nil
+		})
 		file, err := os.OpenFile(file2fullname0, os.O_RDONLY, 0777)
 		test.AssertNoErr(err)
 		defer file.Close()
