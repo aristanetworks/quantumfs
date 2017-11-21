@@ -623,6 +623,10 @@ func (th *TestHelper) TestCtx() *ctx {
 	return th.dummyReq(qlog.TestReqId)
 }
 
+func (th *TestHelper) QfsCtx() *quantumfs.Ctx {
+	return &th.qfs.c.Ctx
+}
+
 //only to be used for some testing - not all functions will work with this
 func (th *TestHelper) dummyReq(request uint64) *ctx {
 	requestCtx := &ctx{
