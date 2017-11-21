@@ -164,6 +164,7 @@ func (h *Histogram) Add(bucket string, delta uint64) {
 // Print the given Histogram
 func (h *Histogram) Print() {
 
+	defer h.mapLock.Lock().Unlock()
 	m := h.buckets
 	var bucketNames []string
 	for name := range m {
@@ -175,4 +176,9 @@ func (h *Histogram) Print() {
 			(float64(m[name])/float64(h.totalValues))*100.0)
 	}
 	fmt.Printf("Total Values : %d\n", h.totalValues)
+}
+
+// Bucket returns a refernece to the internal bucket
+func (h *Histogram) Bucket() map[string]uint64 {
+	return h.buckets
 }
