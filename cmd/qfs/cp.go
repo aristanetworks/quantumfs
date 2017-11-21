@@ -40,6 +40,9 @@ func cp() {
 	if flag.NArg() == 4 {
 		if flag.Arg(1) == "-o" {
 			overwriteDst = true
+		} else {
+			fmt.Printf("Invalid option flags '%s'\n", flag.Arg(1))
+			os.Exit(exitBadArgs)
 		}
 
 		src = flag.Arg(2)
