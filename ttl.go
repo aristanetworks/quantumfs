@@ -124,7 +124,7 @@ func handleTTLHistogram(args []string) error {
 	}
 	wsname := args[0]
 
-	keymap := make(map[quantumfs.ObjectKey]bool)
+	keymap := make(map[string]bool)
 	var maplock utils.DeferableMutex
 	hist := qubitutils.NewHistogram()
 	bucketer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
@@ -137,10 +137,10 @@ func handleTTLHistogram(args []string) error {
 		// So that the lock is not held during cql ops.
 		present := func() bool {
 			defer maplock.Lock().Unlock()
-			if _, ok := keymap[key]; ok {
+			if _, ok := keymap[key.String()]; ok {
 				return true
 			}
-			keymap[key] = true
+			keymap[key.String()] = true
 			return false
 		}()
 		if present {
