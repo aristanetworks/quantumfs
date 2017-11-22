@@ -33,8 +33,8 @@ func (s *storeIntegrationTests) SetupSuite() {
 	confFile, err := EtherConfFile()
 	s.Require().NoError(err, "error in getting ether configuration file")
 
-	err = SetupTestSchema(confFile)
-	s.Require().NoError(err, "SetupSchema returned an error")
+	err = DoTestSchemaOp(confFile, SCHEMA_CREATE)
+	s.Require().NoError(err, "DoTestSchemaOp returned an error")
 
 	// Establish connection with the cluster
 	s.bls, err = NewCqlBlobStore(confFile)
@@ -169,5 +169,5 @@ func (s *storeIntegrationTests) TearDownSuite() {
 	s.Require().NoError(err, "error in getting ether configuration file")
 
 	resetCqlStore()
-	_ = TearDownTestSchema(confFile)
+	_ = DoTestSchemaOp(confFile, SCHEMA_DELETE)
 }

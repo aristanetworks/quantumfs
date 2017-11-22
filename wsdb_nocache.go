@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -35,10 +36,11 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 		return nil, err
 	}
 
+	_, wsdbName := prefixToTblNames(os.Getenv("CFNAME_PREFIX"))
 	wsdbInst := &noCacheWsdb{
 		store:    &store,
 		keyspace: cfg.Cluster.KeySpace,
-		cfName:   "workspacedb",
+		cfName:   wsdbName,
 	}
 
 	return wsdbInst, nil

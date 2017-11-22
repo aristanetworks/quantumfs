@@ -7,7 +7,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 )
+
+func checkCfNamePrefix(prefix string) error {
+	if prefix == "" ||
+		(prefix != "" && len(prefix) >= maxKsTblPrefixLen) ||
+		(prefix != "" && !isValidCqlKsTableName(prefix)) {
+		return fmt.Errorf("Invalid prefix %q", prefix)
+	}
+	return nil
+}
+
+func prefixToTblNames(prefix string) (bsName string, wsdbName string) {
+	bsName = fmt.Sprintf("%sblobStore", prefix)
+	wsdbName = fmt.Sprintf("%sworkspacedb", prefix)
+	return
+}
+
+// isValidCqlKsTableName checks if name is valid
+// name for keyspace or table as per CQL grammar
+// defined at https://cassandra.apache.org/doc/latest/cql/ddl.html
+func isValidCqlKsTableName(name string) bool {
+	isCql := regexp.MustCompile(`^\w{1,48}$`).MatchString
+	if !isCql(name) {
+		return false
+	}
+	return true
+}
 
 // WriteCqlConfig converts the Config struct to a JSON file
 func writeCqlConfig(fileName string, config *Config) error {

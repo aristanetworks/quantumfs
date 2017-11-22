@@ -6,6 +6,7 @@ package cql
 import (
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -42,10 +43,11 @@ func newCqlBS(cluster Cluster, cfg *Config) (blobstore.BlobStore, error) {
 			"error in initializing cql store %s", err.Error())
 	}
 
+	bsName, _ := prefixToTblNames(os.Getenv("CFNAME_PREFIX"))
 	cbs := &cqlBlobStore{
 		store:       &store,
 		keyspace:    cfg.Cluster.KeySpace,
-		cfName:      "blobStore",
+		cfName:      bsName,
 		insertStats: inmem.NewOpStatsInMem("insertBlobStore"),
 		getStats:    inmem.NewOpStatsInMem("getBlobStore"),
 	}

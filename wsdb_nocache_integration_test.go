@@ -23,7 +23,7 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	var cfg *Config
 	cfg, err = readCqlConfig(confFile)
 	suite.Require().NoError(err, "Error during configuration read")
-	err = SetupTestSchema(confFile)
+	err = DoTestSchemaOp(confFile, SCHEMA_CREATE)
 	suite.Require().NoError(err, "SetupSchema returned an error")
 
 	var wsdb qwsdb.WorkspaceDB
@@ -93,7 +93,7 @@ func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegDeleteImmutableSet() {
 func (suite *wsdbNoCacheIntegTestSuite) TearDownTest() {
 	confFile, err := EtherConfFile()
 	suite.Require().NoError(err, "error in getting ether configuration file")
-	_ = TearDownTestSchema(confFile)
+	_ = DoTestSchemaOp(confFile, SCHEMA_DELETE)
 	resetCqlStore()
 }
 

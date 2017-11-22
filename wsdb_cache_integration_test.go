@@ -20,8 +20,8 @@ type wsdbCacheIntegTestSuite struct {
 func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 	confFile, err := EtherConfFile()
 	suite.Require().NoError(err, "error in getting ether configuration file")
-	err = SetupTestSchema(confFile)
-	suite.Require().NoError(err, "SetupSchema returned an error")
+	err = DoTestSchemaOp(confFile, SCHEMA_CREATE)
+	suite.Require().NoError(err, "DoTestSchemaOp returned an error")
 
 	wsdb := NewWorkspaceDB(confFile)
 
@@ -111,7 +111,7 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
 func (suite *wsdbCacheIntegTestSuite) TearDownTest() {
 	confFile, err := EtherConfFile()
 	suite.Require().NoError(err, "error in getting ether configuration file")
-	_ = TearDownTestSchema(confFile)
+	_ = DoTestSchemaOp(confFile, SCHEMA_DELETE)
 	resetCqlStore()
 }
 

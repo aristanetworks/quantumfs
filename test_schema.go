@@ -5,6 +5,7 @@ package cql
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/gocql/gocql"
@@ -34,103 +35,86 @@ func execWithRetry(q *gocql.Query) error {
 	return err
 }
 
-// SetupTestSchema does the setup of schema for docker/k8s
-//   CREATE KEYSPACE IF NOT EXISTS ether WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };
-//   CREATE TABLE IF NOT EXISTS ether.blobstore ( key blob PRIMARY KEY, value blob );
-//   CREATE TABLE IF NOT EXISTS ether.workspacedb ( namespace text, workspace text, key blob, PRIMARY KEY ( namespace, workspace )) ;
-func SetupTestSchema(confFile string) error {
+type SchemaOp int
 
-	cfg, err := readCqlConfig(confFile)
-	if err != nil {
-		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
-	}
-	session, err := getTestClusterSession(cfg.Cluster)
-	if err != nil {
-		return fmt.Errorf("error in creating gocql session inside SetupTestSchema: %s", err.Error())
-	}
-	defer session.Close()
+const (
+	SCHEMA_CREATE SchemaOp = iota
+	SCHEMA_DELETE
+)
 
-	queryStr := fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = "+
-		"{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }", cfg.Cluster.KeySpace)
-
-	query := session.Query(queryStr)
-	err = execWithRetry(query)
-
-	if err != nil {
-		return fmt.Errorf("error in creating keyspace %s: %s", cfg.Cluster.KeySpace, err.Error())
+func (s SchemaOp) String() string {
+	switch s {
+	case SCHEMA_CREATE:
+		return "create"
+	case SCHEMA_DELETE:
+		return "delete"
 	}
 
-	queryStr = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.blobstore"+
-		"( key blob PRIMARY KEY, value blob )", cfg.Cluster.KeySpace)
-	query = session.Query(queryStr)
-	err = execWithRetry(query)
-	if err != nil {
-		return fmt.Errorf("error in creating Table  %s: %s", "blobstore", err.Error())
+	return fmt.Sprintf("unknown schema op(%d)", s)
+}
+
+func doTableOp(sess *gocql.Session, op SchemaOp,
+	keyspace string, bsName string, wsdbName string) error {
+
+	var ddls []string
+	if op == SCHEMA_CREATE {
+		ddls = []string{
+			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s"+
+				" ( key blob PRIMARY KEY, value blob )"+
+				" WITH compaction = { 'class': 'LeveledCompactionStrategy' };",
+				keyspace, bsName),
+			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s"+
+				" ( typespace text, namespace text,"+
+				" workspace text, key blob, nonce bigint,"+
+				" immutable boolean,"+
+				" PRIMARY KEY ( typespace, namespace, workspace ))"+
+				" WITH compaction = { 'class': 'LeveledCompactionStrategy' };",
+				keyspace, wsdbName),
+		}
+	} else {
+		ddls = []string{
+			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s", keyspace, bsName),
+			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s", keyspace, wsdbName),
+		}
 	}
 
-	queryStr = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.workspacedb "+
-		"( typespace text, namespace text, workspace text, key blob, nonce bigint, immutable boolean,"+
-		"PRIMARY KEY ( typespace, namespace, workspace ))",
-		cfg.Cluster.KeySpace)
-	query = session.Query(queryStr)
-	err = execWithRetry(query)
-	if err != nil {
-		return fmt.Errorf("error in creating Table  %s: %s", "workspacedb", err.Error())
+	for _, stmt := range ddls {
+		query := sess.Query(stmt)
+		err := execWithRetry(query)
+		if err != nil {
+			return fmt.Errorf("error %q during %s", err.Error(), stmt)
+		}
 	}
 
 	return nil
 }
 
-// TearDownTestSchema drops the entire keyspace.
-func TearDownTestSchema(confFile string) error {
+// based on the standard limits on the keyspace and tablename
+// we restrict the max length of prefix to 30 chars
+const maxKsTblPrefixLen = 30
 
+func DoTestSchemaOp(confFile string, op SchemaOp) error {
+	prefix := os.Getenv("CFNAME_PREFIX")
+	perr := checkCfNamePrefix(prefix)
+	if perr != nil {
+		return perr
+	}
+
+	bsName, wsdbName := prefixToTblNames(prefix)
 	cfg, err := readCqlConfig(confFile)
 	if err != nil {
 		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
 	}
-	session, err := getTestClusterSession(cfg.Cluster)
-	if err != nil {
-		return fmt.Errorf("error in creating gocql session inside TearDownTestSchema: %s",
-			err.Error())
-	}
-	defer session.Close()
 
-	queryStr := fmt.Sprintf("DROP keyspace if exists %s", cfg.Cluster.KeySpace)
-	query := session.Query(queryStr)
-	err = execWithRetry(query)
-	if err != nil {
-		return fmt.Errorf("error in dropping keyspace %s: %s", cfg.Cluster.KeySpace, err.Error())
+	c := NewRealCluster(cfg.Cluster)
+	realc := c.(*RealCluster)
+	sess, serr := realc.cluster.CreateSession()
+	if serr != nil {
+		return fmt.Errorf("error in creating session in DoTestSchemaOp: %s", serr.Error())
 	}
-	return nil
-}
+	defer sess.Close()
+	doTableOp(sess, op, cfg.Cluster.KeySpace, bsName, wsdbName)
 
-// TruncateTable truncates the blobstore and workspacedb tables in the
-// keyspace. Not used right now. Can be used later.
-func TruncateTable(confFile string) error {
-
-	cfg, err := readCqlConfig(confFile)
-	if err != nil {
-		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
-	}
-	session, err := getTestClusterSession(cfg.Cluster)
-	if err != nil {
-		return fmt.Errorf("error in creating gocql session inside TruncateTable: %s",
-			err.Error())
-	}
-	defer session.Close()
-
-	queryStr := fmt.Sprintf("Truncate %s.blobstore", cfg.Cluster.KeySpace)
-	query := session.Query(queryStr)
-	err = execWithRetry(query)
-	if err != nil {
-		return fmt.Errorf("error in Truncate Table blobstore: %s", err.Error())
-	}
-	queryStr = fmt.Sprintf("Truncate %s.workspacedb", cfg.Cluster.KeySpace)
-	query = session.Query(queryStr)
-	err = execWithRetry(query)
-	if err != nil {
-		return fmt.Errorf("error in Truncate Table workspacedb: %s", err.Error())
-	}
 	return nil
 }
 

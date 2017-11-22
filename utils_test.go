@@ -29,6 +29,27 @@ func (s *setupTests) SetupTest() {
 	//nop
 }
 
+func (s *setupTests) TestCFNamePrefix() {
+	tests := []struct {
+		name  string
+		value string
+		pass  bool
+	}{
+		{"empty val", "", false},
+		{"val with special chars", "a$#c", false},
+		{"correct val", "a9A0_1", true},
+		{"val with > 30 chars", "99999999999999999999999999999999", false},
+	}
+
+	for _, test := range tests {
+		actual := true
+		if err := checkCfNamePrefix(test.value); err != nil {
+			actual = false
+		}
+		s.Require().Equal(test.pass, actual, "Failed test %q", test.name)
+	}
+}
+
 func (s *setupTests) TestValidConfig() {
 	var config Config
 	var config2 *Config

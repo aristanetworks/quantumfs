@@ -298,17 +298,17 @@ func BenchmarkGoCQL(b *testing.B) {
 	}
 
 	// ensure a clean state
-	err = TearDownTestSchema(confFile)
+	err = DoTestSchemaOp(confFile, SCHEMA_DELETE)
 	if err != nil {
 		b.Fatalf("TearDownScheme failed error: %s", err)
 	}
 	// clean up upon any b.Run failures
-	defer TearDownTestSchema(confFile)
+	defer DoTestSchemaOp(confFile, SCHEMA_DELETE)
 
 	for _, subBmark := range bmarks {
 		// setup and teardown of schema for each kind of
 		// benchmark to enable a clean state
-		if err = SetupTestSchema(confFile); err != nil {
+		if err = DoTestSchemaOp(confFile, SCHEMA_CREATE); err != nil {
 			b.Fatalf("SetupSchema returned an error: %s", err)
 		}
 
@@ -318,7 +318,7 @@ func BenchmarkGoCQL(b *testing.B) {
 					subBmark.ttl)
 			})
 
-		if err = TearDownTestSchema(confFile); err != nil {
+		if err = DoTestSchemaOp(confFile, SCHEMA_DELETE); err != nil {
 			b.Fatalf("TearDownSchema returned an error: %s", err)
 		}
 	}
