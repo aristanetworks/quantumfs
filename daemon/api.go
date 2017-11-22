@@ -546,6 +546,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	// Fetch base
+	c.qfs.syncWorkspace(c, cmd.BaseWorkspace)
 	baseRootId := quantumfs.EmptyWorkspaceKey
 	base := strings.Split(cmd.BaseWorkspace, "/")
 	baseRootId, _, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
@@ -559,6 +560,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	// Fetch Remote
+	c.qfs.syncWorkspace(c, cmd.RemoteWorkspace)
 	remote := strings.Split(cmd.RemoteWorkspace, "/")
 	remoteRootId, _, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
 		remote[2])
