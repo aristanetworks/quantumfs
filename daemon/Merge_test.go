@@ -743,3 +743,33 @@ func TestMergeExtendedAttrs(t *testing.T) {
 		})
 	})
 }
+
+func TestMergeRecreateFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(bws string) {
+			test.AssertNoErr(testutils.PrintToFile(bws+"/local",
+				"base"))
+			test.AssertNoErr(testutils.PrintToFile(bws+"/remote",
+				"base"))
+			test.AssertNoErr(testutils.PrintToFile(bws+"/newer",
+				"base"))
+		}, func(localWs string, remoteWs string) mergeTestCheck {
+			test.AssertNoErr(testutils.OverWriteFile(remoteWs+"/remote",
+				"remote"))
+			test.AssertNoErr(os.Remove(remoteWs + "/newer"))
+			test.AssertNoErr(testutils.PrintToFile(remoteWs+"/newer",
+				"remote"))
+
+			test.AssertNoErr(testutils.OverWriteFile(localWs+"/local",
+				"local"))
+			test.AssertNoErr(testutils.OverWriteFile(localWs+"/newer",
+				"local"))
+
+			return func(merged string) {
+				test.CheckData(merged+"/local", []byte("local"))
+				test.CheckData(merged+"/remote", []byte("remote"))
+				test.CheckData(merged+"/newer", []byte("remote"))
+			}
+		})
+	})
+}
