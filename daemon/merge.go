@@ -154,12 +154,16 @@ func loadWorkspaceRoot(c *ctx,
 	return links, workspaceRoot.BaseLayer(), nil
 }
 
+type mergeSkipPaths struct {
+	paths []string
+}
+
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
-	local quantumfs.ObjectKey, prefer int, skipPaths []string) (
+	local quantumfs.ObjectKey, prefer int, skipPaths mergeSkipPaths) (
 	quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d", prefer,
-		len(skipPaths)).Out()
+		len(skipPaths.paths)).Out()
 
 	baseHardlinks, baseDirectory, err := loadWorkspaceRoot(c, base)
 	if err != nil {
@@ -219,13 +223,13 @@ func loadRecords(c *ctx,
 // records with the same name. We handle these cases like mostly normal conflicts.
 func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
-	baseExists bool, ht *hardlinkTracker, prefer int, skipPaths []string) (
+	baseExists bool, ht *hardlinkTracker, prefer int, skipPaths mergeSkipPaths) (
 	quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn("mergeDirectory", "%s skipPaths len %d", dirName,
-		len(skipPaths)).Out()
+		len(skipPaths.paths)).Out()
 
-	for _, name := range skipPaths {
+	for _, name := range skipPaths.paths {
 		if name == "/" {
 			c.vlog("Skipping dir")
 			return local, nil
@@ -262,10 +266,13 @@ func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 		if inLocal {
 			// We have at least a local and remote, must merge
 
-			childSkipPaths := make([]string, 0)
-			for _, path := range skipPaths {
+			childSkipPaths := mergeSkipPaths{
+				paths: make([]string, 0),
+			}
+			for _, path := range skipPaths.paths {
 				if strings.HasPrefix(path, "/"+name) {
-					childSkipPaths = append(childSkipPaths,
+					childSkipPaths.paths = append(
+						childSkipPaths.paths,
 						strings.TrimPrefix(path, "/"+name))
 				} else {
 					c.vlog("Dropping skip path %s", path)
@@ -544,7 +551,7 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 
 func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	ht *hardlinkTracker, prefer int, skipPaths []string) (
+	ht *hardlinkTracker, prefer int, skipPaths mergeSkipPaths) (
 	quantumfs.DirectoryRecord, error) {
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).Out()
