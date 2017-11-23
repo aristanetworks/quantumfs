@@ -471,38 +471,13 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 }
 
 // Should be called with the tree locked for read or write
-func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, lastInode bool) bool {
+func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode) bool {
+	defer c.funcIn("Mux::flushInode_").Out()
 
-	inodeNum := inode.inodeNum()
-	defer c.FuncIn("Mux::flushInode_", "inode %d", inodeNum).Out()
-
-	flushSuccess := true
-	if !inode.isOrphaned() {
-		if wsr, isWsr := inode.(*WorkspaceRoot); isWsr {
-			_, flushSuccess = wsr.flushCanFail(c)
-
-			// Flush of wsr failed, so try merging
-			if !flushSuccess {
-				if lastInode {
-					err := forceMerge(c, wsr)
-					if err == nil {
-						// We fixed the wsr flush failure
-						// via merge
-						flushSuccess = true
-					}
-				} else {
-					// the workspaceroot should be dropped for
-					// now - there are children in queue to be
-					// flushed first. They will push the wsr
-					// back into the dirty queue later
-					flushSuccess = true
-				}
-			}
-		} else {
-			inode.flush(c)
-		}
+	if inode.isOrphaned() {
+		return true
 	}
-	return flushSuccess
+	return inode.flush(c).IsValid()
 }
 
 const skipForgetLog = "inode %d doesn't need to be forgotten"

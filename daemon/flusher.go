@@ -193,21 +193,24 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// the case of a panic.
 	inode := dirtyInode.inode
 
-	dqlen := dq.Len_()
 	success := func() bool {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
-		return c.qfs.flushInode_(c, inode, dqlen <= 1)
+		return c.qfs.flushInode_(c, inode)
 	}()
-	if success {
-		inode.markClean_()
+
+	if !success {
+		return false
 	}
+
+	inode.markClean_()
+
 	if dirtyInode.shouldUninstantiate {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
 		c.qfs.uninstantiateInode(c, inode.inodeNum())
 	}
-	return success
+	return true
 }
 
 // flusher lock must be locked when calling this function
@@ -321,6 +324,20 @@ type Flusher struct {
 	// this is an easy way to sort Inodes by workspace.
 	dqs  map[*TreeLock]*DirtyQueue
 	lock utils.DeferableMutex
+}
+
+func (flusher *Flusher) nQueued(c *ctx, treelock *TreeLock) int {
+	defer flusher.lock.Lock().Unlock()
+	return flusher.nQueued_(c, treelock)
+}
+
+// flusher lock must be locked when calling this function
+func (flusher *Flusher) nQueued_(c *ctx, treelock *TreeLock) int {
+	dq, exists := flusher.dqs[treelock]
+	if !exists {
+		return 0
+	}
+	return dq.Len_()
 }
 
 func NewFlusher() *Flusher {
