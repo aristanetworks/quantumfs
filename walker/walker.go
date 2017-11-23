@@ -154,7 +154,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 		return err
 	})
-	
+
 	err = group.Wait()
 	if err != nil {
 		cq.Elog(qlog.LogTool, "Walk error: %s", err.Error())
@@ -427,7 +427,7 @@ func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 			}
 		}
 		if err := wf(c, keyItem.path, keyItem.key,
-			keyItem.size, false); err != nil && err != SkipError{
+			keyItem.size, false); err != nil && err != SkipError {
 			return err
 		}
 	}
