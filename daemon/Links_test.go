@@ -57,8 +57,7 @@ func TestHardlink(t *testing.T) {
 		defer parentDir.childRecordLock.Lock().Unlock()
 		test.Assert(parentDir.children.record(file1InodeNum).Type() ==
 			quantumfs.ObjectTypeHardlink,
-			"file1 not replaced with hardlink %d %v", file1InodeNum,
-			parentDir.children.childrenRecords)
+			"file1 not replaced with hardlink %d", file1InodeNum)
 		test.Assert(parentDir.children.record(file2InodeNum).Type() ==
 			quantumfs.ObjectTypeHardlink,
 			"file2 not created as hardlink")
