@@ -129,7 +129,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		defer close(keyChan)
 
 		// WSR
-		if err = writeToChan(c, keyChan, "", rootID,
+		if err = writeToChan(c, keyChan, "[rootId]", rootID,
 			uint64(buf.Size())); err != nil {
 
 			return err
@@ -193,7 +193,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"WorkspaceRoot buffer %s", key.String())
 
-		if err := writeToChan(c, keyChan, "", key,
+		if err := writeToChan(c, keyChan, "[hardlink table]", key,
 			uint64(buf.Size())); err != nil {
 			return err
 		}
