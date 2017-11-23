@@ -30,6 +30,10 @@ type wsDetails struct {
 func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 	dur time.Duration) {
 
+	if c.Influx == nil {
+		return
+	}
+
 	measurement := "walkerWorkspace"
 	tags := map[string]string{
 		"typeSpace": w.ts,
@@ -72,6 +76,10 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 func AddPointWalkerIteration(c *Ctx, dur time.Duration,
 	numSuccess uint32, numError uint32) {
 
+	if c.Influx == nil {
+		return
+	}
+
 	measurement := "walkerIteration"
 	tags := map[string]string{
 		"keyspace": c.keyspace,
@@ -100,6 +108,10 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration,
 // fields: alive - a place holder. Since, we have to have a field.
 //
 func AddPointWalkerHeartBeat(c *Ctx) {
+
+	if c.Influx == nil {
+		return
+	}
 
 	measurement := "walkerHeartBeat"
 	tags := map[string]string{

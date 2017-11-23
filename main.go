@@ -106,21 +106,39 @@ func main() {
 	timer := time.Tick(heartBeatInterval)
 	go heartBeat(c, timer)
 
-	walkFullWSDBLoop(c)
+	walkFullWSDBLoop(c, true)
 }
 
-func walkFullWSDBLoop(c *Ctx) {
+const SkipMapClearLog = "SkipMap period over - clearing."
+func walkFullWSDBLoop(c *Ctx, backOffLoop bool) {
+	ttlCfg := c.ttlCfg
+	if ttlCfg.SkipMapMaxLen == 0 {
+		// Set a reasonable default value
+		ttlCfg.SkipMapMaxLen = 20 * 1024 * 1024
+	}
+
+	skipMap := utils.NewSkipMap(ttlCfg.SkipMapMaxLen)
+	skipMapPeriod := time.Duration(ttlCfg.SkipMapResetAfter_ms) *
+		time.Millisecond
+	nextMapReset :=	time.Now().Add(skipMapPeriod)
+
 	for {
 		c.iteration++
 
 		atomic.StoreUint32(&c.numSuccess, 0)
 		atomic.StoreUint32(&c.numError, 0)
 
+		if time.Now().After(nextMapReset) {
+			c.vlog(SkipMapClearLog)
+			skipMap.Clear()
+			nextMapReset = time.Now().Add(skipMapPeriod)
+		}
+
 		startTimeOuter := time.Now()
 		c.vlog("Iteration[%d] started at %s", c.iteration,
 			startTimeOuter.String())
 
-		err := walkFullWSDBSetup(c)
+		err := walkFullWSDBSetup(c, skipMap)
 
 		dur := time.Since(startTimeOuter)
 		errStr := ""
@@ -140,7 +158,9 @@ func walkFullWSDBLoop(c *Ctx) {
 		// If there are errors, then it makes sense to try
 		// after sometime in the hope that errors are being
 		// watched and operator has resolved the failure.
-		backOff(c, dur)
+		if backOffLoop {
+			backOff(c, dur)
+		}
 	}
 }
 
@@ -152,7 +172,7 @@ func walkFullWSDBLoop(c *Ctx) {
 // When an error occurs in any of the gouroutines, c.Done() is triggered and
 // all the goroutines exit. Errors returned from walker.Walk() are
 // ignored.
-func walkFullWSDBSetup(c *Ctx) error {
+func walkFullWSDBSetup(c *Ctx, skipMap *utils.SkipMap) error {
 
 	group, groupCtx := errgroup.WithContext(context.Background())
 	c.Context = groupCtx
@@ -162,7 +182,7 @@ func walkFullWSDBSetup(c *Ctx) error {
 	for i := 1; i <= c.numWalkers; i++ {
 		id := i
 		group.Go(func() error {
-			return walkWorker(c, workChan, id)
+			return walkWorker(c, workChan, id, skipMap)
 		})
 	}
 
@@ -246,7 +266,8 @@ func queueWorkspace(c *Ctx, workChan chan<- *workerData, t string, n string,
 	return nil
 }
 
-func walkWorker(c *Ctx, workChan <-chan *workerData, workerID int) (err error) {
+func walkWorker(c *Ctx, workChan <-chan *workerData, workerID int,
+	skipMap *utils.SkipMap) (err error) {
 
 	c.vlog("%s walkWorker[%d] started", eventPrefix, workerID)
 	for {
@@ -265,7 +286,9 @@ func walkWorker(c *Ctx, workChan <-chan *workerData, workerID int) (err error) {
 			}
 			c.vlog("%s walkWorker[%d] processing %s/%s/%s",
 				eventPrefix, workerID, w.ts, w.ns, w.ws)
-			if cmdErr := runWalker(c, w.ts, w.ns, w.ws); cmdErr != nil {
+			if cmdErr := runWalker(c, w.ts, w.ns, w.ws,
+				skipMap); cmdErr != nil {
+
 				atomic.AddUint32(&c.numError, 1)
 			} else {
 				atomic.AddUint32(&c.numSuccess, 1)
@@ -275,14 +298,18 @@ func walkWorker(c *Ctx, workChan <-chan *workerData, workerID int) (err error) {
 }
 
 // Wrapper around the call to the walker library.
-func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
+func runWalker(oldC *Ctx, ts string, ns string, ws string,
+	skipMap *utils.SkipMap) error {
+
 	var err error
 	var rootID quantumfs.ObjectKey
 	wsname := ts + "/" + ns + "/" + ws
 	c := oldC.newRequestID() // So that each walk has its own ID in the qlog.
 
 	start := time.Now()
-	if rootID, _, err = qubitutils.GetWorkspaceRootID(c.qctx, c.wsdb, wsname); err != nil {
+	if rootID, _, err = qubitutils.GetWorkspaceRootID(c.qctx, c.wsdb,
+		wsname); err != nil {
+
 		return err
 	}
 
@@ -298,18 +325,20 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
 		return utils.RefreshTTL(cw, path, key, size, isDir, c.cqlds,
-			c.ttlCfg.TTLThreshold, c.ttlCfg.TTLNew)
+			c.ttlCfg.TTLNew, skipMap)
 	}
 
 	// Call the walker library.
-	c.vlog("%s TTL refresh for %s/%s/%s (%s)", startPrefix, ts, ns, ws, rootID.String())
+	c.vlog("%s TTL refresh for %s/%s/%s (%s)", startPrefix, ts, ns, ws,
+		rootID.String())
 	if err = walker.Walk(c.qctx, c.ds, rootID, walkFunc); err != nil {
 		c.elog("TTL refresh for %s/%s/%s (%s), err(%s)", ts, ns, ws,
 			rootID.String(), err.Error())
 
 		AddPointWalkerWorkspace(c, w, false, time.Since(start))
 	} else {
-		c.vlog("%s TTL refresh for %s/%s/%s (%s)", successPrefix, ts, ns, ws, rootID.String())
+		c.vlog("%s TTL refresh for %s/%s/%s (%s)", successPrefix, ts, ns, ws,
+			rootID.String())
 		AddPointWalkerWorkspace(c, w, true, time.Since(start))
 	}
 	return err
