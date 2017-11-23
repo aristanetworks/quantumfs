@@ -261,8 +261,13 @@ func (up *Uploader) pathWalker(c *Ctx, piChan chan<- *pathInfo,
 		// whose parent directory state tracking has already been
 		// setup. Hence empty directory is handled by worker to maintain
 		// separation of concerns between walker and worker
-		if expectedDirRecords > 0 || path == root {
+		if expectedDirRecords > 0 {
 			up.setupDirEntryTracker(path, root, info, expectedDirRecords)
+			return nil
+		}
+
+		// We have an empty root directory - ensure we don't push it to queue
+		if checkPath == "/" {
 			return nil
 		}
 	}
