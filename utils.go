@@ -41,7 +41,7 @@ func (d *ttlDuration) UnmarshalJSON(data []byte) error {
 
 type cqlWalkerConfig struct {
 	// CqlTTLRefreshTime controls when a block's TTL is refreshed
-	// A block's TTL is refreshed when its TTL is <= CqlTTLRefreshTime
+	// All blocks in the datastore are refreshed every TTLRefreshTime
 	// ttlrefreshtime is a string accepted by
 	// https://golang.org/pkg/time/#ParseDuration
 	TTLRefreshTime ttlDuration `json:"ttlrefreshtime"`
@@ -54,6 +54,11 @@ type cqlWalkerConfig struct {
 	// https://golang.org/pkg/time/#ParseDuration
 	TTLRefreshValue ttlDuration `json:"ttlrefreshvalue"`
 
+	// TTLRefreshCacheLen is the maximum number of keys to hold in the
+	// skip map when walking. This restricts how effectively the walker can
+	// prevent re-walking duplicate blocks, and controls memory usage.
+	TTLRefreshCacheLen int
+
 	// CqlTTLDefaultValue is the TTL value of a new block
 	// When a block is written its TTL is set to
 	// CqlTTLDefaultValue
@@ -64,7 +69,8 @@ type cqlWalkerConfig struct {
 
 // TTLConfig hold the boundary TTL values to be used in the walker.
 type TTLConfig struct {
-	TTLThreshold int64
+	SkipMapResetAfter_ms int64
+	SkipMapMaxLen int
 	TTLNew       int64
 }
 
@@ -87,10 +93,11 @@ func LoadTTLConfig(path string) (*TTLConfig, error) {
 	}
 
 	var tc TTLConfig
-	tc.TTLThreshold = int64(c.A.TTLRefreshTime.Duration.Seconds())
+	tc.SkipMapResetAfter_ms = int64(c.A.TTLRefreshTime.Duration.Seconds() * 1000)
+	tc.SkipMapMaxLen = int(c.A.TTLRefreshCacheLen)
 	tc.TTLNew = int64(c.A.TTLRefreshValue.Duration.Seconds())
 
-	if tc.TTLThreshold == 0 || tc.TTLNew == 0 {
+	if tc.SkipMapResetAfter_ms == 0 || tc.TTLNew == 0 {
 		return nil, fmt.Errorf("ttlrefreshvalue and ttlrefreshtime must be non-zero")
 	}
 
