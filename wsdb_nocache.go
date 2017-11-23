@@ -150,8 +150,7 @@ func (nc *noCacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace 
 
 	}
 
-	err := nc.wsdbKeyPut(ether.DefaultCtx, typespace, namespace, workspace,
-		wsKey, nonce.Value())
+	err := nc.wsdbKeyPut(c, typespace, namespace, workspace, wsKey, nonce.Value())
 	if err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
 			"during Put in CreateWorkspace %s/%s/%s(%s) : %s",
