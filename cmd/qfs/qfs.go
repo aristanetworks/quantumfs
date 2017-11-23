@@ -46,7 +46,9 @@ func printUsage() {
 	fmt.Println("         - get the access list of workspace")
 	fmt.Println("  clearAccessedFiles <workspace>")
 	fmt.Println("         - clear the access list of workspace")
-	fmt.Println("  cp <srcPath> <dstPath> - Copy a directory using insertInode")
+	fmt.Println("  cp [-o] <srcPath> <dstPath> - Copy a directory using " +
+		"insertInode")
+	fmt.Println("         -o Overwrite files which exist in the destination")
 	fmt.Println("  insertInode <dstPath> <key> <uid> <gid> <permission>")
 	fmt.Println("         - copy an inode corresponding to an extended" +
 		" key under the location of dstPath with specifications of" +

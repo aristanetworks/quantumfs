@@ -348,8 +348,6 @@ func publishDirectoryRecords(c *ctx,
 	// in the datastore.
 	newBaseLayerId := quantumfs.EmptyDirKey
 
-	// childIdx indexes into dir.childrenRecords, entryIdx indexes into the
-	// metadata block
 	numEntries, baseLayer := quantumfs.NewDirectoryEntry(numEntries)
 	entryIdx := 0
 	quantumfs.SortDirectoryRecordsByName(records)
