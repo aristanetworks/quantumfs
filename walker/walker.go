@@ -20,21 +20,12 @@ import (
 )
 
 // SkipError is used as a return value from WalkFunc to indicate that
-// the directory named in the call is to be skipped. It is not returned
+// the entry named in the call is to be skipped. It is not returned
 // as an error by any function.
 var SkipError = errors.New("skip this key")
 
 // WalkFunc is the type of the function called for each data block under the
 // Workspace.
-//
-// NOTE
-// Walker in this package honors SkipError only when walkFunc is called for a
-// directory.
-//
-// This is a key difference from path/filepath.Walk,
-// in which if filepath.Walkunc returns SkipError when invoked on a
-// non-directory file, Walk skips the remaining files in the
-// containing directory.
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 	size uint64, isDir bool) error
 
@@ -173,8 +164,10 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 			hlr := hle.Entry(idx)
 			dr := hlr.Record()
 			linkPath := dr.Filename()
-			if err := handleDirectoryRecord(c, linkPath, ds, dr, wf,
-				keyChan); err != nil && err != SkipError {
+			err := handleDirectoryRecord(c, linkPath, ds, dr, wf,
+				keyChan);
+			
+			if err != nil && err != SkipError {
 				return err
 			}
 			// add an entry to enable lookup based on FileId
