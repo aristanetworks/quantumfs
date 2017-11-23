@@ -481,6 +481,7 @@ func TestWalkPanicErr(t *testing.T) {
 
 func TestWalkErr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
+		test.ShouldFailLogscan = true
 
 		data := daemon.GenData(133)
 		workspace := test.NewWorkspace()
