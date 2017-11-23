@@ -191,24 +191,23 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// we'll deadlock. We defer relocking in order to balance
 	// against the deferred unlocking from our caller, even in
 	// the case of a panic.
-	uninstantiate := dirtyInode.shouldUninstantiate
 	inode := dirtyInode.inode
 
 	dqlen := dq.Len_()
-	ret := func() bool {
+	success := func() bool {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
-		return c.qfs.flushInode_(c, inode, uninstantiate, dqlen <= 1)
+		return c.qfs.flushInode_(c, inode, dqlen <= 1)
 	}()
-	if !uninstantiate && dirtyInode.shouldUninstantiate {
-		// we have released and re-acquired the flusher lock, and the
-		// dirtyInode is now up for uninstantiation. This transition
-		// cannot happen again, so it is safe to release the lock again.
+	if success {
+		inode.markClean_()
+	}
+	if dirtyInode.shouldUninstantiate {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
 		c.qfs.uninstantiateInode(c, inode.inodeNum())
 	}
-	return ret
+	return success
 }
 
 // flusher lock must be locked when calling this function
