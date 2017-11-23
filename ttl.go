@@ -48,7 +48,7 @@ func handleTTL(args []string) error {
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
 		return walkutils.RefreshTTL(c, path, key, size, isDir,
-			cs.cqlds, cs.ttlCfg.TTLThreshold, cs.ttlCfg.TTLNew)
+			cs.cqlds, cs.ttlCfg.TTLNew, nil)
 	}
 
 	showRootIDStatus := true
@@ -93,7 +93,7 @@ func handleForceTTL(args []string) error {
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
 		return walkutils.RefreshTTL(c, path, key, size, isDir,
-			cs.cqlds, newTTL, newTTL)
+			cs.cqlds, newTTL, nil)
 	}
 
 	showRootIDStatus := true
