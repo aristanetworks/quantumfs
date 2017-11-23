@@ -25,7 +25,7 @@ type hardlinkTracker struct {
 
 func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]linkEntry,
 	remote map[quantumfs.FileId]linkEntry, local map[quantumfs.FileId]linkEntry,
-	prefer int) *hardlinkTracker {
+	prefer mergePreference) *hardlinkTracker {
 
 	rtn := hardlinkTracker{
 		allRecords: make(map[quantumfs.FileId]*quantumfs.DirectRecord),
@@ -150,7 +150,8 @@ func loadWorkspaceRoot(c *ctx,
 }
 
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
-	local quantumfs.ObjectKey, prefer int) (quantumfs.ObjectKey, error) {
+	local quantumfs.ObjectKey, prefer mergePreference) (quantumfs.ObjectKey,
+	error) {
 
 	defer c.funcIn("mergeWorkspaceRoot").Out()
 
@@ -210,8 +211,8 @@ func loadRecords(c *ctx,
 // records with the same name. We handle these cases like mostly normal conflicts.
 func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
-	baseExists bool, ht *hardlinkTracker, prefer int) (quantumfs.ObjectKey,
-	error) {
+	baseExists bool, ht *hardlinkTracker, prefer mergePreference) (
+	quantumfs.ObjectKey, error) {
 
 	defer c.funcIn("mergeDirectory").Out()
 
@@ -330,7 +331,7 @@ func init() {
 
 func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	newer quantumfs.ObjectKey, older quantumfs.ObjectKey,
-	prefer int) (quantumfs.ObjectKey, error) {
+	prefer mergePreference) (quantumfs.ObjectKey, error) {
 
 	baseAttrs, err := getRecordExtendedAttributes(c, base)
 	if err == fuse.ENOENT || base.IsEqualTo(quantumfs.ZeroKey) {
@@ -415,13 +416,17 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	return rtnKey, nil
 }
 
-func pickPreference(prefer int, newer quantumfs.DirectoryRecord,
+type mergePreference struct {
+	preference int
+}
+
+func (mp *mergePreference) pick(newer quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
-	switch prefer {
+	switch mp.preference {
 	default:
-		panic(fmt.Sprintf("Unknown merge preference %d", prefer))
+		panic(fmt.Sprintf("Unknown merge preference %d", mp.preference))
 	case quantumfs.PreferNewer:
 		return newer.Clone()
 	case quantumfs.PreferLocal:
@@ -434,7 +439,7 @@ func pickPreference(prefer int, newer quantumfs.DirectoryRecord,
 // Merge record attributes based on ContentTime
 func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	prefer int) (quantumfs.DirectoryRecord, error) {
+	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
 
 	newer := local
 	older := remote
@@ -445,7 +450,7 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 
 	if base == nil {
 		// Without a base we cannot be any cleverer than our base preference.
-		return pickPreference(prefer, newer, local, remote), nil
+		return prefer.pick(newer, local, remote), nil
 	}
 
 	if local.FileId() != remote.FileId() {
@@ -460,7 +465,7 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 			return local.Clone(), nil
 		} else {
 			// Both recreated, keep our preference
-			return pickPreference(prefer, newer, local, remote), nil
+			return prefer.pick(newer, local, remote), nil
 		}
 	} else {
 		// local.FileId() == remote.FileId()
@@ -509,7 +514,8 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 
 func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	ht *hardlinkTracker, prefer int) (quantumfs.DirectoryRecord, error) {
+	ht *hardlinkTracker, prefer mergePreference) (quantumfs.DirectoryRecord,
+	error) {
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).Out()
 
@@ -661,7 +667,7 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 
 func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	prefer int) (quantumfs.DirectoryRecord, error) {
+	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
 
 	var baseAccessor blockAccessor
 	baseAvailable := false
