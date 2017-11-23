@@ -14,10 +14,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/cmd/qupload/qwr"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	exs "github.com/aristanetworks/quantumfs/utils/excludespec"
@@ -320,13 +320,13 @@ func main() {
 			var d1, m1, d2, m2, speed uint64
 			for {
 				start := time.Now()
-				d1 = qwr.DataBytesWritten
-				m1 = qwr.MetadataBytesWritten
+				d1 = atomic.LoadUint64(&up.dataBytesWritten)
+				m1 = atomic.LoadUint64(&up.metadataBytesWritten)
 				fmt.Printf("\rData: %12d Metadata: %12d "+
 					"Speed: %5d MB/s", d1, m1, speed)
 				time.Sleep(1 * time.Second)
-				d2 = qwr.DataBytesWritten
-				m2 = qwr.MetadataBytesWritten
+				d2 = atomic.LoadUint64(&up.dataBytesWritten)
+				m2 = atomic.LoadUint64(&up.metadataBytesWritten)
 				speed = (((d2 + m2) - (d1 + m1)) /
 					uint64(1000000)) /
 					uint64(time.Since(start).Seconds())
