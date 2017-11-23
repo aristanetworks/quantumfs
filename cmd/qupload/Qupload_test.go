@@ -265,3 +265,14 @@ func TestSymlinks(t *testing.T) {
 		})
 	})
 }
+
+func TestEmptyDirectory(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		test.checkQuploadMatches(workspace, func() {
+			test.AssertNoErr(testutils.PrintToFile(workspace+"/somefile",
+				"random file"))
+		})
+	})
+}
