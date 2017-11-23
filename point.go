@@ -47,14 +47,14 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
 		c.elog("Writing %s to influxDB for "+
-			"%s/%s/%s (%s) iteration=%v walkSuccess=%v err:%v\n",
+			"%s/%s/%s (%s) iteration=%d walkSuccess=%v err:%s\n",
 			measurement, w.ts, w.ns, w.ws, w.rootID,
-			c.iteration, pass, err)
+			c.iteration, pass, err.Error())
 		return
 	}
-	c.vlog("%s Writing %s=%v to influxDB for "+
-		"%s/%s/%s (%s) iteration=%v walkSuccess=%v \n",
-		successPrefix, measurement, dur,
+	c.vlog("%s Writing %s=%s to influxDB for "+
+		"%s/%s/%s (%s) iteration=%d walkSuccess=%v \n",
+		successPrefix, measurement, dur.String(),
 		w.ts, w.ns, w.ws, w.rootID,
 		c.iteration, pass)
 }
@@ -84,12 +84,13 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration,
 	}
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
-		c.elog("Writing %s iteration=%v to influxDB err: %v\n",
-			measurement, c.iteration, err)
+		c.elog("Writing %s iteration=%d to influxDB err: %s\n",
+			measurement, c.iteration, err.Error())
 		return
 	}
-	c.vlog("%s Writing %s=%v iteration=%v numSuccess=%v numError=%v to influxDB\n",
-		successPrefix, measurement, dur, c.iteration, numSuccess, numError)
+	c.vlog("%s Writing %s=%s iteration=%d numSuccess=%d numError=%d to influxDB\n",
+		successPrefix, measurement, dur.String(), c.iteration, numSuccess,
+		numError)
 }
 
 // Write point to indicate that walker is alive.
@@ -110,7 +111,8 @@ func AddPointWalkerHeartBeat(c *Ctx) {
 
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
-		c.elog("Error:   Writing %s to influxDB err: %v\n", measurement, err)
+		c.elog("Error:   Writing %s to influxDB err: %s\n", measurement,
+			err.Error())
 		return
 	}
 	c.vlog("Success: Writing %s to influxDB\n", measurement)

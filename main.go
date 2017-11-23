@@ -117,13 +117,20 @@ func walkFullWSDBLoop(c *Ctx) {
 		atomic.StoreUint32(&c.numError, 0)
 
 		startTimeOuter := time.Now()
-		c.vlog("Iteration[%v] started at %v", c.iteration, startTimeOuter)
+		c.vlog("Iteration[%d] started at %s", c.iteration,
+			startTimeOuter.String())
 
 		err := walkFullWSDBSetup(c)
 
 		dur := time.Since(startTimeOuter)
-		c.vlog("Iteration[%v] ended at %v took %v numError %d (err %v)",
-			c.iteration, time.Now(), dur, c.numError, err)
+		errStr := ""
+		if err != nil {
+			errStr = err.Error()
+		}
+
+		c.vlog("Iteration[%d] ended at %s took %s numError %d (err %s)",
+			c.iteration, time.Now().String(), dur.String(), c.numError,
+			errStr)
 		AddPointWalkerIteration(c, dur, c.numSuccess, c.numError)
 
 		// If the walk iteration completes very quickly
@@ -188,7 +195,7 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 
 	tsl, err := c.wsdb.TypespaceList(c.qctx)
 	if err != nil {
-		c.elog("TypespaceList failed: %v", err)
+		c.elog("TypespaceList failed: %s", err.Error())
 		atomic.AddUint32(&c.numError, 1)
 		return err
 	}
@@ -197,20 +204,20 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 	for _, ts := range tsl {
 		nsl, err := c.wsdb.NamespaceList(c.qctx, ts)
 		if err != nil {
-			c.elog("NamespaceList(%s) failed: %v", ts, err)
+			c.elog("NamespaceList(%s) failed: %s", ts, err.Error())
 			continue
 		}
 		for _, ns := range nsl {
 			wsMap, err := c.wsdb.WorkspaceList(c.qctx, ts, ns)
 			if err != nil {
-				c.elog("WorkspaceList(%s/%s) failed: %v ",
-					ts, ns, err)
+				c.elog("WorkspaceList(%s/%s) failed: %s ",
+					ts, ns, err.Error())
 				continue
 			}
 			for ws := range wsMap {
 				if err := queueWorkspace(c, workChan, ts, ns, ws); err != nil {
-					c.elog("Error from queueWorkspace (%s/%s/%s): %v",
-						ts, ns, ws, err)
+					c.elog("Error from queueWorkspace (%s/%s/%s): %s",
+						ts, ns, ws, err.Error())
 					return err
 				}
 			}
@@ -229,8 +236,8 @@ func queueWorkspace(c *Ctx, workChan chan<- *workerData, t string, n string,
 	w string) error {
 	select {
 	case <-c.Done():
-		c.elog("queueWorkspace received Done:%v. Did not queue %s/%s/%s",
-			c.Err(), t, n, w)
+		c.elog("queueWorkspace received Done:%s. Did not queue %s/%s/%s",
+			c.Err().Error(), t, n, w)
 		return c.Err()
 	case workChan <- &workerData{ts: t, ns: n, ws: w}:
 		c.vlog("%s Workspace queued %s/%s/%s", eventPrefix, t, n, w)
@@ -246,7 +253,8 @@ func walkWorker(c *Ctx, workChan <-chan *workerData, workerID int) (err error) {
 		select {
 		case <-c.Done():
 			err = c.Err()
-			c.elog("walkWorker[%d] received Done:%v", workerID, err)
+			c.elog("walkWorker[%d] received Done:%s", workerID,
+				err.Error())
 			return
 		case w := <-workChan:
 			if w == nil {
@@ -296,8 +304,8 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 	// Call the walker library.
 	c.vlog("%s TTL refresh for %s/%s/%s (%s)", startPrefix, ts, ns, ws, rootID.String())
 	if err = walker.Walk(c.qctx, c.ds, rootID, walkFunc); err != nil {
-		c.elog("TTL refresh for %s/%s/%s (%s), err(%v)", ts, ns, ws,
-			rootID.String(), err)
+		c.elog("TTL refresh for %s/%s/%s (%s), err(%s)", ts, ns, ws,
+			rootID.String(), err.Error())
 
 		AddPointWalkerWorkspace(c, w, false, time.Since(start))
 	} else {
@@ -337,19 +345,19 @@ func backOff(c *Ctx, iterDur time.Duration) {
 
 	switch {
 	case c.numError != 0:
-		c.vlog("Iteration[%v] ended with errors so sleep for %s until %v",
-			c.iteration, backOffAfterErrors,
-			time.Now().Add(backOffAfterErrors))
+		c.vlog("Iteration[%d] ended with errors so sleep for %s until %s",
+			c.iteration, backOffAfterErrors.String(),
+			time.Now().Add(backOffAfterErrors).String())
 		time.Sleep(backOffAfterErrors)
 	case iterDur <= shortIterationDuration:
-		c.vlog("Iteration[%v] took <= %s so sleep for %s until %v",
-			c.iteration, shortIterationDuration,
-			backOffAfterShortIteration,
-			time.Now().Add(backOffAfterShortIteration))
+		c.vlog("Iteration[%d] took <= %s so sleep for %s until %s",
+			c.iteration, shortIterationDuration.String(),
+			backOffAfterShortIteration.String(),
+			time.Now().Add(backOffAfterShortIteration).String())
 		time.Sleep(backOffAfterShortIteration)
 	default:
-		c.vlog("Iteration[%v] took > %s so proceeding to next iteration",
-			c.iteration, shortIterationDuration)
+		c.vlog("Iteration[%d] took > %s so proceeding to next iteration",
+			c.iteration, shortIterationDuration.String())
 		return
 	}
 }
