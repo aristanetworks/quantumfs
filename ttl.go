@@ -14,39 +14,19 @@ import (
 )
 
 // RefreshTTL will update the TTL of the block pointed to by key.
-// If the current TTL of the block is less than thresholdTTL, it
-// will be updated to newTTL.
 func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-	size uint64, isDir bool, cqlds blobstore.BlobStore,
-	thresholdTTL int64, newTTL int64) error {
+	size uint64, isDir bool, cqlds blobstore.BlobStore, newTTL int64,
+	skipMap *SkipMap) error {
 
 	if walker.SkipKey(c, key) {
 		return nil
 	}
 
+	if skipMap != nil && skipMap.Check(c, key) {
+		return walker.SkipEntry
+	}
+
 	kv := key.Value()
-	metadata, err := cqlds.Metadata(ToECtx(c), kv)
-	if err != nil {
-		return fmt.Errorf("path: %v key %v: %v", path, key.String(), err)
-	}
-	if metadata == nil {
-		return fmt.Errorf("Store must have metadata")
-	}
-	ttl, ok := metadata[cql.TimeToLive]
-	if !ok {
-		return fmt.Errorf("Store must return metadata with TimeToLive")
-	}
-	ttlVal, err := strconv.ParseInt(ttl, 10, 64)
-	if err != nil {
-		return fmt.Errorf("Invalid TTL value in metadata %s ", ttl)
-	}
-
-	// if key exists and TTL doesn't need to be refreshed
-	// then return.
-	if ttlVal >= thresholdTTL {
-		return nil
-	}
-
 	buf, _, err := cqlds.Get(ToECtx(c), kv)
 	if err != nil {
 		return fmt.Errorf("path: %v key %v: %v", path, key.String(), err)
@@ -57,6 +37,11 @@ func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 	err = cqlds.Insert(ToECtx(c), kv, buf, newmetadata)
 	if err != nil {
 		return fmt.Errorf("path: %v key %v: %v", path, key.String(), err)
+	}
+
+	// only set the skipMap if we return successfully
+	if skipMap != nil {
+		skipMap.Set(c, key)
 	}
 	return nil
 }
