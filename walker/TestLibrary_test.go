@@ -158,7 +158,7 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 		}
 
 		if skipDirTest && info.IsDir() && strings.HasSuffix(path, "/dir1") {
-			return filepath.SkipError
+			return filepath.SkipDir
 		}
 
 		if path == workspace+"/api" || info.IsDir() {
@@ -213,7 +213,7 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 		// NOTE: In the TTL walker this path comparison will be
 		// replaced by a TTL comparison.
 		if skipDirTest && isDir && strings.HasSuffix(path, "/dir1") {
-			return SkipKey
+			return SkipError
 		}
 
 		// Skip, since constant and embedded keys will not
