@@ -9,9 +9,6 @@ package daemon
 
 import (
 	"testing"
-	"time"
-
-	"github.com/aristanetworks/quantumfs/processlocal"
 )
 
 func TestSmokeTestEtherFilesystem(t *testing.T) {
