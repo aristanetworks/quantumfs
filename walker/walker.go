@@ -165,8 +165,8 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 			dr := hlr.Record()
 			linkPath := dr.Filename()
 			err := handleDirectoryRecord(c, linkPath, ds, dr, wf,
-				keyChan);
-			
+				keyChan)
+
 			if err != nil && err != SkipError {
 				return err
 			}
