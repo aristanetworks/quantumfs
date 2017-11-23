@@ -471,12 +471,10 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 }
 
 // Should be called with the tree locked for read or write
-func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool,
-	lastInode bool) bool {
+func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, lastInode bool) bool {
 
 	inodeNum := inode.inodeNum()
-	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
-		inodeNum, uninstantiate).Out()
+	defer c.FuncIn("Mux::flushInode_", "inode %d", inodeNum).Out()
 
 	flushSuccess := true
 	if !inode.isOrphaned() {
@@ -504,22 +502,7 @@ func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool,
 			inode.flush(c)
 		}
 	}
-
-	if !flushSuccess {
-		c.wlog("Escaping flushInode due to flush failure")
-		return false
-	}
-
-	func() {
-		defer qfs.flusher.lock.Lock().Unlock()
-		inode.markClean_()
-	}()
-
-	if uninstantiate {
-		qfs.uninstantiateInode(c, inodeNum)
-	}
-
-	return true
+	return flushSuccess
 }
 
 const skipForgetLog = "inode %d doesn't need to be forgotten"
