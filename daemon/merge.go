@@ -416,17 +416,15 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	return rtnKey, nil
 }
 
-type mergePreference struct {
-	preference int
-}
+type mergePreference int
 
-func (mp *mergePreference) pick(newer quantumfs.DirectoryRecord,
+func (mp mergePreference) pick(newer quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
-	switch mp.preference {
+	switch mp {
 	default:
-		panic(fmt.Sprintf("Unknown merge preference %d", mp.preference))
+		panic(fmt.Sprintf("Unknown merge preference %d", mp))
 	case quantumfs.PreferNewer:
 		return newer.Clone()
 	case quantumfs.PreferLocal:
