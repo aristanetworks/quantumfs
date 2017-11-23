@@ -573,7 +573,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 		local[0], local[1], local[2])
 
 	newRootId, err := mergeWorkspaceRoot(c, baseRootId, remoteRootId,
-		localRootId, cmd.ConflictPreference)
+		localRootId, mergePreference{preference: cmd.ConflictPreference})
 	if err != nil {
 		c.vlog("Merge failed: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
