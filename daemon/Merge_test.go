@@ -783,7 +783,7 @@ func TestMergeRecreateFile(t *testing.T) {
 
 func TestMergeSkipDirectories(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		MergeTesterWithSkip(test, []string{"/merge1/merge2/skip/"},
+		MergeTesterWithSkip(test, []string{"merge1/merge2/skip"},
 			func(bws string) {
 				test.AssertNoErr(utils.MkdirAll(
 					bws+"/merge1/merge2/skip", 0777))

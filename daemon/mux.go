@@ -447,7 +447,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 
 		mergedId, err := mergeWorkspaceRoot(c, wsr.publishedRootId, rootId,
 			newRootId, quantumfs.PreferNewer,
-			mergeSkipPaths{paths: []string{}})
+			&mergeSkipPaths{paths: make(map[string]struct{}, 0)})
 
 		if err != nil {
 			c.elog("Unable to merge: %s", err.Error())

@@ -537,14 +537,6 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 			err.Error())
 	}
 
-	for _, path := range cmd.SkipPaths {
-		if path[0] != '/' || path[len(path)-1] != '/' {
-			return api.queueErrorResponse(0+
-				quantumfs.ErrorBadArgs,
-				"SkipPaths must start and end with /")
-		}
-	}
-
 	// Fetch base
 	c.qfs.syncWorkspace(c, cmd.BaseWorkspace)
 	baseRootId := quantumfs.EmptyWorkspaceKey
@@ -597,9 +589,16 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	c.vlog("Merging %s/%s/%s into %s/%s/%s", remote[0], remote[1], remote[2],
 		local[0], local[1], local[2])
 
+	skipPaths := mergeSkipPaths{
+		paths: make(map[string]struct{}, len(cmd.SkipPaths)),
+	}
+
+	for _, path := range cmd.SkipPaths {
+		skipPaths.paths[path] = struct{}{}
+	}
+
 	newRootId, err := mergeWorkspaceRoot(c, baseRootId, remoteRootId,
-		localRootId, cmd.ConflictPreference,
-		mergeSkipPaths{paths: cmd.SkipPaths})
+		localRootId, cmd.ConflictPreference, &skipPaths)
 	if err != nil {
 		c.vlog("Merge failed: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
