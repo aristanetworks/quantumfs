@@ -831,3 +831,51 @@ func TestMergeSkipDirectories(t *testing.T) {
 			})
 	})
 }
+
+func TestMergeSkipFiles(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTesterWithSkip(test, []string{"merge1/merge2/skip"},
+			func(bws string) {
+				test.AssertNoErr(utils.MkdirAll(
+					bws+"/merge1/merge2", 0777))
+				test.AssertNoErr(testutils.PrintToFile(
+					bws+"/merge1/merge2/skip",
+					"base"))
+				test.AssertNoErr(utils.MkdirAll(
+					bws+"/merge3/merge4", 0777))
+			}, func(branchA string, branchB string) mergeTestCheck {
+				test.AssertNoErr(testutils.PrintToFile(
+					branchA+"/merge1/local1", "local1"))
+				test.AssertNoErr(testutils.PrintToFile(
+					branchA+"/merge1/merge2/local2", "local2"))
+				test.AssertNoErr(testutils.OverWriteFile(
+					branchA+"/merge1/merge2/skip", "local"))
+
+				test.AssertNoErr(testutils.PrintToFile(
+					branchB+"/merge1/remote1", "remote1"))
+				test.AssertNoErr(testutils.PrintToFile(
+					branchB+"/merge1/merge2/remote2", "remote2"))
+				test.AssertNoErr(testutils.OverWriteFile(
+					branchB+"/merge1/merge2/skip", "remote"))
+				test.AssertNoErr(testutils.PrintToFile(
+					branchB+"/merge3/merge4/remote4", "remote4"))
+
+				return func(merged string) {
+					test.assertFileExists(
+						merged + "/merge1/local1")
+					test.assertFileExists(
+						merged + "/merge1/merge2/local2")
+
+					test.assertFileExists(
+						merged + "/merge1/remote1")
+					test.assertFileExists(
+						merged + "/merge1/merge2/remote2")
+					test.assertFileExists(
+						merged + "/merge3/merge4/remote4")
+
+					test.CheckData(merged+"/merge1/merge2/skip",
+						[]byte("local"))
+				}
+			})
+	})
+}
