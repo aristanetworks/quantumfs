@@ -270,7 +270,7 @@ func merge() {
 		fmt.Println("Failed to find API:", err)
 		os.Exit(exitApiNotFound)
 	}
-	err = api.Merge3Way(base, remote, local, prefer, []string{})
+	err = api.Merge3Way(base, remote, local, prefer, skipPaths)
 	if err != nil {
 		fmt.Println("Operation failed:", err)
 		os.Exit(exitBadArgs)
