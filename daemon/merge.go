@@ -248,8 +248,8 @@ func childSkipPaths(c *ctx, parentSkipPaths *mergeSkipPaths,
 // records with the same name. We handle these cases like mostly normal conflicts.
 func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
-	baseExists bool, ht *hardlinkTracker, prefer int, skipPaths *mergeSkipPaths) (
-	quantumfs.ObjectKey, error) {
+	baseExists bool, ht *hardlinkTracker, prefer int,
+	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn("mergeDirectory", "%s skipPaths len %d", dirName,
 		len(skipPaths.paths)).Out()
