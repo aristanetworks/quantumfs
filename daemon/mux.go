@@ -471,55 +471,13 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 }
 
 // Should be called with the tree locked for read or write
-func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool,
-	lastInode bool) bool {
+func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode) bool {
+	defer c.funcIn("Mux::flushInode_").Out()
 
-	inodeNum := inode.inodeNum()
-	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
-		inodeNum, uninstantiate).Out()
-
-	flushSuccess := true
-	if !inode.isOrphaned() {
-		if wsr, isWsr := inode.(*WorkspaceRoot); isWsr {
-			_, flushSuccess = wsr.flushCanFail(c)
-
-			// Flush of wsr failed, so try merging
-			if !flushSuccess {
-				if lastInode {
-					err := forceMerge(c, wsr)
-					if err == nil {
-						// We fixed the wsr flush failure
-						// via merge
-						flushSuccess = true
-					}
-				} else {
-					// the workspaceroot should be dropped for
-					// now - there are children in queue to be
-					// flushed first. They will push the wsr
-					// back into the dirty queue later
-					flushSuccess = true
-				}
-			}
-		} else {
-			inode.flush(c)
-		}
+	if inode.isOrphaned() {
+		return true
 	}
-
-	if !flushSuccess {
-		c.wlog("Escaping flushInode due to flush failure")
-		return false
-	}
-
-	func() {
-		defer qfs.flusher.lock.Lock().Unlock()
-		inode.markClean_()
-	}()
-
-	if uninstantiate {
-		qfs.uninstantiateInode(c, inodeNum)
-	}
-
-	return true
+	return inode.flush(c).IsValid()
 }
 
 const skipForgetLog = "inode %d doesn't need to be forgotten"
