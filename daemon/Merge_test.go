@@ -50,7 +50,8 @@ func MergeTester(test *testHelper, base baseSetup, setup mergeTestSetup) {
 
 	if base != nil {
 		err = api.Merge3Way(test.RelPath(workspaceBase),
-			test.RelPath(workspaceB), test.RelPath(tempBranch))
+			test.RelPath(workspaceB), test.RelPath(tempBranch),
+			quantumfs.PreferNewer)
 		test.AssertNoErr(err)
 	} else {
 		err = api.Merge(test.RelPath(workspaceB), test.RelPath(tempBranch))
