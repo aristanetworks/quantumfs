@@ -545,6 +545,8 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 		}
 	}
 
+	// Fetch base
+	c.qfs.syncWorkspace(c, cmd.BaseWorkspace)
 	baseRootId := quantumfs.EmptyWorkspaceKey
 	base := strings.Split(cmd.BaseWorkspace, "/")
 	baseRootId, _, err = c.workspaceDB.Workspace(&c.Ctx, base[0], base[1],
@@ -557,16 +559,8 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 			cmd.BaseWorkspace)
 	}
 
-	local := strings.Split(cmd.LocalWorkspace, "/")
-	localRootId, localNonce, err := c.workspaceDB.Workspace(&c.Ctx, local[0],
-		local[1], local[2])
-	if err != nil {
-		c.vlog("Workspace not fetched (%s): %s", local, err.Error())
-		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
-			"WorkspaceRoot %s does not exist or is not active",
-			cmd.LocalWorkspace)
-	}
-
+	// Fetch Remote
+	c.qfs.syncWorkspace(c, cmd.RemoteWorkspace)
 	remote := strings.Split(cmd.RemoteWorkspace, "/")
 	remoteRootId, _, err := c.workspaceDB.Workspace(&c.Ctx, remote[0], remote[1],
 		remote[2])
@@ -576,6 +570,29 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 			"WorkspaceRoot %s does not exist or is not active",
 			cmd.RemoteWorkspace)
 	}
+
+	// Fetch/prepare Local
+	local := strings.Split(cmd.LocalWorkspace, "/")
+	localWsr, cleanup, ok := c.qfs.getWorkspaceRoot(c, local[0], local[1],
+		local[2])
+	defer cleanup()
+	if !ok {
+		c.vlog("Unable to instantiate local workspace")
+		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"WorkspaceRoot %s could not be instantiated (not found)",
+			cmd.LocalWorkspace)
+	}
+
+	// Prevent local changes while we perform the merge
+	defer localWsr.LockTree().Unlock()
+	if err := c.qfs.flusher.syncWorkspace_(c, cmd.LocalWorkspace); err != nil {
+		c.vlog("Failed flushing local workspace: %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadCommandId,
+			"Failed flushing local workspace: %s", err.Error())
+	}
+
+	localRootId := localWsr.publishedRootId
+	localNonce := localWsr.nonce
 
 	c.vlog("Merging %s/%s/%s into %s/%s/%s", remote[0], remote[1], remote[2],
 		local[0], local[1], local[2])
@@ -597,6 +614,8 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
 			"Workspace rootId advanced after merge began, try again.")
 	}
+
+	localWsr.refresh_(c)
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Merge Succeeded")
 }
