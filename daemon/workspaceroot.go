@@ -803,16 +803,26 @@ func (wsr *WorkspaceRoot) clearList() {
 }
 
 func (wsr *WorkspaceRoot) flush(c *ctx) quantumfs.ObjectKey {
-	newKey, _ := wsr.flushCanFail(c)
-	return newKey
+	defer c.funcIn("WorkspaceRoot::flush").Out()
+	wsr.Directory.flush(c)
+	if !wsr.publish(c) {
+		if !wsr.handleFlushFailure_(c) {
+			return quantumfs.ZeroKey
+		}
+	}
+	return wsr.publishedRootId
 }
 
-func (wsr *WorkspaceRoot) flushCanFail(c *ctx) (quantumfs.ObjectKey, bool) {
-	defer c.funcIn("WorkspaceRoot::flushCanFail").Out()
+// Should be called with the tree locked for read or write
+func (wsr *WorkspaceRoot) handleFlushFailure_(c *ctx) bool {
+	defer c.funcIn("WorkspaceRoot::handleFlushFailure_").Out()
 
-	wsr.Directory.flush(c)
-	success := wsr.publish(c)
-	return wsr.publishedRootId, success
+	// If there is anything in the dirty queue, postpone handling of the
+	// failure to the next time flush fails
+	if c.qfs.flusher.nQueued(c, wsr.treeLock()) != 1 {
+		return true
+	}
+	return nil == forceMerge(c, wsr)
 }
 
 func (wsr *WorkspaceRoot) directChildInodes() []InodeId {

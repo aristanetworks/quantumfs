@@ -1636,3 +1636,45 @@ func TestRefreshDirReCreate(t *testing.T) {
 		test.AssertNoErr(file.Close())
 	})
 }
+
+func TestRefreshDualInstancesMultiDirty(t *testing.T) {
+	t.Skip() // BUG229811
+	runDualQuantumFsTest(t, func(test *testHelper) {
+		workspace0 := test.NewWorkspace()
+		c := test.TestCtx()
+		mnt1 := test.qfsInstances[1].config.MountPath + "/"
+		workspaceName := test.RelPath(workspace0)
+		workspace1 := mnt1 + workspaceName
+		dir := "dir"
+		file1 := "testFile1"
+		file2 := "testFile2"
+		content1 := "content"
+
+		file2fullname0 := fmt.Sprintf("%s/%s/%s", workspace0, dir, file2)
+
+		file1fullname1 := fmt.Sprintf("%s/%s/%s", workspace1, dir, file1)
+		file2fullname1 := fmt.Sprintf("%s/%s/%s", workspace1, dir, file2)
+
+		test.markImmutable(c, workspaceName)
+		api1, err := quantumfs.NewApiWithPath(mnt1 + "api")
+		test.AssertNoErr(err)
+		defer api1.Close()
+		test.AssertNoErr(api1.EnableRootWrite(workspaceName))
+
+		// Keep a handle to workspace0 to make sure it is refreshed
+		wsr0, cleanup := test.GetWorkspaceRoot(workspace0)
+		defer cleanup()
+		test.Assert(wsr0 != nil, "workspace root does not exist")
+
+		test.AssertNoErr(utils.MkdirAll(workspace1+"/"+dir, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file1fullname1, content1))
+		test.AssertNoErr(testutils.PrintToFile(file2fullname1, content1))
+
+		test.waitForNRefresh(workspaceName, 1)
+
+		file, err := os.OpenFile(file2fullname0, os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+		defer file.Close()
+		test.verifyContentStartsWith(file, content1)
+	})
+}
