@@ -6,6 +6,7 @@ package daemon
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -24,8 +25,10 @@ type hardlinkTracker struct {
 }
 
 func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]linkEntry,
-	remote map[quantumfs.FileId]linkEntry,
-	local map[quantumfs.FileId]linkEntry) *hardlinkTracker {
+	remote map[quantumfs.FileId]linkEntry, local map[quantumfs.FileId]linkEntry,
+	prefer mergePreference) *hardlinkTracker {
+
+	defer c.funcIn("newHardlinkTracker").Out()
 
 	rtn := hardlinkTracker{
 		allRecords: make(map[quantumfs.FileId]*quantumfs.DirectRecord),
@@ -47,7 +50,7 @@ func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]linkEntry,
 			}
 
 			mergedRecord, err := mergeFile(c, baseRecord,
-				remoteEntry.record, localEntry.record)
+				remoteEntry.record, localEntry.record, prefer)
 			if err != nil {
 				panic(err)
 			}
@@ -137,6 +140,8 @@ func loadWorkspaceRoot(c *ctx,
 	key quantumfs.ObjectKey) (hardlinks map[quantumfs.FileId]linkEntry,
 	directory quantumfs.ObjectKey, err error) {
 
+	defer c.funcIn("loadWorkspaceRoot").Out()
+
 	buffer := c.dataStore.Get(&c.Ctx, key)
 	if buffer == nil {
 		return nil, key,
@@ -149,10 +154,16 @@ func loadWorkspaceRoot(c *ctx,
 	return links, workspaceRoot.BaseLayer(), nil
 }
 
-func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
-	local quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+type mergeSkipPaths struct {
+	paths map[string]struct{}
+}
 
-	defer c.funcIn("mergeWorkspaceRoot").Out()
+func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
+	local quantumfs.ObjectKey, prefer mergePreference,
+	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
+
+	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d", prefer,
+		len(skipPaths.paths)).Out()
 
 	baseHardlinks, baseDirectory, err := loadWorkspaceRoot(c, base)
 	if err != nil {
@@ -169,10 +180,10 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	}
 
 	tracker := newHardlinkTracker(c, baseHardlinks, remoteHardlinks,
-		localHardlinks)
+		localHardlinks, prefer)
 
-	localDirectory, err = mergeDirectory(c, baseDirectory,
-		remoteDirectory, localDirectory, true, tracker)
+	localDirectory, err = mergeDirectory(c, "/", baseDirectory,
+		remoteDirectory, localDirectory, true, tracker, prefer, skipPaths)
 	if err != nil {
 		return local, err
 	}
@@ -182,6 +193,8 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 
 func loadRecords(c *ctx,
 	key quantumfs.ObjectKey) (map[string]quantumfs.DirectoryRecord, error) {
+
+	defer c.funcIn("loadRecords").Out()
 
 	rtn := make(map[string]quantumfs.DirectoryRecord)
 
@@ -206,13 +219,40 @@ func loadRecords(c *ctx,
 	}
 }
 
+func childSkipPaths(c *ctx, parentSkipPaths *mergeSkipPaths,
+	name string) *mergeSkipPaths {
+
+	// Avoid unnecessary allocation
+	if len(parentSkipPaths.paths) == 0 {
+		return parentSkipPaths
+	}
+
+	skipPaths := mergeSkipPaths{
+		paths: make(map[string]struct{}, 0),
+	}
+
+	for path, _ := range parentSkipPaths.paths {
+		if strings.HasPrefix(path, name) {
+			trimmed := strings.TrimPrefix(path, name+"/")
+			skipPaths.paths[trimmed] = struct{}{}
+			c.vlog("Adding skip path %s", trimmed)
+		} else {
+			c.vlog("Dropping skip path %s", path)
+		}
+	}
+
+	return &skipPaths
+}
+
 // sometimes, in theory, two workspaces could simultaneously create directories or
 // records with the same name. We handle these cases like mostly normal conflicts.
-func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
+func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
-	baseExists bool, ht *hardlinkTracker) (quantumfs.ObjectKey, error) {
+	baseExists bool, ht *hardlinkTracker, prefer mergePreference,
+	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
 
-	defer c.funcIn("mergeDirectory").Out()
+	defer c.FuncIn("mergeDirectory", "%s skipPaths len %d", dirName,
+		len(skipPaths.paths)).Out()
 
 	var err error
 	baseRecords := make(map[string]quantumfs.DirectoryRecord)
@@ -233,29 +273,36 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 
 	// make a copy to preserve localRecords
 	mergedRecords := make(map[string]quantumfs.DirectoryRecord)
-	for k, v := range localRecords {
-		mergedRecords[k] = v
+	for name, record := range localRecords {
+		mergedRecords[name] = record
 	}
 
-	for k, v := range remoteRecords {
-		baseChild, inBase := baseRecords[k]
-		localChild, inLocal := localRecords[k]
+	for name, remoteRecord := range remoteRecords {
+		baseChild, inBase := baseRecords[name]
+		localChild, inLocal := localRecords[name]
 
 		if inLocal {
 			// We have at least a local and remote, must merge
-			mergedRecords[k], err = mergeRecord(c, baseChild, v,
-				localChild, ht)
+			if _, skipChild := skipPaths.paths[name]; skipChild {
+				c.vlog("skipping child %s due to skiplist", name)
+				mergedRecords[name] = localChild
+				continue
+			}
+
+			mergedRecords[name], err = mergeRecord(c, baseChild,
+				remoteRecord, localChild, ht, prefer,
+				childSkipPaths(c, skipPaths, name))
 			if err != nil {
 				return local, err
 			}
 		} else if !inBase {
 			// just take remote since it's known newer than base, but
 			// only if local didn't delete it from base
-			mergedRecords[k] = v
+			mergedRecords[name] = remoteRecord
 
 			// Add new links
-			if v.Type() == quantumfs.ObjectTypeDirectory {
-				err = traverseSubtree(c, v.ID(),
+			if remoteRecord.Type() == quantumfs.ObjectTypeDirectory {
+				err = traverseSubtree(c, remoteRecord.ID(),
 					func(v quantumfs.DirectoryRecord) {
 
 						ht.checkLinkChanged(c, nil, v)
@@ -267,21 +314,21 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 		}
 
 		// check for hardlink addition or update
-		mergedRecord, _ := mergedRecords[k]
+		mergedRecord, _ := mergedRecords[name]
 		ht.checkLinkChanged(c, localChild, mergedRecord)
 	}
 
 	if baseExists {
-		for k, _ := range baseRecords {
-			_, inRemote := remoteRecords[k]
-			localRecord, inLocal := localRecords[k]
+		for name, _ := range baseRecords {
+			_, inRemote := remoteRecords[name]
+			localRecord, inLocal := localRecords[name]
 
 			// Delete iff the file was deleted in remote only,
 			// (otherwise local, our reference, already deleted it and
 			// we don't want to doulbly delete)
 			if !inRemote && inLocal {
-				c.vlog("Remote deleted %s", k)
-				delete(mergedRecords, k)
+				c.vlog("Remote deleted %s", name)
+				delete(mergedRecords, name)
 
 				// check for hardlink deletion
 				ht.checkLinkChanged(c, localRecord, nil)
@@ -291,8 +338,8 @@ func mergeDirectory(c *ctx, base quantumfs.ObjectKey,
 
 	// turn mergedRecords into a publishable format
 	localRecordsList := make([]quantumfs.DirectoryRecord, 0, len(mergedRecords))
-	for _, v := range mergedRecords {
-		localRecordsList = append(localRecordsList, v)
+	for _, mergeRecord := range mergedRecords {
+		localRecordsList = append(localRecordsList, mergeRecord)
 	}
 
 	// publish localRecordsList
@@ -328,11 +375,11 @@ func init() {
 }
 
 func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
-	newer quantumfs.ObjectKey, older quantumfs.ObjectKey) (quantumfs.ObjectKey,
-	error) {
+	newer quantumfs.ObjectKey, older quantumfs.ObjectKey,
+	prefer mergePreference) (quantumfs.ObjectKey, error) {
 
 	baseAttrs, err := getRecordExtendedAttributes(c, base)
-	if err == fuse.ENOENT || base == quantumfs.ZeroKey {
+	if err == fuse.ENOENT || base.IsEqualTo(quantumfs.ZeroKey) {
 		baseAttrs = emptyAttrs
 	} else if err != fuse.OK {
 		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr base: " +
@@ -340,7 +387,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	}
 
 	newerAttrs, err := getRecordExtendedAttributes(c, newer)
-	if err == fuse.ENOENT || newer == quantumfs.ZeroKey {
+	if err == fuse.ENOENT || newer.IsEqualTo(quantumfs.ZeroKey) {
 		newerAttrs = emptyAttrs
 	} else if err != fuse.OK {
 		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr new: " +
@@ -348,11 +395,18 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	}
 
 	olderAttrs, err := getRecordExtendedAttributes(c, older)
-	if err == fuse.ENOENT || older == quantumfs.ZeroKey {
+	if err == fuse.ENOENT || older.IsEqualTo(quantumfs.ZeroKey) {
 		olderAttrs = emptyAttrs
 	} else if err != fuse.OK {
 		return quantumfs.EmptyBlockKey, errors.New("Merge ExtAttr old: " +
 			err.String())
+	}
+
+	if baseAttrs == emptyAttrs && newerAttrs == emptyAttrs &&
+		olderAttrs == emptyAttrs {
+
+		// There are no extended attributes
+		return quantumfs.EmptyBlockKey, nil
 	}
 
 	mergeAttrs := quantumfs.NewExtendedAttributes()
@@ -414,62 +468,104 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	return rtnKey, nil
 }
 
+type mergePreference int
+
+func (mp mergePreference) pick(newer quantumfs.DirectoryRecord,
+	local quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
+
+	switch mp {
+	default:
+		panic(fmt.Sprintf("Unknown merge preference %d", mp))
+	case quantumfs.PreferNewer:
+		return newer.Clone()
+	case quantumfs.PreferLocal:
+		return local.Clone()
+	case quantumfs.PreferRemote:
+		return remote.Clone()
+	}
+}
+
 // Merge record attributes based on ContentTime
 func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
+	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
+	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
 
-	newerRecord := local
-	olderRecord := remote
+	newer := local
+	older := remote
 	if remote.ContentTime() > local.ContentTime() {
-		newerRecord = remote
-		olderRecord = local
+		newer = remote
+		older = local
 	}
 
-	rtnRecord := newerRecord.Clone()
+	if base == nil {
+		// Without a base we cannot be any cleverer than our base preference.
+		return prefer.pick(newer, local, remote), nil
+	}
 
-	// We only take fields from the older record when the newer record and base
-	// have the same value, indicating no change from that branch
-	if base != nil && local.FileId() == remote.FileId() {
-		if base.ID() == newerRecord.ID() {
-			rtnRecord.SetID(olderRecord.ID())
+	if local.FileId() != remote.FileId() {
+		// At least one of the sides replaced the base as a deletion followed
+		// by a creation. Stay consistent with the deletion-modification
+		// scenario and keep the newly created file.
+		if local.FileId() == base.FileId() {
+			// The remote recreated
+			return remote.Clone(), nil
+		} else if remote.FileId() == base.FileId() {
+			// The local recreated
+			return local.Clone(), nil
+		} else {
+			// Both recreated, keep our preference
+			return prefer.pick(newer, local, remote), nil
+		}
+	} else {
+		// local.FileId() == remote.FileId()
+		//
+		// We only take fields from the older record when the newer record
+		// and base have the same value, indicating no change from that
+		// branch
+
+		rtnRecord := newer.Clone()
+
+		if base.ID() == newer.ID() {
+			rtnRecord.SetID(older.ID())
 			// type and size must match the content set via ID
-			rtnRecord.SetSize(olderRecord.Size())
-			rtnRecord.SetType(olderRecord.Type())
+			rtnRecord.SetSize(older.Size())
+			rtnRecord.SetType(older.Type())
 		}
-		if base.Permissions() == newerRecord.Permissions() {
-			rtnRecord.SetPermissions(olderRecord.Permissions())
+		if base.Permissions() == newer.Permissions() {
+			rtnRecord.SetPermissions(older.Permissions())
 		}
-		if base.Owner() == newerRecord.Owner() {
-			rtnRecord.SetOwner(olderRecord.Owner())
+		if base.Owner() == newer.Owner() {
+			rtnRecord.SetOwner(older.Owner())
 		}
-		if base.Group() == newerRecord.Group() {
-			rtnRecord.SetGroup(olderRecord.Group())
+		if base.Group() == newer.Group() {
+			rtnRecord.SetGroup(older.Group())
 		}
 
 		newKey, err := mergeExtendedAttrs(c, base.ExtendedAttributes(),
-			newerRecord.ExtendedAttributes(),
-			olderRecord.ExtendedAttributes())
+			newer.ExtendedAttributes(), older.ExtendedAttributes(),
+			prefer)
 		if err != nil {
 			return nil, err
 		}
 		rtnRecord.SetExtendedAttributes(newKey)
 
-		if base.ContentTime() == newerRecord.ContentTime() {
-			rtnRecord.SetContentTime(olderRecord.ContentTime())
+		if base.ContentTime() == newer.ContentTime() {
+			rtnRecord.SetContentTime(older.ContentTime())
 		}
-		if base.ModificationTime() == newerRecord.ModificationTime() {
+		if base.ModificationTime() == newer.ModificationTime() {
 			rtnRecord.SetModificationTime(0 +
-				olderRecord.ModificationTime())
+				older.ModificationTime())
 		}
-	}
 
-	return rtnRecord, nil
+		return rtnRecord, nil
+	}
 }
 
 func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	ht *hardlinkTracker) (quantumfs.DirectoryRecord, error) {
+	ht *hardlinkTracker, prefer mergePreference, skipPaths *mergeSkipPaths) (
+	quantumfs.DirectoryRecord, error) {
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).Out()
 
@@ -478,7 +574,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remoteTypeChanged := base == nil || !remote.Type().Matches(base.Type())
 	bothSameType := local.Type().Matches(remote.Type())
 
-	rtnRecord, err := mergeAttributes(c, base, remote, local)
+	rtnRecord, err := mergeAttributes(c, base, remote, local, prefer)
 	if err != nil {
 		return nil, err
 	}
@@ -493,8 +589,9 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 				baseId = base.ID()
 			}
 
-			mergedKey, err := mergeDirectory(c, baseId,
-				remote.ID(), local.ID(), (base != nil), ht)
+			mergedKey, err := mergeDirectory(c, local.Filename(), baseId,
+				remote.ID(), local.ID(), (base != nil), ht, prefer,
+				skipPaths)
 			if err != nil {
 				return local, err
 			}
@@ -521,7 +618,7 @@ func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	case quantumfs.ObjectTypeVeryLargeFile:
 		if bothSameType {
 			// We can potentially do an intra-file merge
-			return mergeFile(c, base, remote, local)
+			return mergeFile(c, base, remote, local, prefer)
 		}
 	}
 
@@ -609,7 +706,7 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 	iterator = localAccessor
 	otherRecord = remote
 	other = remoteAccessor
-	if localAccessor.fileLength(c) > remoteAccessor.fileLength(c) {
+	if local.Size() > remote.Size() {
 		iteratorRecord = remote
 		iterator = remoteAccessor
 		otherRecord = local
@@ -620,8 +717,8 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 }
 
 func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
+	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
+	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
 
 	var baseAccessor blockAccessor
 	baseAvailable := false
@@ -630,7 +727,7 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 		baseAvailable = true
 	}
 
-	rtnRecord, err := mergeAttributes(c, base, remote, local)
+	rtnRecord, err := mergeAttributes(c, base, remote, local, prefer)
 	if err != nil {
 		return nil, err
 	}

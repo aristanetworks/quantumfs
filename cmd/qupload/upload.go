@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -63,12 +64,15 @@ type Uploader struct {
 	wsDB      quantumfs.WorkspaceDB
 	exInfo    *exs.ExcludeInfo
 
-	topDirRecord quantumfs.DirectoryRecord
+	topDirID quantumfs.ObjectKey
 
 	dirEntryTrackers map[string]*dirEntryTracker
 	dirStateMutex    utils.DeferableMutex
 
 	hardlinks *qwr.Hardlinks
+
+	dataBytesWritten     uint64
+	metadataBytesWritten uint64
 }
 
 func NewUploader() Uploader {
@@ -108,18 +112,15 @@ func (up *Uploader) dumpUploadState() {
 }
 
 func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
-	record quantumfs.DirectoryRecord, path string,
-	handler func(string, *dirEntryTracker) (quantumfs.DirectoryRecord,
-		error)) error {
+	record quantumfs.DirectoryRecord, path string) (err error) {
 
-	var err error
 	defer up.dirStateMutex.Lock().Unlock()
 
 	for {
 		tracker, ok := up.dirEntryTrackers[path]
 		if !ok {
 			up.dumpUploadState()
-			panic(fmt.Sprintf("Directory state tracker must "+
+			panic(fmt.Sprintf("PANIC: Directory state tracker must "+
 				"exist for %q", path))
 		}
 
@@ -128,14 +129,16 @@ func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
 			return nil
 		}
 		qctx.Vlog(qlog.LogTool, "Writing %s", path)
-		record, err = qwr.WriteDirectory(qctx, path, tracker.info,
+		var written uint64
+		record, written, err = qwr.WriteDirectory(qctx, path, tracker.info,
 			tracker.records, up.dataStore)
 		if err != nil {
 			return err
 		}
+		atomic.AddUint64(&up.metadataBytesWritten, written)
 
 		if tracker.root {
-			up.topDirRecord = record
+			up.topDirID = record.ID()
 			return nil
 		}
 		// we flushed current dir which could be the last
@@ -144,18 +147,17 @@ func (up *Uploader) handleDirRecord(qctx *quantumfs.Ctx,
 	}
 }
 
-func (up *Uploader) processPath(c *Ctx, msg *pathInfo) (quantumfs.DirectoryRecord,
-	error) {
+func (up *Uploader) processPath(c *Ctx,
+	msg *pathInfo) (rtn quantumfs.DirectoryRecord, dataWritten uint64,
+	metadataWritten uint64, err error) {
 
 	if !msg.info.IsDir() {
 		// WriteFile() will detect the file type based on
 		// stat information and setup appropriate data
 		// and metadata for the file in storage
 		c.Vlog("Writing %s", msg.path)
-		record, err := qwr.WriteFile(c.Qctx, up.dataStore, msg.info,
+		return qwr.WriteFile(c.Qctx, up.dataStore, msg.info,
 			msg.path, up.hardlinks)
-
-		return record, err
 	} else {
 		// walker walks non-empty directories to generate
 		// worker handles empty directory
@@ -172,11 +174,12 @@ func (up *Uploader) processPath(c *Ctx, msg *pathInfo) (quantumfs.DirectoryRecor
 				stat.Ctim.Nsec)),
 			quantumfs.EmptyDirKey)
 
-		return record, nil
+		return record, 0, 0, nil
 	}
 }
 
 func (up *Uploader) pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
+
 	var msg *pathInfo
 
 	for {
@@ -189,19 +192,14 @@ func (up *Uploader) pathWorker(c *Ctx, piChan <-chan *pathInfo) error {
 			}
 		}
 
-		record, err := up.processPath(c, msg)
+		record, dataWritten, metadataWritten, err := up.processPath(c, msg)
 		if err != nil {
 			return err
 		}
+		atomic.AddUint64(&up.dataBytesWritten, dataWritten)
+		atomic.AddUint64(&up.metadataBytesWritten, metadataWritten)
 
-		err = up.handleDirRecord(c.Qctx, record, filepath.Dir(msg.path),
-			func(path string,
-				tracker *dirEntryTracker) (quantumfs.DirectoryRecord,
-				error) {
-
-				return qwr.WriteDirectory(c.Qctx, path, tracker.info,
-					tracker.records, up.dataStore)
-			})
+		err = up.handleDirRecord(c.Qctx, record, filepath.Dir(msg.path))
 		if err != nil {
 			return err
 		}
@@ -265,6 +263,11 @@ func (up *Uploader) pathWalker(c *Ctx, piChan chan<- *pathInfo,
 		// separation of concerns between walker and worker
 		if expectedDirRecords > 0 {
 			up.setupDirEntryTracker(path, root, info, expectedDirRecords)
+			return nil
+		}
+
+		// We have an empty root directory - ensure we don't push it to queue
+		if checkPath == "/" {
 			return nil
 		}
 	}
@@ -338,18 +341,27 @@ func (up *Uploader) upload(c *Ctx, cli *params,
 		return quantumfs.ObjectKey{}, err
 	}
 
-	if up.topDirRecord == nil {
-		up.dumpUploadState()
-		panic("workspace root dir not written yet but all " +
-			"writes to workspace completed. This is unexpected. " +
-			"Use debug dump to diagnose.")
+	var emptyKey quantumfs.ObjectKey
+	if up.topDirID.IsEqualTo(emptyKey) {
+		// check if the root directory is empty
+		if up.exInfo != nil && up.exInfo.RecordCount(root, 0) != 0 {
+			up.dumpUploadState()
+			panic("PANIC: workspace root dir not written yet but all " +
+				"writes to workspace completed." +
+				"Use debug dump to diagnose.")
+		}
+
+		c.Wlog("Empty workspace root detected.")
+		up.topDirID = quantumfs.EmptyDirKey
 	}
 
-	wsrKey, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirRecord.ID(),
+	wsrKey, written, wsrErr := qwr.WriteWorkspaceRoot(c.Qctx, up.topDirID,
 		up.dataStore, up.hardlinks)
 	if wsrErr != nil {
 		return quantumfs.ObjectKey{}, wsrErr
 	}
+	atomic.AddUint64(&up.metadataBytesWritten, written)
+
 	err = uploadCompleted(c.Qctx, up.wsDB, ws, aliasWS, wsrKey)
 	if err != nil {
 		return quantumfs.ObjectKey{}, err
@@ -357,13 +369,13 @@ func (up *Uploader) upload(c *Ctx, cli *params,
 
 	fmt.Printf("\nUpload completed. Total: %d bytes "+
 		"(Data:%d(%d%%) Metadata:%d(%d%%)) in %.0f secs to %s\n",
-		qwr.DataBytesWritten+qwr.MetadataBytesWritten,
-		qwr.DataBytesWritten,
-		(qwr.DataBytesWritten*100)/
-			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
-		qwr.MetadataBytesWritten,
-		(qwr.MetadataBytesWritten*100)/
-			(qwr.DataBytesWritten+qwr.MetadataBytesWritten),
+		up.dataBytesWritten+up.metadataBytesWritten,
+		up.dataBytesWritten,
+		(up.dataBytesWritten*100)/
+			(up.dataBytesWritten+up.metadataBytesWritten),
+		up.metadataBytesWritten,
+		(up.metadataBytesWritten*100)/
+			(up.dataBytesWritten+up.metadataBytesWritten),
 		time.Since(start).Seconds(), ws)
 	return wsrKey, nil
 }
@@ -425,6 +437,10 @@ func uploadCompleted(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB, ws string,
 			return err
 		}
 	}
+	err = SetImmutable(qctx, wsdb, ws)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -448,4 +464,12 @@ func (up *Uploader) byPass(c *Ctx, cli *params) error {
 	}
 	fmt.Printf("ByPass Completed: %v -> %v\n", ws, referenceWS)
 	return nil
+}
+
+func SetImmutable(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
+	wsname string) error {
+
+	wsParts := strings.Split(wsname, "/")
+	return wsdb.SetWorkspaceImmutable(qctx, wsParts[0], wsParts[1],
+		wsParts[2])
 }

@@ -5,6 +5,7 @@ package grpc
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -25,7 +26,7 @@ import (
 // involves re-subscribing for updates and ensuring the most recent state has been
 // processed.
 
-const maxRetries = 100
+const retryDelay = 50 * time.Millisecond
 
 func shouldRetry(err error) bool {
 	if err == nil {
@@ -99,6 +100,8 @@ type workspaceDB struct {
 
 // Run in a separate goroutine to trigger reconnection when the connection has failed
 func (wsdb *workspaceDB) reconnector() {
+	var conn *grpc.ClientConn
+
 	for {
 		// Wait for a notification
 		<-wsdb.triggerReconnect
@@ -115,7 +118,10 @@ func (wsdb *workspaceDB) reconnector() {
 			}),
 		}
 
-		var conn *grpc.ClientConn
+		if conn != nil {
+			conn.Close()
+			conn = nil
+		}
 
 		err := fmt.Errorf("Not an error")
 		for err != nil {
@@ -162,6 +168,18 @@ func (wsdb *workspaceDB) reconnect() {
 }
 
 func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
+	defer func() {
+		exception := recover()
+		if exception != nil {
+			// Log
+			stackTrace := debug.Stack()
+			fmt.Printf("Panic in grpc::waitForWorkspaceUpdates:\n%s\n",
+				utils.BytesToString(stackTrace))
+			// Swallow and continue. The next wsdb request will attempt
+			// to reconnect.
+		}
+	}()
+
 	stream, err := wsdb.server.ListenForUpdates(context.TODO(), &rpc.Void{})
 	if err != nil {
 		wsdb.reconnect()
@@ -333,25 +351,17 @@ func (wsdb *workspaceDB) convertErr(response rpc.Response) error {
 		response.ErrCause)
 }
 
-func logRetry(c *quantumfs.Ctx, attemptNum int, cmd string, err error) {
-	if attemptNum < maxRetries-1 {
-		c.Dlog(qlog.LogWorkspaceDb,
-			"%s failed, retrying: %s", cmd, err.Error())
-	}
-}
-
 func retry(c *quantumfs.Ctx, opName string, op func(c *quantumfs.Ctx) error) error {
 	var err error
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	for {
 		err = op(c)
 		if !shouldRetry(err) {
 			return err
 		}
-		logRetry(c, attempt, opName, err)
+		c.Dlog(qlog.LogWorkspaceDb,
+			"%s failed, retrying: %s", opName, err.Error())
+		time.Sleep(retryDelay)
 	}
-	c.Dlog(qlog.LogWorkspaceDb, "%s failed, not retrying: %s", opName,
-		err.Error())
-	return err
 }
 
 const NumTypespaceLog = "grpc::NumTypespaces"
@@ -903,14 +913,13 @@ func (wsdb *workspaceDB) SubscribeTo(workspaceName string) error {
 func (wsdb *workspaceDB) subscribeTo(workspaceName string) error {
 	var err error
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	for {
 		err = wsdb._subscribeTo(workspaceName)
 		if !shouldRetry(err) {
 			return err
 		}
+		time.Sleep(retryDelay)
 	}
-
-	panic("subscribeTo failed, no more retries")
 }
 
 func (wsdb *workspaceDB) _subscribeTo(workspaceName string) error {
@@ -939,14 +948,13 @@ func (wsdb *workspaceDB) UnsubscribeFrom(workspaceName string) {
 
 	var err error
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	for {
 		err = wsdb.unsubscribeFrom(workspaceName)
 		if !shouldRetry(err) {
 			return
 		}
+		time.Sleep(retryDelay)
 	}
-
-	panic("UnsubscribeFrom failed, no more retries")
 }
 
 func (wsdb *workspaceDB) unsubscribeFrom(workspaceName string) error {

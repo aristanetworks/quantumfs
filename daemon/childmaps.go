@@ -15,7 +15,7 @@ import (
 // Handles map coordination and partial map pairing (for hardlinks) since now the
 // mapping between maps isn't one-to-one.
 type ChildMap struct {
-	wsr *WorkspaceRoot
+	dir *Directory
 
 	// can be many to one
 	children map[string]InodeId
@@ -24,13 +24,13 @@ type ChildMap struct {
 	childrenRecords_ map[InodeId][]quantumfs.DirectoryRecord
 }
 
-func newChildMap(c *ctx, wsr_ *WorkspaceRoot,
+func newChildMap(c *ctx, dir_ *Directory,
 	baseLayerId quantumfs.ObjectKey) (*ChildMap, []InodeId) {
 
 	defer c.FuncIn("newChildMap", "baseLayer %s", baseLayerId.String()).Out()
 
 	cmap := &ChildMap{
-		wsr:              wsr_,
+		dir:              dir_,
 		children:         make(map[string]InodeId),
 		childrenRecords_: make(map[InodeId][]quantumfs.DirectoryRecord),
 	}
@@ -61,18 +61,13 @@ func (cmap *ChildMap) loadAllChildren(c *ctx,
 	return uninstantiated
 }
 
-func (cmap *ChildMap) baseLayerIs(c *ctx, baseLayerId quantumfs.ObjectKey) {
-	defer c.funcIn("ChildMap::baseLayerIs").Out()
-
-	cmap.childrenRecords_ = make(map[InodeId][]quantumfs.DirectoryRecord)
-	cmap.loadAllChildren(c, baseLayerId)
-}
-
 func (cmap *ChildMap) childrenRecords() map[InodeId][]quantumfs.DirectoryRecord {
 	return cmap.childrenRecords_
 }
 
-func (cmap *ChildMap) setRecord(inodeId InodeId, record quantumfs.DirectoryRecord) {
+func (cmap *ChildMap) setRecord(c *ctx, inodeId InodeId,
+	record quantumfs.DirectoryRecord) {
+
 	// To prevent overwriting one map, but not the other, ensure we clear first
 	cmap.delRecord(inodeId, record.Filename())
 
@@ -83,6 +78,11 @@ func (cmap *ChildMap) setRecord(inodeId InodeId, record quantumfs.DirectoryRecor
 
 	list = append(list, record)
 	cmap.childrenRecords()[inodeId] = list
+
+	// Build the hardlink path list if we just set a hardlink record
+	if record.Type() == quantumfs.ObjectTypeHardlink {
+		cmap.dir.markHardlinkPath(c, record.Filename(), record.FileId())
+	}
 }
 
 func (cmap *ChildMap) delRecord(inodeId InodeId,
@@ -116,6 +116,9 @@ func (cmap *ChildMap) firstRecord(inodeId InodeId) quantumfs.DirectoryRecord {
 
 	if len(list) == 0 {
 		panic("Empty list leftover and not cleaned up")
+	} else if len(list) > 1 {
+		utils.Assert(list[0].Type() == quantumfs.ObjectTypeHardlink,
+			"Wrong type %d", list[0].Type())
 	}
 
 	return list[0]
@@ -148,10 +151,12 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		fileId := entry.FileId()
+
 		// hardlink leg creation time is stored in its ContentTime
 		entry = newHardlink(entry.Filename(), fileId, entry.ContentTime(),
-			cmap.wsr)
-		establishedInodeId := cmap.wsr.getHardlinkInodeId(c, fileId, inodeId)
+			cmap.dir.wsr)
+		establishedInodeId := cmap.dir.wsr.getHardlinkInodeId(c, fileId,
+			inodeId)
 
 		// If you try to load a hardlink and provide a real inodeId, it
 		// should normally match the actual inodeId.
@@ -177,7 +182,7 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 	cmap.children[entry.Filename()] = inodeId
 	// child is not dirty by default
 
-	cmap.setRecord(inodeId, entry)
+	cmap.setRecord(c, inodeId, entry)
 
 	return inodeId
 }
@@ -211,7 +216,7 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 
 	// This may be a hardlink that is due to be converted.
 	if hardlink, isHardlink := record.(*Hardlink); isHardlink && fixHardlinks {
-		newRecord, inodeId := cmap.wsr.removeHardlink(c,
+		newRecord, inodeId := cmap.dir.wsr.removeHardlink(c,
 			hardlink.fileId)
 
 		// Wsr says we're about to orphan the last hardlink copy
@@ -229,11 +234,11 @@ func (cmap *ChildMap) deleteChild(c *ctx,
 		if !fixHardlinks {
 			return nil
 		}
-		if !cmap.wsr.hardlinkExists(c, link.fileId) {
+		if !cmap.dir.wsr.hardlinkExists(c, link.fileId) {
 			c.vlog("hardlink does not exist")
 			return nil
 		}
-		if cmap.wsr.hardlinkDec(link.fileId) {
+		if cmap.dir.wsr.hardlinkDec(link.fileId) {
 			// If the refcount was greater than one we shouldn't
 			// reparent.
 			c.vlog("Hardlink referenced elsewhere")
@@ -278,9 +283,11 @@ func (cmap *ChildMap) renameChild(c *ctx, oldName string, newName string) {
 	cmap.children[newName] = inodeId
 	record.SetFilename(newName)
 
-	// if this is a hardlink, we must update its creationTime
+	// if this is a hardlink, we must update its creationTime and the accesslist
+	// path
 	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
 		hardlink.creationTime = quantumfs.NewTime(time.Now())
+		cmap.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
 }
 
@@ -353,16 +360,13 @@ func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
 		recordCopy := *link
 
 		// Ensure we update the ref count for this hardlink
-		cmap.wsr.hardlinkInc(link.fileId)
+		cmap.dir.wsr.hardlinkInc(link.fileId)
 
 		return &recordCopy, fuse.OK
 	}
 
 	// record must be a file type to be hardlinked
-	if child.Type() != quantumfs.ObjectTypeSmallFile &&
-		child.Type() != quantumfs.ObjectTypeMediumFile &&
-		child.Type() != quantumfs.ObjectTypeLargeFile &&
-		child.Type() != quantumfs.ObjectTypeVeryLargeFile &&
+	if !child.Type().IsRegularFile() &&
 		child.Type() != quantumfs.ObjectTypeSymlink &&
 		child.Type() != quantumfs.ObjectTypeSpecial {
 
@@ -375,11 +379,11 @@ func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
 	cmap.delRecord(childId, childname)
 
 	c.vlog("Converting %s into a hardlink", childname)
-	newLink := cmap.wsr.newHardlink(c, childId, child)
+	newLink := cmap.dir.wsr.newHardlink(c, childId, child)
 
 	linkSrcCopy := newLink.Clone()
 	linkSrcCopy.SetFilename(childname)
-	cmap.setRecord(childId, linkSrcCopy)
+	cmap.setRecord(c, childId, linkSrcCopy)
 
 	newLink.creationTime = quantumfs.NewTime(time.Now())
 	newLink.SetContentTime(newLink.creationTime)
