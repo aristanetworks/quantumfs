@@ -357,6 +357,13 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 			err.String())
 	}
 
+	if baseAttrs == emptyAttrs && newerAttrs == emptyAttrs &&
+		olderAttrs == emptyAttrs {
+
+		// There are no extended attributes
+		return quantumfs.EmptyBlockKey, nil
+	}
+
 	mergeAttrs := quantumfs.NewExtendedAttributes()
 
 	// Add new attrs, but only if they weren't removed in the older branch
