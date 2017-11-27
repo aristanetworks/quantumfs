@@ -761,16 +761,17 @@ func TestMergeRecreateFile(t *testing.T) {
 				"base"))
 			test.AssertNoErr(testutils.PrintToFile(bws+"/newer",
 				"base"))
-		}, func(branchA string, branchB string) mergeTestCheck {
-			test.AssertNoErr(testutils.OverWriteFile(branchA+"/local",
-				"local"))
-			test.AssertNoErr(testutils.OverWriteFile(branchA+"/newer",
-				"local"))
+		}, func(localWs string, remoteWs string) mergeTestCheck {
+			test.AssertNoErr(testutils.OverWriteFile(remoteWs+"/remote",
+				"remote"))
+			test.AssertNoErr(os.Remove(remoteWs + "/newer"))
+			test.AssertNoErr(testutils.PrintToFile(remoteWs+"/newer",
+				"remote"))
 
-			test.AssertNoErr(testutils.OverWriteFile(branchB+"/remote",
-				"remote"))
-			test.AssertNoErr(testutils.OverWriteFile(branchB+"/newer",
-				"remote"))
+			test.AssertNoErr(testutils.OverWriteFile(localWs+"/local",
+				"local"))
+			test.AssertNoErr(testutils.OverWriteFile(localWs+"/newer",
+				"local"))
 
 			return func(merged string) {
 				test.CheckData(merged+"/local", []byte("local"))

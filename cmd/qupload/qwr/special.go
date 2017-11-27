@@ -12,7 +12,7 @@ import (
 )
 
 func specialFileWriter(qctx *quantumfs.Ctx, path string, finfo os.FileInfo,
-	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
+	ds quantumfs.DataStore) (quantumfs.ObjectKey, uint64, uint64, error) {
 
 	var hash [quantumfs.ObjectKeyLength - 1]byte
 
@@ -23,6 +23,6 @@ func specialFileWriter(qctx *quantumfs.Ctx, path string, finfo os.FileInfo,
 
 	// all the information is embedded into key
 	// there are no blocks to be written here
-	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash),
+	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, hash), 0, 0,
 		nil
 }
