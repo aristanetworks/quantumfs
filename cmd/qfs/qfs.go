@@ -62,11 +62,12 @@ func printUsage() {
 	fmt.Println("         - make <workspace> irreversibly immutable")
 	fmt.Println("  advanceWSDB <workspace> <referenceWorkspace>")
 	fmt.Println("  refresh <workspace>")
-	fmt.Println("  merge [-nlr] <base> <remote> <local>")
+	fmt.Println("  merge [-nlr] <base> <remote> <local> [[/dir/to/skip/] ...]")
 	fmt.Println("          - Three-way workspace merge")
 	fmt.Println("          -n - Prefer newer in conflicts (default)")
 	fmt.Println("          -l - Prefer local in conflicts")
 	fmt.Println("          -r - Prefer remote in conflicts")
+	fmt.Println("          /dir/to/skip/ - List of directories to not merge")
 	fmt.Println("  syncWorkspace <workspace>")
 }
 
@@ -237,11 +238,13 @@ func merge() {
 	base := flag.Arg(1)
 	remote := flag.Arg(2)
 	local := flag.Arg(3)
+	skipPathStart := 4
 
 	if flag.NArg() > 4 && flag.Arg(1)[0] == '-' {
 		base = flag.Arg(2)
 		remote = flag.Arg(3)
 		local = flag.Arg(4)
+		skipPathStart = 5
 
 		for _, char := range flag.Arg(1)[1:] {
 			switch char {
@@ -258,12 +261,18 @@ func merge() {
 		}
 	}
 
+	skipPaths := make([]string, 0, flag.NArg()-3)
+
+	for i := skipPathStart; i < flag.NArg(); i++ {
+		skipPaths = append(skipPaths, flag.Arg(i))
+	}
+
 	api, err := quantumfs.NewApi()
 	if err != nil {
 		fmt.Println("Failed to find API:", err)
 		os.Exit(exitApiNotFound)
 	}
-	err = api.Merge3Way(base, remote, local, prefer)
+	err = api.Merge3Way(base, remote, local, prefer, skipPaths)
 	if err != nil {
 		fmt.Println("Operation failed:", err)
 		os.Exit(exitBadArgs)
