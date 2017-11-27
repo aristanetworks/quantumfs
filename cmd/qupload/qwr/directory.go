@@ -6,7 +6,6 @@ package qwr
 import (
 	"fmt"
 	"os"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -16,7 +15,8 @@ import (
 
 func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	childRecords []quantumfs.DirectoryRecord,
-	ds quantumfs.DataStore) (quantumfs.DirectoryRecord, error) {
+	ds quantumfs.DataStore) (rtn quantumfs.DirectoryRecord, bytesWritten uint64,
+	err error) {
 
 	// To promote dedupe, sort the directory
 	// records by Filename before writing DirectoryEntry.
@@ -30,6 +30,7 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	entryNum, dirEntry := quantumfs.NewDirectoryEntry(entryNum)
 	dirEntry.SetNext(quantumfs.EmptyDirKey)
 	entryIdx := 0
+	totalWritten := uint64(0)
 	for _, child := range childRecords {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
@@ -37,12 +38,11 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 			key, err := writeBlock(qctx, dirEntry.Bytes(),
 				quantumfs.KeyTypeMetadata, ds)
 			if err != nil {
-				return nil,
+				return nil, 0,
 					fmt.Errorf("WriteDirectory %q "+
 						"failed: %v", path, err)
 			}
-			atomic.AddUint64(&MetadataBytesWritten,
-				uint64(len(dirEntry.Bytes())))
+			totalWritten += uint64(len(dirEntry.Bytes()))
 			entryNum, dirEntry = quantumfs.NewDirectoryEntry(entryNum)
 			dirEntry.SetNext(key)
 			entryIdx = 0
@@ -55,10 +55,10 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	key, err := writeBlock(qctx, dirEntry.Bytes(),
 		quantumfs.KeyTypeMetadata, ds)
 	if err != nil {
-		return nil, fmt.Errorf("WriteDirectory %q failed: %v",
+		return nil, 0, fmt.Errorf("WriteDirectory %q failed: %v",
 			path, err)
 	}
-	atomic.AddUint64(&MetadataBytesWritten, uint64(len(dirEntry.Bytes())))
+	totalWritten += uint64(len(dirEntry.Bytes()))
 
 	stat := info.Sys().(*syscall.Stat_t)
 	dirRecord := CreateNewDirRecord(info.Name(), stat.Mode,
@@ -71,15 +71,16 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 		quantumfs.NewTime(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)),
 		key)
 
-	xattrsKey, xerr := WriteXAttrs(qctx, path, ds)
+	xattrsKey, attrsWritten, xerr := WriteXAttrs(qctx, path, ds)
 	if xerr != nil {
-		return nil, xerr
+		return nil, 0, xerr
 	}
 	if !xattrsKey.IsEqualTo(quantumfs.EmptyBlockKey) {
 		dirRecord.SetExtendedAttributes(xattrsKey)
 	}
+	totalWritten += attrsWritten
 
-	return dirRecord, nil
+	return dirRecord, totalWritten, nil
 }
 
 func CreateNewDirRecord(name string, mode uint32,
