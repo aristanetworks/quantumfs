@@ -581,7 +581,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 		local[0], local[1], local[2])
 
 	newRootId, err := mergeWorkspaceRoot(c, baseRootId, remoteRootId,
-		localRootId, cmd.ConflictPreference,
+		localRootId, mergePreference(cmd.ConflictPreference),
 		mergeSkipPaths{paths: cmd.SkipPaths})
 	if err != nil {
 		c.vlog("Merge failed: %s", err.Error())

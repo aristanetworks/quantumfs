@@ -61,13 +61,6 @@ func (cmap *ChildMap) loadAllChildren(c *ctx,
 	return uninstantiated
 }
 
-func (cmap *ChildMap) baseLayerIs(c *ctx, baseLayerId quantumfs.ObjectKey) {
-	defer c.funcIn("ChildMap::baseLayerIs").Out()
-
-	cmap.childrenRecords_ = make(map[InodeId][]quantumfs.DirectoryRecord)
-	cmap.loadAllChildren(c, baseLayerId)
-}
-
 func (cmap *ChildMap) childrenRecords() map[InodeId][]quantumfs.DirectoryRecord {
 	return cmap.childrenRecords_
 }
@@ -123,6 +116,9 @@ func (cmap *ChildMap) firstRecord(inodeId InodeId) quantumfs.DirectoryRecord {
 
 	if len(list) == 0 {
 		panic("Empty list leftover and not cleaned up")
+	} else if len(list) > 1 {
+		utils.Assert(list[0].Type() == quantumfs.ObjectTypeHardlink,
+			"Wrong type %d", list[0].Type())
 	}
 
 	return list[0]
@@ -370,10 +366,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
 	}
 
 	// record must be a file type to be hardlinked
-	if child.Type() != quantumfs.ObjectTypeSmallFile &&
-		child.Type() != quantumfs.ObjectTypeMediumFile &&
-		child.Type() != quantumfs.ObjectTypeLargeFile &&
-		child.Type() != quantumfs.ObjectTypeVeryLargeFile &&
+	if !child.Type().IsRegularFile() &&
 		child.Type() != quantumfs.ObjectTypeSymlink &&
 		child.Type() != quantumfs.ObjectTypeSpecial {
 
