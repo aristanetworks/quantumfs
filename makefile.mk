@@ -23,20 +23,36 @@ version := $(shell git describe --dirty --match "v[0-9]*" 2>/dev/null || echo "v
 RPM_VERSION := $(shell echo "$(version)" | sed -e "s/^v//" -e "s/-/_/g")
 RPM_RELEASE := 1
 
-.PHONY: all vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) $(COMMANDS_STATIC)
+.PHONY: all clean check-dep-installed fetch update vet lockcheck cppstyle $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) $(COMMANDS_STATIC)
 
 all: lockcheck cppstyle vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) wsdbservice qfsclient
 
 clean:
 	rm -f $(COMMANDS) $(COMMANDS386) $(COMMANDS_STATIC)
 
-fetch:
-	go get -u google.golang.org/grpc
-	go get -u github.com/golang/protobuf/protoc-gen-go
-	for cmd in $(COMMANDS); do \
-		echo "Fetching $$cmd"; \
-		go get github.com/aristanetworks/quantumfs/cmd/$$cmd; \
-	done
+# Vendored dependency management
+#
+# fetch fetches dependencies based on the recorded versions in Gopkg.lock.
+#
+# update checks for newer versions of dependencies and resolves version constraints
+# if updates are available.
+#
+# Cityhash contains no go code, so dep currently won't handle it.
+# Clone it under the vendor dir for safe keeping (should we begin committing vendor).
+
+check-dep-installed:
+	dep version &>/dev/null || go get -u github.com/golang/dep/cmd/dep
+
+fetch: check-dep-installed
+	dep ensure -v
+	git clone https://github.com/google/cityhash vendor/cityhash
+	rm -rf vendor/cityhash/.git
+
+update: check-dep-installed
+	dep ensure -v --update
+	git clone https://github.com/google/cityhash vendor/cityhash
+	rm -rf vendor/cityhash/.git
+	@echo "Please review and commit any changes to Gopkg.toml and Gopkg.lock"
 
 vet: $(PKGS_TO_TEST) $(COMMANDS)
 	go vet -n ./... | while read -r line; do if  [[ ! "$$line" =~ .*encoding.* ]]; then eval $$line || exit 1; fi; done
