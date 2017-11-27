@@ -9,9 +9,10 @@ To build an image with the default QFS version run `docker build -t qfs .`.
 This will create an image tagged as `qfs:latest`.
 
 If you would like to use a different version then change the `QFS_RPM_VERSION`
-build arg. E.g. `docker build -t qfs --build-arg QFS_RPM_VERSION=v0.6-1 .`.
+build arg. E.g. `docker build -t qfs --build-arg QFS_RPM_VERSION=0.10.0-1 .`.
 The version you are trying to run must be available in
-http://dist/storage/QuantumFS/.
+http://dist/storage/QuantumFS/. Wget will print an error if the version 
+requested is invalid.
 
 ## Running A Container
 To run a container use the following steps:
