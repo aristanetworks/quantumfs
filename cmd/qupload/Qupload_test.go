@@ -5,14 +5,18 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils/excludespec"
 	"golang.org/x/net/context"
@@ -50,7 +54,7 @@ func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 				continue
 			}
 
-			record, err := up.processPath(&c, msg)
+			record, _, _, err := up.processPath(&c, msg)
 			th.AssertNoErr(err)
 
 			checkedRoot = true
@@ -101,12 +105,17 @@ func TestFileMatches(t *testing.T) {
 	})
 }
 
-func (test *testHelper) checkQuploadMatches(workspace string, triggerErr func()) {
-	workspaceB := "test/test/quploaded"
+func (test *testHelper) checkQuploadMatches(workspace string,
+	triggerErr func()) (dataWritten uint64, metadataWritten uint64) {
+
+	// give it a random suffix to ensure multiple calls don't collide
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	workspaceB := fmt.Sprintf("test/test/quploaded_%d", r.Uint32())
 
 	up := NewUploader()
 
 	// setup exclude to ignore the api file
+	os.Remove(test.TempDir + "/exInfo")
 	test.AssertNoErr(testutils.PrintToFile(test.TempDir+"/exInfo",
 		"api"))
 	var err error
@@ -160,6 +169,8 @@ func (test *testHelper) checkQuploadMatches(workspace string, triggerErr func())
 				output)
 		}
 	}
+
+	return up.dataBytesWritten, up.metadataBytesWritten
 }
 
 func TestFilesAndDir(t *testing.T) {
@@ -263,5 +274,64 @@ func TestSymlinks(t *testing.T) {
 			test.AssertNoErr(testutils.PrintToFile(linkB,
 				"fileB has data"))
 		})
+	})
+}
+
+func TestEmptyDirectory(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		test.checkQuploadMatches(workspace, func() {
+			test.AssertNoErr(testutils.PrintToFile(workspace+"/somefile",
+				"random file"))
+		})
+	})
+}
+
+func TestUploadBytes(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		// create a whole bunch of hardlinks and files to generate
+		// as much possibility for concurrency issues as possible
+		for i := 0; i < 20; i++ {
+			prefix := workspace + fmt.Sprintf("/iter%d", i)
+			test.AssertNoErr(testutils.PrintToFile(prefix+"_file",
+				fmt.Sprintf("%d", i)))
+
+			for j := 0; j < 4; j++ {
+				syscall.Link(prefix+"_file", prefix+
+					fmt.Sprintf("_link%d_%d", i, j))
+			}
+
+			test.AssertNoErr(os.Symlink(prefix, prefix+"_symlink"))
+			test.AssertNoErr(os.Mkdir(prefix+"_dir", 0777))
+		}
+
+		var dataWritten, metadataWritten uint64
+		for i := 0; i < 4; i++ {
+			data, metadata := test.checkQuploadMatches(workspace,
+				func() {
+					test.AssertNoErr(testutils.PrintToFile(""+
+						workspace+"/wrongfile", "some data"))
+				})
+			// Make sure to remove the "wrongfile"
+			test.AssertNoErr(os.Remove(workspace + "/wrongfile"))
+
+			if i == 0 {
+				dataWritten = data
+				metadataWritten = metadata
+			}
+			test.TestCtx().Vlog(qlog.LogTest,
+				"Qupload iteration %d: %d %d", i, data,
+				metadataWritten)
+
+			test.Assert(data == dataWritten,
+				"Number of data bytes changed: %d vs %d",
+				dataWritten, data)
+			test.Assert(metadata == metadataWritten,
+				"Number of metadata bytes changed: %d vs %d",
+				metadataWritten, metadata)
+		}
 	})
 }

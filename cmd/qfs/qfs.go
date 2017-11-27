@@ -46,7 +46,9 @@ func printUsage() {
 	fmt.Println("         - get the access list of workspace")
 	fmt.Println("  clearAccessedFiles <workspace>")
 	fmt.Println("         - clear the access list of workspace")
-	fmt.Println("  cp <srcPath> <dstPath> - Copy a directory using insertInode")
+	fmt.Println("  cp [-o] <srcPath> <dstPath> - Copy a directory using " +
+		"insertInode")
+	fmt.Println("         -o Overwrite files which exist in the destination")
 	fmt.Println("  insertInode <dstPath> <key> <uid> <gid> <permission>")
 	fmt.Println("         - copy an inode corresponding to an extended" +
 		" key under the location of dstPath with specifications of" +
@@ -60,6 +62,12 @@ func printUsage() {
 	fmt.Println("         - make <workspace> irreversibly immutable")
 	fmt.Println("  advanceWSDB <workspace> <referenceWorkspace>")
 	fmt.Println("  refresh <workspace>")
+	fmt.Println("  merge [-nlr] <base> <remote> <local> [[path/to/skip] ...]")
+	fmt.Println("          - Three-way workspace merge")
+	fmt.Println("          -n - Prefer newer in conflicts (default)")
+	fmt.Println("          -l - Prefer local in conflicts")
+	fmt.Println("          -r - Prefer remote in conflicts")
+	fmt.Println("          dir/to/skip - List of paths to not merge")
 	fmt.Println("  syncWorkspace <workspace>")
 }
 
@@ -101,6 +109,8 @@ func main() {
 		setWorkspaceImmutable()
 	case "refresh":
 		refresh()
+	case "merge":
+		merge()
 	case "advanceWSDB":
 		advanceWSDB()
 	case "syncWorkspace":
@@ -213,6 +223,58 @@ func refresh() {
 	}
 	if err := api.Refresh(workspace); err != nil {
 		fmt.Println("Operations failed:", err)
+		os.Exit(exitBadArgs)
+	}
+}
+
+func merge() {
+	if flag.NArg() < 4 {
+		fmt.Println("Too few arguments for merge command")
+		os.Exit(exitBadArgs)
+	}
+
+	prefer := quantumfs.PreferNewer
+
+	base := flag.Arg(1)
+	remote := flag.Arg(2)
+	local := flag.Arg(3)
+	skipPathStart := 4
+
+	if flag.NArg() > 4 && flag.Arg(1)[0] == '-' {
+		base = flag.Arg(2)
+		remote = flag.Arg(3)
+		local = flag.Arg(4)
+		skipPathStart = 5
+
+		for _, char := range flag.Arg(1)[1:] {
+			switch char {
+			default:
+				fmt.Printf("Unknown flag %c\n", char)
+				os.Exit(exitBadArgs)
+			case 'n':
+				prefer = quantumfs.PreferNewer
+			case 'l':
+				prefer = quantumfs.PreferLocal
+			case 'r':
+				prefer = quantumfs.PreferRemote
+			}
+		}
+	}
+
+	skipPaths := make([]string, 0, flag.NArg()-3)
+
+	for i := skipPathStart; i < flag.NArg(); i++ {
+		skipPaths = append(skipPaths, flag.Arg(i))
+	}
+
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
+	err = api.Merge3Way(base, remote, local, prefer, skipPaths)
+	if err != nil {
+		fmt.Println("Operation failed:", err)
 		os.Exit(exitBadArgs)
 	}
 }

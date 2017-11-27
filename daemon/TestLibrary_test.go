@@ -131,7 +131,7 @@ func runTestNoQfsExpensiveTest(t *testing.T, test quantumFsTest) {
 // If you need to run two concurrent instances of QuantumFS in the same test, use
 // runTestDualQuantumFS().
 func runDualQuantumFsTest(t *testing.T, test quantumFsTest) {
-	runTestCommon(t, test, 2, nil)
+	runTestCommon(t, test, 2, dirtyDelay100Ms)
 }
 
 // If you have a test which is expensive in terms of CPU time, then use
@@ -312,6 +312,14 @@ func (th *testHelper) MakeFile(filepath string) (data []byte) {
 
 }
 
+func (th *testHelper) SameLink(fileA string, fileB string) {
+	var statA, statB syscall.Stat_t
+	th.AssertNoErr(syscall.Stat(fileA, &statA))
+	th.AssertNoErr(syscall.Stat(fileB, &statB))
+
+	th.Assert(statA.Ino == statB.Ino, "Files are not hardlinked together")
+}
+
 func (th *testHelper) CheckLink(filepath string, data []byte, nlink uint64) {
 	th.CheckData(filepath, data)
 
@@ -423,7 +431,7 @@ func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 func (th *testHelper) getAccessList(workspace string) *quantumfs.PathsAccessed {
 	wsr, cleanup := th.GetWorkspaceRoot(workspace)
 	defer cleanup()
-	accessed := wsr.getList()
+	accessed := wsr.getList(&th.qfs.c)
 	return &accessed
 }
 
@@ -748,6 +756,44 @@ func (test *testHelper) verifyContentStartsWith(file *os.File, expected string) 
 	test.AssertNoErr(err)
 	test.Assert(string(content) == expected,
 		"content mismatch %s vs. %s", content, expected)
+}
+
+func (test *testHelper) setupDual() (workspace0 string, workspace1 string) {
+	workspace0 = test.NewWorkspace()
+	mnt1 := test.qfsInstances[1].config.MountPath
+	workspaceName := test.RelPath(workspace0)
+	workspace1 = mnt1 + "/" + workspaceName
+
+	api1, err := quantumfs.NewApiWithPath(mnt1 + "/api")
+	test.AssertNoErr(err)
+	defer api1.Close()
+
+	test.AssertNoErr(api1.EnableRootWrite(workspaceName))
+
+	return workspace0, workspace1
+}
+
+// Specify data of length zero to wait for file to not exist
+func (test *testHelper) waitForPropagate(file string, data []byte) {
+	test.WaitFor(file+" to propagate", func() bool {
+		fd, err := os.Open(file)
+		defer fd.Close()
+		if len(data) == 0 {
+			return os.IsNotExist(err)
+		}
+
+		readData, err := ioutil.ReadFile(file)
+		if err != nil {
+			return false
+		}
+
+		if !bytes.Equal(readData, data) {
+			test.qfs.c.vlog("Propagation %s vs %s", readData, data)
+			return false
+		}
+
+		return true
+	})
 }
 
 func createSparseFile(name string, size int64) error {

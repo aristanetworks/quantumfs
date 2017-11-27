@@ -241,7 +241,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 	if remoteRecord.ID().IsEqualTo(localRecord.ID()) {
 		c.wlog("No changes to record %s", remoteRecord.Filename())
 		if localRecord.Type() != quantumfs.ObjectTypeHardlink {
-			dir.children.setRecord(childId, remoteRecord)
+			dir.children.setRecord(c, childId, remoteRecord)
 		}
 		return
 	}
@@ -259,7 +259,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 		record = dir.normalizeHardlinks_DOWN_(c, rc, localRecord,
 			remoteRecord)
 	}
-	dir.children.setRecord(childId, record)
+	dir.children.setRecord(c, childId, record)
 	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
 		reload(c, dir.wsr, rc, inode, record)
 	}
@@ -330,7 +330,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 			moved := remoteRecord == nil ||
 				remoteRecord.FileId() != localRecord.FileId()
 			rc.attachLocalRecord(c, dir.inodeNum(), childId, moved,
-				localRecord)
+				localRecord, remoteRecord)
 		} else {
 			rc.addStaleEntry(c, dir.inodeNum(), childId, localRecord)
 		}

@@ -323,7 +323,7 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	defer logRequestPanic(c)
 	parts := strings.Split(name, "/")
 
-	wsrLineage, err := qfs.getWorkspaceRootLineageNoInstantiate(c,
+	wsrLineage, err := qfs.getWsrLineageNoInstantiate(c,
 		parts[0], parts[1], parts[2])
 	if err != nil {
 		c.elog("getting wsrLineage failed: %s", err.Error())
@@ -371,9 +371,33 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
+	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+		parts[0], parts[1], parts[2])
+
+	if err != nil {
+		c.elog("Unable to get workspace rootId")
+		return
+	}
+	if nonce != wsr.nonce {
+		c.dlog("Not refreshing workspace %s due to mismatching "+
+			"nonces %d vs %d", name, wsr.nonce, nonce)
+		return
+	}
+
+	published := func() bool {
+		defer wsr.RLockTree().RUnlock()
+		return wsr.publishedRootId.IsEqualTo(rootId)
+	}()
+
+	if published {
+		c.dlog("Not refreshing workspace %s as there has been no updates",
+			name)
+		return
+	}
+
 	defer wsr.LockTree().Unlock()
 
-	err := qfs.flusher.syncWorkspace_(c, name)
+	err = qfs.flusher.syncWorkspace_(c, name)
 	if err != nil {
 		c.elog("Unable to syncWorkspace: %s", err.Error())
 		return
@@ -384,6 +408,24 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 
 func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 	defer c.funcIn("Mux::forceMerge").Out()
+
+	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+		wsr.typespace, wsr.namespace, wsr.workspace)
+
+	if err != nil {
+		c.elog("Unable to get workspace rootId")
+		return err
+	}
+
+	if nonce != wsr.nonce {
+		c.wlog("Nothing to merge, new workspace")
+		return nil
+	}
+
+	if wsr.publishedRootId.IsEqualTo(rootId) {
+		c.dlog("Not merging as there are no updates upstream")
+		return nil
+	}
 
 	newRootId := publishWorkspaceRoot(c,
 		wsr.baseLayerId, wsr.hardlinks)
@@ -404,7 +446,8 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 		}
 
 		mergedId, err := mergeWorkspaceRoot(c, wsr.publishedRootId, rootId,
-			newRootId)
+			newRootId, quantumfs.PreferNewer,
+			&mergeSkipPaths{paths: make(map[string]struct{}, 0)})
 
 		if err != nil {
 			c.elog("Unable to merge: %s", err.Error())
@@ -429,55 +472,13 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 }
 
 // Should be called with the tree locked for read or write
-func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode, uninstantiate bool,
-	lastInode bool) bool {
+func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode) bool {
+	defer c.funcIn("Mux::flushInode_").Out()
 
-	inodeNum := inode.inodeNum()
-	defer c.FuncIn("Mux::flushInode_", "inode %d, uninstantiate %t",
-		inodeNum, uninstantiate).Out()
-
-	flushSuccess := true
-	if !inode.isOrphaned() {
-		if wsr, isWsr := inode.(*WorkspaceRoot); isWsr {
-			_, flushSuccess = wsr.flushCanFail(c)
-
-			// Flush of wsr failed, so try merging
-			if !flushSuccess {
-				if lastInode {
-					err := forceMerge(c, wsr)
-					if err == nil {
-						// We fixed the wsr flush failure
-						// via merge
-						flushSuccess = true
-					}
-				} else {
-					// the workspaceroot should be dropped for
-					// now - there are children in queue to be
-					// flushed first. They will push the wsr
-					// back into the dirty queue later
-					flushSuccess = true
-				}
-			}
-		} else {
-			inode.flush(c)
-		}
+	if inode.isOrphaned() {
+		return true
 	}
-
-	if !flushSuccess {
-		c.wlog("Escaping flushInode due to flush failure")
-		return false
-	}
-
-	func() {
-		defer qfs.flusher.lock.Lock().Unlock()
-		inode.markClean_()
-	}()
-
-	if uninstantiate {
-		qfs.uninstantiateInode(c, inodeNum)
-	}
-
-	return true
+	return inode.flush(c).IsValid()
 }
 
 const skipForgetLog = "inode %d doesn't need to be forgotten"
@@ -837,8 +838,8 @@ func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
 }
 
 // Returns true if the count became zero or was previously zero
-func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
-	defer qfs.c.FuncIn("Mux::shouldForget", "inode %d count %d", inodeId,
+func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
+	defer c.FuncIn("Mux::shouldForget", "inode %d count %d", inodeId,
 		count).Out()
 
 	if inodeId == quantumfs.InodeIdApi || inodeId == quantumfs.InodeIdRoot {
@@ -848,19 +849,19 @@ func (qfs *QuantumFs) shouldForget(inodeId InodeId, count uint64) bool {
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
-		qfs.c.dlog("inode %d has not been instantiated", inodeId)
+		c.dlog("inode %d has not been instantiated", inodeId)
 		return true
 	}
 
 	if lookupCount < count {
-		qfs.c.elog("lookupCount less than zero %d %d", lookupCount, count)
+		c.elog("lookupCount less than zero %d %d", lookupCount, count)
 	}
 
 	lookupCount -= count
 	qfs.lookupCounts[inodeId] = lookupCount
 	if lookupCount == 0 {
 		if count > 1 {
-			qfs.c.dlog("Forgetting inode with lookupCount of %d", count)
+			c.dlog("Forgetting inode with lookupCount of %d", count)
 		}
 		return true
 	} else {
@@ -925,8 +926,7 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	defer c.funcIn(SyncWorkspaceLog).Out()
 
 	parts := strings.Split(workspace, "/")
-	ids, err := qfs.getWorkspaceRootLineageNoInstantiate(c, parts[0], parts[1],
-		parts[2])
+	ids, err := qfs.getWsrLineageNoInstantiate(c, parts[0], parts[1], parts[2])
 	if err != nil {
 		return errors.New("Unable to get WorkspaceRoot for Sync")
 	}
@@ -1121,10 +1121,10 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 }
 
 // Returns the inode id of the root, the typespace, the namespace and the workspace
-func (qfs *QuantumFs) getWorkspaceRootLineageNoInstantiate(c *ctx,
+func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	typespace, namespace, workspace string) (ids []InodeId, err error) {
 
-	defer c.FuncIn("QuantumFs::getWorkspaceRootLineageNoInstantiate", "%s/%s/%s",
+	defer c.FuncIn("QuantumFs::getWsrLineageNoInstantiate", "%s/%s/%s",
 		typespace, namespace, workspace).Out()
 	ids = append(ids, quantumfs.InodeIdRoot)
 	inode := qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
@@ -1172,13 +1172,13 @@ func (qfs *QuantumFs) getWorkspaceRootLineageNoInstantiate(c *ctx,
 	return
 }
 
-func (qfs *QuantumFs) getWorkspaceRootLineage(c *ctx,
+func (qfs *QuantumFs) getWsrLineage(c *ctx,
 	typespace, namespace, workspace string) (ids []InodeId, cleanup func()) {
 
-	defer c.FuncIn("QuantumFs::getWorkspaceRootLineage", "%s/%s/%s",
+	defer c.FuncIn("QuantumFs::getWsrLineage", "%s/%s/%s",
 		typespace, namespace, workspace).Out()
 
-	// In order to run getWorkspaceRootLineage, we must set a proper value for
+	// In order to run getWsrLineage, we must set a proper value for
 	// the variable nLookup. If the function is called internally, it needs to
 	// reduce the increased lookupCount, so set nLookup to 1. Only if it is
 	// triggered by kernel, should lookupCount be increased by one, and nLookup
@@ -1234,8 +1234,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).Out()
-	ids, cleanup := qfs.getWorkspaceRootLineage(c,
-		typespace, namespace, workspace)
+	ids, cleanup := qfs.getWsrLineage(c, typespace, namespace, workspace)
 	defer cleanup()
 	if len(ids) != 4 {
 		c.vlog("Workspace inode not found")
@@ -1261,12 +1260,11 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 	// The default cases will be inode such as file, symlink, hardlink etc, they
 	// get workspaceroots from their parents.
 	default:
+		defer inode.getParentLock().RLock().RUnlock()
 		// if inode is already forgotten, the workspace doesn't process it.
-		if inode.isOrphaned() {
+		if inode.isOrphaned_() {
 			return true
 		}
-		// Otherwise, go up to its parent which must be a directory/workspace
-		defer inode.getParentLock().RLock().RUnlock()
 		parent := inode.parent_(c)
 		switch parent.(type) {
 		default:
@@ -1355,7 +1353,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
 
-	if !qfs.shouldForget(InodeId(nodeID), nlookup) {
+	if !qfs.shouldForget(c, InodeId(nodeID), nlookup) {
 		// The kernel hasn't completely forgotten this Inode. Keep it around
 		// a while longer.
 		c.dlog("inode %d lookup not zero yet", nodeID)

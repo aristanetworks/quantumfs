@@ -381,8 +381,14 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 	test.Assert(err == nil,
 		"Error duplicating a file to target workspace: %v", err)
 
-	err = syscall.Stat(workspaceDst+"/test/a/file", &stat)
-	test.Assert(err == nil, "Error get status of a file: %v", err)
+	test.WaitFor("Inserted file to exist", func() bool {
+		err = syscall.Stat(workspaceDst+"/test/a/file", &stat)
+		return err == nil
+	})
+
+	// InsertInode with an empty key should fail
+	err = api.InsertInode(dst+"/test/a/file1", "", PermissionA, uid, gid)
+	test.Assert(err != nil, "Unexpected success inserting empty key")
 
 	// check the mode of file
 	expectedMode = syscall.S_IFREG | PermissionA

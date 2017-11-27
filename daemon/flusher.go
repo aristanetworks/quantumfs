@@ -30,6 +30,7 @@ type dirtyInode struct {
 type triggerCmd struct {
 	flushAll bool
 	finished chan struct{}
+	ctx      *ctx
 }
 
 type FlushCmd int
@@ -90,6 +91,7 @@ func (dq *DirtyQueue) PushFront_(v interface{}) *list.Element {
 }
 
 func (dq *DirtyQueue) kicker(c *ctx) {
+	defer c.FuncIn("DirtyQueue::kicker", "%s", dq.treelock.name).Out()
 	defer logRequestPanic(c)
 
 	// When we think we have no inodes try periodically anyways to ensure sanity
@@ -128,11 +130,13 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 					dq.trigger <- triggerCmd{
 						flushAll: false,
 						finished: doneChan,
+						ctx:      c,
 					}
 				case FLUSHALL:
 					dq.trigger <- triggerCmd{
 						flushAll: true,
 						finished: doneChan,
+						ctx:      c,
 					}
 				case RETURN:
 					c.elog("RETURN with non-empty dirty queue")
@@ -187,24 +191,26 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// we'll deadlock. We defer relocking in order to balance
 	// against the deferred unlocking from our caller, even in
 	// the case of a panic.
-	uninstantiate := dirtyInode.shouldUninstantiate
 	inode := dirtyInode.inode
 
-	dqlen := dq.Len_()
-	ret := func() bool {
+	success := func() bool {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
-		return c.qfs.flushInode_(c, inode, uninstantiate, dqlen <= 1)
+		return c.qfs.flushInode_(c, inode)
 	}()
-	if !uninstantiate && dirtyInode.shouldUninstantiate {
-		// we have released and re-acquired the flusher lock, and the
-		// dirtyInode is now up for uninstantiation. This transition
-		// cannot happen again, so it is safe to release the lock again.
+
+	if !success {
+		return false
+	}
+
+	inode.markClean_()
+
+	if dirtyInode.shouldUninstantiate {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
 		c.qfs.uninstantiateInode(c, inode.inodeNum())
 	}
-	return ret
+	return true
 }
 
 // flusher lock must be locked when calling this function
@@ -263,13 +269,14 @@ func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 }
 
 func (dq *DirtyQueue) flusher(c *ctx) {
-	defer c.FuncIn("DirtyQueue::flush", "%s", dq.treelock.name).Out()
+	defer c.FuncIn("DirtyQueue::flusher", "%s", dq.treelock.name).Out()
 	defer logRequestPanic(c)
 	done := false
 	var empty struct{}
 
 	for !done {
 		trigger := <-dq.trigger
+		c = trigger.ctx
 		c.vlog("trigger, flushAll: %v", trigger.flushAll)
 
 		// NOTE: When we are triggered, the treelock *must* already
@@ -304,9 +311,7 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 	}
 
 	// consume any leftover triggers
-	for range dq.trigger {
-		trigger := <-dq.trigger
-
+	for trigger := range dq.trigger {
 		if trigger.finished != nil {
 			trigger.finished <- empty
 		}
@@ -321,6 +326,20 @@ type Flusher struct {
 	lock utils.DeferableMutex
 }
 
+func (flusher *Flusher) nQueued(c *ctx, treelock *TreeLock) int {
+	defer flusher.lock.Lock().Unlock()
+	return flusher.nQueued_(c, treelock)
+}
+
+// flusher lock must be locked when calling this function
+func (flusher *Flusher) nQueued_(c *ctx, treelock *TreeLock) int {
+	dq, exists := flusher.dqs[treelock]
+	if !exists {
+		return 0
+	}
+	return dq.Len_()
+}
+
 func NewFlusher() *Flusher {
 	dqs := Flusher{
 		dqs: make(map[*TreeLock]*DirtyQueue),
@@ -332,6 +351,7 @@ func NewFlusher() *Flusher {
 // If sync all is specified, no treelock should be locked already
 func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 	defer c.FuncIn("Flusher::sync", "%s", workspace).Out()
+
 	doneChannels := make([]chan error, 0)
 	var err error
 	func() {
@@ -351,6 +371,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 				dq.trigger <- triggerCmd{
 					flushAll: true,
 					finished: nil,
+					ctx:      c,
 				}
 			} else {
 				err = dq.TryCommand(c, FLUSHALL)
@@ -433,10 +454,8 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	treelock := inode.treeLock()
 	dq := flusher.dqs[treelock]
 	if launch {
-		nc := c.flusherCtx()
-
-		go dq.flusher(nc)
-		go dq.kicker(nc)
+		go dq.flusher(c)
+		go dq.kicker(c.flusherCtx())
 	}
 
 	dq.TryCommand(c, KICK)

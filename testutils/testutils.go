@@ -549,7 +549,7 @@ func ShowSummary() {
 	for summary := range fullLogs {
 		testSummary += summary
 	}
-	outputTimeGraph := strings.Contains(testSummary, "TIMED OUT")
+	outputTimeGraph := strings.Contains(testSummary, "Timed out")
 	ErrorMutex.Unlock()
 	fmt.Println("------ Test Summary:\n" + testSummary)
 
