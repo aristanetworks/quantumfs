@@ -62,8 +62,11 @@ func printUsage() {
 	fmt.Println("         - make <workspace> irreversibly immutable")
 	fmt.Println("  advanceWSDB <workspace> <referenceWorkspace>")
 	fmt.Println("  refresh <workspace>")
-	fmt.Println("  merge <base> <remote> <local>")
+	fmt.Println("  merge [-nlr] <base> <remote> <local>")
 	fmt.Println("          - Three-way workspace merge")
+	fmt.Println("          -n - Prefer newer in conflicts (default)")
+	fmt.Println("          -l - Prefer local in conflicts")
+	fmt.Println("          -r - Prefer remote in conflicts")
 	fmt.Println("  syncWorkspace <workspace>")
 }
 
@@ -224,20 +227,44 @@ func refresh() {
 }
 
 func merge() {
-	if flag.NArg() != 4 {
+	if flag.NArg() < 4 {
 		fmt.Println("Too few arguments for merge command")
 		os.Exit(exitBadArgs)
 	}
+
+	prefer := quantumfs.PreferNewer
+
 	base := flag.Arg(1)
 	remote := flag.Arg(2)
 	local := flag.Arg(3)
+
+	if flag.NArg() > 4 && flag.Arg(1)[0] == '-' {
+		base = flag.Arg(2)
+		remote = flag.Arg(3)
+		local = flag.Arg(4)
+
+		for _, char := range flag.Arg(1)[1:] {
+			switch char {
+			default:
+				fmt.Printf("Unknown flag %c\n", char)
+				os.Exit(exitBadArgs)
+			case 'n':
+				prefer = quantumfs.PreferNewer
+			case 'l':
+				prefer = quantumfs.PreferLocal
+			case 'r':
+				prefer = quantumfs.PreferRemote
+			}
+		}
+	}
 
 	api, err := quantumfs.NewApi()
 	if err != nil {
 		fmt.Println("Failed to find API:", err)
 		os.Exit(exitApiNotFound)
 	}
-	if err := api.Merge3Way(base, remote, local); err != nil {
+	err = api.Merge3Way(base, remote, local, prefer)
+	if err != nil {
 		fmt.Println("Operation failed:", err)
 		os.Exit(exitBadArgs)
 	}
