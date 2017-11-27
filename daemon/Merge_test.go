@@ -12,6 +12,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 type baseSetup func(base string)
@@ -19,6 +20,12 @@ type mergeTestCheck func(merged string)
 type mergeTestSetup func(branchA string, branchB string) mergeTestCheck
 
 func MergeTester(test *testHelper, base baseSetup, setup mergeTestSetup) {
+	MergeTesterWithSkip(test, []string{}, base, setup)
+}
+
+func MergeTesterWithSkip(test *testHelper, skipPaths []string, base baseSetup,
+	setup mergeTestSetup) {
+
 	workspaceBase := test.NewWorkspace()
 
 	if base != nil {
@@ -51,7 +58,7 @@ func MergeTester(test *testHelper, base baseSetup, setup mergeTestSetup) {
 	if base != nil {
 		err = api.Merge3Way(test.RelPath(workspaceBase),
 			test.RelPath(workspaceB), test.RelPath(tempBranch),
-			quantumfs.PreferNewer)
+			quantumfs.PreferNewer, skipPaths)
 		test.AssertNoErr(err)
 	} else {
 		err = api.Merge(test.RelPath(workspaceB), test.RelPath(tempBranch))
@@ -772,5 +779,56 @@ func TestMergeRecreateFile(t *testing.T) {
 				test.CheckData(merged+"/newer", []byte("remote"))
 			}
 		})
+	})
+}
+
+func TestMergeSkipDirectories(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTesterWithSkip(test, []string{"/merge1/merge2/skip/"},
+			func(bws string) {
+				test.AssertNoErr(utils.MkdirAll(
+					bws+"/merge1/merge2/skip", 0777))
+				test.AssertNoErr(testutils.PrintToFile(
+					bws+"/merge1/merge2/skip/skipped",
+					"skipped"))
+				test.AssertNoErr(utils.MkdirAll(
+					bws+"/merge3/merge4", 0777))
+			}, func(branchA string, branchB string) mergeTestCheck {
+				test.AssertNoErr(testutils.PrintToFile(
+					branchA+"/merge1/local1", "local1"))
+				test.AssertNoErr(testutils.PrintToFile(
+					branchA+"/merge1/merge2/local2", "local2"))
+				test.AssertNoErr(testutils.PrintToFile(
+					branchA+"/merge1/merge2/skip/local3",
+					"local3"))
+
+				test.AssertNoErr(testutils.PrintToFile(
+					branchB+"/merge1/remote1", "remote1"))
+				test.AssertNoErr(testutils.PrintToFile(
+					branchB+"/merge1/merge2/remote2", "remote2"))
+				test.AssertNoErr(testutils.PrintToFile(
+					branchB+"/merge1/merge2/skip/remote3",
+					"remote3"))
+				test.AssertNoErr(testutils.PrintToFile(
+					branchB+"/merge3/merge4/remote4", "remote4"))
+
+				return func(merged string) {
+					test.assertFileExists(
+						merged + "/merge1/local1")
+					test.assertFileExists(
+						merged + "/merge1/merge2/local2")
+					test.assertFileExists(merged +
+						"/merge1/merge2/skip/local3")
+
+					test.assertFileExists(
+						merged + "/merge1/remote1")
+					test.assertFileExists(
+						merged + "/merge1/merge2/remote2")
+					test.assertNoFile(merged +
+						"/merge1/merge2/skip/remote3")
+					test.assertFileExists(
+						merged + "/merge3/merge4/remote4")
+				}
+			})
 	})
 }

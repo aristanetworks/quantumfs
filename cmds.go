@@ -295,7 +295,7 @@ type Api interface {
 	// modification times. It is also the workspace who is Advanced to the
 	// resulting ID.
 	Merge3Way(base string, remote string, local string,
-		conflictPreference int) error
+		conflictPreference int, skipPaths []string) error
 
 	// Get the list of accessed file from workspaceroot
 	GetAccessed(wsr string) (*PathsAccessed, error)
@@ -432,6 +432,10 @@ type MergeRequest struct {
 	RemoteWorkspace    string
 	LocalWorkspace     string
 	ConflictPreference int // One of Prefer* above
+
+	// Directory paths within workspace to always choose local. Must be
+	// started and terminated with a '/', ie. /usr/lib/python2.7/
+	SkipPaths []string
 }
 
 type RefreshRequest struct {
@@ -571,11 +575,12 @@ func (api *apiImpl) Branch(src string, dst string) error {
 }
 
 func (api *apiImpl) Merge(remote string, local string) error {
-	return api.Merge3Way(NullWorkspaceName, remote, local, PreferNewer)
+	return api.Merge3Way(NullWorkspaceName, remote, local, PreferNewer,
+		[]string{})
 }
 
 func (api *apiImpl) Merge3Way(base string, remote string, local string,
-	prefer int) error {
+	prefer int, skipPaths []string) error {
 
 	if !isWorkspaceNameValid(base) {
 		return fmt.Errorf("\"%s\" (as base) must be an empty string or "+
@@ -597,6 +602,7 @@ func (api *apiImpl) Merge3Way(base string, remote string, local string,
 		RemoteWorkspace:    remote,
 		LocalWorkspace:     local,
 		ConflictPreference: prefer,
+		SkipPaths:          skipPaths,
 	}
 	return api.processCmd(cmd, nil)
 }
