@@ -62,12 +62,12 @@ func printUsage() {
 	fmt.Println("         - make <workspace> irreversibly immutable")
 	fmt.Println("  advanceWSDB <workspace> <referenceWorkspace>")
 	fmt.Println("  refresh <workspace>")
-	fmt.Println("  merge [-nlr] <base> <remote> <local> [[/dir/to/skip/] ...]")
+	fmt.Println("  merge [-nlr] <base> <remote> <local> [[path/to/skip] ...]")
 	fmt.Println("          - Three-way workspace merge")
 	fmt.Println("          -n - Prefer newer in conflicts (default)")
 	fmt.Println("          -l - Prefer local in conflicts")
 	fmt.Println("          -r - Prefer remote in conflicts")
-	fmt.Println("          /dir/to/skip/ - List of directories to not merge")
+	fmt.Println("          dir/to/skip - List of paths to not merge")
 	fmt.Println("  syncWorkspace <workspace>")
 }
 

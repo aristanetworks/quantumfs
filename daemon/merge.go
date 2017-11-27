@@ -155,12 +155,12 @@ func loadWorkspaceRoot(c *ctx,
 }
 
 type mergeSkipPaths struct {
-	paths []string
+	paths map[string]struct{}
 }
 
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
 	local quantumfs.ObjectKey, prefer mergePreference,
-	skipPaths mergeSkipPaths) (quantumfs.ObjectKey, error) {
+	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d", prefer,
 		len(skipPaths.paths)).Out()
@@ -219,22 +219,40 @@ func loadRecords(c *ctx,
 	}
 }
 
+func childSkipPaths(c *ctx, parentSkipPaths *mergeSkipPaths,
+	name string) *mergeSkipPaths {
+
+	// Avoid unnecessary allocation
+	if len(parentSkipPaths.paths) == 0 {
+		return parentSkipPaths
+	}
+
+	skipPaths := mergeSkipPaths{
+		paths: make(map[string]struct{}, 0),
+	}
+
+	for path, _ := range parentSkipPaths.paths {
+		if strings.HasPrefix(path, name) {
+			trimmed := strings.TrimPrefix(path, name+"/")
+			skipPaths.paths[trimmed] = struct{}{}
+			c.vlog("Adding skip path %s", trimmed)
+		} else {
+			c.vlog("Dropping skip path %s", path)
+		}
+	}
+
+	return &skipPaths
+}
+
 // sometimes, in theory, two workspaces could simultaneously create directories or
 // records with the same name. We handle these cases like mostly normal conflicts.
 func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
 	baseExists bool, ht *hardlinkTracker, prefer mergePreference,
-	skipPaths mergeSkipPaths) (quantumfs.ObjectKey, error) {
+	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn("mergeDirectory", "%s skipPaths len %d", dirName,
 		len(skipPaths.paths)).Out()
-
-	for _, name := range skipPaths.paths {
-		if name == "/" {
-			c.vlog("Skipping dir")
-			return local, nil
-		}
-	}
 
 	var err error
 	baseRecords := make(map[string]quantumfs.DirectoryRecord)
@@ -265,22 +283,15 @@ func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 
 		if inLocal {
 			// We have at least a local and remote, must merge
-
-			childSkipPaths := mergeSkipPaths{
-				paths: make([]string, 0),
-			}
-			for _, path := range skipPaths.paths {
-				if strings.HasPrefix(path, "/"+name) {
-					childSkipPaths.paths = append(
-						childSkipPaths.paths,
-						strings.TrimPrefix(path, "/"+name))
-				} else {
-					c.vlog("Dropping skip path %s", path)
-				}
+			if _, skipChild := skipPaths.paths[name]; skipChild {
+				c.vlog("skipping child %s due to skiplist", name)
+				mergedRecords[name] = localChild
+				continue
 			}
 
 			mergedRecords[name], err = mergeRecord(c, baseChild,
-				remoteRecord, localChild, ht, prefer, childSkipPaths)
+				remoteRecord, localChild, ht, prefer,
+				childSkipPaths(c, skipPaths, name))
 			if err != nil {
 				return local, err
 			}
@@ -553,7 +564,7 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 
 func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	ht *hardlinkTracker, prefer mergePreference, skipPaths mergeSkipPaths) (
+	ht *hardlinkTracker, prefer mergePreference, skipPaths *mergeSkipPaths) (
 	quantumfs.DirectoryRecord, error) {
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).Out()

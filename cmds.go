@@ -433,8 +433,8 @@ type MergeRequest struct {
 	LocalWorkspace     string
 	ConflictPreference int // One of Prefer* above
 
-	// Directory paths within workspace to always choose local. Must be
-	// started and terminated with a '/', ie. /usr/lib/python2.7/
+	// Paths within workspace to always choose local. Relative to the workspace
+	// root, ie. usr/lib/python2.7/site-packages or usr/bin/ls
 	SkipPaths []string
 }
 
