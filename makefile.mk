@@ -104,24 +104,50 @@ quploadRPM: check-fpm $(COMMANDS)
 		--version $(RPM_VERSION) --iteration $(RPM_RELEASE) \
 		./qupload=/usr/bin/qupload
 
-qfsRPM: check-fpm $(COMMANDS)
-	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS --no-depends \
+quantumfsRPM: check-fpm $(COMMANDS)
+	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS \
 		--license='Arista Proprietary' \
 		--vendor='Arista Networks' \
 		--url http://gut/repos/quantumfs \
 		--description='A distributed filesystem optimized for large scale software development' \
 		--depends libstdc++ \
 		--depends fuse \
+		--depends QuantumFS-tool
 		--after-install systemd_reload \
 		--after-remove systemd_reload \
 		--after-upgrade systemd_reload \
 		--version $(RPM_VERSION) --iteration $(RPM_RELEASE) \
 		./quantumfsd=/usr/sbin/quantumfsd \
-		./qfs=/usr/bin/qfs \
-		./qparse=/usr/sbin/qparse \
 		./qloggerdb=/usr/sbin/qloggerdb \
 		./qloggerdb_system_unit=/usr/lib/systemd/system/qloggerdb.service \
 		./systemd_unit=/usr/lib/systemd/system/quantumfs.service
+
+qfsRPM: check-fpm $(COMMANDS)
+	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS-tool --no-depends \
+		--license='Arista Proprietary' \
+		--vendor='Arista Networks' \
+		--url http://gut/repos/quantumfs \
+		--description='A distributed filesystem optimized for large scale software development' \
+		--after-install systemd_reload \
+		--after-remove systemd_reload \
+		--after-upgrade systemd_reload \
+		--version $(RPM_VERSION) --iteration $(RPM_RELEASE) \
+		./qfs=/usr/bin/qfs \
+		./qparse=/usr/sbin/qparse
+
+qfsRPMi686: check-fpm $(COMMANDS386)
+	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS-tool --no-depends \
+		-a i686 \
+		--license='Arista Proprietary' \
+		--vendor='Arista Networks' \
+		--url http://gut/repos/quantumfs \
+		--description='A distributed filesystem optimized for large scale software development' \
+		--after-install systemd_reload \
+		--after-remove systemd_reload \
+		--after-upgrade systemd_reload \
+		--version $(RPM_VERSION) --iteration $(RPM_RELEASE) \
+		./qfs-386=/usr/bin/qfs \
+		./qparse-386=/usr/sbin/qparse
 
 # Default to x86_64 location; we'll override when building via mock
 RPM_LIBDIR ?= /usr/lib64
@@ -176,7 +202,7 @@ clientRPM32:
 		) 9>$$MOCKLOCK ; \
 	}
 
-rpm: $(COMMANDS) qfsRPM quploadRPM clientRPM clientRPM32
+rpm: $(COMMANDS) quantumfsRPM qfsRPM qfsRPMi686 quploadRPM clientRPM clientRPM32
 
 push-rpms: $(RPM_FILES_TOOLSV2_I686) $(RPM_FILES_TOOLSV2_X86_64)
 	a4 scp $(RPM_FILES_TOOLSV2_I686) dist:/dist/release/ToolsV2/repo/i386/RPMS

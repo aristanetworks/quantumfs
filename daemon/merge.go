@@ -26,7 +26,7 @@ type hardlinkTracker struct {
 
 func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]linkEntry,
 	remote map[quantumfs.FileId]linkEntry, local map[quantumfs.FileId]linkEntry,
-	prefer int) *hardlinkTracker {
+	prefer mergePreference) *hardlinkTracker {
 
 	defer c.funcIn("newHardlinkTracker").Out()
 
@@ -159,8 +159,8 @@ type mergeSkipPaths struct {
 }
 
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
-	local quantumfs.ObjectKey, prefer int, skipPaths *mergeSkipPaths) (
-	quantumfs.ObjectKey, error) {
+	local quantumfs.ObjectKey, prefer mergePreference,
+	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d", prefer,
 		len(skipPaths.paths)).Out()
@@ -248,7 +248,7 @@ func childSkipPaths(c *ctx, parentSkipPaths *mergeSkipPaths,
 // records with the same name. We handle these cases like mostly normal conflicts.
 func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
-	baseExists bool, ht *hardlinkTracker, prefer int,
+	baseExists bool, ht *hardlinkTracker, prefer mergePreference,
 	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn("mergeDirectory", "%s skipPaths len %d", dirName,
@@ -376,7 +376,7 @@ func init() {
 
 func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	newer quantumfs.ObjectKey, older quantumfs.ObjectKey,
-	prefer int) (quantumfs.ObjectKey, error) {
+	prefer mergePreference) (quantumfs.ObjectKey, error) {
 
 	baseAttrs, err := getRecordExtendedAttributes(c, base)
 	if err == fuse.ENOENT || base.IsEqualTo(quantumfs.ZeroKey) {
@@ -468,13 +468,15 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	return rtnKey, nil
 }
 
-func pickPreference(prefer int, newer quantumfs.DirectoryRecord,
+type mergePreference int
+
+func (mp mergePreference) pick(newer quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
-	switch prefer {
+	switch mp {
 	default:
-		panic(fmt.Sprintf("Unknown merge preference %d", prefer))
+		panic(fmt.Sprintf("Unknown merge preference %d", mp))
 	case quantumfs.PreferNewer:
 		return newer.Clone()
 	case quantumfs.PreferLocal:
@@ -487,7 +489,7 @@ func pickPreference(prefer int, newer quantumfs.DirectoryRecord,
 // Merge record attributes based on ContentTime
 func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	prefer int) (quantumfs.DirectoryRecord, error) {
+	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
 
 	newer := local
 	older := remote
@@ -498,7 +500,7 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 
 	if base == nil {
 		// Without a base we cannot be any cleverer than our base preference.
-		return pickPreference(prefer, newer, local, remote), nil
+		return prefer.pick(newer, local, remote), nil
 	}
 
 	if local.FileId() != remote.FileId() {
@@ -513,7 +515,7 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 			return local.Clone(), nil
 		} else {
 			// Both recreated, keep our preference
-			return pickPreference(prefer, newer, local, remote), nil
+			return prefer.pick(newer, local, remote), nil
 		}
 	} else {
 		// local.FileId() == remote.FileId()
@@ -562,7 +564,7 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 
 func mergeRecord(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	ht *hardlinkTracker, prefer int, skipPaths *mergeSkipPaths) (
+	ht *hardlinkTracker, prefer mergePreference, skipPaths *mergeSkipPaths) (
 	quantumfs.DirectoryRecord, error) {
 
 	defer c.FuncIn("mergeRecord", "%s", local.Filename()).Out()
@@ -716,7 +718,7 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 
 func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	prefer int) (quantumfs.DirectoryRecord, error) {
+	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
 
 	var baseAccessor blockAccessor
 	baseAvailable := false
