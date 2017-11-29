@@ -537,7 +537,7 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf *buffer) {
 	for cc.freeSpace < 0 {
 		// Note: cache entries that are still awaiting their data are not
 		// placed in the lru yet and as such will never be evicted
-		evictedBuf := cc.lru.Remove(cc.lru.Front()).(buffer)
+		evictedBuf := cc.lru.Remove(cc.lru.Front()).(*buffer)
 		cc.freeSpace += evictedBuf.Size()
 		delete(cc.cache, evictedBuf.key.String())
 	}
