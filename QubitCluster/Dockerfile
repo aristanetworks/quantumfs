@@ -8,7 +8,7 @@ ENV USER root
 ARG QFS_RPM_VERSION=latest
 
 RUN yum install -y supervisor fuse wget && \
-    wget -q http://dist/storage/QuantumFS/QuantumFS-$QFS_RPM_VERSION.x86_64.rpm && \
+    wget -nv http://dist/storage/QuantumFS/QuantumFS-$QFS_RPM_VERSION.x86_64.rpm && \
     yum --nogpgcheck -y localinstall QuantumFS-$QFS_RPM_VERSION.x86_64.rpm && \
     mkdir /qfs
 

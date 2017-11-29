@@ -191,24 +191,30 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// we'll deadlock. We defer relocking in order to balance
 	// against the deferred unlocking from our caller, even in
 	// the case of a panic.
-	uninstantiate := dirtyInode.shouldUninstantiate
 	inode := dirtyInode.inode
 
-	dqlen := dq.Len_()
-	ret := func() bool {
+	// the inode should be marked clean before flushing so that any new
+	// attemps to write to the inode dirties it again.
+	dirtyElement := inode.markClean_()
+	success := func() bool {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
-		return c.qfs.flushInode_(c, inode, uninstantiate, dqlen <= 1)
+		return c.qfs.flushInode_(c, inode)
 	}()
-	if !uninstantiate && dirtyInode.shouldUninstantiate {
-		// we have released and re-acquired the flusher lock, and the
-		// dirtyInode is now up for uninstantiation. This transition
-		// cannot happen again, so it is safe to release the lock again.
+
+	if !success {
+		// flushing the inode has failed, if the inode has been dirtied in
+		// the meantime, just drop this list entry as there is now another
+		// one
+		return inode.markUnclean_(dirtyElement)
+	}
+
+	if dirtyInode.shouldUninstantiate {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
 		c.qfs.uninstantiateInode(c, inode.inodeNum())
 	}
-	return ret
+	return true
 }
 
 // flusher lock must be locked when calling this function
@@ -322,6 +328,20 @@ type Flusher struct {
 	// this is an easy way to sort Inodes by workspace.
 	dqs  map[*TreeLock]*DirtyQueue
 	lock utils.DeferableMutex
+}
+
+func (flusher *Flusher) nQueued(c *ctx, treelock *TreeLock) int {
+	defer flusher.lock.Lock().Unlock()
+	return flusher.nQueued_(c, treelock)
+}
+
+// flusher lock must be locked when calling this function
+func (flusher *Flusher) nQueued_(c *ctx, treelock *TreeLock) int {
+	dq, exists := flusher.dqs[treelock]
+	if !exists {
+		return 0
+	}
+	return dq.Len_()
 }
 
 func NewFlusher() *Flusher {
