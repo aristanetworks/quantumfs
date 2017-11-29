@@ -254,6 +254,11 @@ type TLA struct {
 	FailMsg     string // Message to fail with
 }
 
+func (th *TestHelper) CountLogStrings(text string) int {
+	contains := th.messagesInTestLog([]TLA{TLA{true, text, "unable to get log"}})
+	return contains[0]
+}
+
 // Assert the test log contains the given text
 // N.B. This is an expensive call as it parses all of the logs every 20ms
 // Try minimizing the usage of this function.
