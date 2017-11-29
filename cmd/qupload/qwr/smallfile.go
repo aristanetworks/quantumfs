@@ -11,17 +11,18 @@ import (
 
 func smallFileWriter(qctx *quantumfs.Ctx, path string,
 	finfo os.FileInfo,
-	ds quantumfs.DataStore) (quantumfs.ObjectKey, error) {
+	ds quantumfs.DataStore) (quantumfs.ObjectKey, uint64, uint64, error) {
 
 	file, oerr := os.Open(path)
 	if oerr != nil {
-		return quantumfs.ZeroKey, oerr
+		return quantumfs.ZeroKey, 0, 0, oerr
 	}
 	defer file.Close()
 
-	keys, _, err := writeFileBlocks(qctx, file, uint64(finfo.Size()), ds)
+	keys, _, bytesWritten, err := writeFileBlocks(qctx, file,
+		uint64(finfo.Size()), ds)
 	if err != nil {
-		return quantumfs.ZeroKey, err
+		return quantumfs.ZeroKey, 0, 0, err
 	}
 
 	fileKey := quantumfs.EmptyBlockKey
@@ -31,5 +32,5 @@ func smallFileWriter(qctx *quantumfs.Ctx, path string,
 		fileKey = keys[0]
 	}
 
-	return fileKey, err
+	return fileKey, bytesWritten, 0, err
 }
