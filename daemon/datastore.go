@@ -88,7 +88,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	// Check cache
 	var err error
 	bufResult, resultChannel := store.cache.get(c, key,
-		func () *quantumfs.Buffer {
+		func () *buffer {
 	
 		buf := newEmptyBuffer()
 		initBuffer(&buf, store, key)
@@ -139,7 +139,7 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buf quantumfs.Buffer) error {
 		panic("Attempted to set embedded key")
 	}
 	buf_ := buf.(*buffer)
-	store.cache.storeInCache(c, *buf_)
+	store.cache.storeInCache(c, buf_)
 	return store.durableStore.Set(c, key, buf)
 }
 
@@ -438,14 +438,14 @@ func (cc *combiningCache) shutdown() {
 	// Prevent future additions
 	cc.cacheSize = -1
 	cc.freeSpace = -1
-	cc.cache = make(map[string]*buffer, 0)
+	cc.cache = make(map[string]*cacheEntry, 0)
 	cc.lru = list.List{}
 }
 
 // get either returns a buffer copy from the cache, or a channel that the buffer
 // will come back on
 func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
-	fetch func () *quantumfs.Buffer) (cached quantumfs.Buffer,
+	fetch func () *buffer) (cached quantumfs.Buffer,
 	resultChannel chan quantumfs.Buffer) {
 
 	defer cc.lock.Lock().Unlock()
@@ -462,11 +462,11 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 		// Prepare a placeholder to indicate the result is being fetched
 		entry = &cacheEntry{
 			data:		nil,
-			concurrents: 	make([]chan *quantumfs.Buffer),
+			concurrents: 	make([]chan quantumfs.Buffer, 0),
 		}
 
 		// Launch a go thread to fetch and store the result
-		go cc.storeInCache(c, fetch)
+		go cc.storeInCache(c, fetch())
 	}
 
 	// Waiting for data, so add on a channel
@@ -479,7 +479,7 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	return nil, waitChan
 }
 
-func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf buffer) {
+func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf *buffer) {
 	defer c.FuncIn(qlog.LogDaemon, "dataStore::storeInCache", "Key: %s",
 		buf.key.String()).Out()
 
@@ -490,7 +490,9 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf buffer) {
 	if exists && entry.data == nil && entry.concurrents != nil {
 		// Send copies to each waiter and then nullify the queue of them
 		for _, channel := range entry.concurrents {
-			channel <- buf.clone()
+			var qfsBuffer quantumfs.Buffer
+			qfsBuffer = buf.clone()
+			channel <- qfsBuffer
 		}
 		entry.concurrents = nil
 	}
@@ -504,7 +506,7 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf buffer) {
 		}
 		// ensure we remove any entries that may signal that we're waiting
 		// for this data to come back any more
-		delete (cc.cache, buf.key.string())
+		delete (cc.cache, buf.key.String())
 		return
 	}
 
@@ -539,6 +541,8 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf buffer) {
 		cc.freeSpace += evictedBuf.Size()
 		delete(cc.cache, evictedBuf.key.String())
 	}
-	cc.cache[buf.key.String()] = &buf
 	buf.lruElement = cc.lru.PushBack(buf)
+	cc.cache[buf.key.String()] = &cacheEntry {
+		data:	buf,
+	}
 }
