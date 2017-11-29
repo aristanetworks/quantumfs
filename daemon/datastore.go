@@ -35,15 +35,7 @@ func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal,
 	for {
 		select {
 		case <-sigUsr1Chan:
-			func() {
-				defer store.cacheLock.Lock().Unlock()
-
-				// Prevent future additions
-				store.cacheSize = -1
-				store.freeSpace = -1
-				store.cache = make(map[string]*buffer, 0)
-				store.lru = list.List{}
-			}()
+			store.cache.shutdown()
 
 			// Release the memory
 			debug.FreeOSMemory()
@@ -57,12 +49,9 @@ func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal,
 }
 
 func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
-	entryNum := cacheSize / 102400
 	store := &dataStore{
 		durableStore: durableStore,
-		cache:        make(map[string]*buffer, entryNum),
-		cacheSize:    cacheSize,
-		freeSpace:    cacheSize,
+		cache:        newCombiningCache(cacheSize),
 		quit:         make(chan struct{}),
 	}
 
@@ -75,67 +64,14 @@ func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 
 type dataStore struct {
 	durableStore quantumfs.DataStore
+	cache	*combiningCache
 
-	cacheLock utils.DeferableMutex
-	lru       list.List // Back is most recently used
-	cache     map[string]*buffer
-	cacheSize int
-	freeSpace int
 	quit      chan struct{} // Signal termination
 }
 
 func (store *dataStore) shutdown() {
 	store.quit <- struct{}{}
 }
-
-func (store *dataStore) storeInCache(c *quantumfs.Ctx, buf buffer) {
-	defer c.FuncIn(qlog.LogDaemon, "dataStore::storeInCache", "Key: %s",
-		buf.key.String()).Out()
-
-	size := buf.Size()
-
-	// Store in cache
-	defer store.cacheLock.Lock().Unlock()
-
-	if size > store.cacheSize {
-		if store.cacheSize != -1 {
-			c.Wlog(qlog.LogDaemon, "The size of content is greater than"+
-				" total capacity of the cache")
-		}
-		return
-	}
-
-	if _, exists := store.cache[buf.key.String()]; exists {
-		// It is possible when storing dirty data that we could reproduce the
-		// contents which already exist in the cache. We don't want to have
-		// the same data in the LRU queue twice as that is wasteful, though
-		// eventually the 'overwritten' buffer will be evicted and the space
-		// recovered.
-		//
-		// Now if we have reproduced the same data already in the cache we
-		// could move/set the buffer to be the most recently used. We choose
-		// not to do that because inserting newly uploaded data into the
-		// cache is an optimization for the relatively common case where a
-		// file is written and then read shortly afterwards. However, that
-		// doesn't always happen. Instead we will leave the data's LRU
-		// position unchanged. Should the data be reread in short order then
-		// it is likely to still be in the cache. However, if the data isn't
-		// read in short order then marking that data most recently used will
-		// simply force something else out of the cache.
-		c.Vlog(qlog.LogDaemon, "Not touching key in cache")
-		return
-	}
-
-	store.freeSpace -= size
-	for store.freeSpace < 0 {
-		evictedBuf := store.lru.Remove(store.lru.Front()).(buffer)
-		store.freeSpace += evictedBuf.Size()
-		delete(store.cache, evictedBuf.key.String())
-	}
-	store.cache[buf.key.String()] = &buf
-	buf.lruElement = store.lru.PushBack(buf)
-}
-
 const CacheHitLog = "Found key in readcache"
 const CacheMissLog = "Cache miss"
 
@@ -150,38 +86,40 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	}
 
 	// Check cache
-	bufResult := func() quantumfs.Buffer {
-		defer store.cacheLock.Lock().Unlock()
+	var err error
+	bufResult, resultChannel := store.cache.get(c, key,
+		func () *quantumfs.Buffer {
+	
+		buf := newEmptyBuffer()
+		initBuffer(&buf, store, key)
 
-		if buf, exists := store.cache[key.String()]; exists {
-			store.lru.MoveToBack(buf.lruElement)
-			return buf.clone()
+		err = quantumfs.ConstantStore.Get(c, key, &buf)
+		if err == nil {
+			c.Vlog(qlog.LogDaemon, "Found key in constant store")
+			return &buf
 		}
+
+		err = store.durableStore.Get(c, key, &buf)
+		if err == nil {
+			c.Vlog(qlog.LogDaemon, "Found key in durable store")
+			return &buf
+		}
+
 		return nil
-	}()
+	})
+
 	if bufResult != nil {
 		c.Vlog(qlog.LogDaemon, CacheHitLog)
 		return bufResult
 	}
 	c.Vlog(qlog.LogDaemon, CacheMissLog)
 
-	buf := newEmptyBuffer()
-	initBuffer(&buf, store, key)
-
-	err := quantumfs.ConstantStore.Get(c, key, &buf)
-	if err == nil {
-		c.Vlog(qlog.LogDaemon, "Found key in constant store")
-		return &buf
+	// Wait for the result to come in
+	bufResult = <-resultChannel
+	if bufResult != nil {
+		return bufResult
 	}
-
-	err = store.durableStore.Get(c, key, &buf)
-	if err == nil {
-		store.storeInCache(c, buf)
-		c.Vlog(qlog.LogDaemon, "Found key in durable store")
-		// buf might be stored in the cache, give the client a copy to
-		// prevent it from screwing up the content in the cache.
-		return buf.clone()
-	}
+	
 	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %s. Key %s",
 		err.Error(), key.String())
 
@@ -201,7 +139,7 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buf quantumfs.Buffer) error {
 		panic("Attempted to set embedded key")
 	}
 	buf_ := buf.(*buffer)
-	store.storeInCache(c, *buf_)
+	store.cache.storeInCache(c, *buf_)
 	return store.durableStore.Set(c, key, buf)
 }
 
@@ -467,4 +405,140 @@ func (buf *buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
 	return quantumfs.OverlayHardlinkEntry(
 		encoding.ReadRootHardlinkEntry(segment))
 
+}
+
+type cacheEntry struct {
+	data *buffer
+	concurrents	[]chan quantumfs.Buffer
+}
+
+type combiningCache struct {
+	lock utils.DeferableMutex
+
+	lru       list.List // Back is most recently used
+	cache     map[string]*cacheEntry
+
+	cacheSize int
+	freeSpace int
+}
+
+func newCombiningCache(cacheSize int) *combiningCache {
+	entryNum := cacheSize / 102400
+
+	return &combiningCache {
+		cache:        make(map[string]*cacheEntry, entryNum),
+		cacheSize:    cacheSize,
+		freeSpace:    cacheSize,
+	}
+}
+
+func (cc *combiningCache) shutdown() {
+	defer cc.lock.Lock().Unlock()
+
+	// Prevent future additions
+	cc.cacheSize = -1
+	cc.freeSpace = -1
+	cc.cache = make(map[string]*buffer, 0)
+	cc.lru = list.List{}
+}
+
+// get either returns a buffer copy from the cache, or a channel that the buffer
+// will come back on
+func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+	fetch func () *quantumfs.Buffer) (cached quantumfs.Buffer,
+	resultChannel chan quantumfs.Buffer) {
+
+	defer cc.lock.Lock().Unlock()
+
+	entry, exists := cc.cache[key.String()];
+	if exists {
+		// If the entry data is nil, then we need to wait for the result
+		if entry.data != nil {
+			// refresh an existing cached entry
+			cc.lru.MoveToBack(entry.data.lruElement)
+			return entry.data.clone(), nil
+		}
+	} else {
+		// Prepare a placeholder to indicate the result is being fetched
+		entry = &cacheEntry{
+			data:		nil,
+			concurrents: 	make([]chan *quantumfs.Buffer),
+		}
+
+		// Launch a go thread to fetch and store the result
+		go cc.storeInCache(c, fetch)
+	}
+
+	// Waiting for data, so add on a channel
+	waitChan := make(chan quantumfs.Buffer)
+	entry.concurrents = append(entry.concurrents, waitChan)
+	// Note: the cache entry will only get pushed into the lru queue when its
+	// data is set into the cache
+	cc.cache[key.String()] = entry
+
+	return nil, waitChan
+}
+
+func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf buffer) {
+	defer c.FuncIn(qlog.LogDaemon, "dataStore::storeInCache", "Key: %s",
+		buf.key.String()).Out()
+
+	defer cc.lock.Lock().Unlock()
+
+	// Satisfy any channels waiting for this data, no matter what
+	entry, exists := cc.cache[buf.key.String()]
+	if exists && entry.data == nil && entry.concurrents != nil {
+		// Send copies to each waiter and then nullify the queue of them
+		for _, channel := range entry.concurrents {
+			channel <- buf.clone()
+		}
+		entry.concurrents = nil
+	}
+
+	// Now determine whether we can actually store in the cache
+	size := buf.Size()
+	if size > cc.cacheSize {
+		if cc.cacheSize != -1 {
+			c.Wlog(qlog.LogDaemon, "The size of content is greater than"+
+				" total capacity of the cache")
+		}
+		// ensure we remove any entries that may signal that we're waiting
+		// for this data to come back any more
+		delete (cc.cache, buf.key.string())
+		return
+	}
+
+	
+	if exists && entry.data != nil {
+		// It is possible when storing dirty data that we could reproduce the
+		// contents which already exist in the cache. We don't want to have
+		// the same data in the LRU queue twice as that is wasteful, though
+		// eventually the 'overwritten' buffer will be evicted and the space
+		// recovered.
+		//
+		// Now if we have reproduced the same data already in the cache we
+		// could move/set the buffer to be the most recently used. We choose
+		// not to do that because inserting newly uploaded data into the
+		// cache is an optimization for the relatively common case where a
+		// file is written and then read shortly afterwards. However, that
+		// doesn't always happen. Instead we will leave the data's LRU
+		// position unchanged. Should the data be reread in short order then
+		// it is likely to still be in the cache. However, if the data isn't
+		// read in short order then marking that data most recently used will
+		// simply force something else out of the cache.
+		c.Vlog(qlog.LogDaemon, "Not touching key in cache")
+		return
+	}
+
+	// Place it in the cache
+	cc.freeSpace -= size
+	for cc.freeSpace < 0 {
+		// Note: cache entries that are still awaiting their data are not
+		// placed in the lru yet and as such will never be evicted
+		evictedBuf := cc.lru.Remove(cc.lru.Front()).(buffer)
+		cc.freeSpace += evictedBuf.Size()
+		delete(cc.cache, evictedBuf.key.String())
+	}
+	cc.cache[buf.key.String()] = &buf
+	buf.lruElement = cc.lru.PushBack(buf)
 }
