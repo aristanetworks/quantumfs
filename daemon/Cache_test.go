@@ -128,7 +128,7 @@ func TestCacheLru(t *testing.T) {
 			datastore.cache.freeSpace)
 		num := 1
 		for e := datastore.cache.lru.Back(); e != nil; e = e.Prev() {
-			buf := e.Value.(buffer)
+			buf := e.Value.(*buffer)
 			i := int(buf.data[1]) + int(buf.data[2])*256
 			test.Assert(i <= lruNum, "Unexpected block in lru %d", i)
 			test.Assert(i == num, "Out of order block %d not %d", i, num)
@@ -139,11 +139,11 @@ func TestCacheLru(t *testing.T) {
 		buf := datastore.Get(c, keys[256])
 		test.Assert(buf != nil, "Block not found")
 
-		data := datastore.cache.lru.Back().Value.(buffer)
+		data := datastore.cache.lru.Back().Value.(*buffer)
 		i := int(data.data[1]) + int(data.data[2])*256
 		test.Assert(i == 256, "Incorrect most recent block %d != 256", i)
 
-		data = datastore.cache.lru.Front().Value.(buffer)
+		data = datastore.cache.lru.Front().Value.(*buffer)
 		i = int(data.data[1]) + int(data.data[2])*256
 		test.Assert(i == 255, "Wrong least recent block %d != 255", i)
 	})
@@ -199,7 +199,7 @@ func TestCacheLruDiffSize(t *testing.T) {
 			datastore.cache.freeSpace)
 		num := 1
 		for e := datastore.cache.lru.Back(); e != nil; e = e.Prev() {
-			buf := e.Value.(buffer)
+			buf := e.Value.(*buffer)
 			i := int(buf.data[1]) + int(buf.data[2])*256
 			test.Assert(i <= lruNum, "Unexpected block in lru %d", i)
 			test.Assert(i == num, "Out of order block %d not %d", i, num)
@@ -215,13 +215,13 @@ func TestCacheLruDiffSize(t *testing.T) {
 		buf = datastore.Get(c, keys[298])
 		test.Assert(buf != nil, "Block not found")
 
-		data := datastore.cache.lru.Back().Value.(buffer)
+		data := datastore.cache.lru.Back().Value.(*buffer)
 		i := int(data.data[1]) + int(data.data[2])*256
 		test.Assert(i == 298, "Incorrect most recent block %d != 298", i)
 
 		// The front element is supposed to be keys[13], but its size is too
 		// large, so it has to be removed from the cache
-		data = datastore.cache.lru.Front().Value.(buffer)
+		data = datastore.cache.lru.Front().Value.(*buffer)
 		i = int(data.data[1]) + int(data.data[2])*256
 		test.Assert(i == 12, "Wrong least recent block %d != 12", i)
 
