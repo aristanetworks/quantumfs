@@ -18,11 +18,11 @@ type Hardlink struct {
 	// hidden field only used for merging. Stored in the ContentTime field.
 	creationTime quantumfs.Time
 
-	wsr *WorkspaceRoot
+	wsr HardlinkContainer
 }
 
 func newHardlink(name string, fileId quantumfs.FileId, creationTime quantumfs.Time,
-	wsr *WorkspaceRoot) *Hardlink {
+	wsr HardlinkContainer) *Hardlink {
 
 	utils.Assert(fileId != quantumfs.InvalidFileId,
 		"invalid fileId for %s", name)

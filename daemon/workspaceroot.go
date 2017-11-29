@@ -45,6 +45,29 @@ type linkEntry struct {
 	paths   []string
 }
 
+type HardlinkContainer interface {
+	getHardlinkByInode(inodeId InodeId) (bool, quantumfs.DirectoryRecord)
+	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
+	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
+	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
+	getHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId) InodeId
+	removeHardlink(c *ctx, fileId quantumfs.FileId,
+	) (record quantumfs.DirectoryRecord, inodeId InodeId)
+	hardlinkExists(c *ctx, fileId quantumfs.FileId) bool
+	hardlinkDec(fileId quantumfs.FileId) bool
+	hardlinkInc(fileId quantumfs.FileId)
+	newHardlink(c *ctx, inodeId InodeId, record quantumfs.DirectoryRecord,
+	) *Hardlink
+	getHardlink(fileId quantumfs.FileId) (valid bool,
+		record quantumfs.DirectRecord)
+	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
+	setHardlink(fileId quantumfs.FileId,
+		fnSetter func(dir *quantumfs.DirectRecord))
+	nlinks(fileId quantumfs.FileId) uint32
+	updateParent_(inode Inode)
+	getWorkspaceRoot() *WorkspaceRoot
+}
+
 func newLinkEntry(record_ *quantumfs.DirectRecord) linkEntry {
 	return linkEntry{
 		record:  record_,
@@ -134,6 +157,15 @@ func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
 	} else {
 		wsr.Directory.dirtyChild(c, childId)
 	}
+}
+
+// Must be called with inode's parentLock locked for writing
+func (wsr *WorkspaceRoot) updateParent_(inode Inode) {
+	inode.setParent_(wsr.inodeNum())
+}
+
+func (wsr *WorkspaceRoot) getWorkspaceRoot() *WorkspaceRoot {
+	return wsr
 }
 
 func (wsr *WorkspaceRoot) nlinks(fileId quantumfs.FileId) uint32 {
@@ -235,15 +267,12 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 		wsr)
 }
 
-func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
-	[]InodeId) {
-
-	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeNum).Out()
+func (wsr *WorkspaceRoot) instantiateHardlink(c *ctx, inodeId InodeId) Inode {
 
 	hardlinkRecord := func() *quantumfs.DirectRecord {
 		defer wsr.linkLock.RLock().RUnlock()
 
-		id, exists := wsr.inodeToLink[inodeNum]
+		id, exists := wsr.inodeToLink[inodeId]
 		if !exists {
 			return nil
 		}
@@ -251,16 +280,28 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 		c.dlog("Instantiating hardlink %d", id)
 		return wsr.hardlinks[id].record
 	}()
-	if hardlinkRecord != nil {
-		if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
-			c.vlog("Someone has already instantiated inode %d", inodeNum)
-			return inode, nil
-		}
-		return wsr.Directory.recordToChild(c, inodeNum, hardlinkRecord)
+	if hardlinkRecord == nil {
+		return nil
 	}
+	if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
+		c.vlog("Someone has already instantiated inode %d", inodeId)
+		return inode
+	}
+	inode, _ := wsr.Directory.recordToChild(c, inodeId, hardlinkRecord)
+	return inode
+}
 
+func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) (Inode,
+	[]InodeId) {
+
+	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeId).Out()
+
+	inode := wsr.instantiateHardlink(c, inodeId)
+	if inode != nil {
+		return inode, nil
+	}
 	// This isn't a hardlink, so proceed as normal
-	return wsr.Directory.instantiateChild(c, inodeNum)
+	return wsr.Directory.instantiateChild(c, inodeId)
 }
 
 func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx,
