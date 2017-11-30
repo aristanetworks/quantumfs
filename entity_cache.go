@@ -5,6 +5,7 @@ package cql
 
 import (
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,15 +34,9 @@ import (
 // (i.e. when a local insert/delete happens in a level while a set of entities is
 // being fetched from CQL for refreshing that same level)
 
-// Error handling strategy: TODO
-// The entityCache APIs do not interact directly with CQL datastore
-// and hence there are no error returns. The cache
-// however refreshes remotely inserted/deleted data which involves
-// CQL interactions and can potentially fail. Current error handling
-// strategy is that - CQL session used to refresh cache auto-corrects and so during
-// the period where the session is disconnected, the cache is stale
-// in terms of remote operations. This is perfectly ok from workspace
-// DB API expectations. The workspace DB API supports reporting errors.
+// The cache refreshes remotely inserted/deleted data which involves
+// CQL interactions and can potentially fail. The errors seen during
+// refresh are propogated to caller using WSDB API.
 
 // Following example illustrates how the entityCache is used as
 // workspace DB cache.
@@ -364,6 +359,25 @@ func (ec *entityCache) markChildEntityGroupsDetached(c ether.Ctx,
 	}
 }
 
+// since some callers could be blocking for refresh
+// any panics during fetch should be converted to errors
+func (ec *entityCache) callFetch(c ether.Ctx,
+	entityPath ...string) (m map[string]bool, e error) {
+
+	defer func() {
+		if ex := recover(); ex != nil {
+			var ok bool
+			e, ok = ex.(error)
+			if !ok {
+				e = fmt.Errorf("%v", ex)
+			}
+			m = nil
+		}
+	}()
+
+	return ec.fetcher(c, ec.fetcherArg, entityPath...)
+}
+
 // invoked under rwMutex read lock, does a unlocked fetch, refresh under
 // write lock and finally re-acquires read lock
 // returns non-nil entityGroup whose list or count can be extracted
@@ -379,23 +393,27 @@ func (ec *entityCache) getEntityCountListGroup(c ether.Ctx,
 	group := ec.root
 	// this routine can be called without entityPath
 	// eg: root level
-	for i := 0; true; i++ {
+	for pathIdx := 0; true; pathIdx++ {
 
 		// for each entity in given entityPath
 		// check if corresponding entityGroup needs to be
 		// refreshed
-		needed := group.refreshNeeded(c)
-		if needed {
-
+		action := group.refreshNeeded(c)
+		c.Vlog("refreshAction: %d for (%s)", action,
+			strings.Join(entityPath[:pathIdx], "/"))
+		switch action {
+		case refreshPerform:
 			err := func() error {
 				ec.rwMutex.RUnlock()
+				// data after refresh will be looked at under
+				// a read lock
 				defer ec.rwMutex.RLock()
 
 				// fetch data from CQL without locking cache
-				fetchList, err := ec.fetcher(c, ec.fetcherArg, entityPath[:i]...)
+				fetchList, err := ec.callFetch(c, entityPath[:pathIdx]...)
 				if err != nil {
 					c.Elog("Ether cache refresh (%s) failed: %s",
-						strings.Join(entityPath[:i], "/"), err.Error())
+						strings.Join(entityPath[:pathIdx], "/"), err.Error())
 				}
 				// update the group under write lock unless the fetched
 				// data has been invalidated by a local insert/delete
@@ -427,6 +445,29 @@ func (ec *entityCache) getEntityCountListGroup(c ether.Ctx,
 			//     this is no different than remote information getting
 			//     in DB as soon as we completed running fetcher. We just use
 			//     the cache information we have.
+
+		case refreshWait:
+			// refresh is needed and there are no entities
+			// currently but can't do refresh since
+			// theres already some other caller doing refresh
+			// so we wait until the refresh
+			err := func() error {
+				// all waiters need to release the read
+				// lock so that the refresh under write
+				// lock can happen
+				group.fetchErrReapersWg.Add(1)
+				ec.rwMutex.RUnlock()
+				// the fetch error is deposited with write
+				// lock held and so this caller can look at the
+				// data after the refresh has completed
+				defer ec.rwMutex.RLock()
+
+				return group.reapFetchError()
+			}()
+			if err != nil {
+				return nil, err
+			}
+		default:
 		}
 
 		// current group got detached
@@ -436,14 +477,13 @@ func (ec *entityCache) getEntityCountListGroup(c ether.Ctx,
 		}
 
 		// we have completed walk
-		if i == len(entityPath) {
+		if pathIdx == len(entityPath) {
 			break
 		}
 
 		// continue walking entityPath
 		var exists bool
-		// entity = entityPath[i] removed from group
-		group, exists = group.entities[entityPath[i]]
+		group, exists = group.entities[entityPath[pathIdx]]
 		if !exists {
 			detachOccured = true
 			break
@@ -490,6 +530,9 @@ type entityGroup struct {
 	// this entityGroup when fetchInProgress == true
 	concLocalInserts map[string]bool
 	concLocalDeletes map[string]bool
+
+	fetchErrReapersWg sync.WaitGroup
+	fetchErr          error
 }
 
 func newEntityGroup(parent *entityGroup, parentEntity string,
@@ -510,7 +553,15 @@ func newEntityGroup(parent *entityGroup, parentEntity string,
 }
 
 // called under rwMutex read lock
-func (g *entityGroup) refreshNeeded(c ether.Ctx) bool {
+type refreshAction int
+
+const (
+	refreshPerform refreshAction = iota // caller must perform refresh
+	refreshWait                  = iota // caller must wait for refresh to be done
+	refreshIgnore                = iota // refresh not needed and no waiting
+)
+
+func (g *entityGroup) refreshNeeded(c ether.Ctx) (action refreshAction) {
 	defer c.FuncIn("cache::refreshNeeded",
 		"p:%s c:%d e:%s now:%s d:%s",
 		g.parentEntity, g.entityCount,
@@ -519,7 +570,7 @@ func (g *entityGroup) refreshNeeded(c ether.Ctx) bool {
 		strconv.FormatBool(g.detached)).Out()
 
 	if g.cache.neverExpires {
-		return false
+		return refreshIgnore
 	}
 
 	duration := time.Now().Sub(g.expiresAt)
@@ -536,13 +587,20 @@ func (g *entityGroup) refreshNeeded(c ether.Ctx) bool {
 		if swapped {
 			// only 1 caller will see swapped = true so can modify without write lock
 			// upgrade
+			// possible writers: read-Locked-CAS-winner or write-Locked refresh
+			g.fetchErr = nil
 			g.fetchInProgress = true
+			return refreshPerform
 		}
-		c.Vlog("cache::refreshNeeded swapped:%s", strconv.FormatBool(swapped))
-		return swapped
+
+		if len(g.entities) == 0 {
+			// wait for refresh since we don't have any data
+			return refreshWait
+		}
+		// ok to serve stale data while refresh is in progress
 	}
 
-	return false
+	return refreshIgnore
 }
 
 // called under rwMutex held in write mode
@@ -640,23 +698,63 @@ func (g *entityGroup) mergeLocalUpdates(c ether.Ctx, fetchData map[string]bool) 
 	}
 }
 
+// reapFetchError is used by the callers waiting for
+// refresh to reap the error from fetch. The fetch error
+// is deposited into group before unsetting the refreshScheduled
+// CAS and hence this wait is ok.
+func (g *entityGroup) reapFetchError() error {
+	defer g.fetchErrReapersWg.Done()
+	for {
+		val := atomic.LoadUint32(&g.refreshScheduled)
+		if val == 0 {
+			break
+		}
+		runtime.Gosched()
+	}
+
+	var err error
+	if g.fetchErr != nil {
+		// copy the error so that next refresh doesn't
+		// clobber it in the group
+		err = fmt.Errorf(g.fetchErr.Error())
+	}
+	return err
+}
+
+// refresh will update the group under write lock unless the fetched
+// data has been invalidated by a local insert/delete. The
+// error from fetcher is passed into refresh so that proper clean up can be done.
+// No locks should be held when calling this function.
 func (g *entityGroup) refresh(c ether.Ctx, fetchData map[string]bool,
-	err error) error {
+	ferr error) error {
 	defer c.FuncIn("cache::refresh", "p:%s c:%d d:%s",
 		g.parentEntity, g.entityCount,
 		strconv.FormatBool(g.detached)).Out()
 
 	// takes the fetchList and merges it to group.entities under write lock
 	g.cache.rwMutex.Lock()
+
+	// order is important here
+	// write lock is released after making sure that all the waiters
+	// have reaped the error status. New waiters cannot be added since
+	// write lock is held
 	defer g.cache.rwMutex.Unlock()
 
-	g.fetchInProgress = false
+	defer g.fetchErrReapersWg.Wait()
+
+	defer func() { g.fetchInProgress = false }()
+
+	// deposit the error before ack'ing the refresh
+	g.fetchErr = ferr
+
+	// refreshScheduled must be reset after depositing the fetch error
 	if swapped := atomic.CompareAndSwapUint32(&g.refreshScheduled, 1, 0); !swapped {
+		g.fetchErr = fmt.Errorf("BUG: Concurrent refreshes scheduled")
 		panic("BUG: EntityGroup can only have 1 refresh scheduled at any time")
 	}
 
-	if err != nil {
-		return err
+	if ferr != nil {
+		return ferr
 	}
 	// its ok to proceed if this group has been detached from parent (implies
 	// all entities deleted and hence parent entity also deleted). The List or

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/gocql/gocql"
 	mock "github.com/stretchr/testify/mock"
@@ -140,8 +141,10 @@ func (suite *wsdbCacheTestSuite) TestCacheWithoutExpiry() {
 	suite.Require().True(group != nil, "group not found after insert")
 
 	// check that refresh is not needed for this group
-	suite.Require().False(group.refreshNeeded(unitTestEtherCtx),
-		"group need refresh when cache expiry disabled")
+	action := group.refreshNeeded(unitTestEtherCtx)
+	suite.Require().Equal(int(refreshIgnore), int(action),
+		"incorrect refresh action %d when cache expiry disabled",
+		action)
 
 	time1 := group.expiresAt
 
@@ -157,8 +160,10 @@ func (suite *wsdbCacheTestSuite) TestCacheWithoutExpiry() {
 	suite.Require().True(group != nil, "group not found after Count")
 
 	// check that refresh is not needed for this group
-	suite.Require().False(group.refreshNeeded(unitTestEtherCtx),
-		"group need refresh when cache expiry disabled")
+	action = group.refreshNeeded(unitTestEtherCtx)
+	suite.Require().Equal(int(refreshIgnore), int(action),
+		"incorrect refresh action %d when cache expiry disabled",
+		action)
 
 	time2 := group.expiresAt
 
@@ -971,15 +976,11 @@ func (suite *wsdbCacheTestSuite) TestPanicDuringFetch() {
 	// force the typespace fetch to be invoked
 	suite.cache.enableCqlRefresh(unitTestEtherCtx)
 
-	// Don't use Require().Panics(f) test so that reason for
-	// panic can be verified.
-	defer func() {
-		ex := recover()
-		suite.Require().NotNil(ex, "expected panic, didn't occur")
-		suite.Require().Equal("PanicOnFetch", ex,
-			"actual panic: %v", ex)
-	}()
-	suite.common.wsdb.NumTypespaces(unitTestEtherCtx)
+	_, err := suite.common.wsdb.NumTypespaces(unitTestEtherCtx)
+
+	suite.Require().Error(err, "NumTypespaces did not get error")
+	suite.Require().Equal("PanicOnFetch", err.Error(),
+		"Unexpected error %s in NumTypespaces", err.Error())
 }
 
 // TestRefreshFailure tests if the error in DB refresh
@@ -1075,6 +1076,254 @@ VALUES (?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), nonce.Value())
 
 	err := query.Exec()
 	suite.Require().NoError(err, "Insert failed with %s", err)
+}
+
+// caller1 and caller2 are two concurrent List requests
+// for the same cache path. They should never see nil
+// data if the cache entry is not setup. The cache entry
+// may not be setup if the cache is just started up or if
+// that cache entity was recently deleted from cache.
+func (suite *wsdbCacheTestSuite) TestCacheConcTsListWhenEmpty() {
+
+	// make sure the cache is empty, not even null workspace
+	// since the test requires empty typespace list in cache
+	suite.cache.DeleteEntities(unitTestEtherCtx, wsdb.NullSpaceName)
+
+	tsRows := mockDbRows{[]interface{}{"t1"}}
+	tsIter := new(MockIter)
+	tsVals := []interface{}(nil)
+
+	var tsWg sync.WaitGroup
+	var tsList1, tsList2 []string
+	// buffered chan since db will be queried twice and we want it to block
+	// on the second query.
+	tsFetchPause := make(chan bool)
+
+	mockWsdbCacheTypespaceFetch(suite.common.mockSess, tsRows, tsVals,
+		tsIter, tsFetchPause)
+
+	suite.cache.enableCqlRefresh(unitTestEtherCtx)
+
+	tsWg.Add(1)
+	go func() {
+		defer tsWg.Done()
+		var err error
+		var call1Ctx = &ether.StdCtx{RequestID: 1}
+		tsList1, err = suite.common.wsdb.TypespaceList(call1Ctx)
+		suite.Require().NoError(err, "TypespaceList call1 returned error : %v", err)
+	}()
+
+	// wait for fetch to stall
+	<-tsFetchPause
+
+	// fetched data contains t1 typespace
+
+	// now start another TypespaceList API call which should see that a
+	// refresh is in progress, block and both TypespaceList API calls
+	// should complete with the t1 as the typespace
+
+	tsWg.Add(1)
+	go func() {
+		defer tsWg.Done()
+		var err error
+		var call2Ctx = &ether.StdCtx{RequestID: 2}
+		tsList2, err = suite.common.wsdb.TypespaceList(call2Ctx)
+		suite.Require().NoError(err, "TypespaceList call2 returned error : %v", err)
+	}()
+
+	// unpause the DB fetch
+	tsFetchPause <- true
+
+	// wait for both TypespaceList API calls to complete
+	tsWg.Wait()
+
+	suite.Require().Contains(tsList1, "t1",
+		"Expected t1 typespace not seen in call1")
+	suite.Require().Contains(tsList2, "t1",
+		"Expected t1 typespace not seen in call2")
+
+}
+
+// all concurrent callers must terminate with the refresh error
+func (suite *wsdbCacheTestSuite) TestCacheConcTsListWhenEmptyErr() {
+
+	// make sure the cache is empty, not even null workspace
+	// since the test requires empty typespace list in cache
+	suite.cache.DeleteEntities(unitTestEtherCtx, wsdb.NullSpaceName)
+
+	mockWsdbCacheTypespaceFetchPanic(suite.common.mockSess)
+
+	var tsWg sync.WaitGroup
+	var tsList1, tsList2 []string
+	// channel used to create concurrent TS list requests
+	tsListPause := make(chan bool)
+
+	suite.cache.enableCqlRefresh(unitTestEtherCtx)
+
+	tsWg.Add(1)
+	go func() {
+		defer tsWg.Done()
+		var err error
+		var call1Ctx = &ether.StdCtx{RequestID: 1}
+		<-tsListPause
+
+		tsList1, err = suite.common.wsdb.TypespaceList(call1Ctx)
+		suite.Require().Error(err, "call1 expected did not get error")
+		suite.Require().Equal("PanicOnFetch", err.Error(),
+			"Unexpected error %s in call1", err.Error())
+	}()
+
+	tsWg.Add(1)
+	go func() {
+		defer tsWg.Done()
+		var err error
+		var call2Ctx = &ether.StdCtx{RequestID: 2}
+		<-tsListPause
+
+		tsList2, err = suite.common.wsdb.TypespaceList(call2Ctx)
+		suite.Require().Error(err, "call2 expected did not get error")
+		suite.Require().Equal("PanicOnFetch", err.Error(),
+			"Unexpected error %s in call2", err.Error())
+	}()
+
+	// let go the TS list APIs
+	close(tsListPause)
+
+	// wait for both TypespaceList API calls to complete
+	tsWg.Wait()
+
+}
+
+// caller1 and caller2 are two concurrent List requests
+// for the same cache path. They should never see nil
+// data if the cache entry is not setup. The cache entry
+// may not be setup if the cache is just started up or if
+// that cache entity was recently deleted from cache.
+func (suite *wsdbCacheTestSuite) TestCacheConcNsListWhenEmpty() {
+	suite.cache.InsertEntities(unitTestEtherCtx, "t1")
+
+	nsRows := mockDbRows{[]interface{}{"n1"}}
+	nsIter := new(MockIter)
+	nsVals := []interface{}{"t1"}
+
+	var nsWg sync.WaitGroup
+	var nsList1, nsList2 []string
+	// buffered chan since db will be queried twice and we want it to block
+	// on the second query.
+	nsFetchPause := make(chan bool)
+
+	mockWsdbCacheNamespaceFetch(suite.common.mockSess, nsRows, nsVals,
+		nsIter, nsFetchPause)
+
+	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour)
+	suite.cache.enableCqlRefresh(unitTestEtherCtx, "t1")
+
+	nsWg.Add(1)
+	go func() {
+		defer nsWg.Done()
+		var err error
+		var call1Ctx = &ether.StdCtx{RequestID: 1}
+		nsList1, err = suite.common.wsdb.NamespaceList(call1Ctx, "t1")
+		suite.Require().NoError(err, "NamespaceList call1 returned error : %v", err)
+	}()
+
+	// wait for fetch to stall
+	<-nsFetchPause
+
+	// fetched data contains t1 typespace
+
+	// now start another TypespaceList API call which should see that a
+	// refresh is in progress, block and both TypespaceList API calls
+	// should complete with the t1 as the typespace
+
+	nsWg.Add(1)
+	go func() {
+		defer nsWg.Done()
+		var err error
+		var call2Ctx = &ether.StdCtx{RequestID: 2}
+		nsList2, err = suite.common.wsdb.NamespaceList(call2Ctx, "t1")
+		suite.Require().NoError(err, "NamespaceList call2 returned error : %v", err)
+	}()
+
+	// unpause the DB fetch
+	nsFetchPause <- true
+
+	// wait for both TypespaceList API calls to complete
+	nsWg.Wait()
+
+	suite.Require().Contains(nsList1, "n1",
+		"Expected n1 namespace not seen in call1")
+	suite.Require().Contains(nsList2, "n1",
+		"Expected n1 namespace not seen in call2")
+
+}
+
+// caller1 and caller2 are two concurrent List requests
+// for the same cache path. They should never see nil
+// data if the cache entry is not setup. The cache entry
+// may not be setup if the cache is just started up or if
+// that cache entity was recently deleted from cache.
+func (suite *wsdbCacheTestSuite) TestCacheConcWsListWhenEmpty() {
+	suite.cache.InsertEntities(unitTestEtherCtx, "t1", "n1")
+
+	var wsWg sync.WaitGroup
+	var wsMap1, wsMap2 map[string]wsdb.WorkspaceNonce
+	wsFetchPause := make(chan bool)
+
+	wsRows := mockDbRows{{"w1"}}
+	wsIter := new(MockIter)
+	wsVals := []interface{}{"t1", "n1"}
+	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
+		wsIter, wsFetchPause)
+	mockWsdbKeyGet(suite.common.mockSess, "t1", "n1", "w1",
+		[]byte(nil), 7, nil)
+
+	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour)
+	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour, "t1")
+	suite.cache.enableCqlRefresh(unitTestEtherCtx, "t1", "n1")
+
+	wsWg.Add(1)
+	go func() {
+		defer wsWg.Done()
+		var err error
+		var call1Ctx = &ether.StdCtx{RequestID: 1}
+		wsMap1, err = suite.common.wsdb.WorkspaceList(call1Ctx, "t1", "n1")
+		suite.Require().NoError(err, "WorkspaceList call1 returned error : %v", err)
+	}()
+
+	// wait for fetch to stall
+	<-wsFetchPause
+
+	// fetched data contains t1 typespace
+
+	// now start another WorkspaceList API call which should see that a
+	// refresh is in progress, block and both TypespaceList API calls
+	// should complete with the t1 as the typespace
+
+	wsWg.Add(1)
+	go func() {
+		defer wsWg.Done()
+		var err error
+		var call2Ctx = &ether.StdCtx{RequestID: 2}
+		wsMap2, err = suite.common.wsdb.WorkspaceList(call2Ctx, "t1", "n1")
+		suite.Require().NoError(err, "WorkspaceList call2 returned error : %v", err)
+	}()
+
+	// unpause the DB fetch
+	wsFetchPause <- true
+
+	// wait for both WorkspaceList API calls to complete
+	wsWg.Wait()
+
+	suite.Require().Contains(wsMap1, "w1",
+		"Expected w1 workspace not seen in call1")
+	suite.Require().Contains(wsMap2, "w1",
+		"Expected w1 workspace not seen in call2")
+
+	suite.Require().Equal(int(wsMap1["w1"]), 7,
+		"Expected nonce 7 not see in wsMap1, %d", wsMap1["w1"])
+	suite.Require().Equal(int(wsMap2["w1"]), 7,
+		"Expected nonce 7 not see in wsMap2, %d", wsMap2["w1"])
 }
 
 // TODO: once the APIs return errors, add appropriate test cases
