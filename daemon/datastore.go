@@ -105,6 +105,9 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 			return &buf
 		}
 
+		c.Elog(qlog.LogDaemon, "Couldn't get from any store: %s. Key %s",
+			err.Error(), key.String())
+
 		return nil
 	})
 
@@ -119,9 +122,6 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	if bufResult != nil {
 		return bufResult
 	}
-	
-	c.Elog(qlog.LogDaemon, "Couldn't get from any store: %s. Key %s",
-		err.Error(), key.String())
 
 	return nil
 }
