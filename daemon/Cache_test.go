@@ -6,9 +6,11 @@ package daemon
 // Test the internal datastore cache
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 )
@@ -17,6 +19,9 @@ type testDataStore struct {
 	datastore  quantumfs.DataStore
 	shouldRead bool
 	test       *testHelper
+
+	countLock  utils.DeferableMutex
+	getCount   map[quantumfs.ObjectKey]int
 }
 
 func newTestDataStore(test *testHelper) *testDataStore {
@@ -24,6 +29,7 @@ func newTestDataStore(test *testHelper) *testDataStore {
 		datastore:  processlocal.NewDataStore(""),
 		shouldRead: true,
 		test:       test,
+		getCount:   make(map[quantumfs.ObjectKey]int),
 	}
 }
 
@@ -32,6 +38,12 @@ func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 	store.test.Assert(store.shouldRead, "Received unexpected Get for %s",
 		key.String())
+
+	func () {
+		defer store.countLock.Lock().Unlock()
+		store.getCount[key]++
+	}()
+
 	return store.datastore.Get(c, key, buf)
 }
 
@@ -122,7 +134,8 @@ func TestCacheLru(t *testing.T) {
 		test.Log("Verifying LRU")
 		freeSpace := cacheSize % quantumfs.ObjectKeyLength
 		test.Assert(datastore.cache.lru.Len() == lruNum,
-			"Incorrect Lru size %d != %d ", lruNum, datastore.cache.lru.Len())
+			"Incorrect Lru size %d != %d ", lruNum,
+			datastore.cache.lru.Len())
 		test.Assert(datastore.cache.freeSpace == freeSpace,
 			"Incorrect Free space %d != %d", freeSpace,
 			datastore.cache.freeSpace)
@@ -192,7 +205,8 @@ func TestCacheLruDiffSize(t *testing.T) {
 		}
 		test.Log("Verifying LRU")
 		test.Assert(datastore.cache.lru.Len() == lruNum,
-			"Incorrect Lru size %d != %d ", lruNum, datastore.cache.lru.Len())
+			"Incorrect Lru size %d != %d ", lruNum,
+			datastore.cache.lru.Len())
 		freeSpace := 10*quantumfs.ObjectKeyLength + 12
 		test.Assert(datastore.cache.freeSpace == freeSpace,
 			"Incorrect Free space %d != %d", freeSpace,
@@ -255,8 +269,8 @@ func TestCacheCaching(t *testing.T) {
 		// Since the size of keys[1] is doubled, so it is removed from the
 		// cache, so the usage of space is 99*quantumfs.ObjectKeyLength
 		test.Assert(datastore.cache.freeSpace == quantumfs.ObjectKeyLength,
-			"Failed memory management: %d != %d", datastore.cache.freeSpace,
-			quantumfs.ObjectKeyLength)
+			"Failed memory management: %d != %d",
+			datastore.cache.freeSpace, quantumfs.ObjectKeyLength)
 
 		backingStore.shouldRead = false
 
@@ -274,5 +288,48 @@ func TestCacheCaching(t *testing.T) {
 			buf := datastore.Get(c, keys[i])
 			test.Assert(buf != nil, "Failed to get block %d", i)
 		}
+	})
+}
+
+func TestCacheCombining(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		entryNum := 256
+		c, backingStore, datastore, keys := createDatastore(test,
+			entryNum, 100*quantumfs.ObjectKeyLength)
+		defer datastore.shutdown()
+
+		// Run parallel gets and check to ensure that we only Get once
+		getsBefore := func () int {
+			defer backingStore.countLock.Lock().Unlock()
+			return backingStore.getCount[keys[0]]
+		} ()
+
+		// Pre-lock the countLock to block the next Gets so we know that
+		// they happen in parallel
+		backingStore.countLock.Lock()
+
+		var wg sync.WaitGroup
+		for j := 0; j < 10; j++ {
+			wg.Add(1)
+			go func () {
+				datastore.Get(c, keys[0])
+				wg.Done()
+			} ()
+		}
+
+		// now unlock the lock to let anything through
+		backingStore.countLock.Unlock()
+		wg.Wait()
+
+		getsAfter := func () int {
+			defer backingStore.countLock.Lock().Unlock()
+			return backingStore.getCount[keys[0]]
+		} ()
+
+		// Even though we bunched Gets for the same block in parallel,
+		// they should have been combined and only one Get triggered
+		test.Assert(getsAfter == getsBefore + 1,
+			"Gets not properly combined: %d vs %d", getsBefore,
+			getsAfter)
 	})
 }

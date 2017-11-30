@@ -139,7 +139,7 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buf quantumfs.Buffer) error {
 		panic("Attempted to set embedded key")
 	}
 	buf_ := buf.(*buffer)
-	store.cache.storeInCache(c, buf_)
+	store.cache.storeInCache(c, key, buf_)
 	return store.durableStore.Set(c, key, buf)
 }
 
@@ -466,7 +466,7 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 		}
 
 		// Launch a go thread to fetch and store the result
-		go cc.storeInCache(c, fetch())
+		go cc.storeInCache(c, key, fetch())
 	}
 
 	// Waiting for data, so add on a channel
@@ -479,22 +479,33 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	return nil, waitChan
 }
 
-func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf *buffer) {
+func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+	buf *buffer) {
+
 	defer c.FuncIn(qlog.LogDaemon, "dataStore::storeInCache", "Key: %s",
-		buf.key.String()).Out()
+		key.String()).Out()
 
 	defer cc.lock.Lock().Unlock()
 
 	// Satisfy any channels waiting for this data, no matter what
-	entry, exists := cc.entryMap[buf.key.String()]
+	entry, exists := cc.entryMap[key.String()]
 	if exists && entry.buf == nil && entry.concurrents != nil {
 		// Send copies to each waiter and then nullify the queue of them
 		for _, channel := range entry.concurrents {
 			var qfsBuffer quantumfs.Buffer
-			qfsBuffer = buf.clone()
+			if buf != nil {
+				qfsBuffer = buf.clone()
+			}
+
 			channel <- qfsBuffer
 		}
 		entry.concurrents = nil
+	}
+
+	// Empty buffer, nothing to do but clear the entry
+	if buf == nil {
+		delete (cc.entryMap, key.String())
+		return
 	}
 
 	// Now determine whether we can actually store in the cache
