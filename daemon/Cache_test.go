@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 type testDataStore struct {
@@ -20,8 +20,8 @@ type testDataStore struct {
 	shouldRead bool
 	test       *testHelper
 
-	countLock  utils.DeferableMutex
-	getCount   map[quantumfs.ObjectKey]int
+	countLock utils.DeferableMutex
+	getCount  map[quantumfs.ObjectKey]int
 }
 
 func newTestDataStore(test *testHelper) *testDataStore {
@@ -39,7 +39,7 @@ func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	store.test.Assert(store.shouldRead, "Received unexpected Get for %s",
 		key.String())
 
-	func () {
+	func() {
 		defer store.countLock.Lock().Unlock()
 		store.getCount[key]++
 	}()
@@ -302,10 +302,10 @@ func TestCacheCombining(t *testing.T) {
 		checkKey := keys[1]
 
 		// Run parallel gets and check to ensure that we only Get once
-		getsBefore := func () int {
+		getsBefore := func() int {
 			defer backingStore.countLock.Lock().Unlock()
 			return backingStore.getCount[checkKey]
-		} ()
+		}()
 
 		// Pre-lock the countLock to block the next Gets so we know that
 		// they happen in parallel
@@ -314,24 +314,24 @@ func TestCacheCombining(t *testing.T) {
 		var wg sync.WaitGroup
 		for j := 0; j < 10; j++ {
 			wg.Add(1)
-			go func () {
+			go func() {
 				datastore.Get(c, checkKey)
 				wg.Done()
-			} ()
+			}()
 		}
 
 		// now unlock the lock to let anything through
 		backingStore.countLock.Unlock()
 		wg.Wait()
 
-		getsAfter := func () int {
+		getsAfter := func() int {
 			defer backingStore.countLock.Lock().Unlock()
 			return backingStore.getCount[checkKey]
-		} ()
+		}()
 
 		// Even though we bunched Gets for the same block in parallel,
 		// they should have been combined and only one Get triggered
-		test.Assert(getsAfter == getsBefore + 1,
+		test.Assert(getsAfter == getsBefore+1,
 			"Gets not properly combined: %d vs %d", getsBefore,
 			getsAfter)
 	})
