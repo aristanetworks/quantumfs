@@ -408,7 +408,7 @@ func (buf *buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
 }
 
 type cacheEntry struct {
-	data *buffer
+	buf *buffer
 	concurrents	[]chan quantumfs.Buffer
 }
 
@@ -416,7 +416,7 @@ type combiningCache struct {
 	lock utils.DeferableMutex
 
 	lru       list.List // Back is most recently used
-	cache     map[string]*cacheEntry
+	entryMap     map[string]*cacheEntry
 
 	cacheSize int
 	freeSpace int
@@ -426,7 +426,7 @@ func newCombiningCache(cacheSize int) *combiningCache {
 	entryNum := cacheSize / 102400
 
 	return &combiningCache {
-		cache:        make(map[string]*cacheEntry, entryNum),
+		entryMap:        make(map[string]*cacheEntry, entryNum),
 		cacheSize:    cacheSize,
 		freeSpace:    cacheSize,
 	}
@@ -438,7 +438,7 @@ func (cc *combiningCache) shutdown() {
 	// Prevent future additions
 	cc.cacheSize = -1
 	cc.freeSpace = -1
-	cc.cache = make(map[string]*cacheEntry, 0)
+	cc.entryMap = make(map[string]*cacheEntry, 0)
 	cc.lru = list.List{}
 }
 
@@ -450,18 +450,18 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 	defer cc.lock.Lock().Unlock()
 
-	entry, exists := cc.cache[key.String()];
+	entry, exists := cc.entryMap[key.String()];
 	if exists {
 		// If the entry data is nil, then we need to wait for the result
-		if entry.data != nil {
+		if entry.buf != nil {
 			// refresh an existing cached entry
-			cc.lru.MoveToBack(entry.data.lruElement)
-			return entry.data.clone(), nil
+			cc.lru.MoveToBack(entry.buf.lruElement)
+			return entry.buf.clone(), nil
 		}
 	} else {
 		// Prepare a placeholder to indicate the result is being fetched
 		entry = &cacheEntry{
-			data:		nil,
+			buf:		nil,
 			concurrents: 	make([]chan quantumfs.Buffer, 0),
 		}
 
@@ -474,7 +474,7 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	entry.concurrents = append(entry.concurrents, waitChan)
 	// Note: the cache entry will only get pushed into the lru queue when its
 	// data is set into the cache
-	cc.cache[key.String()] = entry
+	cc.entryMap[key.String()] = entry
 
 	return nil, waitChan
 }
@@ -486,8 +486,8 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf *buffer) {
 	defer cc.lock.Lock().Unlock()
 
 	// Satisfy any channels waiting for this data, no matter what
-	entry, exists := cc.cache[buf.key.String()]
-	if exists && entry.data == nil && entry.concurrents != nil {
+	entry, exists := cc.entryMap[buf.key.String()]
+	if exists && entry.buf == nil && entry.concurrents != nil {
 		// Send copies to each waiter and then nullify the queue of them
 		for _, channel := range entry.concurrents {
 			var qfsBuffer quantumfs.Buffer
@@ -506,12 +506,12 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf *buffer) {
 		}
 		// ensure we remove any entries that may signal that we're waiting
 		// for this data to come back any more
-		delete (cc.cache, buf.key.String())
+		delete (cc.entryMap, buf.key.String())
 		return
 	}
 
 	
-	if exists && entry.data != nil {
+	if exists && entry.buf != nil {
 		// It is possible when storing dirty data that we could reproduce the
 		// contents which already exist in the cache. We don't want to have
 		// the same data in the LRU queue twice as that is wasteful, though
@@ -539,10 +539,10 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, buf *buffer) {
 		// placed in the lru yet and as such will never be evicted
 		evictedBuf := cc.lru.Remove(cc.lru.Front()).(*buffer)
 		cc.freeSpace += evictedBuf.Size()
-		delete(cc.cache, evictedBuf.key.String())
+		delete(cc.entryMap, evictedBuf.key.String())
 	}
 	buf.lruElement = cc.lru.PushBack(buf)
-	cc.cache[buf.key.String()] = &cacheEntry {
-		data:	buf,
+	cc.entryMap[buf.key.String()] = &cacheEntry {
+		buf:	buf,
 	}
 }

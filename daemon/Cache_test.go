@@ -114,8 +114,8 @@ func TestCacheLru(t *testing.T) {
 			"Incorrect Cache size %d != %d", datastore.cache.cacheSize,
 			cacheSize)
 		lruNum := cacheSize / quantumfs.ObjectKeyLength
-		for _, v := range datastore.cache.cache {
-			i := int(v.data.data[1]) + int(v.data.data[2])*256
+		for _, v := range datastore.cache.entryMap {
+			i := int(v.buf.data[1]) + int(v.buf.data[2])*256
 			test.Assert(i <= lruNum,
 				"Unexpected block in cache %d", i)
 		}
@@ -185,8 +185,8 @@ func TestCacheLruDiffSize(t *testing.T) {
 		// Since keys[71] is too large, cache will contain the first 70
 		// entries, and we can calculate the free space accordingly
 		lruNum := 70
-		for _, v := range datastore.cache.cache {
-			i := int(v.data.data[1]) + int(v.data.data[2])*256
+		for _, v := range datastore.cache.entryMap {
+			i := int(v.buf.data[1]) + int(v.buf.data[2])*256
 			test.Assert(i <= lruNum,
 				"Unexpected block in cache %d", i)
 		}
@@ -262,10 +262,10 @@ func TestCacheCaching(t *testing.T) {
 
 		// Because of the size constraint, the least recent used entry
 		// keys[1] should be deleted from cache
-		_, exists := datastore.cache.cache[keys[1].String()]
+		_, exists := datastore.cache.entryMap[keys[1].String()]
 		test.Assert(!exists, "Failed to forget block 1")
 		// The content is oversized, so it should be stored in the cache
-		_, exists = datastore.cache.cache[keys[257].String()]
+		_, exists = datastore.cache.entryMap[keys[257].String()]
 		test.Assert(!exists, "Failed to forget block 257")
 
 		// Reading again should come entirely from the cache. If not
