@@ -297,11 +297,14 @@ func TestCacheCombining(t *testing.T) {
 		c, backingStore, datastore, keys := createDatastore(test,
 			entryNum, 100*quantumfs.ObjectKeyLength)
 		defer datastore.shutdown()
+		fillDatastore(c, test, backingStore, datastore, entryNum, keys)
+
+		checkKey := keys[1]
 
 		// Run parallel gets and check to ensure that we only Get once
 		getsBefore := func () int {
 			defer backingStore.countLock.Lock().Unlock()
-			return backingStore.getCount[keys[0]]
+			return backingStore.getCount[checkKey]
 		} ()
 
 		// Pre-lock the countLock to block the next Gets so we know that
@@ -312,7 +315,7 @@ func TestCacheCombining(t *testing.T) {
 		for j := 0; j < 10; j++ {
 			wg.Add(1)
 			go func () {
-				datastore.Get(c, keys[0])
+				datastore.Get(c, checkKey)
 				wg.Done()
 			} ()
 		}
@@ -323,7 +326,7 @@ func TestCacheCombining(t *testing.T) {
 
 		getsAfter := func () int {
 			defer backingStore.countLock.Lock().Unlock()
-			return backingStore.getCount[keys[0]]
+			return backingStore.getCount[checkKey]
 		} ()
 
 		// Even though we bunched Gets for the same block in parallel,
