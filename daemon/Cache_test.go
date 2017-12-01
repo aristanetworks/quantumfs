@@ -321,7 +321,7 @@ func TestCacheCombining(t *testing.T) {
 			}()
 		}
 
-		test.WaitFor("All datastore Gets to queue up", func () bool {
+		test.WaitFor("All datastore Gets to queue up", func() bool {
 			defer datastore.cache.lock.Lock().Unlock()
 			keyEntry, exists := datastore.cache.entryMap[""+
 				checkKey.String()]

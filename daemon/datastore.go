@@ -401,7 +401,7 @@ func (buf *buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
 }
 
 type cacheEntry struct {
-	buf         *buffer
+	buf     *buffer
 	waiting []chan quantumfs.Buffer
 }
 
@@ -411,7 +411,7 @@ type combiningCache struct {
 	lru      list.List // Back is most recently used
 	entryMap map[string]*cacheEntry
 
-	size int
+	size      int
 	freeSpace int
 }
 
@@ -420,7 +420,7 @@ func newCombiningCache(cacheSize int) *combiningCache {
 
 	return &combiningCache{
 		entryMap:  make(map[string]*cacheEntry, entryNum),
-		size: cacheSize,
+		size:      cacheSize,
 		freeSpace: cacheSize,
 	}
 }
@@ -453,16 +453,16 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	} else {
 		// Prepare a placeholder to indicate the result is being fetched
 		entry = &cacheEntry{
-			buf:         nil,
+			buf:     nil,
 			waiting: make([]chan quantumfs.Buffer, 0),
 		}
 
 		// Asynchronously fetch and store the result
-		go func () {
+		go func() {
 			// Note: to prevent deadlock when testing we want to fetch
 			// in the goroutine
 			cc.storeInCache(c, key, fetch())
-		} ()
+		}()
 	}
 
 	// Waiting for data, so add on a channel
