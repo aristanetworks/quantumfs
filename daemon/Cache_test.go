@@ -122,8 +122,8 @@ func TestCacheLru(t *testing.T) {
 			test.Assert(buf != nil, "Failed retrieving block %d", i)
 		}
 		test.Log("Verifying cache")
-		test.Assert(datastore.cache.cacheSize == cacheSize,
-			"Incorrect Cache size %d != %d", datastore.cache.cacheSize,
+		test.Assert(datastore.cache.size == cacheSize,
+			"Incorrect Cache size %d != %d", datastore.cache.size,
 			cacheSize)
 		lruNum := cacheSize / quantumfs.ObjectKeyLength
 		for _, v := range datastore.cache.entryMap {
@@ -170,7 +170,7 @@ func TestCacheLruDiffSize(t *testing.T) {
 			entryNum, cacheSize)
 		defer datastore.shutdown()
 
-		// Add a content with size greater than datastore.cacheSize, and set
+		// Add a content with size greater than datastore.size, and set
 		// different sizes of several keys in advance.
 		createBuffer(c, test, backingStore, datastore, keys, 1, 2)
 		createBuffer(c, test, backingStore, datastore, keys, 4, 15)
@@ -192,8 +192,8 @@ func TestCacheLruDiffSize(t *testing.T) {
 		test.Assert(buf != nil, "Failed retrieving block 257")
 
 		test.Log("Verifying cache")
-		test.Assert(datastore.cache.cacheSize == cacheSize,
-			"Incorrect cache size %d != %d", datastore.cache.cacheSize,
+		test.Assert(datastore.cache.size == cacheSize,
+			"Incorrect cache size %d != %d", datastore.cache.size,
 			cacheSize)
 		// Since keys[71] is too large, cache will contain the first 70
 		// entries, and we can calculate the free space accordingly
@@ -249,7 +249,7 @@ func TestCacheCaching(t *testing.T) {
 			entryNum, 100*quantumfs.ObjectKeyLength)
 		defer datastore.shutdown()
 
-		// Add a content with size greater than datastore.cacheSize, and
+		// Add a content with size greater than datastore.size, and
 		// double the size of keys[1] in advance.
 		createBuffer(c, test, backingStore, datastore, keys, 257, 101)
 		createBuffer(c, test, backingStore, datastore, keys, 1, 2)
@@ -328,7 +328,7 @@ func TestCacheCombining(t *testing.T) {
 			if !exists {
 				return false
 			}
-			return len(keyEntry.concurrents) == parallelReqs
+			return len(keyEntry.waiting) == parallelReqs
 		})
 
 		// now unlock the lock to let anything through
