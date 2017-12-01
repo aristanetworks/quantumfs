@@ -467,7 +467,11 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 		}
 
 		// Launch a go thread to fetch and store the result
-		go cc.storeInCache(c, key, fetch())
+		go func () {
+			// Note: to prevent deadlock when testing we want to fetch
+			// in the goroutine
+			cc.storeInCache(c, key, fetch())
+		} ()
 	}
 
 	// Waiting for data, so add on a channel

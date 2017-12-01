@@ -311,8 +311,9 @@ func TestCacheCombining(t *testing.T) {
 		// they happen in parallel
 		backingStore.countLock.Lock()
 
+		parallelReqs := 10
 		var wg sync.WaitGroup
-		for j := 0; j < 10; j++ {
+		for j := 0; j < parallelReqs; j++ {
 			wg.Add(1)
 			go func() {
 				datastore.Get(c, checkKey)
@@ -320,8 +321,20 @@ func TestCacheCombining(t *testing.T) {
 			}()
 		}
 
+		test.WaitFor("All datastore Gets to queue up", func () bool {
+			defer datastore.cache.lock.Lock().Unlock()
+			keyEntry, exists := datastore.cache.entryMap[""+
+				checkKey.String()]
+			if !exists {
+				return false
+			}
+			return len(keyEntry.concurrents) == parallelReqs
+		})
+
 		// now unlock the lock to let anything through
 		backingStore.countLock.Unlock()
+
+		// wait for every call to finish
 		wg.Wait()
 
 		getsAfter := func() int {
