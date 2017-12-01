@@ -9,6 +9,8 @@ ExecStart=/usr/sbin/qloggerdb -db influxdb /dev/shm/quantumfs/qlog
 ExecStop=/usr/bin/killall -SIGHUP qloggerdb
 User=root
 KillMode=none
+Restart=always
+MemoryMax=20G
 
 [Install]
 WantedBy=multi-user.target
