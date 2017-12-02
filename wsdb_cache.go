@@ -6,7 +6,6 @@ package cql
 import (
 	"encoding/hex"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/aristanetworks/ether"
@@ -249,8 +248,8 @@ func (cw *cacheWsdb) WorkspaceIsImmutable(c ether.Ctx, typespace string, namespa
 		workspace).Out()
 
 	immutable, err := cw.base.WorkspaceIsImmutable(c, typespace, namespace, workspace)
-	c.Vlog("cacheWsdb::WorkspaceIsImmutable %s/%s/%s immutable:%s", typespace,
-		namespace, workspace, strconv.FormatBool(immutable))
+	c.Vlog("cacheWsdb::WorkspaceIsImmutable %s/%s/%s immutable:%t", typespace,
+		namespace, workspace, immutable)
 	return immutable, err
 }
 

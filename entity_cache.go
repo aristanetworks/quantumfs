@@ -6,7 +6,6 @@ package cql
 import (
 	"fmt"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -282,8 +281,9 @@ func (ec *entityCache) getLastEntityGroup(c ether.Ctx, group *entityGroup,
 func (ec *entityCache) checkDeleteEntity(c ether.Ctx, group *entityGroup, local bool,
 	entityPath ...string) {
 
-	defer c.FuncIn("cache::checkDeleteEntity", "%s local:%s",
-		strings.Join(entityPath, "/"), local).Out()
+	defer c.FuncIn("cache::checkDeleteEntity", "%s local:%t",
+		strings.Join(entityPath, "/"),
+		local).Out()
 
 	// Its possible to specify only some leading portion
 	// of the complete entityPath. Even though its a delete
@@ -296,6 +296,7 @@ func (ec *entityCache) checkDeleteEntity(c ether.Ctx, group *entityGroup, local 
 	}
 
 	if group = ec.getLastEntityGroup(c, group, entityPath...); group == nil {
+		c.Vlog("Skipping delete %s", strings.Join(entityPath, "/"))
 		return
 	}
 
@@ -317,6 +318,7 @@ func (ec *entityCache) checkDeleteEntity(c ether.Ctx, group *entityGroup, local 
 		}
 		group.entities[entity].parent = nil
 		// this turns the entityGroup pointed by entity into garbage
+		c.Vlog("Deleting %s", entity)
 		delete(group.entities, entity)
 
 		if local && group.fetchInProgress {
@@ -563,11 +565,11 @@ const (
 
 func (g *entityGroup) refreshNeeded(c ether.Ctx) (action refreshAction) {
 	defer c.FuncIn("cache::refreshNeeded",
-		"p:%s c:%d e:%s now:%s d:%s",
+		"p:%s c:%d e:%s now:%s d:%t",
 		g.parentEntity, g.entityCount,
 		g.expiresAt.Format(time.RFC3339Nano),
 		time.Now().Format(time.RFC3339Nano),
-		strconv.FormatBool(g.detached)).Out()
+		g.detached).Out()
 
 	if g.cache.neverExpires {
 		return refreshIgnore
@@ -606,17 +608,17 @@ func (g *entityGroup) refreshNeeded(c ether.Ctx) (action refreshAction) {
 // called under rwMutex held in write mode
 func (g *entityGroup) checkInsertEntity(c ether.Ctx, entity string, local bool) {
 	defer c.FuncIn("cache::checkInsertEntity",
-		"e:%s l:%s p:%s c:%d d:%s",
-		entity, strconv.FormatBool(local), g.parentEntity,
-		g.entityCount, strconv.FormatBool(g.detached)).Out()
+		"e:%s l:%t p:%s c:%d d:%t",
+		entity, local, g.parentEntity,
+		g.entityCount, g.detached).Out()
 
 	_, exists := g.entities[entity]
 
 	if !exists {
 		c.Vlog("cache::checkInsertEntity entity does not exist for "+
-			"e:%s l:%s p:%s c:%d d:%s",
-			entity, strconv.FormatBool(local), g.parentEntity,
-			g.entityCount, strconv.FormatBool(g.detached))
+			"e:%s l:%t p:%s c:%d d:%t",
+			entity, local, g.parentEntity,
+			g.entityCount, g.detached)
 		newGroup := newEntityGroup(g, entity, g.cache)
 		g.entities[entity] = newGroup
 		g.entityCount++
@@ -638,9 +640,9 @@ func (g *entityGroup) checkInsertEntity(c ether.Ctx, entity string, local bool) 
 
 // called under rwMutex read lock
 func (g *entityGroup) getListCopy(c ether.Ctx) []string {
-	defer c.FuncIn("cache::getListCopy", "p:%s c:%d d:%s",
+	defer c.FuncIn("cache::getListCopy", "p:%s c:%d d:%t",
 		g.parentEntity, g.entityCount,
-		strconv.FormatBool(g.detached)).Out()
+		g.detached).Out()
 
 	count := g.entityCount
 	newList := make([]string, 0, count)
@@ -659,8 +661,8 @@ func (g *entityGroup) getListCopy(c ether.Ctx) []string {
 // invoked under rwMutex write lock
 func (g *entityGroup) mergeLocalUpdates(c ether.Ctx, fetchData map[string]bool) {
 	defer c.FuncIn("cache::mergeLocalUpdates", "p:%s c:%d "+
-		"d:%s lI:%d lD:%d", g.parentEntity, g.entityCount,
-		strconv.FormatBool(g.detached), len(g.concLocalInserts),
+		"d:%t lI:%d lD:%d", g.parentEntity, g.entityCount,
+		g.detached, len(g.concLocalInserts),
 		len(g.concLocalDeletes)).Out()
 
 	mergedInserts := false
@@ -727,9 +729,9 @@ func (g *entityGroup) reapFetchError() error {
 // No locks should be held when calling this function.
 func (g *entityGroup) refresh(c ether.Ctx, fetchData map[string]bool,
 	ferr error) error {
-	defer c.FuncIn("cache::refresh", "p:%s c:%d d:%s",
+	defer c.FuncIn("cache::refresh", "p:%s c:%d d:%t",
 		g.parentEntity, g.entityCount,
-		strconv.FormatBool(g.detached)).Out()
+		g.detached).Out()
 
 	// takes the fetchList and merges it to group.entities under write lock
 	g.cache.rwMutex.Lock()

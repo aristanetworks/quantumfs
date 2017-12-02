@@ -1255,7 +1255,6 @@ func (suite *wsdbCacheTestSuite) TestCacheConcNsListWhenEmpty() {
 		"Expected n1 namespace not seen in call1")
 	suite.Require().Contains(nsList2, "n1",
 		"Expected n1 namespace not seen in call2")
-
 }
 
 // caller1 and caller2 are two concurrent List requests

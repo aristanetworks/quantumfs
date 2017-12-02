@@ -13,7 +13,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/aristanetworks/ether"
@@ -606,9 +605,9 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace, nc.cfName
 func (nc *noCacheWsdb) wsdbImmutablePut(c ether.Ctx, typespace string,
 	namespace string, workspace string, immutable bool) error {
 
-	defer c.FuncIn("noCacheWsdb::wsdbImmutablePut", "%s/%s/%s immutable: %s",
+	defer c.FuncIn("noCacheWsdb::wsdbImmutablePut", "%s/%s/%s immutable: %t",
 		typespace, namespace, workspace,
-		strconv.FormatBool(immutable)).Out()
+		immutable).Out()
 
 	qryStr := fmt.Sprintf(`
 UPDATE %s.%s
