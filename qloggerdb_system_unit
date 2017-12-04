@@ -10,7 +10,7 @@ ExecStop=/usr/bin/killall -SIGHUP qloggerdb
 User=root
 KillMode=none
 Restart=always
-MemoryMax=20G
+MemoryLimit=20G
 
 [Install]
 WantedBy=multi-user.target
