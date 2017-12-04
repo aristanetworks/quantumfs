@@ -6,6 +6,7 @@ package utils
 import (
 	"io/ioutil"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -39,82 +40,120 @@ func (s *odsTests) SetupTest() {
 	checkSetup(s)
 }
 
-func (s *odsTests) TestOdsInsert() {
+func (s *odsTests) TestOdsInsertElem() {
 	element := "Insert"
-	present, err := s.ods.Insert(element)
-	s.Require().NoError(err, "Failure in Insert")
-	s.Require().Equal(present, false, "Element present")
+	present, err := s.ods.InsertElem(element)
+	s.Require().NoError(err, "Failure in InsertElem")
+	s.Require().Equal(false, present, "Element present")
 }
 
-func (s *odsTests) TestOdsInsertAgain() {
+func (s *odsTests) TestOdsInsertElemAgain() {
 	element := "InsertAgain"
-	present, err := s.ods.Insert(element)
-	s.Require().Equal(present, false, "Element present")
-	s.Require().NoError(err, "Failure in Insert")
-	present, err = s.ods.Insert(element)
-	s.Require().NoError(err, "Failure in Insert Again")
-	s.Require().Equal(present, true, "Element not present")
+	present, err := s.ods.InsertElem(element)
+	s.Require().Equal(false, present, "Element present")
+	s.Require().NoError(err, "Failure in InsertElem")
+
+	present, err = s.ods.InsertElem(element)
+	s.Require().NoError(err, "Failure in InsertElem Again")
+	s.Require().Equal(true, present, "Element absent")
 }
 
-func (s *odsTests) TestOdsIsPresent() {
+func (s *odsTests) TestOdsInsertElemAgainParallel() {
+	element := "InsertAgainParallel"
+	var wg sync.WaitGroup
+	countBefore, err := s.ods.CountElem(element)
+	s.Require().NoError(err, "Failure in TotalUniqueElems")
+
+	insertFunc := func() {
+		defer wg.Done()
+		_, err := s.ods.InsertElem(element)
+		s.Require().NoError(err, "Failure in InsertElem")
+	}
+
+	numRoutines := 50
+	for i := 0; i < numRoutines; i++ {
+		wg.Add(1)
+		go insertFunc()
+	}
+
+	wg.Wait()
+	countAfter, err := s.ods.CountElem(element)
+	s.Require().NoError(err, "Failure in TotalUniqueElems")
+	s.Require().Equal(countBefore+uint64(numRoutines), countAfter,
+		"Incorrect count value present for InsertElem")
+}
+
+func (s *odsTests) TestOdsCountElem() {
 	element := "Present"
-	present, err := s.ods.Insert(element)
-	s.Require().NoError(err, "Failure in Insert")
-	s.Require().Equal(present, false, "Element present")
+	present, err := s.ods.InsertElem(element)
+	s.Require().NoError(err, "Failure in InsertElem")
+	s.Require().Equal(false, present, "Element present")
 
-	present = s.ods.IsPresent(element)
-	s.Require().Equal(present, true, "Element not present")
+	count, err := s.ods.CountElem(element)
+	s.Require().NoError(err, "Failure in CountElem")
+	s.Require().Equal(uint64(1), count, "Count Mismatch")
 }
 
-func (s *odsTests) TestOdsIsPresentFalse() {
+func (s *odsTests) TestOdsCountElemFalse() {
 	element := "PresentFalse"
-	present := s.ods.IsPresent(element)
-	s.Require().Equal(present, false, "Element found in the Set")
+	count, err := s.ods.CountElem(element)
+	s.Require().NoError(err, "Failure in CountElem")
+	s.Require().Equal(uint64(0), count, "Count Mismatch")
 }
 
 func (s *odsTests) TestOdsCount() {
 	element := "Count"
 
-	count, err := s.ods.Count()
-	s.Require().NoError(err, "Error in Count")
-	s.Require().Equal(count, 0, "Incorrect Count")
+	keyCount, err := s.ods.TotalUniqueElems()
+	s.Require().NoError(err, "Error in TotalUniqueElems")
+	s.Require().Equal(0, keyCount, "Incorrect TotalUniqueElems")
 
-	present, err := s.ods.Insert(element)
-	s.Require().NoError(err, "Failure in Insert")
-	s.Require().Equal(present, false, "Element present")
+	present, err := s.ods.InsertElem(element)
+	s.Require().NoError(err, "Failure in InsertElem")
+	s.Require().Equal(false, present, "Element present")
 
-	count, err = s.ods.Count()
-	s.Require().NoError(err, "Error in Count")
-	s.Require().Equal(count, 1, "Incorrect Count")
+	keyCount, err = s.ods.TotalUniqueElems()
+	s.Require().NoError(err, "Error in TotalUniqueElems")
+	s.Require().Equal(1, keyCount, "Incorrect TotalUniqueElems")
 }
 
-func (s *odsTests) TestOdsDelete() {
+func (s *odsTests) TestOdsDeleteElem() {
 	element := "Delete"
 
-	orgCount, err := s.ods.Count()
-	s.Require().NoError(err, "Error in Count")
-	s.Require().Equal(1, orgCount, "Incorrect Count")
+	orgTotalCount, err := s.ods.TotalUniqueElems()
+	s.Require().NoError(err, "Error in TotalUniqueElems")
 
-	present, err := s.ods.Insert(element)
-	s.Require().NoError(err, "Failure in Insert")
-	s.Require().Equal(present, false, "Element present")
+	present, err := s.ods.InsertElem(element)
+	s.Require().NoError(err, "Failure in InsertElem")
+	s.Require().Equal(false, present, "Element present")
 
-	present = s.ods.IsPresent(element)
-	s.Require().Equal(present, true, "Element not present")
+	count, err := s.ods.CountElem(element)
+	s.Require().NoError(err, "Failure in CountElem")
+	s.Require().Equal(uint64(1), count, "Count Mismatch")
 
-	err = s.ods.Delete(element)
-	s.Require().NoError(err, "Failure in Delete")
-	present = s.ods.IsPresent(element)
-	s.Require().Equal(present, false, "Element present")
+	err = s.ods.DeleteElem(element)
+	s.Require().NoError(err, "Failure in DeleteElem")
 
-	count, err := s.ods.Count()
-	s.Require().NoError(err, "Error in Count")
-	s.Require().Equal(orgCount, count, "Incorrect Count")
+	count, err = s.ods.CountElem(element)
+	s.Require().NoError(err, "Failure in CountElem")
+	s.Require().Equal(uint64(0), count, "Count Mismatch")
 
-	err = s.ods.Delete(element)
-	s.Require().NoError(err, "Failure in Delete")
-	present = s.ods.IsPresent(element)
-	s.Require().Equal(present, false, "Element present")
+	totalCount, err := s.ods.TotalUniqueElems()
+	s.Require().NoError(err, "Error in TotalUniqueElems")
+	s.Require().Equal(orgTotalCount, totalCount, "Incorrect TotalUniqueElems")
+
+	// Delete Again
+	err = s.ods.DeleteElem(element)
+	s.Require().NoError(err, "Failure in DeleteElem")
+
+	count, err = s.ods.CountElem(element)
+	s.Require().NoError(err, "Failure in CountElem")
+	s.Require().Equal(uint64(0), count, "Count Mismatch")
+
+	totalCount, err = s.ods.TotalUniqueElems()
+	s.Require().NoError(err, "Error in TotalUniqueElems")
+	s.Require().Equal(orgTotalCount, totalCount, "Incorrect TotalUniqueElems")
+
 }
 
 func TestOds(t *testing.T) {

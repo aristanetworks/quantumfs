@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/boltdb/bolt"
@@ -12,7 +13,8 @@ import (
 var bucketName = []byte("onDiskMap")
 
 // OnDiskSet mimics the a Set API
-// and is backed by a boltdb
+// and is backed by a boltdb.
+// Maintains count for evert element
 type OnDiskSet struct {
 	db *bolt.DB
 }
@@ -38,28 +40,46 @@ func NewOnDiskSet(dbFileName string) (*OnDiskSet, error) {
 	return ods, err
 }
 
-// Insert the given key  in the Set,
-// return true if Key was already Present
-func (ods *OnDiskSet) Insert(key string) (bool, error) {
+// InsertElem inserts the given element in the Set,
+// returns
+// 	true,  if Key was already Present
+// 	false, if Key was not Present
+func (ods *OnDiskSet) InsertElem(key string) (bool, error) {
 	present := false
 	err := ods.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketName)
+		count := uint64(0)
+		n := 0
 
 		// First check if the key is present
-		val := bucket.Get([]byte(key))
-		if val != nil {
+		countByteArray := bucket.Get([]byte(key))
+		if countByteArray != nil {
 			present = true
-			return nil
+			count, n = binary.Uvarint(countByteArray)
+			if n == 0 {
+				return fmt.Errorf("Too small buffer to store count")
+			} else if n < 0 {
+				return fmt.Errorf("value larger than 64 bits, overflow")
+			} else {
+				count++
+			}
+		} else {
+			count = 1
 		}
 
-		err := bucket.Put([]byte(key), []byte(nil))
+		countByteArray = make([]byte, binary.MaxVarintLen64)
+		n = binary.PutUvarint(countByteArray, count)
+		if n < 1 {
+			return fmt.Errorf("less than 1 byte written to buffer for count")
+		}
+		err := bucket.Put([]byte(key), countByteArray)
 		return err
 	})
 	return present, err
 }
 
-// Delete the given key from the Set
-func (ods *OnDiskSet) Delete(key string) error {
+// DeleteElem deletes the given element from the Set
+func (ods *OnDiskSet) DeleteElem(key string) error {
 	return ods.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketName)
 		err := bucket.Delete([]byte(key))
@@ -67,23 +87,31 @@ func (ods *OnDiskSet) Delete(key string) error {
 	})
 }
 
-// IsPresent returns true if the Key is present in the map
-func (ods *OnDiskSet) IsPresent(key string) bool {
-	present := false
-	_ = ods.db.View(func(tx *bolt.Tx) error {
+// CountElem returns the currentCount of the given element in the map
+func (ods *OnDiskSet) CountElem(key string) (uint64, error) {
+	count := uint64(0)
+	n := 0
+	err := ods.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketName)
-		val := bucket.Get([]byte(key))
-		if val != nil {
-			present = true
-			return nil
+		countByteArray := bucket.Get([]byte(key))
+		if countByteArray != nil {
+			count, n = binary.Uvarint(countByteArray)
+			if n == 0 {
+				return fmt.Errorf("Too small bugger to store countByteArray")
+			} else if n < 0 {
+				return fmt.Errorf("value larger than 64 bits, overflow")
+			} else {
+				return nil
+			}
 		}
-		return fmt.Errorf("Key not found")
+		return nil
 
 	})
-	return present
+	return count, err
 }
 
-func (ods *OnDiskSet) Count() (int, error) {
+// TotalUniqueElems returns the total number of elements in the set.
+func (ods *OnDiskSet) TotalUniqueElems() (int, error) {
 	count := 0
 	err := ods.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketName)
