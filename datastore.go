@@ -891,8 +891,6 @@ type ImmutableDirectoryRecord interface {
 func NewDirectoryRecord() *DirectRecord {
 	segment := capn.NewBuffer(nil)
 
-	// for more records, nlinksCache is 1. If we're a shallow copy of a hardlink,
-	// it must be a different value greater than 1
 	record := DirectRecord{
 		record: encoding.NewRootDirectoryRecord(segment),
 	}
@@ -901,8 +899,7 @@ func NewDirectoryRecord() *DirectRecord {
 }
 
 type DirectRecord struct {
-	record      encoding.DirectoryRecord
-	nlinksCache uint32
+	record encoding.DirectoryRecord
 }
 
 func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectRecord {
@@ -916,17 +913,8 @@ func (record *DirectRecord) Record() DirectRecord {
 	return *record
 }
 
-func (record *DirectRecord) SetNlinks(links uint32) {
-	record.nlinksCache = links
-}
-
 func (record *DirectRecord) Nlinks() uint32 {
-	// Unless otherwise set, this is a normal record with one link
-	if record.nlinksCache == 0 {
-		return 1
-	}
-
-	return record.nlinksCache
+	return 1
 }
 
 func (record *DirectRecord) Filename() string {
@@ -1050,7 +1038,6 @@ func (record *DirectRecord) Clone() DirectoryRecord {
 	newEntry.SetExtendedAttributes(record.ExtendedAttributes())
 	newEntry.SetContentTime(record.ContentTime())
 	newEntry.SetModificationTime(record.ModificationTime())
-	newEntry.SetNlinks(record.Nlinks())
 	newEntry.SetFileId(record.FileId())
 
 	return newEntry
