@@ -204,7 +204,7 @@ func (container *ChildContainer) directInodes() []InodeId {
 	inodes := make([]InodeId, 0, len(container.children))
 
 	for _, inodeId := range container.children {
-		isHardlink, _ := container.dir.hardlinkContainer.checkHardlink(
+		isHardlink, _ := container.dir.hardlinkTable.checkHardlink(
 			inodeId)
 		if !isHardlink {
 			inodes = append(inodes, inodeId)

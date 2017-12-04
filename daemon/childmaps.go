@@ -140,11 +140,11 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 		if _, isHardlink := entry.(*Hardlink); !isHardlink {
 			// hardlink leg creation time is stored in its ContentTime
 			entry = newHardlink(entry.Filename(), fileId,
-				entry.ContentTime(), cmap.dir.hardlinkContainer)
+				entry.ContentTime(), cmap.dir.hardlinkTable)
 		}
 
 		establishedInodeId :=
-			cmap.dir.hardlinkContainer.getHardlinkInodeId(c, fileId,
+			cmap.dir.hardlinkTable.getHardlinkInodeId(c, fileId,
 				inodeId)
 
 		// If you try to load a hardlink and provide a real inodeId, it
@@ -196,7 +196,7 @@ func (cmap *ChildMap) deleteChild(c *ctx, inodeId InodeId,
 
 	// This may be a hardlink that is due to be converted.
 	if hardlink, isHardlink := record.(*Hardlink); isHardlink && fixHardlinks {
-		newRecord, inodeId := cmap.dir.hardlinkContainer.removeHardlink(c,
+		newRecord, inodeId := cmap.dir.hardlinkTable.removeHardlink(c,
 			hardlink.fileId)
 
 		// Wsr says we're about to orphan the last hardlink copy
@@ -213,11 +213,11 @@ func (cmap *ChildMap) deleteChild(c *ctx, inodeId InodeId,
 		if !fixHardlinks {
 			return nil
 		}
-		if !cmap.dir.hardlinkContainer.hardlinkExists(c, link.fileId) {
+		if !cmap.dir.hardlinkTable.hardlinkExists(c, link.fileId) {
 			c.vlog("hardlink does not exist")
 			return nil
 		}
-		if cmap.dir.hardlinkContainer.hardlinkDec(link.fileId) {
+		if cmap.dir.hardlinkTable.hardlinkDec(link.fileId) {
 			// If the refcount was greater than one we shouldn't
 			// reparent.
 			c.vlog("Hardlink referenced elsewhere")
@@ -258,7 +258,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
 		recordCopy := *link
 
 		// Ensure we update the ref count for this hardlink
-		cmap.dir.hardlinkContainer.hardlinkInc(link.fileId)
+		cmap.dir.hardlinkTable.hardlinkInc(link.fileId)
 
 		return &recordCopy, fuse.OK
 	}
@@ -277,7 +277,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
 	cmap.delRecord(childId, childname)
 
 	c.vlog("Converting %s into a hardlink", childname)
-	newLink := cmap.dir.hardlinkContainer.newHardlink(c, childId, child)
+	newLink := cmap.dir.hardlinkTable.newHardlink(c, childId, child)
 
 	linkSrcCopy := newLink.Clone()
 	linkSrcCopy.SetFilename(childname)

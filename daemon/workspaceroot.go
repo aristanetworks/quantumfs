@@ -45,19 +45,20 @@ type linkEntry struct {
 	paths   []string
 }
 
-type HardlinkContainer interface {
+type HardlinkTable interface {
 	getHardlinkByInode(inodeId InodeId) (bool, quantumfs.DirectoryRecord)
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
 	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
 	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
 	getHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId) InodeId
-	removeHardlink(c *ctx, fileId quantumfs.FileId,
-	) (record quantumfs.DirectoryRecord, inodeId InodeId)
+	removeHardlink(c *ctx,
+		fileId quantumfs.FileId) (record quantumfs.DirectoryRecord,
+		inodeId InodeId)
 	hardlinkExists(c *ctx, fileId quantumfs.FileId) bool
 	hardlinkDec(fileId quantumfs.FileId) bool
 	hardlinkInc(fileId quantumfs.FileId)
-	newHardlink(c *ctx, inodeId InodeId, record quantumfs.DirectoryRecord,
-	) *Hardlink
+	newHardlink(c *ctx, inodeId InodeId,
+		record quantumfs.DirectoryRecord) *Hardlink
 	getHardlink(fileId quantumfs.FileId) (valid bool,
 		record quantumfs.DirectRecord)
 	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
@@ -268,7 +269,8 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 }
 
 func (wsr *WorkspaceRoot) instantiateHardlink(c *ctx, inodeId InodeId) Inode {
-	defer c.FuncIn("WorkspaceRoot::instantiateHardlink", "inode %d", inodeId).Out()
+	defer c.FuncIn("WorkspaceRoot::instantiateHardlink",
+		"inode %d", inodeId).Out()
 
 	hardlinkRecord := func() *quantumfs.DirectRecord {
 		defer wsr.linkLock.RLock().RUnlock()

@@ -30,7 +30,7 @@ type InodeConstructor func(c *ctx, name string, key quantumfs.ObjectKey,
 type Directory struct {
 	InodeCommon
 
-	hardlinkContainer HardlinkContainer
+	hardlinkTable HardlinkTable
 
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
@@ -70,7 +70,7 @@ func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 }
 
 func initDirectory(c *ctx, name string, dir *Directory,
-	hardlinkContainer HardlinkContainer,
+	hardlinkTable HardlinkTable,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
 	parent InodeId, treeLock *TreeLock) []InodeId {
 
@@ -84,7 +84,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.InodeCommon.accessed_ = 0
 	dir.setParent(parent)
 	dir.treeLock_ = treeLock
-	dir.hardlinkContainer = hardlinkContainer
+	dir.hardlinkTable = hardlinkTable
 	dir.baseLayerId = baseLayerId
 
 	container, uninstantiated := newChildContainer(c, dir, dir.baseLayerId)
@@ -104,18 +104,18 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	var dir Directory
 	dir.self = &dir
 
-	var hardlinkContainer HardlinkContainer
+	var hardlinkTable HardlinkTable
 	switch v := parent.(type) {
 	case *Directory:
-		hardlinkContainer = v.hardlinkContainer
+		hardlinkTable = v.hardlinkTable
 	case *WorkspaceRoot:
-		hardlinkContainer = v
+		hardlinkTable = v
 	default:
 		panic(fmt.Sprintf("Parent of inode %d is neither "+
 			"Directory nor WorkspaceRoot", inodeNum))
 	}
 
-	uninstantiated := initDirectory(c, name, &dir, hardlinkContainer,
+	uninstantiated := initDirectory(c, name, &dir, hardlinkTable,
 		baseLayerId, inodeNum, parent.inodeNum(), parent.treeLock())
 	return &dir, uninstantiated
 }
@@ -784,7 +784,7 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	if dir.self.isWorkspaceRoot() {
 		c.vlog("Checking hardlink table")
 		valid, linkRecord :=
-			dir.hardlinkContainer.getHardlinkByInode(inodeNum)
+			dir.hardlinkTable.getHardlinkByInode(inodeNum)
 		if valid {
 			c.vlog("Hardlink found")
 			return linkRecord
@@ -1608,9 +1608,9 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	}
 
 	// check if the child is a hardlink
-	isHardlink, _ := dir.hardlinkContainer.checkHardlink(inodeNum)
+	isHardlink, _ := dir.hardlinkTable.checkHardlink(inodeNum)
 	if isHardlink {
-		return dir.hardlinkContainer.instantiateHardlink(c, inodeNum), nil
+		return dir.hardlinkTable.instantiateHardlink(c, inodeNum), nil
 	}
 
 	// add a check incase there's an inconsistency
@@ -1755,7 +1755,7 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 	defer c.funcIn("Directory::markHardlinkPath").Out()
 
 	if dir.InodeCommon.isWorkspaceRoot() {
-		dir.hardlinkContainer.markHardlinkPath(c, path, fileId)
+		dir.hardlinkTable.markHardlinkPath(c, path, fileId)
 		return
 	}
 

@@ -1276,12 +1276,12 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 			wsr = parent.(*WorkspaceRoot)
 		case *Directory:
 			wsr = parent.(*Directory).
-				hardlinkContainer.getWorkspaceRoot()
+				hardlinkTable.getWorkspaceRoot()
 		}
 	case *WorkspaceRoot:
 		wsr = inode.(*WorkspaceRoot)
 	case *Directory:
-		wsr = inode.(*Directory).hardlinkContainer.getWorkspaceRoot()
+		wsr = inode.(*Directory).hardlinkTable.getWorkspaceRoot()
 	case *TypespaceList:
 		// If the inode is typespace/namespace/workspace/api, return true
 		// immediately since workspaceroot shouldn't have authority over them

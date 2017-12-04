@@ -35,7 +35,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		srcParent := asDirectory(srcInode.parent_(c))
 
 		// Ensure the source and dest are in the same workspace
-		if srcParent.hardlinkContainer != dir.hardlinkContainer {
+		if srcParent.hardlinkTable != dir.hardlinkTable {
 			c.dlog("Source and dest are different workspaces.")
 			return nil, fuse.EPERM
 		}
@@ -47,7 +47,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		}
 
 		// We need to reparent under the srcInode lock
-		dir.hardlinkContainer.claimAsChild_(srcInode)
+		dir.hardlinkTable.claimAsChild_(srcInode)
 
 		return newRecord, fuse.OK
 	}()
@@ -172,13 +172,13 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	defer c.funcIn("Directory::makeHardlink_DOWN").Out()
 
 	// If someone is trying to link a hardlink, we just need to return a copy
-	isHardlink, id := dir.hardlinkContainer.checkHardlink(toLink.inodeNum())
+	isHardlink, id := dir.hardlinkTable.checkHardlink(toLink.inodeNum())
 	if isHardlink {
 		// Update the reference count
-		dir.hardlinkContainer.hardlinkInc(id)
+		dir.hardlinkTable.hardlinkInc(id)
 
 		linkCopy := newHardlink(toLink.name(), id,
-			quantumfs.NewTime(time.Now()), dir.hardlinkContainer)
+			quantumfs.NewTime(time.Now()), dir.hardlinkTable)
 		return linkCopy, fuse.OK
 	}
 
@@ -207,15 +207,15 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 		"either local or remote should be hardlinks to be normalized")
 
 	fileId := remoteRecord.FileId()
-	dir.hardlinkContainer.updateHardlinkInodeId(c, fileId, inodeId)
+	dir.hardlinkTable.updateHardlinkInodeId(c, fileId, inodeId)
 	if inode != nil {
 		func() {
 			defer inode.getParentLock().Lock().Unlock()
-			dir.hardlinkContainer.claimAsChild_(inode)
+			dir.hardlinkTable.claimAsChild_(inode)
 		}()
 	}
 	return newHardlink(localRecord.Filename(), fileId,
-		remoteRecord.ContentTime(), dir.hardlinkContainer)
+		remoteRecord.ContentTime(), dir.hardlinkTable)
 }
 
 // The caller must hold the childRecordLock
@@ -255,10 +255,10 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 		localRecord.Type(), localRecord.ID().String(),
 		remoteRecord.Type(), remoteRecord.ID().String())
 
-	utils.Assert(underlyingTypesMatch(dir.hardlinkContainer, localRecord,
+	utils.Assert(underlyingTypesMatch(dir.hardlinkTable, localRecord,
 		remoteRecord), "type mismatch %d vs. %d",
-		underlyingTypeOf(dir.hardlinkContainer, localRecord),
-		underlyingTypeOf(dir.hardlinkContainer, remoteRecord))
+		underlyingTypeOf(dir.hardlinkTable, localRecord),
+		underlyingTypeOf(dir.hardlinkTable, remoteRecord))
 
 	record := quantumfs.DirectoryRecord(remoteRecord)
 	if !localRecord.Type().Matches(remoteRecord.Type()) {
@@ -267,7 +267,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 	}
 	dir.children.setRecord(c, childId, record)
 	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
-		reload(c, dir.hardlinkContainer, rc, inode, record)
+		reload(c, dir.hardlinkTable, rc, inode, record)
 	}
 	status := c.qfs.invalidateInode(childId)
 	utils.Assert(status == fuse.OK,
