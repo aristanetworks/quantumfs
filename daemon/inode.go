@@ -691,7 +691,7 @@ func (inode *InodeCommon) cleanup(c *ctx) {
 	// Most inodes have nothing to do here
 }
 
-func reload(c *ctx, wsr HardlinkContainer, rc *RefreshContext, inode Inode,
+func reload(c *ctx, hardlinkContainer HardlinkContainer, rc *RefreshContext, inode Inode,
 	remoteRecord quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
@@ -710,7 +710,7 @@ func reload(c *ctx, wsr HardlinkContainer, rc *RefreshContext, inode Inode,
 		subdir.refresh_DOWN(c, rc, remoteRecord.ID())
 	case quantumfs.ObjectTypeHardlink:
 		fileId := remoteRecord.FileId()
-		valid, hardlinkRecord := wsr.getHardlink(fileId)
+		valid, hardlinkRecord := hardlinkContainer.getHardlink(fileId)
 		utils.Assert(valid, "hardlink %d not found", fileId)
 		remoteRecord = &hardlinkRecord
 		fallthrough

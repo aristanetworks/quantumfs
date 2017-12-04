@@ -387,22 +387,22 @@ func markType(type_ quantumfs.ObjectType,
 	return pathFlags
 }
 
-func underlyingTypeOf(wsr HardlinkContainer,
+func underlyingTypeOf(hardlinkContainer HardlinkContainer,
 	record quantumfs.DirectoryRecord) quantumfs.ObjectType {
 
 	if record.Type() != quantumfs.ObjectTypeHardlink {
 		return record.Type()
 	}
 	fileId := record.FileId()
-	valid, hardlinkRecord := wsr.getHardlink(fileId)
+	valid, hardlinkRecord := hardlinkContainer.getHardlink(fileId)
 	utils.Assert(valid, "hardlink %d not found", fileId)
 	utils.Assert(hardlinkRecord.Type() != quantumfs.ObjectTypeHardlink,
 		"The underlying type cannot be hardlink")
 	return hardlinkRecord.Type()
 }
 
-func underlyingTypesMatch(wsr HardlinkContainer, r1 quantumfs.DirectoryRecord,
+func underlyingTypesMatch(hardlinkContainer HardlinkContainer, r1 quantumfs.DirectoryRecord,
 	r2 quantumfs.DirectoryRecord) bool {
 
-	return underlyingTypeOf(wsr, r1).Matches(underlyingTypeOf(wsr, r2))
+	return underlyingTypeOf(hardlinkContainer, r1).Matches(underlyingTypeOf(hardlinkContainer, r2))
 }

@@ -47,7 +47,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		}
 
 		// We need to reparent under the srcInode lock
-		dir.hardlinkContainer.updateParent_(srcInode)
+		dir.hardlinkContainer.claimAsChild_(srcInode)
 
 		return newRecord, fuse.OK
 	}()
@@ -211,7 +211,7 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 	if inode != nil {
 		func() {
 			defer inode.getParentLock().Lock().Unlock()
-			dir.hardlinkContainer.updateParent_(inode)
+			dir.hardlinkContainer.claimAsChild_(inode)
 		}()
 	}
 	return newHardlink(localRecord.Filename(), fileId,

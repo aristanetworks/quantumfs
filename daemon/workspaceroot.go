@@ -64,7 +64,7 @@ type HardlinkContainer interface {
 	setHardlink(fileId quantumfs.FileId,
 		fnSetter func(dir *quantumfs.DirectRecord))
 	nlinks(fileId quantumfs.FileId) uint32
-	updateParent_(inode Inode)
+	claimAsChild_(inode Inode)
 	getWorkspaceRoot() *WorkspaceRoot
 }
 
@@ -160,7 +160,7 @@ func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
 }
 
 // Must be called with inode's parentLock locked for writing
-func (wsr *WorkspaceRoot) updateParent_(inode Inode) {
+func (wsr *WorkspaceRoot) claimAsChild_(inode Inode) {
 	inode.setParent_(wsr.inodeNum())
 }
 
@@ -268,6 +268,7 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 }
 
 func (wsr *WorkspaceRoot) instantiateHardlink(c *ctx, inodeId InodeId) Inode {
+	defer c.FuncIn("WorkspaceRoot::instantiateHardlink", "inode %d", inodeId).Out()
 
 	hardlinkRecord := func() *quantumfs.DirectRecord {
 		defer wsr.linkLock.RLock().RUnlock()
