@@ -151,10 +151,12 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		fileId := entry.FileId()
+		if _, isHardlink := entry.(*Hardlink); !isHardlink {
+			// hardlink leg creation time is stored in its ContentTime
+			entry = newHardlink(entry.Filename(), fileId,
+				entry.ContentTime(), cmap.dir.wsr)
+		}
 
-		// hardlink leg creation time is stored in its ContentTime
-		entry = newHardlink(entry.Filename(), fileId, entry.ContentTime(),
-			cmap.dir.wsr)
 		establishedInodeId := cmap.dir.wsr.getHardlinkInodeId(c, fileId,
 			inodeId)
 
