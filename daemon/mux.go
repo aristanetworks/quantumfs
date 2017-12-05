@@ -314,7 +314,7 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	if inode.isOrphaned_() {
 		return
 	}
-	inode.orphan_(c, &quantumfs.DirectRecord{})
+	inode.orphan_(c, nil)
 }
 
 func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {

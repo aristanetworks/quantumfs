@@ -114,7 +114,7 @@ func (wsr *ApiInode) getChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	c.elog("Api doesn't support record fetch")
-	return &quantumfs.DirectRecord{}, errors.New("Unsupported record fetch")
+	return nil, errors.New("Unsupported record fetch")
 }
 
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
