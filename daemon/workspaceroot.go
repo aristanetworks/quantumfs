@@ -542,8 +542,8 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 		rc = newRefreshContext(c, publishedRootId)
 	}
 	if !rc.rootId.IsEqualTo(publishedRootId) {
-		c.vlog("Workspace updated again remotely. Aborting refresh")
-		return
+		c.vlog("Workspace updated again remotely. Refreshing anyway")
+		publishedRootId = rc.rootId
 	}
 	c.vlog("Workspace Refreshing %s rootid: %s -> %s", workspaceName,
 		wsr.publishedRootId.String(), publishedRootId.String())
