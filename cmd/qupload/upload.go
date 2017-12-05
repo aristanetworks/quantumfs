@@ -420,6 +420,11 @@ func branchThenAdvance(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB,
 		return err
 	}
 
+	err = SetImmutable(qctx, wsdb, wsname)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -437,11 +442,6 @@ func uploadCompleted(qctx *quantumfs.Ctx, wsdb quantumfs.WorkspaceDB, ws string,
 			return err
 		}
 	}
-	err = SetImmutable(qctx, wsdb, ws)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
