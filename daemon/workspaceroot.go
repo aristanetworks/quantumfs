@@ -559,8 +559,13 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 }
 
 // Workspace must be synced first, with the tree locked exclusively across both the
-// sync and this refresh
-func (wsr *WorkspaceRoot) refresh_(c *ctx) {
+// sync and this refresh.
+
+// The caller can opt to create a refresh context and supply it to this function
+// to avoid getting it built as part of refresh_() as that would be an expensive
+// operation. The caller can also choose to send a nil refresh context to ask it
+// to be built as part of refresh.
+func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 	defer c.funcIn("WorkspaceRoot::refresh_").Out()
 
 	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
@@ -579,10 +584,19 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 		return
 	}
 
+	if rc == nil {
+		// We should avoid computing the refresh map under the tree lock
+		// if at all possible as it is a very expensive operation
+		rc = newRefreshContext(c, publishedRootId)
+	}
+	if !rc.rootId.IsEqualTo(publishedRootId) {
+		c.vlog("Workspace updated again remotely. Refreshing anyway")
+		publishedRootId = rc.rootId
+	}
 	c.vlog("Workspace Refreshing %s rootid: %s -> %s", workspaceName,
 		wsr.publishedRootId.String(), publishedRootId.String())
 
-	wsr.refreshTo_(c, publishedRootId)
+	wsr.refreshTo_(c, rc)
 	wsr.publishedRootId = publishedRootId
 }
 
