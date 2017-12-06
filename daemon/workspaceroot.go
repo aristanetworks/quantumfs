@@ -60,7 +60,7 @@ type HardlinkTable interface {
 	newHardlink(c *ctx, inodeId InodeId,
 		record quantumfs.DirectoryRecord) *Hardlink
 	getHardlink(fileId quantumfs.FileId) (valid bool,
-		record quantumfs.DirectoryRecord)
+		record quantumfs.ImmutableDirectoryRecord)
 	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
 	setHardlink(fileId quantumfs.FileId,
 		fnSetter func(dir quantumfs.DirectoryRecord))
@@ -356,7 +356,7 @@ func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
 }
 
 func (wsr *WorkspaceRoot) getHardlink(fileId quantumfs.FileId) (valid bool,
-	record quantumfs.DirectoryRecord) {
+	record quantumfs.ImmutableDirectoryRecord) {
 
 	defer wsr.linkLock.RLock().RUnlock()
 

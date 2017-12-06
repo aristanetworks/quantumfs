@@ -692,7 +692,7 @@ func (inode *InodeCommon) cleanup(c *ctx) {
 }
 
 func reload(c *ctx, hardlinkTable HardlinkTable, rc *RefreshContext, inode Inode,
-	remoteRecord quantumfs.DirectoryRecord) {
+	remoteRecord quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
 		remoteRecord.Type()).Out()

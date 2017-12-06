@@ -35,7 +35,7 @@ func newHardlink(name string, fileId quantumfs.FileId, creationTime quantumfs.Ti
 	return &newLink
 }
 
-func (link *Hardlink) get() quantumfs.DirectoryRecord {
+func (link *Hardlink) get() quantumfs.ImmutableDirectoryRecord {
 	valid, link_ := link.hardlinkTable.getHardlink(link.fileId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
