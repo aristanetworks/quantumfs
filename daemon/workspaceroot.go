@@ -516,7 +516,12 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 }
 
 // Workspace must be synced first, with the tree locked exclusively across both the
-// sync and this refresh
+// sync and this refresh.
+
+// The caller can opt to create a refresh context and supply it to this function
+// to avoid getting it built as part of refresh_() as that would be an expensive
+// operation. The caller can also choose to send a nil refresh context to ask it
+// to be built as part of refresh.
 func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 	defer c.funcIn("WorkspaceRoot::refresh_").Out()
 
