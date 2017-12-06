@@ -47,7 +47,7 @@ type Directory struct {
 }
 
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
-	visitor func(*quantumfs.DirectRecord)) {
+	visitor func(quantumfs.DirectoryRecord)) {
 
 	for {
 		c.vlog("Fetching baselayer %s", key.String())
@@ -761,8 +761,7 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 		return record.AsImmutableDirectoryRecord(), nil
 	}
 
-	return &quantumfs.DirectRecord{},
-		errors.New("Inode given is not a child of this directory")
+	return nil, errors.New("Inode given is not a child of this directory")
 }
 
 // must have childRecordLock, fetches the child for calls that come UP from a child.

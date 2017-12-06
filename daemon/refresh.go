@@ -125,7 +125,7 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, baseLayerId quantumfs.ObjectKe
 	path string) {
 
 	defer c.FuncIn("RefreshContext::buildRefreshMap", "%s", path).Out()
-	foreachDentry(c, baseLayerId, func(record *quantumfs.DirectRecord) {
+	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
 		rc.fileMap[record.FileId()] = &FileLoadRecord{
 			remoteRecord:  record,
 			inodeId:       quantumfs.InodeIdInvalid,

@@ -191,7 +191,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 // The caller must hold the childRecordLock
 func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 	rc *RefreshContext, localRecord quantumfs.DirectoryRecord,
-	remoteRecord *quantumfs.DirectRecord) quantumfs.DirectoryRecord {
+	remoteRecord quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
 	defer c.funcIn("Directory::normalizeHardlinks_DOWN_").Out()
 	inodeId := dir.children.inodeNum(remoteRecord.Filename())
@@ -220,7 +220,7 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 
 // The caller must hold the childRecordLock
 func (dir *Directory) loadNewChild_DOWN_(c *ctx,
-	remoteRecord *quantumfs.DirectRecord, inodeId InodeId) InodeId {
+	remoteRecord quantumfs.DirectoryRecord, inodeId InodeId) InodeId {
 
 	defer c.FuncIn("Directory::loadNewChild_DOWN_", "%d : %s : %d",
 		dir.inodeNum(), remoteRecord.Filename(), inodeId).Out()
@@ -238,7 +238,7 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 // The caller must hold the childRecordLock
 func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 	localRecord quantumfs.DirectoryRecord, childId InodeId,
-	remoteRecord *quantumfs.DirectRecord) {
+	remoteRecord quantumfs.DirectoryRecord) {
 
 	childname := remoteRecord.Filename()
 	defer c.FuncIn("Directory::refreshChild_DOWN_", "%s", childname).Out()
@@ -320,9 +320,11 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 	remoteEntries := make(map[string]quantumfs.DirectoryRecord, 0)
 	if baseLayerId != nil {
-		foreachDentry(c, *baseLayerId, func(record *quantumfs.DirectRecord) {
-			remoteEntries[record.Filename()] = record
-		})
+		foreachDentry(c, *baseLayerId,
+			func(record quantumfs.DirectoryRecord) {
+
+				remoteEntries[record.Filename()] = record
+			})
 	}
 
 	dir.children.foreachChild(c, func(childname string, childId InodeId) {
@@ -348,7 +350,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 // The caller must hold the childRecordLock
 func (dir *Directory) findLocalMatch_DOWN_(c *ctx, rc *RefreshContext,
-	record *quantumfs.DirectRecord, localEntries map[string]InodeId) (
+	record quantumfs.DirectoryRecord, localEntries map[string]InodeId) (
 	localRecord quantumfs.DirectoryRecord, inodeId InodeId,
 	missingDentry bool) {
 
@@ -372,7 +374,7 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	dir.children.foreachChild(c, func(childname string, childId InodeId) {
 		localEntries[childname] = childId
 	})
-	foreachDentry(c, baseLayerId, func(record *quantumfs.DirectRecord) {
+	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
 		localRecord, inodeId, missingDentry :=
 			dir.findLocalMatch_DOWN_(c, rc, record, localEntries)
 		if localRecord == nil {

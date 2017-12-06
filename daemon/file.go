@@ -94,7 +94,7 @@ type File struct {
 }
 
 func (fi *File) handleAccessorTypeChange(c *ctx,
-	remoteRecord quantumfs.DirectoryRecord) {
+	remoteRecord quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.FuncIn("File::handleAccessorTypeChange", "%s: %d",
 		remoteRecord.Filename(), remoteRecord.Type()).Out()

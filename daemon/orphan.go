@@ -272,8 +272,7 @@ func (inode *InodeCommon) getChildRecordCopy(c *ctx,
 
 	if !inode.isOrphaned() || inode.id != inodeNum {
 		c.elog("Unsupported record fetch on file")
-		return &quantumfs.DirectRecord{},
-			errors.New("Unsupported record fetch")
+		return nil, errors.New("Unsupported record fetch")
 	}
 	return inode.getOrphanChildRecordCopy(c, inodeNum)
 }
