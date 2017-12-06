@@ -144,7 +144,9 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 
 		inodeId = cmap.dir.hardlinkTable.findHardlinkInodeId(c,
 			fileId, inodeId)
-	} else if inodeId == quantumfs.InodeIdInvalid {
+	}
+
+	if inodeId == quantumfs.InodeIdInvalid {
 		inodeId = c.qfs.newInodeId()
 	}
 	cmap.setRecord(c, inodeId, entry)
