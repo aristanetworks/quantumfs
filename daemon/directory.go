@@ -30,7 +30,7 @@ type InodeConstructor func(c *ctx, name string, key quantumfs.ObjectKey,
 type Directory struct {
 	InodeCommon
 
-	wsr *WorkspaceRoot
+	hardlinkTable HardlinkTable
 
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
@@ -42,7 +42,7 @@ type Directory struct {
 	// via qfs.inode() from a context where the Inode lock is already
 	// held.
 	childRecordLock utils.DeferableMutex
-	children        *ChildMap
+	children        *ChildContainer
 	_generation     uint64
 }
 
@@ -69,7 +69,8 @@ func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 	}
 }
 
-func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
+func initDirectory(c *ctx, name string, dir *Directory,
+	hardlinkTable HardlinkTable,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
 	parent InodeId, treeLock *TreeLock) []InodeId {
 
@@ -83,11 +84,11 @@ func initDirectory(c *ctx, name string, dir *Directory, wsr *WorkspaceRoot,
 	dir.InodeCommon.accessed_ = 0
 	dir.setParent(parent)
 	dir.treeLock_ = treeLock
-	dir.wsr = wsr
+	dir.hardlinkTable = hardlinkTable
 	dir.baseLayerId = baseLayerId
 
-	cmap, uninstantiated := newChildMap(c, dir, dir.baseLayerId)
-	dir.children = cmap
+	container, uninstantiated := newChildContainer(c, dir, dir.baseLayerId)
+	dir.children = container
 
 	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 
@@ -103,19 +104,19 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	var dir Directory
 	dir.self = &dir
 
-	var wsr *WorkspaceRoot
+	var hardlinkTable HardlinkTable
 	switch v := parent.(type) {
 	case *Directory:
-		wsr = v.wsr
+		hardlinkTable = v.hardlinkTable
 	case *WorkspaceRoot:
-		wsr = v
+		hardlinkTable = v
 	default:
 		panic(fmt.Sprintf("Parent of inode %d is neither "+
 			"Directory nor WorkspaceRoot", inodeNum))
 	}
 
-	uninstantiated := initDirectory(c, name, &dir, wsr, baseLayerId,
-		inodeNum, parent.inodeNum(), parent.treeLock())
+	uninstantiated := initDirectory(c, name, &dir, hardlinkTable,
+		baseLayerId, inodeNum, parent.inodeNum(), parent.treeLock())
 	return &dir, uninstantiated
 }
 
@@ -380,7 +381,8 @@ func (dir *Directory) publish_(c *ctx) {
 	defer c.FuncIn("Directory::publish_", "%s", dir.name_).Out()
 
 	oldBaseLayer := dir.baseLayerId
-	dir.baseLayerId = publishDirectoryRecords(c, dir.children.records())
+	dir.baseLayerId = publishDirectoryRecords(c,
+		dir.children.publishableRecords(c))
 
 	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
 		dir.baseLayerId.String())
@@ -781,7 +783,8 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	// if we don't have the child, maybe we're wsr and it's a hardlink
 	if dir.self.isWorkspaceRoot() {
 		c.vlog("Checking hardlink table")
-		valid, linkRecord := dir.wsr.getHardlinkByInode(inodeNum)
+		valid, linkRecord :=
+			dir.hardlinkTable.getHardlinkByInode(inodeNum)
 		if valid {
 			c.vlog("Hardlink found")
 			return linkRecord
@@ -1298,6 +1301,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	if newType != quantumfs.ObjectTypeInvalid {
 		entry.SetType(newType)
 	}
+	dir.children.makePublishable(c, entry.Filename())
 }
 
 func getRecordExtendedAttributes(c *ctx,
@@ -1604,8 +1608,9 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	}
 
 	// check if the child is a hardlink
-	if isHardlink, _ := dir.wsr.checkHardlink(inodeNum); isHardlink {
-		return dir.wsr.instantiateChild(c, inodeNum)
+	isHardlink, _ := dir.hardlinkTable.checkHardlink(inodeNum)
+	if isHardlink {
+		return dir.hardlinkTable.instantiateHardlink(c, inodeNum), nil
 	}
 
 	// add a check incase there's an inconsistency
@@ -1750,7 +1755,7 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 	defer c.funcIn("Directory::markHardlinkPath").Out()
 
 	if dir.InodeCommon.isWorkspaceRoot() {
-		dir.wsr.markHardlinkPath(c, path, fileId)
+		dir.hardlinkTable.markHardlinkPath(c, path, fileId)
 		return
 	}
 

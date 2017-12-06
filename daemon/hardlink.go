@@ -18,17 +18,17 @@ type Hardlink struct {
 	// hidden field only used for merging. Stored in the ContentTime field.
 	creationTime quantumfs.Time
 
-	wsr *WorkspaceRoot
+	hardlinkTable HardlinkTable
 }
 
 func newHardlink(name string, fileId quantumfs.FileId, creationTime quantumfs.Time,
-	wsr *WorkspaceRoot) *Hardlink {
+	hardlinkTable HardlinkTable) *Hardlink {
 
 	utils.Assert(fileId != quantumfs.InvalidFileId,
 		"invalid fileId for %s", name)
 	var newLink Hardlink
 	newLink.name = name
-	newLink.wsr = wsr
+	newLink.hardlinkTable = hardlinkTable
 	newLink.fileId = fileId
 	newLink.creationTime = creationTime
 
@@ -36,7 +36,7 @@ func newHardlink(name string, fileId quantumfs.FileId, creationTime quantumfs.Ti
 }
 
 func (link *Hardlink) get() *quantumfs.DirectRecord {
-	valid, link_ := link.wsr.getHardlink(link.fileId)
+	valid, link_ := link.hardlinkTable.getHardlink(link.fileId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
@@ -47,7 +47,7 @@ func (link *Hardlink) get() *quantumfs.DirectRecord {
 }
 
 func (link *Hardlink) set(fnSetter func(dir *quantumfs.DirectRecord)) {
-	link.wsr.setHardlink(link.fileId, fnSetter)
+	link.hardlinkTable.setHardlink(link.fileId, fnSetter)
 }
 
 func (link *Hardlink) Filename() string {
@@ -180,11 +180,11 @@ func (link *Hardlink) Record() quantumfs.DirectRecord {
 }
 
 func (link *Hardlink) Nlinks() uint32 {
-	return link.wsr.nlinks(link.fileId)
+	return link.hardlinkTable.nlinks(link.fileId)
 }
 
 func (link *Hardlink) EncodeExtendedKey() []byte {
-	valid, realRecord := link.wsr.getHardlink(link.fileId)
+	valid, realRecord := link.hardlinkTable.getHardlink(link.fileId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
@@ -199,7 +199,7 @@ func (l *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryReco
 	// Sorry, this seems to be the only way to get the signature under 85
 	// characters per line and appease gofmt.
 	link := l
-	valid, realRecord := link.wsr.getHardlink(link.fileId)
+	valid, realRecord := link.hardlinkTable.getHardlink(link.fileId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
@@ -223,5 +223,6 @@ func (l *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryReco
 }
 
 func (link *Hardlink) Clone() quantumfs.DirectoryRecord {
-	return newHardlink(link.name, link.fileId, link.creationTime, link.wsr)
+	return newHardlink(link.name, link.fileId, link.creationTime,
+		link.hardlinkTable)
 }
