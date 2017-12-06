@@ -47,7 +47,7 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 			dirEntry.SetNext(key)
 			entryIdx = 0
 		}
-		dirEntry.SetEntry(entryIdx, child.(*quantumfs.DirectRecord))
+		dirEntry.SetEntry(entryIdx, child.Publishable())
 		entryIdx++
 	}
 

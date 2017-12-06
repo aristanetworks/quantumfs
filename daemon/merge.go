@@ -357,9 +357,7 @@ func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 				entryCapacity)
 			entryIdx = 0
 		}
-
-		recordCopy := record.Record()
-		baseLayer.SetEntry(entryIdx, &recordCopy)
+		baseLayer.SetEntry(entryIdx, record.Publishable())
 
 		entryIdx++
 	}
