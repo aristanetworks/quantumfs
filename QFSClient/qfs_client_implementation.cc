@@ -62,6 +62,23 @@ CommandBuffer::CommandBuffer() {
 CommandBuffer::~CommandBuffer() {
 }
 
+// Remove the trailing zeros from the tail of the response
+void CommandBuffer::Sanitize() {
+	auto size = this->data.size();
+
+	for (auto it = this->data.crbegin();
+			it != this->data.crend();
+			++it) {
+		if (*it) {
+			break;
+		}
+		// *it is a trailing zero, discard it
+		--size;
+	}
+
+	this->data.resize(size);
+}
+
 // Copy the contents of the given CommandBuffer into this one
 void CommandBuffer::Copy(const CommandBuffer &source) {
 	this->data = source.data;
@@ -264,6 +281,7 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 		}
 	}
 
+	command->Sanitize();
 	return util::getError(err);
 }
 
