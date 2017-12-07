@@ -15,6 +15,10 @@ import (
 	"unsafe"
 )
 
+const (
+	PacketHeaderLen = 20
+)
+
 type LogStrTrim struct {
 	Text         string
 	LogSubsystem uint8
@@ -302,7 +306,7 @@ func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput
 	packetLen &= ^(uint16(entryCompleteBit))
 
 	if uint64(len(data)) < pastEndIdx || pastEndIdx < uint64(packetLen) ||
-		packetLen == 0 {
+		packetLen < PacketHeaderLen {
 
 		// Not enough data to read packet
 		return 0, LogOutput{}, false
@@ -329,7 +333,7 @@ func (read *Reader) dataToLog(packetData []byte) LogOutput {
 	reqId = *(*uint64)(unsafe.Pointer(&packetData[4]))
 	timestamp = *(*int64)(unsafe.Pointer(&packetData[12]))
 
-	numRead := uint64(20)
+	numRead := uint64(PacketHeaderLen)
 
 	var err error
 	args := make([]interface{}, numFields)

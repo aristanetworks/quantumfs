@@ -101,7 +101,7 @@ func TestHardlinkReload(t *testing.T) {
 			test.Assert(l.nlink == linkBPtr.nlink,
 				"link reference count not preserved")
 
-			linkB := *(linkBPtr.record)
+			linkB := linkBPtr.record
 			v := l.record
 			test.Assert(exists, "link not reloaded in new wsr")
 			test.Assert(v.Filename() == linkB.Filename(),
@@ -832,5 +832,39 @@ func TestHardlinkRenameCreation(t *testing.T) {
 			"Rename of hardlink doesn't reset creationTime")
 		test.Assert(recordB.creationTime < recordD.creationTime,
 			"Mvchild of hardlink doesn't reset creationTime")
+	})
+}
+
+func TestRemoveHardlinkBeforeSync(t *testing.T) {
+	t.Skip() // BUG224729
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		dirName := workspace + "/dir"
+		test.AssertNoErr(utils.MkdirAll(dirName, 0777))
+
+		wsr, cleanup := test.GetWorkspaceRoot(workspace)
+		defer cleanup()
+
+		test.Assert(len(wsr.hardlinks) == 0,
+			"Hardlink table not initially empty")
+
+		// Create and remove the hardlink. Though the file is gone the
+		// hardink entry must remain until after all the directories in which
+		// it was a child have flushed, otherwise an uploaded directory
+		// metadata may point to an entry which does not exist in the
+		// hardlink table.
+		test.createFile(workspace, "dir/leg1", 1)
+		test.linkFile(workspace, "dir/leg1", "leg2")
+		test.removeFile(workspace, "leg2")
+		test.removeFile(workspace, "dir/leg1")
+
+		test.Assert(len(wsr.hardlinks) == 1,
+			"Hardlink table doesn't contain entry after delete")
+
+		test.SyncWorkspace(test.RelPath(workspace))
+
+		test.Assert(len(wsr.hardlinks) == 0,
+			"Hardlink table not empty after sync")
 	})
 }

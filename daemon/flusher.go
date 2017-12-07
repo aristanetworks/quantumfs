@@ -193,6 +193,9 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// the case of a panic.
 	inode := dirtyInode.inode
 
+	// the inode should be marked clean before flushing so that any new
+	// attemps to write to the inode dirties it again.
+	dirtyElement := inode.markClean_()
 	success := func() bool {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
@@ -200,10 +203,11 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	}()
 
 	if !success {
-		return false
+		// flushing the inode has failed, if the inode has been dirtied in
+		// the meantime, just drop this list entry as there is now another
+		// one
+		return inode.markUnclean_(dirtyElement)
 	}
-
-	inode.markClean_()
 
 	if dirtyInode.shouldUninstantiate {
 		c.qfs.flusher.lock.Unlock()

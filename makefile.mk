@@ -128,7 +128,7 @@ quantumfsRPM: check-fpm $(COMMANDS)
 		--description='A distributed filesystem optimized for large scale software development' \
 		--depends libstdc++ \
 		--depends fuse \
-		--depends QuantumFS-tool
+		--depends QuantumFS-tool \
 		--after-install systemd_reload \
 		--after-remove systemd_reload \
 		--after-upgrade systemd_reload \

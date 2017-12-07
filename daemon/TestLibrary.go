@@ -22,6 +22,7 @@ import (
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
@@ -252,6 +253,31 @@ func (th *TestHelper) defaultConfig() QuantumFsConfig {
 func (th *TestHelper) StartDefaultQuantumFs(startChan chan struct{}) {
 	config := th.defaultConfig()
 	th.startQuantumFs(config, startChan, false)
+}
+
+func (th *TestHelper) etherFilesystemConfig() QuantumFsConfig {
+	mountPath := th.TempDir + "/mnt"
+
+	datastorePath := th.TempDir + "/ether"
+	datastore, err := thirdparty_backends.ConnectDatastore("ether.filesystem",
+		datastorePath)
+	th.AssertNoErr(err)
+
+	config := QuantumFsConfig{
+		CachePath:        th.TempDir + "/ramfs",
+		CacheSize:        1 * 1024 * 1024,
+		CacheTimeSeconds: 1,
+		CacheTimeNsecs:   0,
+		DirtyFlushDelay:  30 * time.Second,
+		MountPath:        mountPath,
+		WorkspaceDB:      processlocal.NewWorkspaceDB(""),
+		DurableStore:     datastore,
+	}
+	return config
+}
+
+func (th *TestHelper) StartEtherFileQuantumFs(startChan chan struct{}) {
+	th.startQuantumFs(th.etherFilesystemConfig(), startChan, false)
 }
 
 // If the filesystem panics, abort it and unmount it to prevent the test binary from
@@ -621,6 +647,10 @@ func init() {
 // functions.
 func (th *TestHelper) TestCtx() *ctx {
 	return th.dummyReq(qlog.TestReqId)
+}
+
+func (th *TestHelper) QfsCtx() *quantumfs.Ctx {
+	return &th.qfs.c.Ctx
 }
 
 //only to be used for some testing - not all functions will work with this

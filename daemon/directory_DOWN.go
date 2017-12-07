@@ -35,7 +35,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		srcParent := asDirectory(srcInode.parent_(c))
 
 		// Ensure the source and dest are in the same workspace
-		if srcParent.wsr != dir.wsr {
+		if srcParent.hardlinkTable != dir.hardlinkTable {
 			c.dlog("Source and dest are different workspaces.")
 			return nil, fuse.EPERM
 		}
@@ -47,7 +47,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		}
 
 		// We need to reparent under the srcInode lock
-		srcInode.setParent_(dir.wsr.inodeNum())
+		dir.hardlinkTable.claimAsChild_(srcInode)
 
 		return newRecord, fuse.OK
 	}()
@@ -62,7 +62,8 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.loadChild(c, newRecord, quantumfs.InodeIdInvalid)
+		return dir.children.loadPublishableChild(c, newRecord,
+			quantumfs.InodeIdInvalid)
 	}()
 
 	dir.self.markAccessed(c, newName,
@@ -171,12 +172,13 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	defer c.funcIn("Directory::makeHardlink_DOWN").Out()
 
 	// If someone is trying to link a hardlink, we just need to return a copy
-	if isHardlink, id := dir.wsr.checkHardlink(toLink.inodeNum()); isHardlink {
+	isHardlink, id := dir.hardlinkTable.checkHardlink(toLink.inodeNum())
+	if isHardlink {
 		// Update the reference count
-		dir.wsr.hardlinkInc(id)
+		dir.hardlinkTable.hardlinkInc(id)
 
 		linkCopy := newHardlink(toLink.name(), id,
-			quantumfs.NewTime(time.Now()), dir.wsr)
+			quantumfs.NewTime(time.Now()), dir.hardlinkTable)
 		return linkCopy, fuse.OK
 	}
 
@@ -189,7 +191,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 // The caller must hold the childRecordLock
 func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 	rc *RefreshContext, localRecord quantumfs.DirectoryRecord,
-	remoteRecord *quantumfs.DirectRecord) quantumfs.DirectoryRecord {
+	remoteRecord quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
 	defer c.funcIn("Directory::normalizeHardlinks_DOWN_").Out()
 	inodeId := dir.children.inodeNum(remoteRecord.Filename())
@@ -205,24 +207,27 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 		"either local or remote should be hardlinks to be normalized")
 
 	fileId := remoteRecord.FileId()
-	dir.wsr.updateHardlinkInodeId(c, fileId, inodeId)
+	dir.hardlinkTable.updateHardlinkInodeId(c, fileId, inodeId)
 	if inode != nil {
-		inode.setParent(dir.wsr.inodeNum())
+		func() {
+			defer inode.getParentLock().Lock().Unlock()
+			dir.hardlinkTable.claimAsChild_(inode)
+		}()
 	}
 	return newHardlink(localRecord.Filename(), fileId,
-		remoteRecord.ContentTime(), dir.wsr)
+		remoteRecord.ContentTime(), dir.hardlinkTable)
 }
 
 // The caller must hold the childRecordLock
 func (dir *Directory) loadNewChild_DOWN_(c *ctx,
-	remoteRecord *quantumfs.DirectRecord, inodeId InodeId) InodeId {
+	remoteRecord quantumfs.DirectoryRecord, inodeId InodeId) InodeId {
 
 	defer c.FuncIn("Directory::loadNewChild_DOWN_", "%d : %s : %d",
 		dir.inodeNum(), remoteRecord.Filename(), inodeId).Out()
 
 	// Allocate a new inode for regular files or return an already
 	// existing inode for hardlinks to existing inodes
-	inodeId = dir.children.loadChild(c, remoteRecord, inodeId)
+	inodeId = dir.children.loadPublishableChild(c, remoteRecord, inodeId)
 	status := c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
 	utils.Assert(status == fuse.OK,
 		"marking %s created failed with %d", remoteRecord.Filename(),
@@ -233,7 +238,7 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 // The caller must hold the childRecordLock
 func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 	localRecord quantumfs.DirectoryRecord, childId InodeId,
-	remoteRecord *quantumfs.DirectRecord) {
+	remoteRecord quantumfs.DirectoryRecord) {
 
 	childname := remoteRecord.Filename()
 	defer c.FuncIn("Directory::refreshChild_DOWN_", "%s", childname).Out()
@@ -250,9 +255,10 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 		localRecord.Type(), localRecord.ID().String(),
 		remoteRecord.Type(), remoteRecord.ID().String())
 
-	utils.Assert(underlyingTypesMatch(dir.wsr, localRecord, remoteRecord),
-		"type mismatch %d vs. %d", underlyingTypeOf(dir.wsr, localRecord),
-		underlyingTypeOf(dir.wsr, remoteRecord))
+	utils.Assert(underlyingTypesMatch(dir.hardlinkTable, localRecord,
+		remoteRecord), "type mismatch %d vs. %d",
+		underlyingTypeOf(dir.hardlinkTable, localRecord),
+		underlyingTypeOf(dir.hardlinkTable, remoteRecord))
 
 	record := quantumfs.DirectoryRecord(remoteRecord)
 	if !localRecord.Type().Matches(remoteRecord.Type()) {
@@ -261,7 +267,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 	}
 	dir.children.setRecord(c, childId, record)
 	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
-		reload(c, dir.wsr, rc, inode, record)
+		reload(c, dir.hardlinkTable, rc, inode, record)
 	}
 	status := c.qfs.invalidateInode(childId)
 	utils.Assert(status == fuse.OK,
@@ -314,9 +320,11 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 	remoteEntries := make(map[string]quantumfs.DirectoryRecord, 0)
 	if baseLayerId != nil {
-		foreachDentry(c, *baseLayerId, func(record *quantumfs.DirectRecord) {
-			remoteEntries[record.Filename()] = record
-		})
+		foreachDentry(c, *baseLayerId,
+			func(record quantumfs.DirectoryRecord) {
+
+				remoteEntries[record.Filename()] = record
+			})
 	}
 
 	dir.children.foreachChild(c, func(childname string, childId InodeId) {
@@ -342,7 +350,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 // The caller must hold the childRecordLock
 func (dir *Directory) findLocalMatch_DOWN_(c *ctx, rc *RefreshContext,
-	record *quantumfs.DirectRecord, localEntries map[string]InodeId) (
+	record quantumfs.DirectoryRecord, localEntries map[string]InodeId) (
 	localRecord quantumfs.DirectoryRecord, inodeId InodeId,
 	missingDentry bool) {
 
@@ -366,7 +374,7 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	dir.children.foreachChild(c, func(childname string, childId InodeId) {
 		localEntries[childname] = childId
 	})
-	foreachDentry(c, baseLayerId, func(record *quantumfs.DirectRecord) {
+	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
 		localRecord, inodeId, missingDentry :=
 			dir.findLocalMatch_DOWN_(c, rc, record, localEntries)
 		if localRecord == nil {

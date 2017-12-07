@@ -39,13 +39,37 @@ type WorkspaceRoot struct {
 }
 
 type linkEntry struct {
-	record  *quantumfs.DirectRecord
+	record  quantumfs.DirectoryRecord
 	nlink   uint32
 	inodeId InodeId
 	paths   []string
 }
 
-func newLinkEntry(record_ *quantumfs.DirectRecord) linkEntry {
+type HardlinkTable interface {
+	getHardlinkByInode(inodeId InodeId) (bool, quantumfs.DirectoryRecord)
+	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
+	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
+	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
+	findHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId) InodeId
+	removeHardlink(c *ctx,
+		fileId quantumfs.FileId) (record quantumfs.DirectoryRecord,
+		inodeId InodeId)
+	hardlinkExists(c *ctx, fileId quantumfs.FileId) bool
+	hardlinkDec(fileId quantumfs.FileId) bool
+	hardlinkInc(fileId quantumfs.FileId)
+	newHardlink(c *ctx, inodeId InodeId,
+		record quantumfs.DirectoryRecord) *Hardlink
+	getHardlink(fileId quantumfs.FileId) (valid bool,
+		record quantumfs.ImmutableDirectoryRecord)
+	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
+	setHardlink(fileId quantumfs.FileId,
+		fnSetter func(dir quantumfs.DirectoryRecord))
+	nlinks(fileId quantumfs.FileId) uint32
+	claimAsChild_(inode Inode)
+	getWorkspaceRoot() *WorkspaceRoot
+}
+
+func newLinkEntry(record_ quantumfs.DirectoryRecord) linkEntry {
 	return linkEntry{
 		record:  record_,
 		nlink:   2,
@@ -136,6 +160,15 @@ func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
 	}
 }
 
+// Must be called with inode's parentLock locked for writing
+func (wsr *WorkspaceRoot) claimAsChild_(inode Inode) {
+	inode.setParent_(wsr.inodeNum())
+}
+
+func (wsr *WorkspaceRoot) getWorkspaceRoot() *WorkspaceRoot {
+	return wsr
+}
+
 func (wsr *WorkspaceRoot) nlinks(fileId quantumfs.FileId) uint32 {
 	defer wsr.linkLock.RLock().RUnlock()
 
@@ -209,20 +242,15 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 		panic("newHardlink called on existing hardlink")
 	}
 
-	dirRecord, isRecord := record.(*quantumfs.DirectRecord)
-	if !isRecord {
-		panic("newHardlink called on non-DirectRecord")
-	}
-
 	defer wsr.linkLock.Lock().Unlock()
 
-	newEntry := newLinkEntry(dirRecord)
+	newEntry := newLinkEntry(record)
 	newEntry.inodeId = inodeId
 	// Linking updates ctime
 	newEntry.record.SetContentTime(quantumfs.NewTime(time.Now()))
 	newEntry.record.SetFilename("")
 
-	fileId := dirRecord.FileId()
+	fileId := record.FileId()
 	utils.Assert(fileId != quantumfs.InvalidFileId, "invalid fileId")
 	wsr.hardlinks[fileId] = newEntry
 	wsr.inodeToLink[inodeId] = fileId
@@ -235,15 +263,14 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 		wsr)
 }
 
-func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
-	[]InodeId) {
+func (wsr *WorkspaceRoot) instantiateHardlink(c *ctx, inodeId InodeId) Inode {
+	defer c.FuncIn("WorkspaceRoot::instantiateHardlink",
+		"inode %d", inodeId).Out()
 
-	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeNum).Out()
-
-	hardlinkRecord := func() *quantumfs.DirectRecord {
+	hardlinkRecord := func() quantumfs.DirectoryRecord {
 		defer wsr.linkLock.RLock().RUnlock()
 
-		id, exists := wsr.inodeToLink[inodeNum]
+		id, exists := wsr.inodeToLink[inodeId]
 		if !exists {
 			return nil
 		}
@@ -251,35 +278,47 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeNum InodeId) (Inode,
 		c.dlog("Instantiating hardlink %d", id)
 		return wsr.hardlinks[id].record
 	}()
-	if hardlinkRecord != nil {
-		if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
-			c.vlog("Someone has already instantiated inode %d", inodeNum)
-			return inode, nil
-		}
-		return wsr.Directory.recordToChild(c, inodeNum, hardlinkRecord)
+	if hardlinkRecord == nil {
+		return nil
 	}
-
-	// This isn't a hardlink, so proceed as normal
-	return wsr.Directory.instantiateChild(c, inodeNum)
+	if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
+		c.vlog("Someone has already instantiated inode %d", inodeId)
+		return inode
+	}
+	inode, _ := wsr.Directory.recordToChild(c, inodeId, hardlinkRecord)
+	return inode
 }
 
-func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx,
+func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) (Inode,
+	[]InodeId) {
+
+	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeId).Out()
+
+	inode := wsr.instantiateHardlink(c, inodeId)
+	if inode != nil {
+		return inode, nil
+	}
+	// This isn't a hardlink, so proceed as normal
+	return wsr.Directory.instantiateChild(c, inodeId)
+}
+
+func (wsr *WorkspaceRoot) findHardlinkInodeId(c *ctx,
 	fileId quantumfs.FileId, inodeId InodeId) InodeId {
 
-	defer c.FuncIn("WorkspaceRoot::getHardlinkInodeId", "%d inode %d",
+	defer c.FuncIn("WorkspaceRoot::findHardlinkInodeId", "%d inode %d",
 		fileId, inodeId).Out()
 	defer wsr.linkLock.Lock().Unlock()
 
-	// Ensure the fileId is valid
 	hardlink, exists := wsr.hardlinks[fileId]
 	if !exists {
-		// It should be possible, via races, that someone could check
-		// on a link which has *just* been deleted
-		c.vlog("no hardlink entry for %d", fileId)
 		return inodeId
 	}
-
 	if hardlink.inodeId != quantumfs.InodeIdInvalid {
+		if inodeId != quantumfs.InodeIdInvalid {
+			utils.Assert(inodeId == hardlink.inodeId,
+				"requested hardlink inodeId %d exists as %d",
+				inodeId, hardlink.inodeId)
+		}
 		return hardlink.inodeId
 	}
 
@@ -287,7 +326,6 @@ func (wsr *WorkspaceRoot) getHardlinkInodeId(c *ctx,
 		return inodeId
 	}
 
-	// we need to load this Hardlink partially - giving it an inode number
 	inodeId = c.qfs.newInodeId()
 	hardlink.inodeId = inodeId
 	wsr.hardlinks[fileId] = hardlink
@@ -317,18 +355,17 @@ func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
 		wsr)
 }
 
-// Return a snapshot / instance so that it's concurrency safe
 func (wsr *WorkspaceRoot) getHardlink(fileId quantumfs.FileId) (valid bool,
-	record quantumfs.DirectRecord) {
+	record quantumfs.ImmutableDirectoryRecord) {
 
 	defer wsr.linkLock.RLock().RUnlock()
 
 	link, exists := wsr.hardlinks[fileId]
 	if exists {
-		return true, *(link.record)
+		return true, link.record
 	}
 
-	return false, quantumfs.DirectRecord{}
+	return false, nil
 }
 
 func (wsr *WorkspaceRoot) getInodeIdNoInstantiate(c *ctx,
@@ -412,7 +449,7 @@ func (wsr *WorkspaceRoot) removeHardlink(c *ctx,
 
 // We need the wsr lock to cover setting safely
 func (wsr *WorkspaceRoot) setHardlink(fileId quantumfs.FileId,
-	fnSetter func(dir *quantumfs.DirectRecord)) {
+	fnSetter func(dir quantumfs.DirectoryRecord)) {
 
 	defer wsr.linkLock.Lock().Unlock()
 
@@ -484,7 +521,7 @@ func publishHardlinkMap(c *ctx,
 
 		newRecord := quantumfs.NewHardlinkRecord()
 		newRecord.SetFileId(uint64(fileId))
-		newRecord.SetRecord(record)
+		newRecord.SetRecord(record.(*quantumfs.DirectRecord))
 		newRecord.SetNlinks(entry.nlink)
 		baseLayer.SetEntry(entryIdx, newRecord)
 
@@ -516,8 +553,13 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 }
 
 // Workspace must be synced first, with the tree locked exclusively across both the
-// sync and this refresh
-func (wsr *WorkspaceRoot) refresh_(c *ctx) {
+// sync and this refresh.
+
+// The caller can opt to create a refresh context and supply it to this function
+// to avoid getting it built as part of refresh_() as that would be an expensive
+// operation. The caller can also choose to send a nil refresh context to ask it
+// to be built as part of refresh.
+func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 	defer c.funcIn("WorkspaceRoot::refresh_").Out()
 
 	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
@@ -536,10 +578,19 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 		return
 	}
 
+	if rc == nil {
+		// We should avoid computing the refresh map under the tree lock
+		// if at all possible as it is a very expensive operation
+		rc = newRefreshContext(c, publishedRootId)
+	}
+	if !rc.rootId.IsEqualTo(publishedRootId) {
+		c.vlog("Workspace updated again remotely. Refreshing anyway")
+		publishedRootId = rc.rootId
+	}
 	c.vlog("Workspace Refreshing %s rootid: %s -> %s", workspaceName,
 		wsr.publishedRootId.String(), publishedRootId.String())
 
-	wsr.refreshTo_(c, publishedRootId)
+	wsr.refreshTo_(c, rc)
 	wsr.publishedRootId = publishedRootId
 }
 

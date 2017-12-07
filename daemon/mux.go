@@ -314,7 +314,7 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	if inode.isOrphaned_() {
 		return
 	}
-	inode.orphan_(c, &quantumfs.DirectRecord{})
+	inode.orphan_(c, nil)
 }
 
 func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
@@ -395,6 +395,8 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
+	rc := newRefreshContext(c, rootId)
+
 	defer wsr.LockTree().Unlock()
 
 	err = qfs.flusher.syncWorkspace_(c, name)
@@ -403,7 +405,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
-	wsr.refresh_(c)
+	wsr.refresh_(c, rc)
 }
 
 func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
@@ -446,7 +448,8 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 		}
 
 		mergedId, err := mergeWorkspaceRoot(c, wsr.publishedRootId, rootId,
-			newRootId)
+			newRootId, quantumfs.PreferNewer,
+			&mergeSkipPaths{paths: make(map[string]struct{}, 0)})
 
 		if err != nil {
 			c.elog("Unable to merge: %s", err.Error())
@@ -949,7 +952,7 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 		return err
 	}
 
-	wsr.refresh_(c)
+	wsr.refresh_(c, nil)
 	return nil
 }
 
@@ -1274,12 +1277,13 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 		case *WorkspaceRoot:
 			wsr = parent.(*WorkspaceRoot)
 		case *Directory:
-			wsr = parent.(*Directory).wsr
+			wsr = parent.(*Directory).
+				hardlinkTable.getWorkspaceRoot()
 		}
 	case *WorkspaceRoot:
 		wsr = inode.(*WorkspaceRoot)
 	case *Directory:
-		wsr = inode.(*Directory).wsr
+		wsr = inode.(*Directory).hardlinkTable.getWorkspaceRoot()
 	case *TypespaceList:
 		// If the inode is typespace/namespace/workspace/api, return true
 		// immediately since workspaceroot shouldn't have authority over them

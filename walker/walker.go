@@ -19,22 +19,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// SkipDir is used as a return value from WalkFunc to indicate that
-// the directory named in the call is to be skipped. It is not returned
+// SkipEntry is used as a return value from WalkFunc to indicate that
+// the entry named in the call is to be skipped. It is not returned
 // as an error by any function.
-var SkipDir = errors.New("skip this directory")
+var SkipEntry = errors.New("skip this key")
 
 // WalkFunc is the type of the function called for each data block under the
 // Workspace.
-//
-// NOTE
-// Walker in this package honors SkipDir only when walkFunc is called for a
-// directory.
-//
-// This is a key difference from path/filepath.Walk,
-// in which if filepath.Walkunc returns SkipDir when invoked on a
-// non-directory file, Walk skips the remaining files in the
-// containing directory.
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 	size uint64, isDir bool) error
 
@@ -78,14 +69,14 @@ func panicHandler(c *Ctx, err *error) {
 
 // Walk the workspace hierarchy
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
-	wf WalkFunc) error {
+	wf WalkFunc) (err error) {
 
 	// encompass the provided datastore in an
 	// AggregateDataStore
 	ads := aggregatedatastore.New(ds)
 
 	buf := simplebuffer.New(nil, rootID)
-	if err := ads.Get(cq, rootID, buf); err != nil {
+	if err = ads.Get(cq, rootID, buf); err != nil {
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
@@ -116,7 +107,11 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		group.Go(func() (err error) {
 			defer panicHandler(c, &err)
 			err = worker(c, keyChan, wf)
-			return
+			if err != nil {
+				cq.Elog(qlog.LogTool, "Worker error: %s",
+					err.Error())
+			}
+			return err
 		})
 	}
 
@@ -125,14 +120,16 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		defer close(keyChan)
 
 		// WSR
-		if err = writeToChan(c, keyChan, "", rootID,
+		if err = writeToChan(c, keyChan, "[rootId]", rootID,
 			uint64(buf.Size())); err != nil {
-			return
+
+			return err
 		}
 
 		if err = handleHardLinks(c, ads, wsr.HardlinkEntry(), wf,
 			keyChan); err != nil {
-			return
+
+			return err
 		}
 
 		// all the hardlinks in this workspace must be walked
@@ -141,15 +138,19 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		// path which represents the hardlink
 
 		if err = handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
-			keyChan); err != nil {
-			if err == SkipDir {
-				return nil
-			}
+			keyChan); err != nil && err != SkipEntry {
+
 			return err
 		}
-		return
+
+		return nil
 	})
-	return group.Wait()
+
+	err = group.Wait()
+	if err != nil {
+		cq.Elog(qlog.LogTool, "Walk error: %s", err.Error())
+	}
+	return err
 }
 
 func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
@@ -163,8 +164,10 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 			hlr := hle.Entry(idx)
 			dr := hlr.Record()
 			linkPath := dr.Filename()
-			if err := handleDirectoryRecord(c, linkPath, ds, dr, wf,
-				keyChan); err != nil {
+			err := handleDirectoryRecord(c, linkPath, ds, dr, wf,
+				keyChan)
+
+			if err != nil && err != SkipEntry {
 				return err
 			}
 			// add an entry to enable lookup based on FileId
@@ -183,7 +186,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"WorkspaceRoot buffer %s", key.String())
 
-		if err := writeToChan(c, keyChan, "", key,
+		if err := writeToChan(c, keyChan, "[hardlink table]", key,
 			uint64(buf.Size())); err != nil {
 			return err
 		}
@@ -245,8 +248,9 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 	vlf := buf.AsVeryLargeFile()
 	for part := 0; part < vlf.NumberOfParts(); part++ {
-		if err := handleMultiBlockFile(c, path, ds,
-			vlf.LargeFileKey(part), wf, keyChan); err != nil {
+		if err := handleMultiBlockFile(c, path, ds, vlf.LargeFileKey(part),
+			wf, keyChan); err != nil && err != SkipEntry {
+
 			return err
 		}
 	}
@@ -267,13 +271,13 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"DirectoryEntry buffer %s", key.String())
 
-		// When wf returns SkipDir for a DirectoryEntry, we can skip all the
-		// DirectoryRecord in that DirectoryEntry
+		// When wf returns SkipEntry for a DirectoryEntry, we can skip the
+		// DirectoryRecords in that DirectoryEntry
 		if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
 			// TODO(sid): See how this works with chain DirectoryEntries.
 			//            Since we check only the first of the many
 			//            chained DiretoryEntries.
-			if err == SkipDir {
+			if err == SkipEntry {
 				return nil
 			}
 			return err
@@ -281,8 +285,9 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 
 		de := buf.AsDirectoryEntry()
 		for i := 0; i < de.NumEntries(); i++ {
-			if err := handleDirectoryRecord(c, path, ds,
-				de.Entry(i), wf, keyChan); err != nil {
+			if err := handleDirectoryRecord(c, path, ds, de.Entry(i), wf,
+				keyChan); err != nil && err != SkipEntry {
+
 				return err
 			}
 		}
@@ -415,7 +420,7 @@ func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 			}
 		}
 		if err := wf(c, keyItem.path, keyItem.key,
-			keyItem.size, false); err != nil {
+			keyItem.size, false); err != nil && err != SkipEntry {
 			return err
 		}
 	}

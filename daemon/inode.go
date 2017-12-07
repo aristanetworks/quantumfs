@@ -154,8 +154,10 @@ type Inode interface {
 	parentHasAncestor(c *ctx, ancestor Inode) bool
 	parentCheckLinkReparent(c *ctx, parent *Directory)
 
-	dirty(c *ctx) // Mark this Inode dirty
-	markClean_()  // Mark this Inode as cleaned
+	dirty(c *ctx)              // Mark this Inode dirty
+	markClean_() *list.Element // Mark this Inode as cleaned
+	// Undo marking the inode as clean
+	markUnclean_(dirtyElement *list.Element) bool
 	// Mark this Inode dirty because a child is dirty
 	dirtyChild(c *ctx, child InodeId)
 
@@ -427,7 +429,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	link := record.(*Hardlink)
 
 	// This may need to be turned back into a normal file
-	newRecord, inodeId := parent.wsr.removeHardlink(c, link.fileId)
+	newRecord, inodeId := parent.hardlinkTable.removeHardlink(c, link.fileId)
 
 	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
 		// wsr says hardlink isn't ready for removal yet
@@ -501,8 +503,20 @@ func (inode *InodeCommon) dirty(c *ctx) {
 
 // Mark this Inode as having been cleaned
 // flusher lock must be locked when calling this function
-func (inode *InodeCommon) markClean_() {
+func (inode *InodeCommon) markClean_() *list.Element {
+	dirtyElement := inode.dirtyElement__
 	inode.dirtyElement__ = nil
+	return dirtyElement
+}
+
+// Undo marking this inode as clean
+// flusher lock must be locked when calling this function
+func (inode *InodeCommon) markUnclean_(dirtyElement *list.Element) (already bool) {
+	if inode.dirtyElement__ == nil {
+		inode.dirtyElement__ = dirtyElement
+		return false
+	}
+	return true
 }
 
 func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
@@ -677,8 +691,8 @@ func (inode *InodeCommon) cleanup(c *ctx) {
 	// Most inodes have nothing to do here
 }
 
-func reload(c *ctx, wsr *WorkspaceRoot, rc *RefreshContext, inode Inode,
-	remoteRecord quantumfs.DirectoryRecord) {
+func reload(c *ctx, hardlinkTable HardlinkTable, rc *RefreshContext, inode Inode,
+	remoteRecord quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
 		remoteRecord.Type()).Out()
@@ -696,9 +710,9 @@ func reload(c *ctx, wsr *WorkspaceRoot, rc *RefreshContext, inode Inode,
 		subdir.refresh_DOWN(c, rc, remoteRecord.ID())
 	case quantumfs.ObjectTypeHardlink:
 		fileId := remoteRecord.FileId()
-		valid, hardlinkRecord := wsr.getHardlink(fileId)
+		valid, hardlinkRecord := hardlinkTable.getHardlink(fileId)
 		utils.Assert(valid, "hardlink %d not found", fileId)
-		remoteRecord = &hardlinkRecord
+		remoteRecord = hardlinkRecord
 		fallthrough
 	case quantumfs.ObjectTypeSmallFile:
 		fallthrough
