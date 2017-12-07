@@ -86,18 +86,21 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		panic("Attempted to fetch embedded key")
 	}
 
-	buf := newEmptyBuffer()
-	initBuffer(&buf, store, key)
-
-	err := quantumfs.ConstantStore.Get(c, key, &buf)
+	var thinBuf buffer
+	thinBuf.dataStore = store
+	thinBuf.key = key
+	err := quantumfs.ConstantStore.Get(c, key, &thinBuf)
 	if err == nil {
 		c.Vlog(qlog.LogDaemon, "Found key in constant store")
-		return &buf
+		return &thinBuf
 	}
 
 	// Check cache
 	bufResult, resultChannel := store.cache.get(c, key,
 		func() *buffer {
+			buf := newEmptyBuffer()
+			initBuffer(&buf, store, key)
+
 			err = store.durableStore.Get(c, key, &buf)
 			if err == nil {
 				c.Vlog(qlog.LogDaemon, "Found key in durable store")
