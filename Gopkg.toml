@@ -40,3 +40,12 @@
   source = "gerrit.corp.arista.io/ether"
   branch = "master"
 
+
+[[constraint]]
+  name = "github.com/gocql/gocql"
+  revision = "ffae44103aa14ada9e2b342329f44ce354f399fd"
+
+[[override]]
+  name = "github.com/gocql/gocql"
+  revision = "ffae44103aa14ada9e2b342329f44ce354f399fd"
+

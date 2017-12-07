@@ -38,20 +38,26 @@ clean:
 # if updates are available.
 #
 # Cityhash contains no go code, so dep currently won't handle it.
-# Clone it under the vendor dir for safe keeping (should we begin committing vendor).
+# Clone it under the vendor dir for safe keeping (should we begin committing vendor)
+# and reset to a known commit.
+
+define fetch-cityhash =
+	-rm -rf vendor/cityhash
+	git clone https://github.com/google/cityhash vendor/cityhash
+	cd vendor/cityhash && git reset 8af9b8c2b889d80c22d6bc26ba0df1afb79a30db   # Wed Jul 31 23:34:41 2013
+	rm -rf vendor/cityhash/.git
+endef
 
 check-dep-installed:
 	dep version &>/dev/null || go get -u github.com/golang/dep/cmd/dep
 
 fetch: check-dep-installed
 	dep ensure -v
-	git clone https://github.com/google/cityhash vendor/cityhash
-	rm -rf vendor/cityhash/.git
+	$(fetch-cityhash)
 
 update: check-dep-installed
 	dep ensure -v --update
-	git clone https://github.com/google/cityhash vendor/cityhash
-	rm -rf vendor/cityhash/.git
+	$(fetch-cityhash)
 	@echo "Please review and commit any changes to Gopkg.toml and Gopkg.lock"
 
 vet: $(PKGS_TO_TEST) $(COMMANDS)

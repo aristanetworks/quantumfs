@@ -17,7 +17,7 @@
   branch = "master"
   name = "github.com/aristanetworks/ether"
   packages = [".","blobstore","cql","filesystem","qubit/wsdb","utils","utils/stats","utils/stats/inmem"]
-  revision = "d076331009b047b3af57d60039b2da4772c5c425"
+  revision = "052ae365108187d835ad3afd0b3cb33240b6c295"
   source = "gerrit.corp.arista.io/ether"
 
 [[projects]]
@@ -52,10 +52,9 @@
   revision = "cd7940bb26b149ce2faf398e7c63fff01aa7b394"
 
 [[projects]]
-  branch = "master"
   name = "github.com/gocql/gocql"
   packages = [".","internal/lru","internal/murmur","internal/streams"]
-  revision = "1762cce65eafd098045e30ef2b7df2c289740971"
+  revision = "ffae44103aa14ada9e2b342329f44ce354f399fd"
 
 [[projects]]
   branch = "master"
@@ -109,7 +108,7 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "6921abc35dffd00438a0c020584ce560108737ea"
+  revision = "a8b9294777976932365dabb6640cf1468d95c70f"
 
 [[projects]]
   branch = "master"
@@ -121,13 +120,13 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "b76f9891dc1d975623261def70f9b89661f5baab"
+  revision = "9167dbfd0f8e88b731dd88cbf73a270701a37bb4"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
-  revision = "572a2b141f625f4360cf42a41a43622067e0510b"
+  revision = "be25de41fadfae372d6470bda81ca6beb55ef551"
 
 [[projects]]
   branch = "master"
@@ -137,9 +136,9 @@
 
 [[projects]]
   name = "google.golang.org/grpc"
-  packages = [".","balancer","balancer/roundrobin","codes","connectivity","credentials","encoding","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","resolver","resolver/dns","resolver/passthrough","stats","status","tap","transport"]
-  revision = "5a9f7b402fe85096d2e1d0383435ee1876e863d0"
-  version = "v1.8.0"
+  packages = [".","balancer","balancer/roundrobin","codes","connectivity","credentials","encoding","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","resolver","resolver/dns","resolver/manual","resolver/passthrough","stats","status","tap","transport"]
+  revision = "be077907e29fdb945d351e4284eb5361e7f8924e"
+  version = "v1.8.1"
 
 [[projects]]
   name = "gopkg.in/inf.v0"
@@ -150,6 +149,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "5b10b7eb57af42f10716f556ab1764513105c2f89a44fb81f9a27857947cf153"
+  inputs-digest = "2f7dce2c10e37349a94c4aed4d7b07a828348ebf832646b55b2b7f6c055cc144"
   solver-name = "gps-cdcl"
   solver-version = 1
