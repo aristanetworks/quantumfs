@@ -339,8 +339,8 @@ func (dir *DirectoryEntry) Entry(i int) *DirectRecord {
 	return overlayDirectoryRecord(dir.dir.Entries().At(i))
 }
 
-func (dir *DirectoryEntry) SetEntry(i int, record *DirectRecord) {
-	dir.dir.Entries().Set(i, record.record)
+func (dir *DirectoryEntry) SetEntry(i int, record PublishableRecord) {
+	dir.dir.Entries().Set(i, record.Record())
 }
 
 func (dir *DirectoryEntry) Next() ObjectKey {
@@ -650,8 +650,8 @@ func (r *HardlinkRecord) Record() *DirectRecord {
 	return overlayDirectoryRecord(r.record.Record())
 }
 
-func (r *HardlinkRecord) SetRecord(v *DirectRecord) {
-	r.record.SetRecord(v.record)
+func (r *HardlinkRecord) SetRecord(record DirectoryRecord) {
+	r.record.SetRecord(record.(*DirectRecord).record)
 }
 
 func (r *HardlinkRecord) Nlinks() uint32 {
@@ -855,7 +855,6 @@ type DirectoryRecord interface {
 	FileId() FileId
 	SetFileId(fileId FileId)
 
-	Record() DirectRecord
 	Nlinks() uint32
 
 	EncodeExtendedKey() []byte
@@ -868,6 +867,26 @@ type DirectoryRecord interface {
 	// returns a real copy, which can result in future changes changing the
 	// original depending on the underlying class.
 	Clone() DirectoryRecord
+
+	Publishable() PublishableRecord
+}
+
+type PublishableRecord struct {
+	*DirectRecord
+}
+
+func AsPublishableRecord(record DirectoryRecord) PublishableRecord {
+	return PublishableRecord{
+		record.(*DirectRecord),
+	}
+}
+
+func (pr *PublishableRecord) Nlinks() uint32 {
+	panic("A publishable record must not be queried for nlinks")
+}
+
+func (pr *PublishableRecord) Record() encoding.DirectoryRecord {
+	return pr.record
 }
 
 // Just like DirectoryRecord, but without any mutators
@@ -909,8 +928,8 @@ func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectRecord {
 	return &record
 }
 
-func (record *DirectRecord) Record() DirectRecord {
-	return *record
+func (record *DirectRecord) Publishable() PublishableRecord {
+	return AsPublishableRecord(record)
 }
 
 func (record *DirectRecord) Nlinks() uint32 {

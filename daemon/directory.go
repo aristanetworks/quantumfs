@@ -364,9 +364,7 @@ func publishDirectoryRecords(c *ctx,
 				quantumfs.NewDirectoryEntry(numEntries)
 			entryIdx = 0
 		}
-
-		recordCopy := child.Record()
-		baseLayer.SetEntry(entryIdx, &recordCopy)
+		baseLayer.SetEntry(entryIdx, child.Publishable())
 
 		entryIdx++
 	}
