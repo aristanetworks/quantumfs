@@ -11,18 +11,28 @@ Dev Environment Setup
 1) Ensure your GOPATH environment variable is correctly pointed such that this
 README's folder path is $GOPATH/src/github.com/aristanetworks/quantumfs/README
 
-2) Clone the dependent go libraries:
+2) Fetch vendored dependencies.
+   Make a once-off change to your git configuration so that `dep` can
+   resolve references to gerrit-hosted dependencies.
+
+      git config --global \
+         url."https://gerrit.corp.arista.io/".insteadOf \
+         "https://gerrit.corp.arista.io/a/"
+
+   Populate the vendor subdirectory with the required dependency versions,
+   independent of any present in $GOPATH/src.
 
 	cd $GOPATH/src/github.com/aristanetworks/quantumfs
-        make fetch
+	make fetch
 
-3) Compile and install the Google CityHash library:
+3) Compile and install the Google CityHash library.
+   A version was downloaded by `make fetch` to the vendor/cityhash directory.
 
-	go get github.com/google/cityhash
-	cd $GOPATH/src/github.com/google/cityhash
+	cd vendor/cityhash
 	./configure --enable-sse4.2
 	make all check CXXFLAGS="-g -O3 -msse4.2"
 	sudo make install
+	cd ../..
 
 4) Install protobufs:
 	sudo yum install protobuf-devel
@@ -36,6 +46,33 @@ building QFSClient.
 7) If you want to generate an RPM, you must also install fpm
 (https://fpm.readthedocs.io).
 
+
+Vendoring Dependencies
+----------------------
+
+This build environment uses `dep` to manage dependency copies in the vendor
+subdirectory.
+
+The documentation for `dep` can be found at: https://github.com/golang/dep
+
+This tool helps us ensure that we have a record of the precise versions of
+every go dependency in use by the QuantumFS build environment - especially
+when preparing RPMs for releasde.
+
+Any package present in the vendor directory will be used instead of
+an equivalent available elsewhere (eg under $GOPATH/src).
+
+Use `make fetch` to refresh the content of the vendor directory based on
+the versions recorded in Gopkg.lock. `dep` will be installed if necessary.
+
+Use `make update` to check for updates to existing dependencies, or where
+new dependencies are referenced in the code.  This will attempt to resolve
+any conflicting version requirements, and record the updated versions in
+use in Gopkg.lock.
+If there are updates, ensure tests are passing, and then commit the
+updated Gopkg.*.
+
+
 Instructions
 ------------
 
@@ -45,6 +82,7 @@ Instructions
 
 * to generate an RPM:
 
+	make fetch
 	make rpm
 
 Limits

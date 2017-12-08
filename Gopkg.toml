@@ -1,0 +1,51 @@
+# Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
+# Arista Networks, Inc. Confidential and Proprietary.
+
+# Dependency management constraints.
+# See https://github.com/golang/dep for additional background.
+
+# Provide constraints and overrides for packages that aren't
+# available from their apparent paths.
+# Both constraints and overrides are needed so  that these are
+# used to resolve direct and transitive dependencies.
+#
+# In order to resolve any packages that are hosted on gerrit,
+# please also run a one-off git configuration change which is
+# currently required to work around a gerrit plugin issue which
+# returns an authentication request for the "go-get" check.
+#
+# $ git config --global url."https://gerrit.corp.arista.io/".insteadOf "https://gerrit.corp.arista.io/a/"
+#
+# For backgrounder on "go get"-able repositories, see
+# https://golang.org/cmd/go/#hdr-Remote_import_paths
+
+[[constraint]]
+  name = "github.com/aristanetworks/influxlib"
+  source = "gut.aristanetworks.com/repos/influxlib"
+  branch = "master"
+
+[[override]]
+  name = "github.com/aristanetworks/influxlib"
+  source = "gut.aristanetworks.com/repos/influxlib"
+  branch = "master"
+
+
+[[constraint]]
+  name = "github.com/aristanetworks/ether"
+  source = "gerrit.corp.arista.io/ether"
+  branch = "master"
+
+[[override]]
+  name = "github.com/aristanetworks/ether"
+  source = "gerrit.corp.arista.io/ether"
+  branch = "master"
+
+
+[[constraint]]
+  name = "github.com/gocql/gocql"
+  revision = "ffae44103aa14ada9e2b342329f44ce354f399fd"
+
+[[override]]
+  name = "github.com/gocql/gocql"
+  revision = "ffae44103aa14ada9e2b342329f44ce354f399fd"
+
