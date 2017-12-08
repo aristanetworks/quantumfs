@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GOFILES=$(find . -name "*.go")
+GOFILES=$(find . -name "*.go" -not -path "./vendor/*")
 IGNORE="./daemon/inode.go"
 
 FAILED=0

@@ -10,6 +10,7 @@
 /emptykeys
 /cmd/wsdbservice/wsdbservice
 /contentcheck
+/vendor
 /QuantumFS*.rpm
 .*.swp
 .swp
