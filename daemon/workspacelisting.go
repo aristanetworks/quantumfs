@@ -404,8 +404,7 @@ func (tsl *TypespaceList) getChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on TypespaceList")
-	return &quantumfs.DirectRecord{},
-		errors.New("Unsupported record fetch on TypespaceList")
+	return nil, errors.New("Unsupported record fetch on TypespaceList")
 }
 
 func (tsl *TypespaceList) Unlink(c *ctx, name string) fuse.Status {
@@ -729,8 +728,7 @@ func (nsl *NamespaceList) getChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on NamespaceList")
-	return &quantumfs.DirectRecord{},
-		errors.New("Unsupported record fetch on NamespaceList")
+	return nil, errors.New("Unsupported record fetch on NamespaceList")
 }
 
 func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
@@ -1118,8 +1116,7 @@ func (wsl *WorkspaceList) getChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	c.elog("Unsupported record fetch on WorkspaceList")
-	return &quantumfs.DirectRecord{},
-		errors.New("Unsupported record fetch on WorkspaceList")
+	return nil, errors.New("Unsupported record fetch on WorkspaceList")
 }
 
 func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {

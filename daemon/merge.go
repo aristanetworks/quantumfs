@@ -19,7 +19,7 @@ import (
 // Note: We assume that FileId is universally unique and will never collide
 type hardlinkTracker struct {
 	// contains all local and remote records, with their contents merged
-	allRecords map[quantumfs.FileId]*quantumfs.DirectRecord
+	allRecords map[quantumfs.FileId]quantumfs.DirectoryRecord
 
 	merged map[quantumfs.FileId]linkEntry
 }
@@ -31,7 +31,7 @@ func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]linkEntry,
 	defer c.funcIn("newHardlinkTracker").Out()
 
 	rtn := hardlinkTracker{
-		allRecords: make(map[quantumfs.FileId]*quantumfs.DirectRecord),
+		allRecords: make(map[quantumfs.FileId]quantumfs.DirectoryRecord),
 		merged:     make(map[quantumfs.FileId]linkEntry),
 	}
 
@@ -55,7 +55,7 @@ func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]linkEntry,
 				panic(err)
 			}
 
-			rtn.allRecords[k] = mergedRecord.(*quantumfs.DirectRecord)
+			rtn.allRecords[k] = mergedRecord.(quantumfs.DirectoryRecord)
 		} else {
 			rtn.allRecords[k] = localEntry.record
 		}
@@ -357,9 +357,7 @@ func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 				entryCapacity)
 			entryIdx = 0
 		}
-
-		recordCopy := record.Record()
-		baseLayer.SetEntry(entryIdx, &recordCopy)
+		baseLayer.SetEntry(entryIdx, record.Publishable())
 
 		entryIdx++
 	}

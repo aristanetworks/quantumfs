@@ -4,7 +4,6 @@
 package daemon
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -41,7 +40,7 @@ func (cmap *ChildMap) loadAllChildren(c *ctx,
 
 	uninstantiated := make([]InodeId, 0, 200) // 200 arbitrarily chosen
 
-	foreachDentry(c, baseLayerId, func(record *quantumfs.DirectRecord) {
+	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
 		c.vlog("Loading child %s", record.Filename())
 		childInodeNum := cmap.loadChild(c, record, quantumfs.InodeIdInvalid)
 		c.vlog("loaded child %d", childInodeNum)
@@ -143,33 +142,13 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 				entry.ContentTime(), cmap.dir.hardlinkTable)
 		}
 
-		establishedInodeId :=
-			cmap.dir.hardlinkTable.getHardlinkInodeId(c, fileId,
-				inodeId)
+		inodeId = cmap.dir.hardlinkTable.findHardlinkInodeId(c,
+			fileId, inodeId)
+	}
 
-		// If you try to load a hardlink and provide a real inodeId, it
-		// should normally match the actual inodeId.
-		// The only exception is when the file used to be of another type,
-		// but after a refresh it has been changed to be a hardlink.
-		if inodeId != quantumfs.InodeIdInvalid &&
-			inodeId != establishedInodeId {
-
-			c.wlog("requested hardlink inodeId %d exists as %d",
-				inodeId, establishedInodeId)
-		}
-		inodeId = establishedInodeId
-	} else if inodeId == quantumfs.InodeIdInvalid {
+	if inodeId == quantumfs.InodeIdInvalid {
 		inodeId = c.qfs.newInodeId()
 	}
-
-	if entry == nil {
-		panic(fmt.Sprintf("Nil DirectoryEntry for inode %d", inodeId))
-	}
-
-	utils.Assert(inodeId != quantumfs.InodeIdInvalid,
-		"Inode for loaded child %s is zero", entry.Filename())
-	// child is not dirty by default
-
 	cmap.setRecord(c, inodeId, entry)
 
 	return inodeId

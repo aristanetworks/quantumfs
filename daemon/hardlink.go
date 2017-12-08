@@ -19,6 +19,8 @@ type Hardlink struct {
 	creationTime quantumfs.Time
 
 	hardlinkTable HardlinkTable
+
+	publishRecord quantumfs.DirectoryRecord
 }
 
 func newHardlink(name string, fileId quantumfs.FileId, creationTime quantumfs.Time,
@@ -32,10 +34,18 @@ func newHardlink(name string, fileId quantumfs.FileId, creationTime quantumfs.Ti
 	newLink.fileId = fileId
 	newLink.creationTime = creationTime
 
+	publishRecord := quantumfs.NewDirectoryRecord()
+	publishRecord.SetType(quantumfs.ObjectTypeHardlink)
+	publishRecord.SetID(newLink.ID())
+	publishRecord.SetFileId(newLink.fileId)
+	publishRecord.SetExtendedAttributes(quantumfs.EmptyBlockKey)
+
+	newLink.publishRecord = publishRecord
+
 	return &newLink
 }
 
-func (link *Hardlink) get() *quantumfs.DirectRecord {
+func (link *Hardlink) get() quantumfs.ImmutableDirectoryRecord {
 	valid, link_ := link.hardlinkTable.getHardlink(link.fileId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
@@ -43,10 +53,10 @@ func (link *Hardlink) get() *quantumfs.DirectRecord {
 			link.fileId))
 	}
 
-	return &link_
+	return link_
 }
 
-func (link *Hardlink) set(fnSetter func(dir *quantumfs.DirectRecord)) {
+func (link *Hardlink) set(fnSetter func(dir quantumfs.DirectoryRecord)) {
 	link.hardlinkTable.setHardlink(link.fileId, fnSetter)
 }
 
@@ -78,7 +88,7 @@ func (link *Hardlink) SetType(v quantumfs.ObjectType) {
 		panic("SetType called making hardlink")
 	}
 
-	link.set(func(dir *quantumfs.DirectRecord) {
+	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetType(v)
 	})
 }
@@ -88,7 +98,7 @@ func (link *Hardlink) Permissions() uint32 {
 }
 
 func (link *Hardlink) SetPermissions(v uint32) {
-	link.set(func(dir *quantumfs.DirectRecord) {
+	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetPermissions(v)
 	})
 }
@@ -98,7 +108,7 @@ func (link *Hardlink) Owner() quantumfs.UID {
 }
 
 func (link *Hardlink) SetOwner(v quantumfs.UID) {
-	link.set(func(dir *quantumfs.DirectRecord) {
+	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetOwner(v)
 	})
 }
@@ -108,7 +118,7 @@ func (link *Hardlink) Group() quantumfs.GID {
 }
 
 func (link *Hardlink) SetGroup(v quantumfs.GID) {
-	link.set(func(dir *quantumfs.DirectRecord) {
+	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetGroup(v)
 	})
 }
@@ -118,7 +128,7 @@ func (link *Hardlink) Size() uint64 {
 }
 
 func (link *Hardlink) SetSize(v uint64) {
-	link.set(func(dir *quantumfs.DirectRecord) {
+	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetSize(v)
 	})
 }
@@ -128,7 +138,7 @@ func (link *Hardlink) ExtendedAttributes() quantumfs.ObjectKey {
 }
 
 func (link *Hardlink) SetExtendedAttributes(v quantumfs.ObjectKey) {
-	link.set(func(dir *quantumfs.DirectRecord) {
+	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetExtendedAttributes(v)
 	})
 }
@@ -138,7 +148,7 @@ func (link *Hardlink) ContentTime() quantumfs.Time {
 }
 
 func (link *Hardlink) SetContentTime(v quantumfs.Time) {
-	link.set(func(dir *quantumfs.DirectRecord) {
+	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetContentTime(v)
 	})
 }
@@ -148,7 +158,7 @@ func (link *Hardlink) ModificationTime() quantumfs.Time {
 }
 
 func (link *Hardlink) SetModificationTime(v quantumfs.Time) {
-	link.set(func(dir *quantumfs.DirectRecord) {
+	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetModificationTime(v)
 	})
 }
@@ -162,21 +172,15 @@ func (link *Hardlink) SetFileId(fileId quantumfs.FileId) {
 		"attempt to change fileId %d -> %d", fileId, link.fileId)
 }
 
-func (link *Hardlink) Record() quantumfs.DirectRecord {
-	// Note: this is a DirectRecord shallow copy type
-	rtn := quantumfs.NewDirectoryRecord()
-	rtn.SetType(quantumfs.ObjectTypeHardlink)
-	rtn.SetFilename(link.name)
-	rtn.SetFileId(link.fileId)
-	rtn.SetContentTime(link.creationTime)
-	rtn.SetID(link.ID())
-	// Ensure we have a valid empty extended attrs
-	rtn.SetExtendedAttributes(quantumfs.EmptyBlockKey)
+func (link *Hardlink) Publishable() quantumfs.PublishableRecord {
 
-	// we only need to return a thin record - just enough information to
-	// create the hardlink. The rest is stored in workspaceroot.
+	// The immutable parts of the publishRecord are always correct,
+	// just update the file name and creationTime as they might have
+	// changed.
+	link.publishRecord.SetFilename(link.name)
+	link.publishRecord.SetContentTime(link.creationTime)
 
-	return *rtn
+	return quantumfs.AsPublishableRecord(link.publishRecord)
 }
 
 func (link *Hardlink) Nlinks() uint32 {
