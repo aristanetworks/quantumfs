@@ -87,8 +87,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	}
 
 	var thinBuf buffer
-	thinBuf.dataStore = store
-	thinBuf.key = key
+	initBuffer(&thinBuf, store, key)
 	err := quantumfs.ConstantStore.Get(c, key, &thinBuf)
 	if err == nil {
 		c.Vlog(qlog.LogDaemon, "Found key in constant store")
