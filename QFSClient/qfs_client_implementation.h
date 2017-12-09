@@ -193,6 +193,9 @@ class CommandBuffer {
 	CommandBuffer();
 	virtual ~CommandBuffer();
 
+	// Remove the trailing zeros from the tail of the response
+	void Sanitize();
+
 	// Copy the contents of the given CommandBuffer into this one
 	void Copy(const CommandBuffer &source);
 

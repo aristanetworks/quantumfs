@@ -429,7 +429,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	link := record.(*Hardlink)
 
 	// This may need to be turned back into a normal file
-	newRecord, inodeId := parent.wsr.removeHardlink(c, link.fileId)
+	newRecord, inodeId := parent.hardlinkTable.removeHardlink(c, link.fileId)
 
 	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
 		// wsr says hardlink isn't ready for removal yet
@@ -691,8 +691,8 @@ func (inode *InodeCommon) cleanup(c *ctx) {
 	// Most inodes have nothing to do here
 }
 
-func reload(c *ctx, wsr *WorkspaceRoot, rc *RefreshContext, inode Inode,
-	remoteRecord quantumfs.DirectoryRecord) {
+func reload(c *ctx, hardlinkTable HardlinkTable, rc *RefreshContext, inode Inode,
+	remoteRecord quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.FuncIn("reload", "%s: %d", remoteRecord.Filename(),
 		remoteRecord.Type()).Out()
@@ -710,9 +710,9 @@ func reload(c *ctx, wsr *WorkspaceRoot, rc *RefreshContext, inode Inode,
 		subdir.refresh_DOWN(c, rc, remoteRecord.ID())
 	case quantumfs.ObjectTypeHardlink:
 		fileId := remoteRecord.FileId()
-		valid, hardlinkRecord := wsr.getHardlink(fileId)
+		valid, hardlinkRecord := hardlinkTable.getHardlink(fileId)
 		utils.Assert(valid, "hardlink %d not found", fileId)
-		remoteRecord = &hardlinkRecord
+		remoteRecord = hardlinkRecord
 		fallthrough
 	case quantumfs.ObjectTypeSmallFile:
 		fallthrough

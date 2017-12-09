@@ -114,7 +114,7 @@ func (wsr *ApiInode) getChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	c.elog("Api doesn't support record fetch")
-	return &quantumfs.DirectRecord{}, errors.New("Unsupported record fetch")
+	return nil, errors.New("Unsupported record fetch")
 }
 
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
@@ -614,7 +614,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 			"Workspace rootId advanced after merge began, try again.")
 	}
 
-	localWsr.refresh_(c)
+	localWsr.refresh_(c, nil)
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Merge Succeeded")
 }

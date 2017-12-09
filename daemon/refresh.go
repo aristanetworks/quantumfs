@@ -44,13 +44,19 @@ type RefreshContext struct {
 	// but are not present in the remote workspace.
 	// This list will be populated when building the fileMap
 	staleRecords []FileRemoveRecord
+	rootId       quantumfs.ObjectKey
 }
 
-func newRefreshContext() RefreshContext {
-	return RefreshContext{
+func newRefreshContext(c *ctx, rootId quantumfs.ObjectKey) *RefreshContext {
+	rc := RefreshContext{
 		fileMap:      make(map[quantumfs.FileId]*FileLoadRecord, 0),
 		staleRecords: make([]FileRemoveRecord, 0),
+		rootId:       rootId,
 	}
+	workspaceRoot := c.dataStore.Get(&c.Ctx, rootId).AsWorkspaceRoot()
+	baseLayerId := workspaceRoot.BaseLayer()
+	rc.buildRefreshMap(c, baseLayerId, "")
+	return &rc
 }
 
 func (rc *RefreshContext) addStaleEntry(c *ctx, parentId InodeId, inodeId InodeId,
@@ -119,7 +125,7 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, baseLayerId quantumfs.ObjectKe
 	path string) {
 
 	defer c.FuncIn("RefreshContext::buildRefreshMap", "%s", path).Out()
-	foreachDentry(c, baseLayerId, func(record *quantumfs.DirectRecord) {
+	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
 		rc.fileMap[record.FileId()] = &FileLoadRecord{
 			remoteRecord:  record,
 			inodeId:       quantumfs.InodeIdInvalid,
@@ -318,21 +324,20 @@ func (wsr *WorkspaceRoot) unlinkStaleHardlinks(c *ctx,
 }
 
 // The caller must hold the tree lock
-func (wsr *WorkspaceRoot) refreshTo_(c *ctx, rootId quantumfs.ObjectKey) {
+func (wsr *WorkspaceRoot) refreshTo_(c *ctx, rc *RefreshContext) {
+
 	defer c.funcIn("WorkspaceRoot::refreshTo_").Out()
 
-	buffer := c.dataStore.Get(&c.Ctx, rootId)
+	buffer := c.dataStore.Get(&c.Ctx, rc.rootId)
 	workspaceRoot := buffer.AsWorkspaceRoot()
 	baseLayerId := workspaceRoot.BaseLayer()
 	hardlinkEntry := workspaceRoot.HardlinkEntry()
-	rc := newRefreshContext()
 
-	rc.buildRefreshMap(c, baseLayerId, "")
-	wsr.updateRefreshMap_DOWN(c, &rc, &baseLayerId)
-	detachStaleDentries(c, &rc)
-	wsr.refreshHardlinks(c, &rc, hardlinkEntry)
-	wsr.refresh_DOWN(c, &rc, baseLayerId)
-	wsr.moveDentries_(c, &rc)
-	unlinkStaleDentries(c, &rc)
-	wsr.unlinkStaleHardlinks(c, &rc, hardlinkEntry)
+	wsr.updateRefreshMap_DOWN(c, rc, &baseLayerId)
+	detachStaleDentries(c, rc)
+	wsr.refreshHardlinks(c, rc, hardlinkEntry)
+	wsr.refresh_DOWN(c, rc, baseLayerId)
+	wsr.moveDentries_(c, rc)
+	unlinkStaleDentries(c, rc)
+	wsr.unlinkStaleHardlinks(c, rc, hardlinkEntry)
 }
