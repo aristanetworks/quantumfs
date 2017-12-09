@@ -270,14 +270,14 @@ func (qfs *QuantumFs) fuseNotifier() {
 				-1)
 
 		case NotifyFuseDeleted:
-			notification.c.vlog("Notifying FUSE of deleted %d (%s) in %d",
+			notification.c.vlog("Notifying FUSE of delete %d (%s) in %d",
 				notification.child, notification.name,
 				notification.parent)
 			err = qfs.server.DeleteNotify(uint64(notification.parent),
 				uint64(notification.child), notification.name)
 
 		case NotifyFuseCreated:
-			notification.c.vlog("Notifying FUSE of created (%s) in %d",
+			notification.c.vlog("Notifying FUSE of create (%s) in %d",
 				notification.name, notification.parent)
 			err = qfs.server.EntryNotify(uint64(notification.parent),
 				notification.name)
