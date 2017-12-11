@@ -13,25 +13,23 @@ import (
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/walker"
-	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 	"github.com/aristanetworks/qubit/tools/qwalker/utils"
+	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
-
-
 
 func (t *testHelper) testCtx() *Ctx {
 	datastore := t.GetDataStore()
 	translator := datastore.(*thirdparty_backends.EtherBlobStoreTranslator)
 
-	return &Ctx {
-		qctx:	t.QfsCtx(),
-		wsdb:	t.GetWorkspaceDB(),
-		ds:	datastore,
-		cqlds:	translator.Blobstore,
-		ttlCfg: &qubitutils.TTLConfig {
-				SkipMapResetAfter_ms: 500,
-				TTLNew:	600,
-			},
+	return &Ctx{
+		qctx:  t.QfsCtx(),
+		wsdb:  t.GetWorkspaceDB(),
+		ds:    datastore,
+		cqlds: translator.Blobstore,
+		ttlCfg: &qubitutils.TTLConfig{
+			SkipMapResetAfter_ms: 500,
+			TTLNew:               600,
+		},
 		numWalkers: 1,
 	}
 }
@@ -41,8 +39,8 @@ func (test *testHelper) setTTL(c *Ctx, filepath string, ttl int64) {
 
 	record := test.GetRecord(filepath)
 	fileId := record.ID().Value()
-	walkerCtx := walker.Ctx {
-		Qctx:	c.qctx,
+	walkerCtx := walker.Ctx{
+		Qctx: c.qctx,
 	}
 
 	buf, _, err := c.cqlds.Get(utils.ToECtx(&walkerCtx), fileId)
@@ -59,8 +57,8 @@ func (test *testHelper) getTTL(c *Ctx, filepath string) int64 {
 
 	record := test.GetRecord(filepath)
 	fileId := record.ID().Value()
-	walkerCtx := walker.Ctx {
-		Qctx:	c.qctx,
+	walkerCtx := walker.Ctx{
+		Qctx: c.qctx,
 	}
 	metadata, err := c.cqlds.Metadata(utils.ToECtx(&walkerCtx), fileId)
 
@@ -82,7 +80,7 @@ func TestRefreshTTLCache(t *testing.T) {
 
 		workspace := test.NewWorkspace()
 		directory := workspace + "/dirA/dirB/dirC"
-		file :=	directory + "/file"
+		file := directory + "/file"
 
 		test.AssertNoErr(os.MkdirAll(directory, 0777))
 		test.AssertNoErr(testutils.PrintToFile(file, "file data"))
@@ -92,7 +90,7 @@ func TestRefreshTTLCache(t *testing.T) {
 		c := test.testCtx()
 		go walkFullWSDBLoop(c, false)
 
-		test.WaitFor("First walker pass", func () bool {
+		test.WaitFor("First walker pass", func() bool {
 			ttl := test.getTTL(c, file)
 			return ttl == c.ttlCfg.TTLNew
 		})
@@ -102,7 +100,7 @@ func TestRefreshTTLCache(t *testing.T) {
 
 		walks := test.CountLogStrings("TTL refresh for")
 
-		test.WaitFor("Walker to walk again", func () bool {
+		test.WaitFor("Walker to walk again", func() bool {
 			walksNow := test.CountLogStrings("TTL refresh for")
 			return walksNow > walks
 		})
@@ -114,7 +112,7 @@ func TestRefreshTTLCache(t *testing.T) {
 			"TTL refreshed, not skipped: %d", unrefreshedTTL)
 
 		test.WaitForLogString(SkipMapClearLog, "SkipMap never clears")
-		test.WaitFor("TTL to be refreshed again", func () bool {
+		test.WaitFor("TTL to be refreshed again", func() bool {
 			ttl := test.getTTL(c, file)
 			return ttl == c.ttlCfg.TTLNew
 		})
