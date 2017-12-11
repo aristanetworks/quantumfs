@@ -70,8 +70,8 @@ type cqlWalkerConfig struct {
 // TTLConfig hold the boundary TTL values to be used in the walker.
 type TTLConfig struct {
 	SkipMapResetAfter_ms int64
-	SkipMapMaxLen int
-	TTLNew       int64
+	SkipMapMaxLen        int
+	TTLNew               int64
 }
 
 // LoadTTLConfig loaks the TTL config values for the
