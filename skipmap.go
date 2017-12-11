@@ -13,24 +13,24 @@ import (
 )
 
 type SkipMap struct {
-	lru		list.List
-	keys		map[string]*list.Element
+	lru  list.List
+	keys map[string]*list.Element
 
-	maxLen		int
+	maxLen int
 
-	mutex		utils.DeferableMutex
+	mutex utils.DeferableMutex
 }
 
 func NewSkipMap(maxLength int) *SkipMap {
-	return &SkipMap {
-		lru:		list.List{},
-		keys:		make(map[string]*list.Element),
-		maxLen:		maxLength,
+	return &SkipMap{
+		lru:    list.List{},
+		keys:   make(map[string]*list.Element),
+		maxLen: maxLength,
 	}
 }
 
 func (bc *SkipMap) Check(c *walker.Ctx,
-	key quantumfs.ObjectKey) (inCache bool){
+	key quantumfs.ObjectKey) (inCache bool) {
 
 	defer bc.mutex.Lock().Unlock()
 
@@ -45,6 +45,7 @@ func (bc *SkipMap) Check(c *walker.Ctx,
 }
 
 var empty struct{}
+
 func (bc *SkipMap) Set(c *walker.Ctx, key quantumfs.ObjectKey) {
 	defer bc.mutex.Lock().Unlock()
 
