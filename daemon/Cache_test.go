@@ -220,7 +220,18 @@ func TestCacheLruDiffSize(t *testing.T) {
 			num++
 		}
 
-		// Cause a block to be refreshed to the beginning
+		// Cause a block to be refreshed to the beginning after waiting for
+		// all requests to finish
+		test.WaitFor("All asynchronous requests to finish", func () bool {
+			defer datastore.cache.lock.Lock().Unlock()
+			for _, entry := range datastore.cache.entryMap {
+				if entry.buf == nil {
+					return false
+				}
+			}
+
+			return true
+		})
 
 		// The size of keys[298] is 72 units of quantumfs.ObjectKeyLength, so
 		// it will take off the space up to keys[14] and part of keys[13].
@@ -228,6 +239,18 @@ func TestCacheLruDiffSize(t *testing.T) {
 		// keys[13] should be evicted.
 		buf = datastore.Get(c, keys[298])
 		test.Assert(buf != nil, "Block not found")
+
+		// Wait for the request to come in and be placed into the cache
+		test.WaitFor("All asynchronous requests to finish", func () bool {
+			defer datastore.cache.lock.Lock().Unlock()
+			for _, entry := range datastore.cache.entryMap {
+				if entry.buf == nil {
+					return false
+				}
+			}
+
+			return true
+		})
 
 		data := datastore.cache.lru.Back().Value.(*buffer)
 		i := int(data.data[1]) + int(data.data[2])*256
