@@ -306,8 +306,8 @@ func (lwh *LowMemFileHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 func (lwh *LowMemFileHandle) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	defer c.FuncIn("LowMemFileHandle::Read", "offset %d size %d nonblocking %t", offset,
-		size, nonblocking).Out()
+	defer c.FuncIn("LowMemFileHandle::Read", "offset %d size %d nonblocking %t",
+		offset, size, nonblocking).Out()
 
 	readCount := 0
 	if offset < uint64(len(lowMemDescription)) {
