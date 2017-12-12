@@ -222,7 +222,7 @@ func TestCacheLruDiffSize(t *testing.T) {
 
 		// Cause a block to be refreshed to the beginning after waiting for
 		// all requests to finish
-		test.WaitFor("All asynchronous requests to finish", func () bool {
+		test.WaitFor("All asynchronous requests to finish", func() bool {
 			defer datastore.cache.lock.Lock().Unlock()
 			for _, entry := range datastore.cache.entryMap {
 				if entry.buf == nil {
@@ -241,7 +241,7 @@ func TestCacheLruDiffSize(t *testing.T) {
 		test.Assert(buf != nil, "Block not found")
 
 		// Wait for the request to come in and be placed into the cache
-		test.WaitFor("All asynchronous requests to finish", func () bool {
+		test.WaitFor("All asynchronous requests to finish", func() bool {
 			defer datastore.cache.lock.Lock().Unlock()
 			for _, entry := range datastore.cache.entryMap {
 				if entry.buf == nil {
