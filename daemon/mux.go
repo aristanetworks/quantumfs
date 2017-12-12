@@ -260,6 +260,7 @@ func (qfs *QuantumFs) signalHandler(sigUsr1Chan chan os.Signal) {
 		select {
 		case <-sigUsr1Chan:
 			// Enter low memory mode
+			qfs.inLowMemoryMode = true
 			qfs.c.dataStore.shutdown()
 
 			// Release the memory
