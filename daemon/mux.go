@@ -171,6 +171,8 @@ type QuantumFs struct {
 	toBeReleased chan FileHandleId
 
 	stopWaitingForSignals chan struct{}
+
+	inLowMemoryMode bool
 }
 
 func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {

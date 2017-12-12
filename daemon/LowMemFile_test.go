@@ -7,6 +7,7 @@ package daemon
 
 import (
 	"syscall"
+	"testing"
 
 	"github.com/aristanetworks/quantumfs"
 )

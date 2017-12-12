@@ -21,8 +21,6 @@ func init() {
 	zeros = make([]byte, quantumfs.MaxBlockSize)
 }
 
-var inLowMemoryMode bool
-
 func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 	entryNum := cacheSize / 102400
 	store := &dataStore{
