@@ -110,6 +110,7 @@ func main() {
 }
 
 const SkipMapClearLog = "SkipMap period over - clearing."
+
 func walkFullWSDBLoop(c *Ctx, backOffLoop bool) {
 	ttlCfg := c.ttlCfg
 	if ttlCfg.SkipMapMaxLen == 0 {
@@ -118,9 +119,11 @@ func walkFullWSDBLoop(c *Ctx, backOffLoop bool) {
 	}
 
 	skipMap := utils.NewSkipMap(ttlCfg.SkipMapMaxLen)
+	// TODO(sid) remove when we deploy it in production.
+	skipMap = nil
 	skipMapPeriod := time.Duration(ttlCfg.SkipMapResetAfter_ms) *
 		time.Millisecond
-	nextMapReset :=	time.Now().Add(skipMapPeriod)
+	nextMapReset := time.Now().Add(skipMapPeriod)
 
 	for {
 		c.iteration++
@@ -130,7 +133,10 @@ func walkFullWSDBLoop(c *Ctx, backOffLoop bool) {
 
 		if time.Now().After(nextMapReset) {
 			c.vlog(SkipMapClearLog)
-			skipMap.Clear()
+
+			if skipMap != nil {
+				skipMap.Clear()
+			}
 			nextMapReset = time.Now().Add(skipMapPeriod)
 		}
 
