@@ -89,9 +89,8 @@ func TestFileMatches(t *testing.T) {
 				recADirect := recA.(*quantumfs.DirectRecord)
 				recBDirect := recB.(*quantumfs.DirectRecord)
 
-				// Everything should match, except fileId and nlinks
+				// Everything except fileId should match
 				recBDirect.SetFileId(recADirect.FileId())
-				recBDirect.SetNlinks(recADirect.Nlinks())
 
 				recAData, err := recADirect.MarshalJSON()
 				test.AssertNoErr(err)
