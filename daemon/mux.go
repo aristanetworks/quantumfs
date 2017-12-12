@@ -251,7 +251,6 @@ func (qfs *QuantumFs) waitForSignals() {
 // the cache. The intended use is as a way to free the bulk of the memory used by
 // quantumfsd when it is being gracefully shutdown by lazily unmounting it.
 func (qfs *QuantumFs) signalHandler(sigUsr1Chan chan os.Signal) {
-
 	for {
 		select {
 		case <-sigUsr1Chan:
