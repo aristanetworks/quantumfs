@@ -25,6 +25,8 @@ func init() {
 	zeros = make([]byte, quantumfs.MaxBlockSize)
 }
 
+var inLowMemoryMode bool
+
 // If we receive the signal SIGUSR1, then we will prevent further writes to the cache
 // and drop the contents of the cache. The intended use is as a way to free the bulk
 // of the memory used by quantumfsd when it is being gracefully shutdown by lazily
@@ -47,6 +49,7 @@ func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal,
 
 			// Release the memory
 			debug.FreeOSMemory()
+			inLowMemoryMode = true
 
 		case <-quit:
 			signal.Stop(sigUsr1Chan)
