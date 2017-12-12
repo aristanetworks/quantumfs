@@ -251,11 +251,10 @@ func (qfs *QuantumFs) waitForSignals() {
 }
 
 // If we receive the signal SIGUSR1, then we will enter a low memory mode where we,
-// among other things,prevent further writes to the cache and drop the contents of
+// among other things, prevent further writes to the cache and drop the contents of
 // the cache. The intended use is as a way to free the bulk of the memory used by
 // quantumfsd when it is being gracefully shutdown by lazily unmounting it.
 func (qfs *QuantumFs) signalHandler(sigUsr1Chan chan os.Signal) {
-
 	for {
 		select {
 		case <-sigUsr1Chan:
