@@ -290,8 +290,8 @@ func newLowMemFileHandle(c *ctx, treeLock *TreeLock) *LowMemFileHandle {
 	return &lwh
 }
 
-// LowMemFileHandle represents the user's interactions with quantumfs and is not necessarily
-// synchronized with other lw handles.
+// LowMemFileHandle represents the user's interactions with quantumfs and is not
+// necessarily synchronized with other lw handles.
 type LowMemFileHandle struct {
 	FileHandleCommon
 }
