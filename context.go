@@ -23,22 +23,24 @@ var requestID uint64
 // Ctx maintains context for the walker daemon.
 type Ctx struct {
 	context.Context
-	Influx     *influxlib.InfluxDBConnection
-	qctx       *quantumfs.Ctx
-	wsdb       quantumfs.WorkspaceDB
-	ds         quantumfs.DataStore
-	cqlds      blobstore.BlobStore
-	ttlCfg     *qubitutils.TTLConfig
-	config     string
-	numSuccess uint32
-	numError   uint32
-	numWalkers int
-	iteration  uint
-	keyspace   string
+	Influx      *influxlib.InfluxDBConnection
+	qctx        *quantumfs.Ctx
+	wsdb        quantumfs.WorkspaceDB
+	ds          quantumfs.DataStore
+	cqlds       blobstore.BlobStore
+	ttlCfg      *qubitutils.TTLConfig
+	etherConfig string
+	wsdbConfig  string
+	numSuccess  uint32
+	numError    uint32
+	numWalkers  int
+	iteration   uint
+	keyspace    string
 }
 
 func getWalkerDaemonContext(influxServer string, influxPort uint16,
-	influxDBName string, cfgFile string, logdir string, numwalkers int) *Ctx {
+	influxDBName string, etherCfgFile string, wsdbCfgStr string,
+	logdir string, numwalkers int) *Ctx {
 
 	// Connect to InfluxDB
 	var influx *influxlib.InfluxDBConnection
@@ -64,7 +66,7 @@ func getWalkerDaemonContext(influxServer string, influxPort uint16,
 	}
 
 	// Connect to ether backed quantumfs DataStore
-	quantumfsDS, err := thirdparty_backends.ConnectDatastore("ether.cql", cfgFile)
+	quantumfsDS, err := thirdparty_backends.ConnectDatastore("ether.cql", etherCfgFile)
 	if err != nil {
 		fmt.Printf("Connection to DataStore failed")
 		os.Exit(exitBadConfig)
@@ -88,15 +90,25 @@ func getWalkerDaemonContext(influxServer string, influxPort uint16,
 	}
 	keyspace := c.Keyspace()
 
-	// Connect to ether.cql WorkSpaceDB
-	quantumfsWSDB, err := thirdparty_backends.ConnectWorkspaceDB("ether.cql", cfgFile)
-	if err != nil {
-		fmt.Printf("Connection to workspaceDB failed err: %v\n", err)
-		os.Exit(exitBadConfig)
+	// if a wsdbCfgStr was provided use that to connect to 'grpc' backend.
+	var quantumfsWSDB quantumfs.WorkspaceDB
+	if wsdbCfgStr != "" {
+		quantumfsWSDB, err = thirdparty_backends.ConnectWorkspaceDB("grpc", wsdbCfgStr)
+		if err != nil {
+			fmt.Printf("Connection to workspaceDB failed err: %v\n", err)
+			os.Exit(exitBadConfig)
+		}
+
+	} else {
+		quantumfsWSDB, err = thirdparty_backends.ConnectWorkspaceDB("ether.cql", etherCfgFile)
+		if err != nil {
+			fmt.Printf("Connection to workspaceDB failed err: %v\n", err)
+			os.Exit(exitBadConfig)
+		}
 	}
 
 	// Load TTL Config values
-	ttlConfig, err := qubitutils.LoadTTLConfig(cfgFile)
+	ttlConfig, err := qubitutils.LoadTTLConfig(etherCfgFile)
 	if err != nil {
 		fmt.Printf("Failed to load TTL: %s\n", err.Error())
 		os.Exit(exitBadConfig)
@@ -110,15 +122,16 @@ func getWalkerDaemonContext(influxServer string, influxPort uint16,
 
 	id := atomic.AddUint64(&requestID, 1)
 	return &Ctx{
-		Influx:     influx,
-		qctx:       newQCtx(log, id),
-		wsdb:       quantumfsWSDB,
-		ds:         quantumfsDS,
-		cqlds:      cqlDS,
-		ttlCfg:     ttlConfig,
-		config:     cfgFile,
-		numWalkers: numwalkers,
-		keyspace:   keyspace,
+		Influx:      influx,
+		qctx:        newQCtx(log, id),
+		wsdb:        quantumfsWSDB,
+		ds:          quantumfsDS,
+		cqlds:       cqlDS,
+		ttlCfg:      ttlConfig,
+		etherConfig: etherCfgFile,
+		wsdbConfig:  wsdbCfgStr,
+		numWalkers:  numwalkers,
+		keyspace:    keyspace,
 	}
 }
 
