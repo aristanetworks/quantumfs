@@ -123,7 +123,7 @@ func TestCacheLru(t *testing.T) {
 		}
 		test.Log("Verifying cache")
 
-		func () {
+		func() {
 			defer datastore.cache.lock.Lock().Unlock()
 			test.Assert(datastore.cache.size == cacheSize,
 				"Incorrect Cache size %d != %d",
@@ -152,7 +152,7 @@ func TestCacheLru(t *testing.T) {
 					"Out of order block %d not %d", i, num)
 				num++
 			}
-		} ()
+		}()
 
 		// Cause a block to be refreshed to the beginning
 		buf := datastore.Get(c, keys[256])
@@ -200,12 +200,12 @@ func TestCacheLruDiffSize(t *testing.T) {
 
 		test.Log("Verifying cache")
 
-		func () {
+		func() {
 			defer datastore.cache.lock.Lock().Unlock()
 
 			test.Assert(datastore.cache.size == cacheSize,
-				"Incorrect cache size %d != %d", datastore.cache.size,
-				cacheSize)
+				"Incorrect cache size %d != %d",
+				datastore.cache.size, cacheSize)
 			// Since keys[71] is too large, cache will contain the first
 			// 70 entries, and we can calculate free space accordingly
 			lruNum := 70
@@ -232,7 +232,7 @@ func TestCacheLruDiffSize(t *testing.T) {
 					i, num)
 				num++
 			}
-		} ()
+		}()
 
 		// Cause a block to be refreshed to the beginning
 
@@ -280,7 +280,7 @@ func TestCacheCaching(t *testing.T) {
 			"Incorrect length of block 257: %d != %d", buf.Size(),
 			101*quantumfs.ObjectKeyLength)
 
-		func () {
+		func() {
 			defer datastore.cache.lock.Lock().Unlock()
 
 			// Since the size of keys[1] is doubled, so it is removed
@@ -300,7 +300,7 @@ func TestCacheCaching(t *testing.T) {
 			// The content is oversized, so it should be stored in cache
 			_, exists = datastore.cache.entryMap[keys[257].String()]
 			test.Assert(!exists, "Failed to forget block 257")
-		} ()
+		}()
 
 		// Reading again should come entirely from the cache. If not
 		// testDataStore will assert.
