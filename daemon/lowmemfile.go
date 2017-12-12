@@ -35,9 +35,9 @@ type LowMemFile struct {
 }
 
 var lowMemDescription = []byte(
-	`This QuantumFS instance is in a low memory mode and performance will be poorer than
-normal. Please save all work, close all applications and use the newer QuantumFS
-instance.
+	`This QuantumFS instance is in a low memory mode and performance
+will be poorer than normal. Please save all work, close all
+applications and use the newer QuantumFS instance.
 `)
 
 func fillLowMemAttr(c *ctx, attr *fuse.Attr) {
