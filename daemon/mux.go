@@ -188,8 +188,8 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	}
 
 	go qfs.adjustKernelKnobs()
-
 	go qfs.fileHandleReleaser()
+	go qfs.waitForSignals()
 
 	qfs.config.WorkspaceDB.SetCallback(qfs.handleWorkspaceChanges)
 
