@@ -280,9 +280,11 @@ func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 
 	wsr.lock.RLock()
 	defer wsr.lock.RUnlock()
+
+	wsr.hardlinkTable.apply(c, wsr.Directory.hardlinkDelta)
+
 	// Ensure linklock is held because hardlinkTable needs to be protected
 	defer wsr.hardlinkTable.linkLock.RLock().RUnlock()
-
 	// Upload the workspaceroot object
 	newRootId := publishWorkspaceRoot(c, wsr.baseLayerId,
 		wsr.hardlinkTable.hardlinks, publishNow)
@@ -393,7 +395,7 @@ func (wsr *WorkspaceRoot) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	defer c.funcIn("WorkspaceRoot::syncChild").Out()
 
@@ -413,7 +415,10 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 			entry.SetID(newKey)
 		}()
 	} else {
-		wsr.Directory.syncChild(c, inodeNum, newKey)
+		wsr.Directory.syncChild(c, inodeNum, newKey, nil)
+		if hardlinkDelta != nil {
+			wsr.hardlinkTable.apply(c, hardlinkDelta)
+		}
 	}
 }
 
@@ -472,7 +477,14 @@ func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 func (wsr *WorkspaceRoot) getList(c *ctx) quantumfs.PathsAccessed {
 	defer wsr.hardlinkTable.linkLock.Lock().Unlock()
 
-	return wsr.accessList.generate(c, wsr.hardlinkTable.hardlinks)
+	accessMap := make(map[quantumfs.FileId][]string,
+		len(wsr.hardlinkTable.hardlinks))
+
+	for fileId, entry := range wsr.hardlinkTable.hardlinks {
+		accessMap[fileId] = entry.paths
+	}
+
+	return wsr.accessList.generate(c, accessMap)
 }
 
 func (wsr *WorkspaceRoot) clearList() {

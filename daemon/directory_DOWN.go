@@ -184,7 +184,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 		recordCopy := *link
 
 		// Ensure we update the ref count for this hardlink
-		dir.hardlinkTable.hardlinkInc(link.FileId())
+		dir.hardlinkInc(link.FileId())
 
 		return &recordCopy, fuse.OK
 	}
@@ -223,7 +223,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	isHardlink, id := dir.hardlinkTable.checkHardlink(toLink.inodeNum())
 	if isHardlink {
 		// Update the reference count
-		dir.hardlinkTable.hardlinkInc(id)
+		dir.hardlinkInc(id)
 
 		linkCopy := newHardlinkLeg(toLink.name(), id,
 			quantumfs.NewTime(time.Now()), dir.hardlinkTable)

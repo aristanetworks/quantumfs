@@ -313,10 +313,6 @@ func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
 	return nil, nil
 }
 
-func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
-	c.elog("Invalid syncChild on File")
-}
-
 func resize(buffer []byte, size int) []byte {
 	if len(buffer) > size {
 		return buffer[:size]
@@ -537,9 +533,9 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("File::flush", "%s", fi.name_).Out()
 
 	key := quantumfs.EmptyBlockKey
-	fi.parentSyncChild(c, func() quantumfs.ObjectKey {
+	fi.parentSyncChild(c, func() (quantumfs.ObjectKey, *HardlinkDelta) {
 		key = fi.accessor.sync(c, publishNow)
-		return key
+		return key, nil
 	})
 	return key
 }
