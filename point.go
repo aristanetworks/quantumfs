@@ -22,7 +22,7 @@ type wsDetails struct {
 //         keyspace  - Keyspace of the WorkspaceDB
 //
 // fields: workSpace   - Name of the workspace (text)
-//         walkTimeSec - Time it took to walk the workspace in
+//         walkTime    - Time it took to walk the workspace in
 //                       seconds (uint)
 //         iteration   - The iteration number for this walk
 //         rootID      - rootID for the workSpace
@@ -42,10 +42,10 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 		"keyspace":  c.keyspace,
 	}
 	fields := map[string]interface{}{
-		"workSpace":   w.ws,
-		"walkTimeSec": uint(dur / time.Second),
-		"iteration":   c.iteration,
-		"rootID":      w.rootID,
+		"workSpace": w.ws,
+		"walkTime":  uint(dur / time.Second),
+		"iteration": c.iteration,
+		"rootID":    w.rootID,
 	}
 
 	err := c.Influx.WritePoint(measurement, tags, fields)
@@ -67,8 +67,8 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 //
 // tags:   keyspace    - Keyspace of the WorkspaceDB
 //
-// fields: walkTimeMin  - Time it took to walk all the workspace in
-//                        minutes (uint)
+// fields: walkTime  - Time it took to walk all the workspace in
+//                        seconds (uint)
 //         iteration    - The iteration number for this walk
 //         countSuccess - Num successful walks
 //         countError   - Num failed walks
@@ -85,7 +85,7 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration,
 		"keyspace": c.keyspace,
 	}
 	fields := map[string]interface{}{
-		"walkTimeMin":  uint(dur / time.Minute),
+		"walkTime":     uint(dur / time.Second),
 		"iteration":    c.iteration,
 		"countSuccess": numSuccess,
 		"countError":   numError,
