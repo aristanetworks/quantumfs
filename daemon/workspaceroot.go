@@ -512,7 +512,8 @@ func publishHardlinkMap(c *ctx,
 
 			nextBaseLayerId, err = buf.Key(&c.Ctx)
 			if err != nil {
-				panic("Failed to upload new baseLayer object")
+				panic(fmt.Sprintf("Failed to upload object: %v",
+					err))
 			}
 
 			entryNum, baseLayer = quantumfs.NewHardlinkEntry(entryNum)
@@ -608,7 +609,8 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 	newRootId, err := buf.Key(&c.Ctx)
 	if err != nil {
-		panic("Failed to upload new workspace root")
+		panic(fmt.Sprintf("Failed to upload new workspace root: %v",
+			err))
 	}
 
 	c.vlog("Publish: %s", newRootId.String())

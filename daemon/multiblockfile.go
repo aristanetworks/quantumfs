@@ -7,6 +7,7 @@ package daemon
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
 )
@@ -221,7 +222,7 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 	key, err := buf.Key(&c.Ctx)
 	if err != nil {
-		panic("Failed to upload new file metadata")
+		panic(fmt.Sprintf("Failed to upload new file metadata: %v", err))
 	}
 
 	return key
