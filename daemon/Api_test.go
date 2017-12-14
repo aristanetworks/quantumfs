@@ -582,10 +582,10 @@ func TestInvalidWorkspaceName(t *testing.T) {
 		assertInvalid := func(err error) {
 			test.AssertErr(err)
 			test.Assert(strings.Contains(err.Error(), "workspace name"),
-				"Excepted 'workspace name' in error: %s",
+				"Expected 'workspace name' in error: %s",
 				err.Error())
 			test.Assert(strings.Contains(err.Error(), "is malformed"),
-				"Excepted 'is malformed' in error: %s",
+				"Expected 'is malformed' in error: %s",
 				err.Error())
 		}
 
