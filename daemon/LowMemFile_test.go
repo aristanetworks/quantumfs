@@ -42,6 +42,12 @@ func TestLowMemRead(t *testing.T) {
 		test.qfs.inLowMemoryMode = true
 		buf := make([]byte, 1024)
 
+		test.WaitFor("lowmem file to appear", func() bool {
+			var stat syscall.Stat_t
+			err := syscall.Stat(lowmemName, &stat)
+			return err == nil
+		})
+
 		file, err := os.Open(lowmemName)
 		test.AssertNoErr(err)
 		defer file.Close()
