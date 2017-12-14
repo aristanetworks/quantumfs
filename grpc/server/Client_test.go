@@ -102,3 +102,12 @@ func TestAdvanceNonExistentWorkspace(t *testing.T) {
 			"Non-existent workspace was found: %s", err.Error())
 	})
 }
+
+func TestFatalErrorNoRetry(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		client := test.newClient()
+
+		err := client.DeleteWorkspace(test.ctx, "", "", "invalid")
+		test.AssertErr(err)
+	})
+}
