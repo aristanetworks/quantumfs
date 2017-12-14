@@ -64,6 +64,21 @@ func isKeyValid(key string) bool {
 	return true
 }
 
+func isWorkspaceNameValid(name string) bool {
+	parts := strings.Split(name, "/")
+	if len(parts) != 3 {
+		return false
+	}
+
+	for _, part := range parts {
+		if len(part) == 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (api *ApiInode) dirty(c *ctx) {
 	c.vlog("ApiInode::dirty doing nothing")
 	// Override the InodeCommon dirty because the Api can never be changed on the
@@ -503,6 +518,18 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 			err.Error())
 	}
 
+	if !isWorkspaceNameValid(cmd.Src) {
+		c.vlog("workspace name '%s' is invalid", cmd.Src)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.Src)
+	}
+
+	if !isWorkspaceNameValid(cmd.Dst) {
+		c.vlog("workspace name '%s' is invalid", cmd.Dst)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.Dst)
+	}
+
 	src := strings.Split(cmd.Src, "/")
 	dst := strings.Split(cmd.Dst, "/")
 
@@ -535,6 +562,22 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
+	}
+
+	if !isWorkspaceNameValid(cmd.BaseWorkspace) {
+		c.vlog("workspace name '%s' is invalid", cmd.BaseWorkspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.BaseWorkspace)
+	}
+	if !isWorkspaceNameValid(cmd.RemoteWorkspace) {
+		c.vlog("workspace name '%s' is invalid", cmd.RemoteWorkspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.RemoteWorkspace)
+	}
+	if !isWorkspaceNameValid(cmd.LocalWorkspace) {
+		c.vlog("workspace name '%s' is invalid", cmd.LocalWorkspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.LocalWorkspace)
 	}
 
 	// Fetch base
@@ -630,6 +673,12 @@ func (api *ApiHandle) refreshWorkspace(c *ctx, buf []byte) int {
 	}
 	c.vlog("Refreshing workspace %s", cmd.Workspace)
 
+	if !isWorkspaceNameValid(cmd.Workspace) {
+		c.vlog("workspace name '%s' is invalid", cmd.Workspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.Workspace)
+	}
+
 	c.qfs.refreshWorkspace(c, cmd.Workspace)
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Refresh Succeeded")
@@ -646,6 +695,12 @@ func (api *ApiHandle) advanceWSDB(c *ctx, buf []byte) int {
 	}
 	c.vlog("Advancing wsdb of %s to that of %s", cmd.Workspace,
 		cmd.ReferenceWorkspace)
+
+	if !isWorkspaceNameValid(cmd.Workspace) {
+		c.vlog("workspace name '%s' is invalid", cmd.Workspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.Workspace)
+	}
 
 	workspace := strings.Split(cmd.Workspace, "/")
 	wsr, cleanup, ok := c.qfs.getWorkspaceRoot(c, workspace[0],
@@ -691,6 +746,12 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
 			err.Error())
 	}
 
+	if !isWorkspaceNameValid(cmd.WorkspaceRoot) {
+		c.vlog("workspace name '%s' is invalid", cmd.WorkspaceRoot)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.WorkspaceRoot)
+	}
+
 	wsr := cmd.WorkspaceRoot
 	dst := strings.Split(wsr, "/")
 	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
@@ -713,6 +774,12 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) int {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
+	}
+
+	if !isWorkspaceNameValid(cmd.WorkspaceRoot) {
+		c.vlog("workspace name '%s' is invalid", cmd.WorkspaceRoot)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.WorkspaceRoot)
 	}
 
 	wsr := cmd.WorkspaceRoot
@@ -753,6 +820,12 @@ func (api *ApiHandle) syncWorkspace(c *ctx, buf []byte) int {
 	}
 	c.vlog("Syncing workspace %s", cmd.Workspace)
 
+	if !isWorkspaceNameValid(cmd.Workspace) {
+		c.vlog("workspace name '%s' is invalid", cmd.Workspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.Workspace)
+	}
+
 	if err := c.qfs.syncWorkspace(c, cmd.Workspace); err != nil {
 		c.vlog("Error sync %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed, "%s",
@@ -791,6 +864,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
+
+	if !isWorkspaceNameValid(wsr) {
+		c.vlog("workspace name '%s' is invalid", wsr)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", wsr)
+	}
+
 	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	defer cleanup()
 	if !ok {
@@ -862,6 +942,12 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) int {
 			err.Error())
 	}
 
+	if !isWorkspaceNameValid(cmd.WorkspacePath) {
+		c.vlog("workspace name '%s' is invalid", cmd.WorkspacePath)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.WorkspacePath)
+	}
+
 	workspacePath := cmd.WorkspacePath
 	parts := strings.Split(workspacePath, "/")
 	if err := c.workspaceDB.DeleteWorkspace(&c.Ctx, parts[0], parts[1],
@@ -915,6 +1001,12 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) int {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
+	}
+
+	if !isWorkspaceNameValid(cmd.Workspace) {
+		c.vlog("workspace name '%s' is invalid", cmd.Workspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.Workspace)
 	}
 
 	workspacePath := cmd.Workspace
@@ -1034,6 +1126,12 @@ func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) int {
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
+	}
+
+	if !isWorkspaceNameValid(cmd.WorkspacePath) {
+		c.vlog("workspace name '%s' is invalid", cmd.WorkspacePath)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is invalid", cmd.WorkspacePath)
 	}
 
 	workspacePath := cmd.WorkspacePath
