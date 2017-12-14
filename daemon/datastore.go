@@ -28,7 +28,6 @@ func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 		cache:        make(map[string]*buffer, entryNum),
 		cacheSize:    cacheSize,
 		freeSpace:    cacheSize,
-		quit:         make(chan struct{}),
 	}
 
 	return store
@@ -42,7 +41,6 @@ type dataStore struct {
 	cache     map[string]*buffer
 	cacheSize int
 	freeSpace int
-	quit      chan struct{} // Signal termination
 }
 
 func (store *dataStore) shutdown() {
