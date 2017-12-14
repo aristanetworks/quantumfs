@@ -574,3 +574,22 @@ func TestApiGetAndSetBlock(t *testing.T) {
 		test.Assert(err != nil, "Invalid key length allowed in GetBlock")
 	})
 }
+
+func TestInvalidWorkspaceName(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+
+		assertInvalid := func(err error) {
+			test.AssertErr(err)
+			test.Assert(strings.Contains(err.Error(), "workspace name"),
+				"Excepted 'workspace name' in error: %s",
+				err.Error())
+			test.Assert(strings.Contains(err.Error(), "is invalid"),
+				"Excepted 'is invalid' in error: %s",
+				err.Error())
+		}
+
+		assertInvalid(api.DeleteWorkspace("//qfs"))
+		assertInvalid(api.DeleteWorkspace("too/many/slashes/"))
+	})
+}
