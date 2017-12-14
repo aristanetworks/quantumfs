@@ -7,9 +7,9 @@ package daemon
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 // These variables are always correct. Where the datastore value length disagrees,
@@ -221,9 +221,7 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 	key, err := buf.Key(&c.Ctx)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to upload new file metadata: %v", err))
-	}
+	utils.Assert(err == nil, "Failed to upload new file metadata: %v", err)
 
 	return key
 }
