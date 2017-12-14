@@ -4,9 +4,11 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/aristanetworks/ether/cql"
@@ -75,7 +77,8 @@ func (test *testHelper) getTTL(c *Ctx, filepath string) int64 {
 }
 
 // Test to ensure that walker skip map prevents redundant node walking
-func TestRefreshTTLCache(t *testing.T) {
+// when optimal walks are enabled
+func TestRefreshTTLCache_WalkOptimal(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
 		workspace := test.NewWorkspace()
@@ -88,7 +91,8 @@ func TestRefreshTTLCache(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		c := test.testCtx()
-		go walkFullWSDBLoop(c, false)
+		// optimal walks
+		go walkFullWSDBLoop(c, false, true)
 
 		test.WaitFor("First walker pass", func() bool {
 			ttl := test.getTTL(c, file)
@@ -116,6 +120,63 @@ func TestRefreshTTLCache(t *testing.T) {
 			ttl := test.getTTL(c, file)
 			return ttl == c.ttlCfg.TTLNew
 		})
+	})
+}
+
+// Test to check that keys are repeatedly refreshed when optimal walk is disabled
+func TestRefreshTTLCache_WalkNonOptimal(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		wsFullPath := test.NewWorkspace()
+		directory := wsFullPath + "/dirA/dirB/dirC"
+		file := directory + "/file"
+
+		wsParts := strings.Split(wsFullPath, "/")
+		workspace := strings.Join(wsParts[len(wsParts)-3:len(wsParts)], "/")
+
+		test.AssertNoErr(os.MkdirAll(directory, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file, "file data"))
+
+		test.SyncAllWorkspaces()
+
+		record := test.GetRecord(file)
+		fileId := record.ID().Value()
+
+		c := test.testCtx()
+		// non-optimal walks
+		go walkFullWSDBLoop(c, false, false)
+
+		test.WaitForLogString(
+			fmt.Sprintf("Success: TTL refresh for %s", workspace),
+			"Walker never refreshes the workspace")
+
+		// ttl should be refreshed
+		ttl := test.getTTL(c, file)
+		test.Assert(ttl == c.ttlCfg.TTLNew,
+			"TTL not refreshed, ttl: %d", ttl)
+
+		// TTL is refreshed using Inserts, so count refreshes
+		refreshes := test.CountLogStrings(
+			fmt.Sprintf("Insert key: %s", hex.EncodeToString(fileId)))
+
+		// count walks of the test workspace
+		walks := test.CountLogStrings(
+			fmt.Sprintf("Success: TTL refresh for %s", workspace))
+
+		test.WaitFor("Walker to refresh workspace again", func() bool {
+			walksNow := test.CountLogStrings(
+				fmt.Sprintf("Success: TTL refresh for %s", workspace))
+			return walksNow > walks
+		})
+
+		refreshesNow := test.CountLogStrings(
+			fmt.Sprintf("Insert key: %s", hex.EncodeToString(fileId)))
+
+		// due to non-optimal walks, if walker walked the workspace
+		// again then the key should be refreshed again
+		test.Assert(refreshesNow > refreshes,
+			"TTL not refreshed, refreshes: %d, refreshesNow: %d",
+			refreshes, refreshesNow)
 	})
 }
 

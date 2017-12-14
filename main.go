@@ -67,12 +67,13 @@ func main() {
 	influxDBName := walkFlags.String("influxDBName", "", "database to use in influxdb")
 	numWalkers := walkFlags.Int("numWalkers", maxNumWalkers,
 		"Number of parallel walks in the daemon")
+	useSkipMap := walkFlags.Bool("skipSeenKeys", false, "Skip keys seen in earlier walks")
 
 	walkFlags.Usage = func() {
 		fmt.Println("qubit-walkerd version", version)
 		fmt.Println("usage: qubit-walkerd -etherCfg <etherCfg> [-wsdbCfg <wsdb service name>] [-logdir dir]")
 		fmt.Println("                [-influxServer serverIP -influxPort port" +
-			" -influxDBName dbname] [-numWalkers num]")
+			" -influxDBName dbname] [-numWalkers num] [-skipSeenKeys]")
 		fmt.Println()
 		fmt.Println("This daemon periodically walks all the workspaces,")
 		fmt.Println("updates the TTL of each block as per the config file and")
@@ -107,24 +108,27 @@ func main() {
 	timer := time.Tick(heartBeatInterval)
 	go heartBeat(c, timer)
 
-	walkFullWSDBLoop(c, true)
+	walkFullWSDBLoop(c, true, *useSkipMap)
 }
 
 const SkipMapClearLog = "SkipMap period over - clearing."
 
-func walkFullWSDBLoop(c *Ctx, backOffLoop bool) {
+func walkFullWSDBLoop(c *Ctx, backOffLoop bool, useSkipMap bool) {
 	ttlCfg := c.ttlCfg
 	if ttlCfg.SkipMapMaxLen == 0 {
 		// Set a reasonable default value
 		ttlCfg.SkipMapMaxLen = 20 * 1024 * 1024
 	}
 
-	skipMap := utils.NewSkipMap(ttlCfg.SkipMapMaxLen)
-	// TODO(sid) remove when we deploy it in production.
-	skipMap = nil
-	skipMapPeriod := time.Duration(ttlCfg.SkipMapResetAfter_ms) *
-		time.Millisecond
-	nextMapReset := time.Now().Add(skipMapPeriod)
+	var skipMap *utils.SkipMap
+	var skipMapPeriod time.Duration
+	var nextMapReset time.Time
+	if useSkipMap {
+		skipMap = utils.NewSkipMap(ttlCfg.SkipMapMaxLen)
+		skipMapPeriod = time.Duration(ttlCfg.SkipMapResetAfter_ms) *
+			time.Millisecond
+		nextMapReset = time.Now().Add(skipMapPeriod)
+	}
 
 	for {
 		c.iteration++
@@ -132,12 +136,9 @@ func walkFullWSDBLoop(c *Ctx, backOffLoop bool) {
 		atomic.StoreUint32(&c.numSuccess, 0)
 		atomic.StoreUint32(&c.numError, 0)
 
-		if time.Now().After(nextMapReset) {
+		if useSkipMap && time.Now().After(nextMapReset) {
 			c.vlog(SkipMapClearLog)
-
-			if skipMap != nil {
-				skipMap.Clear()
-			}
+			skipMap.Clear()
 			nextMapReset = time.Now().Add(skipMapPeriod)
 		}
 
