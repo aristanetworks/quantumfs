@@ -636,6 +636,15 @@ func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
 	fillApiAttr(c, &api.attr)
 	children = append(children, api)
 
+	if c.qfs.inLowMemoryMode {
+		lowmem := directoryContents{
+			filename: quantumfs.LowMemFileName,
+			fuseType: fuse.S_IFREG,
+		}
+		fillLowMemAttr(c, &lowmem.attr)
+		children = append(children, lowmem)
+	}
+
 	return children
 }
 
@@ -648,6 +657,13 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 		out.NodeId = quantumfs.InodeIdApi
 		fillEntryOutCacheData(c, out)
 		fillApiAttr(c, &out.Attr)
+		return fuse.OK
+	}
+
+	if c.qfs.inLowMemoryMode && name == quantumfs.LowMemFileName {
+		out.NodeId = quantumfs.InodeIdLowMemMarker
+		fillEntryOutCacheData(c, out)
+		fillLowMemAttr(c, &out.Attr)
 		return fuse.OK
 	}
 

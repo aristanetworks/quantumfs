@@ -70,6 +70,8 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs.inodes[quantumfs.InodeIdRoot] = typespaceList
 	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(typespaceList.treeLock(),
 		typespaceList.inodeNum())
+	qfs.inodes[quantumfs.InodeIdLowMemMarker] = NewLowMemFile(
+		typespaceList.treeLock(), typespaceList.inodeNum())
 	return qfs
 }
 
@@ -169,6 +171,8 @@ type QuantumFs struct {
 	toBeReleased chan FileHandleId
 
 	stopWaitingForSignals chan struct{}
+
+	inLowMemoryMode bool
 }
 
 func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
@@ -255,6 +259,7 @@ func (qfs *QuantumFs) signalHandler(sigUsr1Chan chan os.Signal) {
 		select {
 		case <-sigUsr1Chan:
 			qfs.c.wlog("Entering low memory mode")
+			qfs.inLowMemoryMode = true
 			qfs.c.dataStore.shutdown()
 
 			// Release the memory
