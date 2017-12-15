@@ -89,15 +89,21 @@ const (
 	// ie. _/_/_.
 	NullSpaceName     = "_"
 	NullWorkspaceName = "_/_/_"
+
+	// This file indicates that QuantumFS is in a low memory mode and poor
+	// performance is to be expected. This normally happens because QuantumFS is
+	// being gracefully terminated, perhaps for an upgrade.
+	LowMemFileName = "QUANTUMFS_IS_IN_LOW_MEMORY_MODE"
 )
 
 // Special reserved inode numbers
 const (
-	InodeIdInvalid = 0 // Invalid
-	InodeIdRoot    = 1 // Same as fuse.FUSE_ROOT_ID
-	InodeIdApi     = 2 // /api file
+	InodeIdInvalid      = 0 // Invalid
+	InodeIdRoot         = 1 // Same as fuse.FUSE_ROOT_ID
+	InodeIdApi          = 2 // /api file
+	InodeIdLowMemMarker = 3 // /QUANTUMFS_IS_IN_LOW_MEMORY_MODE file
 
-	InodeIdReservedEnd = 2 // End of the reserved range
+	InodeIdReservedEnd = 3 // End of the reserved range
 )
 
 // Object key types, possibly used for datastore routing
