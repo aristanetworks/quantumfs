@@ -409,7 +409,14 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, "systemlocal::DeleteWorkspace").Out()
+	defer c.FuncIn(qlog.LogWorkspaceDb, "systemlocal::DeleteWorkspace",
+		"%s/%s/%s", typespace, namespace, workspace).Out()
+
+	if len(typespace) == 0 || len(namespace) == 0 || len(workspace) == 0 {
+		return quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
+			"Malformed workspace name '%s/%s/%s'", typespace, namespace,
+			workspace)
+	}
 
 	return wsdb.db.Update(func(tx *bolt.Tx) error {
 		typespaces := tx.Bucket(typespacesBucket)
