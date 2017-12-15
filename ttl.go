@@ -16,22 +16,36 @@ import (
 // RefreshTTL will update the TTL of the block pointed to by key.
 func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 	size uint64, isDir bool, cqlds blobstore.BlobStore, newTTL int64,
-	skipMap *SkipMap) error {
+	ttlThreshold int64, skipMap *SkipMap) error {
 
 	if walker.SkipKey(c, key) {
 		return nil
 	}
 
-	if skipMap != nil && skipMap.Check(c, key) {
-		return walker.SkipEntry
+	kv := key.Value()
+
+	if skipMap != nil {
+		if skipMap.Check(c, key) {
+			return walker.SkipEntry
+		}
+	} else {
+		// legacy behavior
+		ttlVal, err := GetTTLForKey(c, cqlds, key, path)
+		if err != nil {
+			return fmt.Errorf("refreshTTL: %v", err)
+		}
+
+		// if key exists and TTL doesn't need to be refreshed
+		// then return.
+		if ttlVal >= ttlThreshold {
+			return nil
+		}
 	}
 
-	kv := key.Value()
 	buf, _, err := cqlds.Get(ToECtx(c), kv)
 	if err != nil {
-		return fmt.Errorf("path: %v key %v: %v", path, key.String(), err)
+		return fmt.Errorf("refreshTTL: path: %v key %v: %v", path, key.String(), err)
 	}
-
 	newmetadata := make(map[string]string)
 	newmetadata[cql.TimeToLive] = fmt.Sprintf("%d", newTTL)
 	err = cqlds.Insert(ToECtx(c), kv, buf, newmetadata)
