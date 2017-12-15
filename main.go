@@ -333,7 +333,8 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
 		return utils.RefreshTTL(cw, path, key, size, isDir, c.cqlds,
-			c.ttlCfg.TTLNew, skipMap)
+			c.ttlCfg.TTLNew, c.ttlCfg.SkipMapResetAfter_ms/1000,
+			skipMap)
 	}
 
 	// Call the walker library.

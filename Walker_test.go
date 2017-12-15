@@ -143,6 +143,12 @@ func TestRefreshTTLCache_WalkNonOptimal(t *testing.T) {
 		fileId := record.ID().Value()
 
 		c := test.testCtx()
+		// In legacy mode, TTLRefreshTime is saved as ms into
+		// SkipMapResetAfter_ms. This test sets TTL to 1s so
+		// to force refresh after it, the threshold should be
+		// greater than 1s
+		c.ttlCfg.SkipMapResetAfter_ms = 2000
+
 		// non-optimal walks
 		go walkFullWSDBLoop(c, false, false)
 
@@ -154,7 +160,6 @@ func TestRefreshTTLCache_WalkNonOptimal(t *testing.T) {
 		ttl := test.getTTL(c, file)
 		test.Assert(ttl == c.ttlCfg.TTLNew,
 			"TTL not refreshed, ttl: %d", ttl)
-
 		// TTL is refreshed using Inserts, so count refreshes
 		refreshes := test.CountLogStrings(
 			fmt.Sprintf("Insert key: %s", hex.EncodeToString(fileId)))
@@ -172,11 +177,27 @@ func TestRefreshTTLCache_WalkNonOptimal(t *testing.T) {
 		refreshesNow := test.CountLogStrings(
 			fmt.Sprintf("Insert key: %s", hex.EncodeToString(fileId)))
 
-		// due to non-optimal walks, if walker walked the workspace
-		// again then the key should be refreshed again
-		test.Assert(refreshesNow > refreshes,
+		// due to threshold TTL check, walker will not refresh key
+		test.Assert(refreshesNow == refreshes,
 			"TTL not refreshed, refreshes: %d, refreshesNow: %d",
 			refreshes, refreshesNow)
+
+		// Clear the TTL so that walker can refresh the key again
+		test.setTTL(c, file, 1)
+
+		// count walks of the test workspace
+		walks = test.CountLogStrings(
+			fmt.Sprintf("Success: TTL refresh for %s", workspace))
+
+		test.WaitFor("Walker to refresh workspace after setTTL", func() bool {
+			walksNow := test.CountLogStrings(
+				fmt.Sprintf("Success: TTL refresh for %s", workspace))
+			return walksNow > walks
+		})
+
+		ttl = test.getTTL(c, file)
+		test.Assert(ttl == c.ttlCfg.TTLNew,
+			"TTL not refreshed again, ttl: %d", ttl)
 	})
 }
 
