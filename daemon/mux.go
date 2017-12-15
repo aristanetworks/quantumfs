@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"os"
+	"os/signal"
 	"reflect"
 	"runtime/debug"
 	"strings"
@@ -46,6 +48,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
 		toBeReleased:           make(chan FileHandleId, 1000000),
+		stopWaitingForSignals:  make(chan struct{}),
 		syncAllRetries:         -1,
 		c: ctx{
 			Ctx: quantumfs.Ctx{
@@ -67,6 +70,8 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs.inodes[quantumfs.InodeIdRoot] = typespaceList
 	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(typespaceList.treeLock(),
 		typespaceList.inodeNum())
+	qfs.inodes[quantumfs.InodeIdLowMemMarker] = NewLowMemFile(
+		typespaceList.treeLock(), typespaceList.inodeNum())
 	return qfs
 }
 
@@ -164,6 +169,10 @@ type QuantumFs struct {
 	workspaceMutability map[string]workspaceState
 
 	toBeReleased chan FileHandleId
+
+	stopWaitingForSignals chan struct{}
+
+	inLowMemoryMode bool
 }
 
 func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
@@ -183,8 +192,8 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	}
 
 	go qfs.adjustKernelKnobs()
-
 	go qfs.fileHandleReleaser()
+	go qfs.waitForSignals()
 
 	qfs.config.WorkspaceDB.SetCallback(qfs.handleWorkspaceChanges)
 
@@ -235,6 +244,35 @@ func (qfs *QuantumFs) fileHandleReleaser() {
 	}
 }
 
+func (qfs *QuantumFs) waitForSignals() {
+	sigUsr1Chan := make(chan os.Signal, 1)
+	signal.Notify(sigUsr1Chan, syscall.SIGUSR1)
+	go qfs.signalHandler(sigUsr1Chan)
+}
+
+// If we receive the signal SIGUSR1, then we will enter a low memory mode where we,
+// among other things, prevent further writes to the cache and drop the contents of
+// the cache. The intended use is as a way to free the bulk of the memory used by
+// quantumfsd when it is being gracefully shutdown by lazily unmounting it.
+func (qfs *QuantumFs) signalHandler(sigUsr1Chan chan os.Signal) {
+	for {
+		select {
+		case <-sigUsr1Chan:
+			qfs.c.wlog("Entering low memory mode")
+			qfs.inLowMemoryMode = true
+			qfs.c.dataStore.shutdown()
+
+			// Release the memory
+			debug.FreeOSMemory()
+
+		case <-qfs.stopWaitingForSignals:
+			signal.Stop(sigUsr1Chan)
+			close(sigUsr1Chan)
+			return
+		}
+	}
+}
+
 func (qfs *QuantumFs) Serve() {
 	qfs.c.dlog("QuantumFs::Serve Serving")
 	qfs.server.Serve()
@@ -255,7 +293,7 @@ func (qfs *QuantumFs) Serve() {
 
 		qfs.syncAllRetries--
 	}
-	qfs.c.dataStore.shutdown()
+	close(qfs.stopWaitingForSignals)
 }
 
 func (qfs *QuantumFs) Shutdown() error {
