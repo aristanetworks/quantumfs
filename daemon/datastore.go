@@ -6,10 +6,6 @@ package daemon
 import (
 	"container/list"
 	"fmt"
-	"os"
-	"os/signal"
-	"runtime/debug"
-	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/encoding"
@@ -25,39 +21,11 @@ func init() {
 	zeros = make([]byte, quantumfs.MaxBlockSize)
 }
 
-// If we receive the signal SIGUSR1, then we will prevent further writes to the cache
-// and drop the contents of the cache. The intended use is as a way to free the bulk
-// of the memory used by quantumfsd when it is being gracefully shutdown by lazily
-// unmounting it.
-func signalHandler(store *dataStore, sigUsr1Chan chan os.Signal,
-	quit chan struct{}) {
-
-	for {
-		select {
-		case <-sigUsr1Chan:
-			store.cache.shutdown()
-
-			// Release the memory
-			debug.FreeOSMemory()
-
-		case <-quit:
-			signal.Stop(sigUsr1Chan)
-			close(sigUsr1Chan)
-			return
-		}
-	}
-}
-
 func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 	store := &dataStore{
 		durableStore: durableStore,
 		cache:        newCombiningCache(cacheSize),
-		quit:         make(chan struct{}),
 	}
-
-	sigUsr1Chan := make(chan os.Signal, 1)
-	signal.Notify(sigUsr1Chan, syscall.SIGUSR1)
-	go signalHandler(store, sigUsr1Chan, store.quit)
 
 	return store
 }
@@ -65,12 +33,10 @@ func newDataStore(durableStore quantumfs.DataStore, cacheSize int) *dataStore {
 type dataStore struct {
 	durableStore quantumfs.DataStore
 	cache        *combiningCache
-
-	quit chan struct{} // Signal termination
 }
 
 func (store *dataStore) shutdown() {
-	store.quit <- struct{}{}
+	store.cache.shutdown()
 }
 
 const CacheHitLog = "Found key in readcache"
