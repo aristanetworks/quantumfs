@@ -10,7 +10,7 @@ ExecStart=/usr/sbin/quantumfsd \
 	  -datastore ether.cql -datastoreconf /etc/quantumfsd.conf \
 	  -workspaceDB grpc -workspaceDBconf qubit-wsdbservice.production.kube.sw-infra.sjc.aristanetworks.com
 ExecStop=/usr/bin/umount -l /qfs
-ExecStop=/usr/bin/umount /share/qfs
+ExecStop=/usr/bin/umount -l /share/qfs
 ExecStop=/usr/bin/killall -SIGUSR1 quantumfsd
 User=root
 KillMode=none
