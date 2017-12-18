@@ -292,6 +292,14 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 
 	defer c.FuncIn(qlog.LogDatastore, EtherSetLog, KeyLog, ks).Out()
 
+	if buf.Size() > quantumfs.MaxBlockSize {
+		err := fmt.Errorf("Key %s size:%d is bigger than max block size",
+			ks, buf.Size())
+		c.Elog(qlog.LogDatastore, "Failed datastore set: %s",
+			err.Error())
+		return err
+	}
+
 	cached := func() bool {
 		defer ebt.ttlCacheLock.RLock().RUnlock()
 		expiry, cached := ebt.ttlCache[ks]
