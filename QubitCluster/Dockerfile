@@ -5,7 +5,7 @@ FROM fedora:20
 LABEL maintainer="clr@arista.com"
 
 ENV USER root
-ARG QFS_RPM_VERSION=0.13.0-1
+ARG QFS_RPM_VERSION
 
 COPY install_qfs.sh /install_qfs.sh
 
