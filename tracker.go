@@ -161,9 +161,14 @@ func (t *tracker) printSizeHistogram() {
 	tooBig := uint64(0)
 	hist := qubitutils.NewHistogram()
 
-	for _, info := range t.keys {
+	badBlockSizes := make([]string, 0)
+	for key, info := range t.keys {
 		idx := sizeBucket(buckets, info.size)
 		if idx < 0 {
+			badBlockSizes = append(badBlockSizes,
+				fmt.Sprintf("bad block size: %d key: %s"+
+					" paths: %v",
+					info.size, key, info.otherPaths))
 			tooBig++
 			continue
 		}
@@ -175,7 +180,7 @@ func (t *tracker) printSizeHistogram() {
 	fmt.Println()
 	fmt.Println("Key counts per byte range")
 	hist.Print()
-	if tooBig != 0 {
-		fmt.Printf("ERROR: %d keys have unsupported block size", tooBig)
+	for _, s := range badBlockSizes {
+		fmt.Println(s)
 	}
 }
