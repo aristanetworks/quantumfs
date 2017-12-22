@@ -113,39 +113,38 @@ func DoTestSchemaOp(confFile string, op SchemaOp) error {
 		return fmt.Errorf("error in creating session in DoTestSchemaOp: %s", serr.Error())
 	}
 	defer sess.Close()
+
 	doTableOp(sess, op, cfg.Cluster.KeySpace, bsName, wsdbName)
 
 	return nil
 }
 
-func getTestClusterConfig(clusterCfg ClusterConfig) *gocql.ClusterConfig {
-
-	var cluster = gocql.NewCluster(clusterCfg.Nodes...)
-
-	cluster.ProtoVersion = 3
-	cluster.Consistency = gocql.Quorum
-	cluster.PoolConfig.HostSelectionPolicy =
-		gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
-	cluster.Events.DisableSchemaEvents = true
-
-	// Hardcoded for testing
-	cluster.Timeout = schemaTimeout
-	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: schemaRetries}
-	cluster.Authenticator = gocql.PasswordAuthenticator{
-		Username: clusterCfg.Username,
-		Password: clusterCfg.Password,
-	}
-
-	return cluster
-}
-
-func getTestClusterSession(clusterCfg ClusterConfig) (*gocql.Session, error) {
-
-	cluster := getTestClusterConfig(clusterCfg)
-	session, err := cluster.CreateSession()
+// SetupIntegTestKeyspace is used to create the keyspace
+// for integration tests. They keyspaces in hardware
+// cluster should be setup by the admin
+func SetupIntegTestKeyspace(confFile string) error {
+	cfg, err := readCqlConfig(confFile)
 	if err != nil {
-		return nil, fmt.Errorf("error in creating session: %s", err.Error())
+		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
 	}
 
-	return session, nil
+	c := NewRealCluster(cfg.Cluster)
+	realc := c.(*RealCluster)
+	sess, serr := realc.cluster.CreateSession()
+	if serr != nil {
+		return fmt.Errorf("error in creating session in DoTestSchemaOp: %s", serr.Error())
+	}
+	defer sess.Close()
+
+	queryStr := fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = "+
+		"{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }", cfg.Cluster.KeySpace)
+
+	query := sess.Query(queryStr)
+	err = execWithRetry(query)
+
+	if err != nil {
+		return fmt.Errorf("error in creating keyspace %s: %s", cfg.Cluster.KeySpace, err.Error())
+	}
+
+	return nil
 }

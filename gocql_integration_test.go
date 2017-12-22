@@ -308,8 +308,11 @@ func BenchmarkGoCQL(b *testing.B) {
 	for _, subBmark := range bmarks {
 		// setup and teardown of schema for each kind of
 		// benchmark to enable a clean state
+		if err = SetupIntegTestKeyspace(confFile); err != nil {
+			b.Fatalf("SetupIntegTestKeyspace returned an error: %s", err)
+		}
 		if err = DoTestSchemaOp(confFile, SCHEMA_CREATE); err != nil {
-			b.Fatalf("SetupSchema returned an error: %s", err)
+			b.Fatalf("DoTestSchemaOp SCHEMA_CREATE returned an error: %s", err)
 		}
 
 		b.Run(fmt.Sprintf("%s", subBmark.name),

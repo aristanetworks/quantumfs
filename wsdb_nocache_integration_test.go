@@ -23,8 +23,10 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	var cfg *Config
 	cfg, err = readCqlConfig(confFile)
 	suite.Require().NoError(err, "Error during configuration read")
+	err = SetupIntegTestKeyspace(confFile)
+	suite.Require().NoError(err, "SetupIntegTestKeyspace returned an error")
 	err = DoTestSchemaOp(confFile, SCHEMA_CREATE)
-	suite.Require().NoError(err, "SetupSchema returned an error")
+	suite.Require().NoError(err, "DoTestSchemaOp SCHEMA_CREATE returned an error")
 
 	var wsdb qwsdb.WorkspaceDB
 	cluster := NewRealCluster(cfg.Cluster)

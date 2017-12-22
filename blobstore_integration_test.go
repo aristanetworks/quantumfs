@@ -33,8 +33,10 @@ func (s *storeIntegrationTests) SetupSuite() {
 	confFile, err := EtherConfFile()
 	s.Require().NoError(err, "error in getting ether configuration file")
 
+	err = SetupIntegTestKeyspace(confFile)
+	s.Require().NoError(err, "SetupIntegTestKeyspace returned an error")
 	err = DoTestSchemaOp(confFile, SCHEMA_CREATE)
-	s.Require().NoError(err, "DoTestSchemaOp returned an error")
+	s.Require().NoError(err, "DoTestSchemaOp SCHEMA_CREATE returned an error")
 
 	// Establish connection with the cluster
 	s.bls, err = NewCqlBlobStore(confFile)

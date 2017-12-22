@@ -32,8 +32,10 @@ type wsdbCacheIntegTestSuite struct {
 func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 	confFile, err := EtherConfFile()
 	suite.Require().NoError(err, "error in getting ether configuration file")
+	err = SetupIntegTestKeyspace(confFile)
+	suite.Require().NoError(err, "SetupIntegTestKeyspace returned an error")
 	err = DoTestSchemaOp(confFile, SCHEMA_CREATE)
-	suite.Require().NoError(err, "DoTestSchemaOp returned an error")
+	suite.Require().NoError(err, "DoTestSchemaOp SCHEMA_CREATE returned an error")
 
 	wsdb := NewWorkspaceDB(confFile)
 	cwsdb, ok := wsdb.(*cacheWsdb)
