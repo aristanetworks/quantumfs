@@ -611,7 +611,7 @@ func TestHardlinkXAttr(t *testing.T) {
 
 // QuantumFS doesn't support POSIX ACLs, but userspace programs use library functions
 // which interact with the extended attribute storage directly. Ensure these accesses
-// fail to trigger backup behaviour.
+// fail in order to trigger backup behaviour, such as using chmod().
 func TestPosixAclDisabled(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
