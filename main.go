@@ -317,7 +317,8 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string,
 	start := time.Now()
 	if rootID, _, err = qubitutils.GetWorkspaceRootID(c.qctx, c.wsdb,
 		wsname); err != nil {
-
+		c.elog("Get rootID for %s/%s/%s, err(%s)", ts, ns, ws,
+			err.Error())
 		return err
 	}
 
