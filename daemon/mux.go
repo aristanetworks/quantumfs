@@ -400,6 +400,11 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 	c = c.refreshCtx()
 	defer logRequestPanic(c)
 
+	if qfs.inLowMemoryMode {
+		c.wlog("Will not refresh workspace %s in low memory mode.", name)
+		return
+	}
+
 	parts := strings.Split(name, "/")
 	wsr, cleanup, ok := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	defer cleanup()
