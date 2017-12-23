@@ -389,11 +389,12 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrI
 
 	defer c.funcIn("Directory::setChildAttr").Out()
 
-	if c.fuseCtx != nil && c.fuseCtx.Owner.Uid != 0 &&
-		utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_UID) {
-
-		c.vlog("Non-root cannot change UID")
-		return fuse.EPERM
+	if c.fuseCtx != nil && utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_UID) {
+		userUid := c.fuseCtx.Owner.Uid
+		if userUid != 0 && userUid != attr.Owner.Uid {
+			c.vlog("Non-root cannot change UID")
+			return fuse.EPERM
+		}
 	}
 
 	if dir.isOrphaned() && dir.id == inodeNum {
