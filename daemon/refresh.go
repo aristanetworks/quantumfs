@@ -162,7 +162,7 @@ func detachInode(c *ctx, inode Inode, staleRecord *FileRemoveRecord) {
 	dir := asDirectory(inode)
 	defer dir.childRecordLock.Lock().Unlock()
 	staleRecord.toOrphan = dir.children.deleteChild(c, staleRecord.name, false)
-	c.qfs.noteDeletedInode(dir.id, staleRecord.inodeId, staleRecord.name)
+	c.qfs.noteDeletedInode(c, dir.id, staleRecord.inodeId, staleRecord.name)
 }
 
 // The reason we cannot unlink the stale dentries at this point is that
@@ -211,9 +211,7 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 			}
 		}
 
-		status := c.qfs.invalidateInode(entry.inodeId)
-		utils.Assert(status == fuse.OK,
-			"invalidating %d failed with %d", entry.inodeId, status)
+		c.qfs.invalidateInode(c, entry.inodeId)
 	}
 }
 
@@ -249,8 +247,8 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 	} else {
 		srcInode.MvChild(c, newParent, oldName, remoteRecord.Filename())
 	}
-	c.qfs.noteDeletedInode(srcInode.inodeNum(), inodeId, oldName)
-	c.qfs.noteChildCreated(newParent.inodeNum(), remoteRecord.Filename())
+	c.qfs.noteDeletedInode(c, srcInode.inodeNum(), inodeId, oldName)
+	c.qfs.noteChildCreated(c, newParent.inodeNum(), remoteRecord.Filename())
 }
 
 // The caller must hold the tree lock
@@ -266,10 +264,7 @@ func (wsr *WorkspaceRoot) moveDentries_(c *ctx, rc *RefreshContext) {
 			inode := c.qfs.inodeNoInstantiate(c, loadRecord.inodeId)
 			if inode != nil {
 				reload(c, wsr, rc, inode, loadRecord.remoteRecord)
-				status := c.qfs.invalidateInode(loadRecord.inodeId)
-				utils.Assert(status == fuse.OK,
-					"invalidating %d failed with %d",
-					loadRecord.inodeId, status)
+				c.qfs.invalidateInode(c, loadRecord.inodeId)
 			}
 		}
 	}
