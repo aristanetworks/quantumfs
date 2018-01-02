@@ -511,9 +511,8 @@ func publishHardlinkMap(c *ctx,
 				quantumfs.KeyTypeMetadata)
 
 			nextBaseLayerId, err = buf.Key(&c.Ctx)
-			if err != nil {
-				panic("Failed to upload new baseLayer object")
-			}
+			utils.Assert(err == nil,
+				"Failed to upload new baseLayer object: %v", err)
 
 			entryNum, baseLayer = quantumfs.NewHardlinkEntry(entryNum)
 			entryIdx = 0
@@ -607,9 +606,7 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 	newRootId, err := buf.Key(&c.Ctx)
-	if err != nil {
-		panic("Failed to upload new workspace root")
-	}
+	utils.Assert(err == nil, "Failed to upload new workspace root: %v", err)
 
 	c.vlog("Publish: %s", newRootId.String())
 	return newRootId
@@ -690,6 +687,15 @@ func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
 	fillApiAttr(c, &api.attr)
 	children = append(children, api)
 
+	if c.qfs.inLowMemoryMode {
+		lowmem := directoryContents{
+			filename: quantumfs.LowMemFileName,
+			fuseType: fuse.S_IFREG,
+		}
+		fillLowMemAttr(c, &lowmem.attr)
+		children = append(children, lowmem)
+	}
+
 	return children
 }
 
@@ -702,6 +708,13 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 		out.NodeId = quantumfs.InodeIdApi
 		fillEntryOutCacheData(c, out)
 		fillApiAttr(c, &out.Attr)
+		return fuse.OK
+	}
+
+	if c.qfs.inLowMemoryMode && name == quantumfs.LowMemFileName {
+		out.NodeId = quantumfs.InodeIdLowMemMarker
+		fillEntryOutCacheData(c, out)
+		fillLowMemAttr(c, &out.Attr)
 		return fuse.OK
 	}
 

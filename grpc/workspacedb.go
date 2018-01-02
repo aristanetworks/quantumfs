@@ -33,16 +33,15 @@ func shouldRetry(err error) bool {
 		return false
 	}
 
-	wsdbErr, ok := err.(quantumfs.WorkspaceDbErr)
-	if !ok {
-		return true
+	// WSDB errors are not expected to improve with retries
+	_, ok := err.(quantumfs.WorkspaceDbErr)
+	if ok {
+		return false
 	}
 
-	if wsdbErr.Code == quantumfs.WSDB_FATAL_DB_ERROR {
-		return true
-	}
-
-	return false
+	// All other errors are assumed to be either network or service related and
+	// therefore will eventually clear if we retry long enough.
+	return true
 }
 
 func maybeAddPort(conf string) string {
