@@ -5,6 +5,7 @@ package cql
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"time"
 
@@ -19,7 +20,13 @@ type RealCluster struct {
 // NewRealCluster returns a default Cluster struct with the given hosts
 func NewRealCluster(clusterCfg ClusterConfig) Cluster {
 
-	c := gocql.NewCluster(clusterCfg.Nodes...)
+	nodes, err := net.LookupHost(clusterCfg.ClusterName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr,
+			"** WARNING: LookupHost failed for %s **\n", clusterCfg.ClusterName)
+		nodes = clusterCfg.Nodes
+	}
+	c := gocql.NewCluster(nodes...)
 	c.ProtoVersion = 3
 	c.Consistency = gocql.Quorum
 	// ConsistencyLevel CL is an undocumented/developer-only/internal
