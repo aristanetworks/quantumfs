@@ -7,7 +7,6 @@ import (
 	"container/list"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
 )
@@ -55,14 +54,12 @@ func (bc *SkipMap) Set(c *walker.Ctx, key quantumfs.ObjectKey) {
 	// before doing operations that assume it exists, since there is no guarantee
 	// that the key exists by the time we've acquired the lock
 	if element, exists := bc.keys[kv]; exists {
-		c.Qctx.Vlog(qlog.LogTool, "Update SkipMap for %s", key.String())
 
 		// Update the position in the lru
 		bc.lru.MoveToBack(element)
 		return
 	}
 
-	c.Qctx.Vlog(qlog.LogTool, "Set SkipMap for %s", key.String())
 	bc.keys[kv] = bc.lru.PushBack(kv)
 
 	// Ensure the cache length is maintained
