@@ -73,8 +73,7 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 //         countSuccess - Num successful walks
 //         countError   - Num failed walks
 //
-func AddPointWalkerIteration(c *Ctx, dur time.Duration,
-	numSuccess uint32, numError uint32) {
+func AddPointWalkerIteration(c *Ctx, dur time.Duration) {
 
 	if c.Influx == nil {
 		return
@@ -87,8 +86,8 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration,
 	fields := map[string]interface{}{
 		"walkTime":     uint(dur / time.Second),
 		"iteration":    c.iteration,
-		"countSuccess": numSuccess,
-		"countError":   numError,
+		"countSuccess": c.numSuccess,
+		"countError":   c.numError,
 	}
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
@@ -97,8 +96,8 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration,
 		return
 	}
 	c.vlog("%s Writing %s=%s iteration=%d numSuccess=%d numError=%d to influxDB\n",
-		successPrefix, measurement, dur.String(), c.iteration, numSuccess,
-		numError)
+		successPrefix, measurement, dur.String(), c.iteration, c.numSuccess,
+		c.numError)
 }
 
 // Write point to indicate that walker is alive.
@@ -118,7 +117,10 @@ func AddPointWalkerHeartBeat(c *Ctx) {
 		"keyspace": c.keyspace,
 	}
 	fields := map[string]interface{}{
-		"alive": 1,
+		"alive":        1,
+		"iteration":    c.iteration,
+		"countSuccess": c.numSuccess,
+		"countError":   c.numError,
 	}
 
 	err := c.Influx.WritePoint(measurement, tags, fields)
@@ -127,5 +129,6 @@ func AddPointWalkerHeartBeat(c *Ctx) {
 			err.Error())
 		return
 	}
-	c.vlog("Success: Writing %s to influxDB\n", measurement)
+	c.vlog("%s Writing %s iteration=%d numSuccess=%d numError=%d to influxDB\n",
+		successPrefix, measurement, c.iteration, c.numSuccess, c.numError)
 }

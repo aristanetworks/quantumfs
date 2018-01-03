@@ -157,7 +157,7 @@ func walkFullWSDBLoop(c *Ctx, backOffLoop bool, useSkipMap bool) {
 		c.vlog("Iteration[%d] ended at %s took %s numError %d (err %s)",
 			c.iteration, time.Now().String(), dur.String(), c.numError,
 			errStr)
-		AddPointWalkerIteration(c, dur, c.numSuccess, c.numError)
+		AddPointWalkerIteration(c, dur)
 
 		// If the walk iteration completes very quickly
 		// then we can relax a bit before moving onto
