@@ -1387,6 +1387,7 @@ func calcMaxDirectoryRecords(maxSize int) int {
 		for i := 0; i < records; i++ {
 			dir.SetEntry(i, published)
 		}
+		dir.SetNumEntries(records)
 
 		return len(dir.Bytes()) >= maxSize
 	})
