@@ -1343,6 +1343,22 @@ func (store *constDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 
 var ZeroKey ObjectKey
 
+func binarySearchSpace(min int, max int, testFn func(int) (checkLower bool)) int {
+	for {
+		if min >= max {
+			return min
+		}
+
+		half := (min + max) / 2
+		goLower := testFn(half)
+		if goLower {
+			max = half
+		} else {
+			min = half + 1
+		}
+	}
+}
+
 func calcMaxNumExtendedAttributes(maxSize int) int {
 	attrs0 := newExtendedAttributesAttrs(0)
 	size0attrs := len(attrs0.Bytes())
@@ -1356,20 +1372,33 @@ func calcMaxNumExtendedAttributes(maxSize int) int {
 	return (maxSize - size0attrs) / (size1attrs - size0attrs)
 }
 
+// We can't assume that directory entries grow by a constant amount for every
+// record that we put into it. So, fully create the directory using hopefully
+// "max" sized records, and search for our answer
 func calcMaxDirectoryRecords(maxSize int) int {
-	dir0 := newDirectoryEntryRecords(0)
-	size0recs := len(dir0.Bytes())
+	closestNum := binarySearchSpace(1, 100000, func (records int) bool {
+		dir := newDirectoryEntryRecords(records)
 
-	// setup the pointers in DirectRecord to practical max values
-	record := NewDirectoryRecord()
-	record.SetFilename(string(make([]byte, MaxFilenameLength)))
-	record.SetExtendedAttributes(createEmptyBlock())
+		record := NewDirectoryRecord()
+		record.SetFilename(string(make([]byte, MaxFilenameLength)))
+		record.SetID(createEmptyBlock())
+		record.SetExtendedAttributes(createEmptyBlock())
+		published := record.Publishable()
+		for i := 0; i < records; i++ {
+			dir.SetEntry(i, published)
+		}
 
-	dir1 := newDirectoryEntryRecords(1)
-	dir1.dir.Entries().Set(0, record.record)
-	size1recs := len(dir1.Bytes())
+		return len(dir.Bytes()) >= maxSize
+	})
 
-	return (maxSize - size0recs) / (size1recs - size0recs)
+	// closestNum may be slightly over our maxBlockSize, so subtract 1 to be safe
+	closestNum -= 1
+
+	// BUG233542: We still haven't identified how up to 1.5MB is acheived, so
+	// add a margin for now
+	closestNum = int(float32(closestNum) * 0.66)
+
+	return closestNum
 }
 
 func calcMaxBlocksLargeFile(maxSize int) int {

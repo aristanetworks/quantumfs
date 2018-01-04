@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"syscall"
 	"testing"
@@ -1818,5 +1819,94 @@ func TestDirectoryReadStaleDir(t *testing.T) {
 			test.AssertNoErr(syscall.Unlink(
 				fmt.Sprintf("%s/f%d", dir, i)))
 		}
+	})
+}
+
+// Test our inherent assumption that underlying container size is independent of
+// the data contents in the buffer
+func TestProtoSizeConsistency(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		_, entry := quantumfs.NewDirectoryEntry(1)
+		record := quantumfs.NewDirectoryRecord()
+
+		entry.SetEntry(0, record.Publishable())
+		sizeA := len(entry.Bytes())
+
+		_, entry = quantumfs.NewDirectoryEntry(1)
+		record = quantumfs.NewDirectoryRecord()
+		record.SetType(255)
+		record.SetPermissions(1048577)
+		entry.SetEntry(0, record.Publishable())
+		sizeB := len(entry.Bytes())
+
+		_, entry = quantumfs.NewDirectoryEntry(1)
+		record = quantumfs.NewDirectoryRecord()
+		record.SetType(0)
+		record.SetPermissions(0)
+		entry.SetEntry(0, record.Publishable())
+		sizeC := len(entry.Bytes())
+
+		_, entry = quantumfs.NewDirectoryEntry(1)
+		record = quantumfs.NewDirectoryRecord()
+		record.SetType(16)
+		record.SetPermissions(32)
+		entry.SetEntry(0, record.Publishable())
+		sizeD := len(entry.Bytes())
+
+		_, entry = quantumfs.NewDirectoryEntry(1)
+		record = quantumfs.NewDirectoryRecord()
+		record.SetType(0)
+		record.SetPermissions(0)
+		entry.SetEntry(0, record.Publishable())
+		sizeE := len(entry.Bytes())
+
+		test.Assert(sizeA == sizeB && sizeB == sizeC && sizeC == sizeD &&
+			sizeD == sizeE,
+			"Underlying container size changes %d %d %d %d %d", sizeA,
+			sizeB, sizeC, sizeD, sizeE)
+	})
+}
+
+func TestMaxDirectoryRecordsSize(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		record := quantumfs.NewDirectoryRecord()
+
+		_, entry := quantumfs.NewDirectoryEntry(0+
+			quantumfs.MaxDirectoryRecords())
+
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		offset := int(r.Uint32() % 1000000)
+		names := GenData(offset + (quantumfs.MaxDirectoryRecords() *
+			quantumfs.MaxFilenameLength))
+		names = names[offset:]
+
+		// Capnproto compresses data, so make it random to minimize that
+		for i := 0; i < quantumfs.MaxDirectoryRecords(); i++ {
+			name := names[i * quantumfs.MaxFilenameLength:]
+			name = name[:quantumfs.MaxFilenameLength]
+			record.SetFilename(string(name))
+
+			idData := name[:quantumfs.ObjectKeyLength]
+			record.SetID(quantumfs.NewObjectKeyFromBytes(idData))
+			record.SetType(quantumfs.ObjectType(r.Int()))
+			record.SetPermissions(r.Uint32())
+			record.SetOwner(quantumfs.UID(r.Uint32()))
+			record.SetGroup(quantumfs.GID(r.Uint32()))
+			record.SetSize(r.Uint64())
+			extData := name[quantumfs.ObjectKeyLength:]
+			extData = extData[:quantumfs.ObjectKeyLength]
+			extKey := quantumfs.NewObjectKeyFromBytes(extData)
+			record.SetExtendedAttributes(extKey)
+			record.SetContentTime(quantumfs.Time(r.Uint64()))
+			record.SetModificationTime(quantumfs.Time(r.Uint64()))
+			record.SetFileId(quantumfs.FileId(r.Uint64()))
+
+			entry.SetEntry(i, record.Publishable())
+		}
+
+		test.Assert(len(entry.Bytes()) < quantumfs.MaxBlockSize,
+			"MaxDirectoryRecords is incorrect: %d block vs %d (%d)",
+			len(entry.Bytes()), quantumfs.MaxBlockSize,
+			quantumfs.MaxDirectoryRecords())
 	})
 }
