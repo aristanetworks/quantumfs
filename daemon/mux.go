@@ -1648,12 +1648,23 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	if input.NodeId == input.Newdir {
 		return srcInode.RenameChild(c, oldName, newName)
 	} else {
-		dstInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.Newdir))
-		defer unlock.RUnlock()
-
+		dstInode := qfs.inode(c, InodeId(input.Newdir))
 		if dstInode == nil {
 			c.dlog("Obsolete dst inode")
 			return fuse.ENOENT
+		}
+
+		if dstInode.treeLock() != srcInode.treeLock() {
+			dstInode, unlock := qfs.RLockTreeGetInode(c,
+				InodeId(input.Newdir))
+			defer unlock.RUnlock()
+
+			// In case it was deleted prior to grabbing the other
+			// workspace treelock.
+			if dstInode == nil {
+				c.dlog("Obsolete dst inode")
+				return fuse.ENOENT
+			}
 		}
 
 		if !qfs.workspaceIsMutable(c, dstInode) {
