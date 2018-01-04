@@ -1871,7 +1871,7 @@ func TestMaxDirectoryRecordsSize(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		record := quantumfs.NewDirectoryRecord()
 
-		_, entry := quantumfs.NewDirectoryEntry(0+
+		_, entry := quantumfs.NewDirectoryEntry(0 +
 			quantumfs.MaxDirectoryRecords())
 
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -1882,7 +1882,7 @@ func TestMaxDirectoryRecordsSize(t *testing.T) {
 
 		// Capnproto compresses data, so make it random to minimize that
 		for i := 0; i < quantumfs.MaxDirectoryRecords(); i++ {
-			name := names[i * quantumfs.MaxFilenameLength:]
+			name := names[i*quantumfs.MaxFilenameLength:]
 			name = name[:quantumfs.MaxFilenameLength]
 			record.SetFilename(string(name))
 

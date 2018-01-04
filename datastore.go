@@ -1376,7 +1376,7 @@ func calcMaxNumExtendedAttributes(maxSize int) int {
 // record that we put into it. So, fully create the directory using hopefully
 // "max" sized records, and search for our answer
 func calcMaxDirectoryRecords(maxSize int) int {
-	closestNum := binarySearchSpace(1, 100000, func (records int) bool {
+	closestNum := binarySearchSpace(1, 100000, func(records int) bool {
 		dir := newDirectoryEntryRecords(records)
 
 		record := NewDirectoryRecord()
