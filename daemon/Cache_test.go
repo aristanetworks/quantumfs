@@ -22,6 +22,7 @@ type testDataStore struct {
 
 	countLock utils.DeferableMutex
 	getCount  map[quantumfs.ObjectKey]int
+	setCount  map[quantumfs.ObjectKey]int
 }
 
 func newTestDataStore(test *testHelper) *testDataStore {
@@ -30,6 +31,7 @@ func newTestDataStore(test *testHelper) *testDataStore {
 		shouldRead: true,
 		test:       test,
 		getCount:   make(map[quantumfs.ObjectKey]int),
+		setCount:   make(map[quantumfs.ObjectKey]int),
 	}
 }
 
@@ -49,6 +51,11 @@ func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
+
+	func() {
+		defer store.countLock.Lock().Unlock()
+		store.setCount[key]++
+	}()
 
 	return store.datastore.Set(c, key, buf)
 }

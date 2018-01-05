@@ -18,6 +18,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/testutils"
 )
 
 func TestWorkspaceBranchNoOtherSyncs(t *testing.T) {
@@ -591,5 +592,94 @@ func TestInvalidWorkspaceName(t *testing.T) {
 
 		assertInvalid(api.DeleteWorkspace("//qfs"))
 		assertInvalid(api.DeleteWorkspace("too/many/slashes/"))
+	})
+}
+
+func TestInsertInodeTraversal(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		config := test.defaultConfig()
+		var dataStore *testDataStore
+		test.startQuantumFs_(config, nil, false,
+			func () *QuantumFs {
+
+			rtn := NewQuantumFsLogs(config, test.Logger)
+			dataStore = newTestDataStore(test)
+			rtn.c.dataStore.durableStore = quantumfs.DataStore(dataStore)
+			return rtn
+		})
+
+		workspace := test.NewWorkspace()
+
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA", 0777))
+
+		// Small file test
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileA",
+			"Some data"))
+/*
+		// Medium file test
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileB",
+			string(GenData(1000 + quantumfs.MaxBlockSize))))
+		// Large file test
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileC",
+			string(GenData(1 + (quantumfs.MaxBlockSize *
+				quantumfs.MaxBlocksMediumFile())))))
+		// Very Large file test
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileD",
+			string(GenData(1 + (quantumfs.MaxBlockSize *
+				quantumfs.MaxBlocksLargeFile())))))
+*/
+		test.SyncAllWorkspaces()
+
+		// Record the set counts in the datastore
+		beforeCounts := make(map[quantumfs.ObjectKey]int, 0)
+		func () {
+			defer dataStore.countLock.Lock().Unlock()
+
+			for k, v := range dataStore.setCount {
+				beforeCounts[k] = v
+			}
+		} ()
+
+		api := test.getApi()
+		permissionA := uint32(syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH)
+
+		key := getExtendedKeyHelper(test, workspace+"/dirA/fileA", "file")
+		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+
+			"/fileA", key, permissionA, 0, 0))
+/*
+		key = getExtendedKeyHelper(test, workspace+"/dirA/fileB", "file")
+		test.AssertNoErr(api.InsertInode(workspace+"/fileB", key,
+			permissionA, 0, 0))
+
+		key = getExtendedKeyHelper(test, workspace+"/dirA/fileC", "file")
+		test.AssertNoErr(api.InsertInode(workspace+"/fileC", key,
+			permissionA, 0, 0))
+
+		key = getExtendedKeyHelper(test, workspace+"/dirA/fileD", "file")
+		test.AssertNoErr(api.InsertInode(workspace+"/fileD", key,
+			permissionA, 0, 0))
+*/
+		test.SyncAllWorkspaces()
+
+		// Almost all of the blocks in the workspace should have been
+		// re-set to refresh their timeouts
+
+		notRefreshed := 0
+		refreshed := 0
+		func () {
+			defer dataStore.countLock.Lock().Unlock()
+
+			for key, before := range beforeCounts {
+				if dataStore.setCount[key] <= before {
+					notRefreshed++
+				} else {
+					refreshed++
+				}
+			}
+		} ()
+
+		test.Assert(notRefreshed <= 0, "Too many blocks not refreshed "+
+			"during InsertInode: %d %d", notRefreshed, refreshed)
 	})
 }
