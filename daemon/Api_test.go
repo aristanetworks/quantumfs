@@ -623,14 +623,6 @@ func InsertInodeTraversal(t *testing.T, createFn func(*testHelper, string),
 
 		createFn(test, workspace)
 
-if false {
-		// Large file test
-
-		// Very Large file test
-		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileD",
-			string(GenData(1 + (quantumfs.MaxBlockSize *
-				quantumfs.MaxBlocksLargeFile())))))
-}
 		test.SyncAllWorkspaces()
 
 		// Record the set counts in the datastore
@@ -644,13 +636,7 @@ if false {
 		} ()
 
 		insertFn(test, workspace)
-if false{
-api := test.getApi()
-permissionA := uint32(0)
-		key := getExtendedKeyHelper(test, workspace+"/dirA/fileD", "file")
-		test.AssertNoErr(api.InsertInode(workspace+"/fileD", key,
-			permissionA, 0, 0))
-}
+
 		test.SyncAllWorkspaces()
 
 		// Almost all of the blocks in the workspace should have been
@@ -719,6 +705,31 @@ func TestInsertInodeLargeFile(t *testing.T) {
 
 		key := getExtendedKeyHelper(test, workspace+"/dirA/fileC", "file")
 		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+"/fileC",
+			key, permission, 0, 0))
+	})
+}
+
+func TestInsertInodeVeryLargeFile(t *testing.T) {
+	InsertInodeTraversal(t, func(test *testHelper, workspace string) {
+		file, err := os.Create(workspace+"/dirA/fileD")
+		defer file.Close()
+		test.Assert(err == nil, "Error creating test file: %v", err)
+
+		testDataSize := 100 * 1024
+		data := GenData(testDataSize)
+		_, err = file.Write(data)
+		test.Assert(err == nil, "Error writing data to file: %v", err)
+
+		os.Truncate(workspace+"/dirA/fileD",
+			int64(quantumfs.MaxLargeFileSize())+
+			int64(quantumfs.MaxBlockSize))
+	}, func(test *testHelper, workspace string) {
+		api := test.getApi()
+		permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH)
+
+		key := getExtendedKeyHelper(test, workspace+"/dirA/fileD", "file")
+		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+"/fileD",
 			key, permission, 0, 0))
 	})
 }
