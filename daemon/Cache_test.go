@@ -21,8 +21,8 @@ type testDataStore struct {
 	test       *testHelper
 
 	countLock utils.DeferableMutex
-	getCount  map[quantumfs.ObjectKey]int
-	setCount  map[quantumfs.ObjectKey]int
+	getCount  map[string]int
+	setCount  map[string]int
 }
 
 func newTestDataStore(test *testHelper) *testDataStore {
@@ -30,8 +30,8 @@ func newTestDataStore(test *testHelper) *testDataStore {
 		datastore:  processlocal.NewDataStore(""),
 		shouldRead: true,
 		test:       test,
-		getCount:   make(map[quantumfs.ObjectKey]int),
-		setCount:   make(map[quantumfs.ObjectKey]int),
+		getCount:   make(map[string]int),
+		setCount:   make(map[string]int),
 	}
 }
 
@@ -43,7 +43,7 @@ func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 	func() {
 		defer store.countLock.Lock().Unlock()
-		store.getCount[key]++
+		store.getCount[key.String()]++
 	}()
 
 	return store.datastore.Get(c, key, buf)
@@ -54,7 +54,7 @@ func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 	func() {
 		defer store.countLock.Lock().Unlock()
-		store.setCount[key]++
+		store.setCount[key.String()]++
 	}()
 
 	return store.datastore.Set(c, key, buf)
@@ -331,7 +331,7 @@ func TestCacheCombining(t *testing.T) {
 		// Run parallel gets and check to ensure that we only Get once
 		getsBefore := func() int {
 			defer backingStore.countLock.Lock().Unlock()
-			return backingStore.getCount[checkKey]
+			return backingStore.getCount[checkKey.String()]
 		}()
 
 		// Pre-lock the countLock to block the next Gets so we know that
@@ -366,7 +366,7 @@ func TestCacheCombining(t *testing.T) {
 
 		getsAfter := func() int {
 			defer backingStore.countLock.Lock().Unlock()
-			return backingStore.getCount[checkKey]
+			return backingStore.getCount[checkKey.String()]
 		}()
 
 		// Even though we bunched Gets for the same block in parallel,

@@ -860,7 +860,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	if type_ == quantumfs.ObjectTypeDirectory {
 		c.vlog("Attempted to insert a directory")
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
-			"InsertInode with directories is not supporte")
+			"InsertInode with directories is not supported")
 	}
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
@@ -921,6 +921,12 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 
 	c.vlog("Api::insertInode put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
+
+	success := refreshKeyTTLs(c, key, type_)
+	if !success {
+		return api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
+			"Unable to refresh all block TTLs for key")
+	}
 
 	func() {
 		defer parent.Lock().Unlock()

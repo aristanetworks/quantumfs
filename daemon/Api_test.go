@@ -595,7 +595,9 @@ func TestInvalidWorkspaceName(t *testing.T) {
 	})
 }
 
-func TestInsertInodeTraversal(t *testing.T) {
+func InsertInodeTraversal(t *testing.T, createFn func(*testHelper, string),
+	insertFn func(*testHelper, string)) {
+
 	runTestNoQfs(t, func(test *testHelper) {
 		config := test.defaultConfig()
 		var dataStore *testDataStore
@@ -612,26 +614,27 @@ func TestInsertInodeTraversal(t *testing.T) {
 
 		test.AssertNoErr(os.MkdirAll(workspace+"/dirA", 0777))
 
-		// Small file test
-		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileA",
-			"Some data"))
-/*
-		// Medium file test
-		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileB",
-			string(GenData(1000 + quantumfs.MaxBlockSize))))
+		test.SyncAllWorkspaces()
+
+		baseNumBlocks := func () int {
+			defer dataStore.countLock.Lock().Unlock()
+			return len(dataStore.setCount)
+		} ()
+
+		createFn(test, workspace)
+
+if false {
 		// Large file test
-		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileC",
-			string(GenData(1 + (quantumfs.MaxBlockSize *
-				quantumfs.MaxBlocksMediumFile())))))
+
 		// Very Large file test
 		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileD",
 			string(GenData(1 + (quantumfs.MaxBlockSize *
 				quantumfs.MaxBlocksLargeFile())))))
-*/
+}
 		test.SyncAllWorkspaces()
 
 		// Record the set counts in the datastore
-		beforeCounts := make(map[quantumfs.ObjectKey]int, 0)
+		beforeCounts := make(map[string]int, 0)
 		func () {
 			defer dataStore.countLock.Lock().Unlock()
 
@@ -640,26 +643,14 @@ func TestInsertInodeTraversal(t *testing.T) {
 			}
 		} ()
 
-		api := test.getApi()
-		permissionA := uint32(syscall.S_IXUSR | syscall.S_IWGRP |
-			syscall.S_IROTH)
-
-		key := getExtendedKeyHelper(test, workspace+"/dirA/fileA", "file")
-		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+
-			"/fileA", key, permissionA, 0, 0))
-/*
-		key = getExtendedKeyHelper(test, workspace+"/dirA/fileB", "file")
-		test.AssertNoErr(api.InsertInode(workspace+"/fileB", key,
-			permissionA, 0, 0))
-
-		key = getExtendedKeyHelper(test, workspace+"/dirA/fileC", "file")
-		test.AssertNoErr(api.InsertInode(workspace+"/fileC", key,
-			permissionA, 0, 0))
-
-		key = getExtendedKeyHelper(test, workspace+"/dirA/fileD", "file")
+		insertFn(test, workspace)
+if false{
+api := test.getApi()
+permissionA := uint32(0)
+		key := getExtendedKeyHelper(test, workspace+"/dirA/fileD", "file")
 		test.AssertNoErr(api.InsertInode(workspace+"/fileD", key,
 			permissionA, 0, 0))
-*/
+}
 		test.SyncAllWorkspaces()
 
 		// Almost all of the blocks in the workspace should have been
@@ -679,7 +670,55 @@ func TestInsertInodeTraversal(t *testing.T) {
 			}
 		} ()
 
-		test.Assert(notRefreshed <= 0, "Too many blocks not refreshed "+
-			"during InsertInode: %d %d", notRefreshed, refreshed)
+		netBlocksNotRefreshed := notRefreshed - baseNumBlocks
+		test.Assert(netBlocksNotRefreshed <= 0, "Blocks not refreshed "+
+			"during InsertInode: %d %d", netBlocksNotRefreshed,
+			refreshed)
+	})
+}
+
+func TestInsertInodeSmallFile(t *testing.T) {
+	InsertInodeTraversal(t, func (test *testHelper, workspace string) {
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileA",
+			"Some data"))
+	}, func (test *testHelper, workspace string) {
+		api := test.getApi()
+		permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH)
+
+		key := getExtendedKeyHelper(test, workspace+"/dirA/fileA", "file")
+		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+
+			"/fileA", key, permission, 0, 0))
+	})
+}
+
+func TestInsertInodeMediumFile(t *testing.T) {
+	InsertInodeTraversal(t, func(test *testHelper, workspace string) {
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileB",
+			string(GenData(1000 + quantumfs.MaxBlockSize))))
+	}, func (test *testHelper, workspace string) {
+		api := test.getApi()
+		permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH)
+
+		key := getExtendedKeyHelper(test, workspace+"/dirA/fileB", "file")
+		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+"/fileB",
+			key, permission, 0, 0))
+	})
+}
+
+func TestInsertInodeLargeFile(t *testing.T) {
+	InsertInodeTraversal(t, func(test *testHelper, workspace string) {
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileC",
+			string(GenData(1 + (quantumfs.MaxBlockSize *
+				quantumfs.MaxBlocksMediumFile())))))
+	}, func (test *testHelper, workspace string) {
+		api := test.getApi()
+		permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH)
+
+		key := getExtendedKeyHelper(test, workspace+"/dirA/fileC", "file")
+		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+"/fileC",
+			key, permission, 0, 0))
 	})
 }
