@@ -733,3 +733,20 @@ func TestInsertInodeVeryLargeFile(t *testing.T) {
 			key, permission, 0, 0))
 	})
 }
+
+func TestInsertInodeSymlink(t *testing.T) {
+	InsertInodeTraversal(t, func(test *testHelper, workspace string) {
+		syscall.Symlink(workspace, workspace+"/link")
+	}, func(test *testHelper, workspace string) {
+		api := test.getApi()
+		permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP |
+			syscall.S_IROTH)
+
+		_, err, key := utils.LGetXattr(workspace+"/link",
+			quantumfs.XAttrTypeKey, quantumfs.ExtendedKeyLength)
+		test.AssertNoErr(err)
+
+		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+"/link2",
+			string(key), permission, 0, 0))
+	})
+}

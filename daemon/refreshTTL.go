@@ -22,6 +22,8 @@ func refreshKeyTTLs(c *ctx, key quantumfs.ObjectKey,
 			return refreshMultiBlockTTL(c, key)
 		case quantumfs.ObjectTypeVeryLargeFile:
 			return refreshVeryLargeFileTTL(c, key)
+		case quantumfs.ObjectTypeSymlink:
+			return refreshSymlinkTTL(c, key)
 	}
 }
 
@@ -72,4 +74,9 @@ func refreshVeryLargeFileTTL(c *ctx, key quantumfs.ObjectKey) bool {
 	}
 
 	return true
+}
+
+func refreshSymlinkTTL(c *ctx, key quantumfs.ObjectKey) bool {
+	_, success := refreshTTL(c, key)
+	return success
 }
