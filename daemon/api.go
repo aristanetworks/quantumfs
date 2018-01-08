@@ -911,9 +911,10 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 			"Path %s does not exist", cmd.DstPath)
 	}
 
-	defer p.RLockTree().RUnlock()
+	p, treeUnlock := c.qfs.RLockTreeGetInode(c, p.inodeNum())
+	defer treeUnlock.RUnlock()
 
-	parent := p.(*Directory)
+	parent := asDirectory(p)
 	target := dst[len(dst)-1]
 
 	if parent.childExists(c, target) == fuse.Status(syscall.EEXIST) {
