@@ -484,7 +484,7 @@ func (sdug SetDefaultUidGids) Revert() {
 // Change the UID/GID the test thread to the given values. Use -1 not to change
 // either the UID or GID. nil sets an empty supplementaryGid set.
 //
-// Use this like "defer test.SetUidGid(...)()".
+// Use this like "defer test.SetUidGid(...).Revert()".
 func (th *TestHelper) SetUidGid(uid int, gid int,
 	supplementaryGids []int) SetDefaultUidGids {
 

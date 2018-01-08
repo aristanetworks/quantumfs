@@ -1842,3 +1842,19 @@ func TestDirectorySetAttrUidPermsRoot(t *testing.T) {
 		test.AssertNoErr(os.Chown(filename, 99, 99))
 	})
 }
+
+func TestDirectoryUnlinkChildNoWrite(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		defer test.SetUidGid(99, 99, nil).Revert()
+
+		test.AssertNoErr(utils.MkdirAll(workspace+"/a/b/c", 0777))
+		test.AssertNoErr(os.Chmod(workspace+"/a/b", 0555))
+
+		err := syscall.Rmdir(workspace + "/a/b/c")
+		test.AssertErr(err)
+		test.Assert(err == syscall.EACCES, "Unexpected error: %s",
+			err.Error())
+	})
+}

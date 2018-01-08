@@ -880,6 +880,11 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 			// objectTypeToFileType
 			record := record_.AsImmutableDirectoryRecord()
 
+			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
+			if err != fuse.OK {
+				return err
+			}
+
 			type_ := objectTypeToFileType(c, record.Type())
 			if type_ != fuse.S_IFDIR {
 				return fuse.ENOTDIR
