@@ -17,8 +17,8 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 func TestWorkspaceBranchNoOtherSyncs(t *testing.T) {
@@ -601,13 +601,13 @@ func insertInodeTraversal(test *testHelper, createFn func(string),
 	config := test.defaultConfig()
 	var dataStore *testDataStore
 	test.startQuantumFs_(config, nil, false,
-		func () *QuantumFs {
+		func() *QuantumFs {
 
-		rtn := NewQuantumFsLogs(config, test.Logger)
-		dataStore = newTestDataStore(test)
-		rtn.c.dataStore.durableStore = quantumfs.DataStore(dataStore)
-		return rtn
-	})
+			rtn := NewQuantumFsLogs(config, test.Logger)
+			dataStore = newTestDataStore(test)
+			rtn.c.dataStore.durableStore = quantumfs.DataStore(dataStore)
+			return rtn
+		})
 
 	workspace := test.NewWorkspace()
 
@@ -615,10 +615,10 @@ func insertInodeTraversal(test *testHelper, createFn func(string),
 
 	test.SyncAllWorkspaces()
 
-	baseNumBlocks := func () int {
+	baseNumBlocks := func() int {
 		defer dataStore.countLock.Lock().Unlock()
 		return len(dataStore.setCount)
-	} ()
+	}()
 
 	createFn(workspace)
 
@@ -626,13 +626,13 @@ func insertInodeTraversal(test *testHelper, createFn func(string),
 
 	// Record the set counts in the datastore
 	beforeCounts := make(map[string]int, 0)
-	func () {
+	func() {
 		defer dataStore.countLock.Lock().Unlock()
 
 		for k, v := range dataStore.setCount {
 			beforeCounts[k] = v
 		}
-	} ()
+	}()
 
 	insertFn(workspace)
 
@@ -643,7 +643,7 @@ func insertInodeTraversal(test *testHelper, createFn func(string),
 
 	notRefreshed := 0
 	refreshed := 0
-	func () {
+	func() {
 		defer dataStore.countLock.Lock().Unlock()
 
 		for key, before := range beforeCounts {
@@ -653,7 +653,7 @@ func insertInodeTraversal(test *testHelper, createFn func(string),
 				refreshed++
 			}
 		}
-	} ()
+	}()
 
 	netBlocksNotRefreshed := notRefreshed - baseNumBlocks
 	test.Assert(netBlocksNotRefreshed <= 0, "Blocks not refreshed "+
@@ -663,10 +663,10 @@ func insertInodeTraversal(test *testHelper, createFn func(string),
 
 func TestInsertInodeSmallFile(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
-		insertInodeTraversal(test, func (workspace string) {
+		insertInodeTraversal(test, func(workspace string) {
 			test.AssertNoErr(testutils.PrintToFile(workspace+
 				"/dirA/fileA", "Some data"))
-		}, func (workspace string) {
+		}, func(workspace string) {
 			api := test.getApi()
 			permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP |
 				syscall.S_IROTH)
@@ -683,9 +683,9 @@ func TestInsertInodeMediumFile(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		insertInodeTraversal(test, func(workspace string) {
 			test.AssertNoErr(testutils.PrintToFile(workspace+
-				"/dirA/fileB", string(GenData(1000 +
+				"/dirA/fileB", string(GenData(1000+
 				quantumfs.MaxBlockSize))))
-		}, func (workspace string) {
+		}, func(workspace string) {
 			api := test.getApi()
 			permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP |
 				syscall.S_IROTH)
@@ -703,9 +703,9 @@ func TestInsertInodeLargeFile(t *testing.T) {
 		insertInodeTraversal(test, func(workspace string) {
 			test.AssertNoErr(testutils.PrintToFile(workspace+
 				"/dirA/fileC",
-				string(GenData(1 + (quantumfs.MaxBlockSize *
+				string(GenData(1+(quantumfs.MaxBlockSize*
 					quantumfs.MaxBlocksMediumFile())))))
-		}, func (workspace string) {
+		}, func(workspace string) {
 			api := test.getApi()
 			permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP |
 				syscall.S_IROTH)
@@ -721,7 +721,7 @@ func TestInsertInodeLargeFile(t *testing.T) {
 func TestInsertInodeVeryLargeFile(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		insertInodeTraversal(test, func(workspace string) {
-			file, err := os.Create(workspace+"/dirA/fileD")
+			file, err := os.Create(workspace + "/dirA/fileD")
 			defer file.Close()
 			test.Assert(err == nil, "Error creating test file: %v", err)
 
@@ -733,7 +733,7 @@ func TestInsertInodeVeryLargeFile(t *testing.T) {
 
 			os.Truncate(workspace+"/dirA/fileD",
 				int64(quantumfs.MaxLargeFileSize())+
-				int64(quantumfs.MaxBlockSize))
+					int64(quantumfs.MaxBlockSize))
 		}, func(workspace string) {
 			api := test.getApi()
 			permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP |

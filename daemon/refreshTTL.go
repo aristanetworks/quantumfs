@@ -11,22 +11,22 @@ func refreshKeyTTLs(c *ctx, key quantumfs.ObjectKey,
 	type_ quantumfs.ObjectType) bool {
 
 	switch type_ {
-		default:
-			c.elog("Unsupported type for key TTL refresh: %d", type_)
-			return false
-		case quantumfs.ObjectTypeSmallFile:
-			return refreshSmallFileTTL(c, key)
-		case quantumfs.ObjectTypeLargeFile:
-			fallthrough
-		case quantumfs.ObjectTypeMediumFile:
-			return refreshMultiBlockTTL(c, key)
-		case quantumfs.ObjectTypeVeryLargeFile:
-			return refreshVeryLargeFileTTL(c, key)
-		case quantumfs.ObjectTypeSymlink:
-			return refreshSymlinkTTL(c, key)
-		case quantumfs.ObjectTypeSpecial:
-			// nothing to do for embedded keys
-			return true
+	default:
+		c.elog("Unsupported type for key TTL refresh: %d", type_)
+		return false
+	case quantumfs.ObjectTypeSmallFile:
+		return refreshSmallFileTTL(c, key)
+	case quantumfs.ObjectTypeLargeFile:
+		fallthrough
+	case quantumfs.ObjectTypeMediumFile:
+		return refreshMultiBlockTTL(c, key)
+	case quantumfs.ObjectTypeVeryLargeFile:
+		return refreshVeryLargeFileTTL(c, key)
+	case quantumfs.ObjectTypeSymlink:
+		return refreshSymlinkTTL(c, key)
+	case quantumfs.ObjectTypeSpecial:
+		// nothing to do for embedded keys
+		return true
 	}
 }
 

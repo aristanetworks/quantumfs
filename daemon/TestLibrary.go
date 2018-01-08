@@ -320,15 +320,15 @@ func (th *TestHelper) startQuantumFs(config QuantumFsConfig,
 	startChan chan struct{}, logPrefix bool) {
 
 	th.startQuantumFs_(config, startChan, logPrefix,
-		func () *QuantumFs{
+		func() *QuantumFs {
 
-		return NewQuantumFsLogs(config, th.Logger)
-	})
+			return NewQuantumFsLogs(config, th.Logger)
+		})
 }
 
 func (th *TestHelper) startQuantumFs_(config QuantumFsConfig,
 	startChan chan struct{}, logPrefix bool,
-	qfsCreator func () *QuantumFs) {
+	qfsCreator func() *QuantumFs) {
 
 	if err := utils.MkdirAll(config.CachePath, 0777); err != nil {
 		th.T.Fatalf("Unable to setup test ramfs path")
