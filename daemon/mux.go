@@ -1798,6 +1798,14 @@ func (qfs *QuantumFs) Access(input *fuse.AccessIn) (result fuse.Status) {
 	return inode.Access(c, input.Mask, input.Uid, input.Gid)
 }
 
+func isPosixAclName(name string) bool {
+	if name == "system.posix_acl_access" || name == "system.posix_acl_default" {
+		return true
+	}
+
+	return false
+}
+
 const GetXAttrSizeLog = "Mux::GetXAttrSize"
 
 func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int,
@@ -1809,6 +1817,10 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 	defer c.FuncIn(GetXAttrSizeLog, InodeOnlyLog, header.NodeId).Out()
+
+	if isPosixAclName(attr) {
+		return 0, fuse.EINVAL
+	}
 
 	if strings.HasPrefix(attr, quantumfs.XAttrTypePrefix) {
 		if attr == quantumfs.XAttrTypeKey {
@@ -1877,6 +1889,10 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 	defer logRequestPanic(c)
 	defer c.FuncIn(GetXAttrDataLog, InodeOnlyLog, header.NodeId).Out()
 
+	if isPosixAclName(attr) {
+		return nil, fuse.EINVAL
+	}
+
 	if strings.HasPrefix(attr, quantumfs.XAttrTypePrefix) {
 		if attr == quantumfs.XAttrTypeKey {
 			return getQuantumfsExtendedKey(c, qfs,
@@ -1927,6 +1943,10 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 	defer c.FuncIn(SetXAttrLog, InodeOnlyLog, input.NodeId).Out()
+
+	if isPosixAclName(attr) {
+		return fuse.EINVAL
+	}
 
 	if strings.HasPrefix(attr, quantumfs.XAttrTypePrefix) {
 		// quantumfs keys are immutable from userspace
