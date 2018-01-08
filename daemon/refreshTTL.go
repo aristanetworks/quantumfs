@@ -24,6 +24,9 @@ func refreshKeyTTLs(c *ctx, key quantumfs.ObjectKey,
 			return refreshVeryLargeFileTTL(c, key)
 		case quantumfs.ObjectTypeSymlink:
 			return refreshSymlinkTTL(c, key)
+		case quantumfs.ObjectTypeSpecial:
+			// nothing to do for embedded keys
+			return true
 	}
 }
 
