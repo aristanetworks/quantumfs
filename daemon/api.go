@@ -914,6 +914,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	p, treeUnlock := c.qfs.RLockTreeGetInode(c, p.inodeNum())
 	defer treeUnlock.RUnlock()
 
+	// The parent may have been deleted between the search and locking its tree.
+	if p == nil {
+		c.vlog("Path does not exist: %s", cmd.DstPath)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Path %s does not exist", cmd.DstPath)
+	}
+
 	parent := asDirectory(p)
 	target := dst[len(dst)-1]
 
