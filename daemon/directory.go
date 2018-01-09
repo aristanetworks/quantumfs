@@ -944,6 +944,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 		// Update the outgoing entry size
 		out.Attr.Size = uint64(len(pointedTo))
+		out.Attr.Blocks = utils.BlocksRoundUp(out.Attr.Size, statBlockSize)
 
 		return fuse.OK
 	}()
