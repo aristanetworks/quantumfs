@@ -1820,3 +1820,41 @@ func TestDirectoryReadStaleDir(t *testing.T) {
 		}
 	})
 }
+
+func TestDirectorySetAttrUidPermsRoot(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+
+		test.AssertNoErr(os.Mkdir(filename, 0777))
+
+		// Root is always allowed to change UID
+		test.AssertNoErr(os.Chown(filename, 99, 99))
+
+		// Nobody else is allowed to change UID
+		defer test.SetUidGid(99, 99, []int{}).Revert()
+
+		err := os.Chown(filename, 0, 99)
+		test.Assert(err != nil && os.IsPermission(err),
+			"unexpected chown error %s", err.Error())
+
+		// However, a call to chown which doesn't change the UID is fine
+		test.AssertNoErr(os.Chown(filename, 99, 99))
+	})
+}
+
+func TestDirectoryUnlinkChildNoWrite(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		defer test.SetUidGid(99, 99, nil).Revert()
+
+		test.AssertNoErr(utils.MkdirAll(workspace+"/a/b/c", 0777))
+		test.AssertNoErr(os.Chmod(workspace+"/a/b", 0555))
+
+		err := syscall.Rmdir(workspace + "/a/b/c")
+		test.AssertErr(err)
+		test.Assert(err == syscall.EACCES, "Unexpected error: %s",
+			err.Error())
+	})
+}
