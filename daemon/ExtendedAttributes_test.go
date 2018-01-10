@@ -608,3 +608,30 @@ func TestHardlinkXAttr(t *testing.T) {
 			"Xattrs aren't shared between links")
 	})
 }
+
+// QuantumFS doesn't support POSIX ACLs, but userspace programs use library functions
+// which interact with the extended attribute storage directly. Ensure these accesses
+// fail in order to trigger backup behaviour, such as using chmod().
+func TestPosixAclDisabled(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+
+		test.AssertNoErr(testutils.PrintToFile(filename, "data"))
+
+		err := syscall.Setxattr(filename, "system.posix_acl_access",
+			[]byte("data"), 0)
+		test.Assert(err != nil && err.(syscall.Errno) == syscall.EINVAL,
+			"Unexpected error %s", err.Error())
+
+		buf := make([]byte, 128)
+		_, err = syscall.Getxattr(filename, "system.posix_acl_access", buf)
+		test.Assert(err != nil && err.(syscall.Errno) == syscall.EINVAL,
+			"Unexpected error %s", err.Error())
+
+		err = syscall.Setxattr(filename, "system.posix_acl_default",
+			[]byte("data"), 0)
+		test.Assert(err != nil && err.(syscall.Errno) == syscall.EINVAL,
+			"Unexpected error %s", err.Error())
+	})
+}

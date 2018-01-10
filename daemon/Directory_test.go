@@ -8,6 +8,7 @@ package daemon
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -1908,5 +1909,95 @@ func TestMaxDirectoryRecordsSize(t *testing.T) {
 			"MaxDirectoryRecords is incorrect: %d block vs %d (%d)",
 			len(entry.Bytes()), quantumfs.MaxBlockSize,
 			quantumfs.MaxDirectoryRecords())
+	})
+}
+
+func TestDirectorySetAttrUidPermsRoot(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+
+		test.AssertNoErr(os.Mkdir(filename, 0777))
+
+		// Root is always allowed to change UID
+		test.AssertNoErr(os.Chown(filename, 99, 99))
+
+		// Nobody else is allowed to change UID
+		defer test.SetUidGid(99, 99, []int{}).Revert()
+
+		err := os.Chown(filename, 0, 99)
+		test.Assert(err != nil && os.IsPermission(err),
+			"unexpected chown error %s", err.Error())
+
+		// However, a call to chown which doesn't change the UID is fine
+		test.AssertNoErr(os.Chown(filename, 99, 99))
+	})
+}
+
+func TestDirectoryUnlinkChildNoWrite(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		defer test.SetUidGid(99, 99, nil).Revert()
+
+		test.AssertNoErr(utils.MkdirAll(workspace+"/a/b/c", 0777))
+		test.AssertNoErr(os.Chmod(workspace+"/a/b", 0555))
+
+		err := syscall.Rmdir(workspace + "/a/b/c")
+		test.AssertErr(err)
+		test.Assert(err == syscall.EACCES, "Unexpected error: %s",
+			err.Error())
+	})
+}
+
+// Read the directory one entry at a time.
+func (test *testHelper) smallReaddirnames(file *os.File, length int) []string {
+	names := make([]string, length)
+	count := 0
+	for {
+		d, err := file.Readdirnames(1)
+		if err == io.EOF {
+			break
+		}
+		test.AssertNoErr(err)
+		test.Assert(len(d) > 0,
+			"readdirnames %q returned empty slice", file.Name())
+		names[count] = d[0]
+		count++
+	}
+	return names[0:count]
+}
+
+// This test is a modified version of a test from golang's os_test with
+// the same name
+func TestReaddirnamesOneAtATime(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/subdir"
+		test.AssertNoErr(utils.MkdirAll(dir, 0777))
+
+		for i := 0; i < 100; i++ {
+			test.createFile(dir, fmt.Sprintf("file_%d", i), 0)
+		}
+
+		file, err := os.Open(dir)
+		test.AssertNoErr(err)
+		defer file.Close()
+
+		all, err := file.Readdirnames(-1)
+		test.AssertNoErr(err)
+
+		file1, err := os.Open(dir)
+		test.AssertNoErr(err)
+		defer file1.Close()
+
+		small := test.smallReaddirnames(file1, len(all)+100)
+		test.Assert(len(small) >= len(all),
+			"len(small) is %d, less than %d", len(small), len(all))
+
+		for i, n := range all {
+			test.Assert(small[i] == n,
+				"small read %q mismatch: %v", small[i], n)
+		}
 	})
 }

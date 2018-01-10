@@ -901,8 +901,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		// have the tree lock on the WorkspaceRoot. Hence, it is safe and
 		// necessary to get the tree lock of the WorkspaceRoot exclusively
 		// here.
-		defer (&workspace.Directory).LockTree().Unlock()
-		return (&workspace.Directory).followPath_DOWN(c, dst)
+		defer workspace.LockTree().Unlock()
+		return workspace.followPath_DOWN(c, dst)
 	}()
 	defer cleanup()
 	if err != nil {
@@ -911,7 +911,17 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 			"Path %s does not exist", cmd.DstPath)
 	}
 
-	parent := p.(*Directory)
+	p, treeUnlock := c.qfs.RLockTreeGetInode(c, p.inodeNum())
+	defer treeUnlock.RUnlock()
+
+	// The parent may have been deleted between the search and locking its tree.
+	if p == nil {
+		c.vlog("Path does not exist: %s", cmd.DstPath)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Path %s does not exist", cmd.DstPath)
+	}
+
+	parent := asDirectory(p)
 	target := dst[len(dst)-1]
 
 	if parent.childExists(c, target) == fuse.Status(syscall.EEXIST) {
