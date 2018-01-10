@@ -44,6 +44,8 @@ func TestSymlinkCreation(t *testing.T) {
 		err := syscall.Lstat(linkFilename, &stat)
 		test.Assert(err == nil, "Error stat'ing test file: %v", err)
 		test.Assert(stat.Nlink == 1, "Incorrect Nlink: %d", stat.Nlink)
+		test.Assert(stat.Size > 0, "Size too small: %d", stat.Size)
+		test.Assert(stat.Blocks > 0, "Too few blocks: %d", stat.Blocks)
 	})
 }
 
