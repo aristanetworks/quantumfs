@@ -319,17 +319,6 @@ func (th *TestHelper) serveSafely(qfs *QuantumFs, startChan chan<- struct{}) {
 func (th *TestHelper) startQuantumFs(config QuantumFsConfig,
 	startChan chan struct{}, logPrefix bool) {
 
-	th.startQuantumFs_(config, startChan, logPrefix,
-		func() *QuantumFs {
-
-			return NewQuantumFsLogs(config, th.Logger)
-		})
-}
-
-func (th *TestHelper) startQuantumFs_(config QuantumFsConfig,
-	startChan chan struct{}, logPrefix bool,
-	qfsCreator func() *QuantumFs) {
-
 	if err := utils.MkdirAll(config.CachePath, 0777); err != nil {
 		th.T.Fatalf("Unable to setup test ramfs path")
 	}
@@ -341,7 +330,7 @@ func (th *TestHelper) startQuantumFs_(config QuantumFsConfig,
 		instanceNum = len(th.qfsInstances) + 1
 
 		th.Log("Instantiating quantumfs instance %d...", instanceNum)
-		qfs = qfsCreator()
+		qfs = NewQuantumFsLogs(config, th.Logger)
 		if logPrefix {
 			qfs.c.Ctx.Prefix = fmt.Sprintf("[%d]: ", instanceNum)
 		}

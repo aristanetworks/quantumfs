@@ -10,6 +10,8 @@ import (
 func refreshKeyTTLs(c *ctx, key quantumfs.ObjectKey,
 	type_ quantumfs.ObjectType) bool {
 
+	defer c.FuncIn("daemon::refreshKeyTTLs", "%d", type_).Out()
+
 	switch type_ {
 	default:
 		c.elog("Unsupported type for key TTL refresh: %d", type_)
