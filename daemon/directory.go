@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -605,6 +606,13 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 		children = append(children, entryInfo)
 	}
+
+	// Sort the dentries so that their order is deterministic
+	// on every invocation
+	sort.Slice(children,
+		func(i, j int) bool {
+			return children[i].filename < children[j].filename
+		})
 
 	return children
 }
