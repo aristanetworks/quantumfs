@@ -40,6 +40,7 @@ type BlobStoreConfig struct {
 	SomeConfig string `json:"someconfig"`
 }
 
+// DontExpireWsdbCache disables cache timeouts
 const DontExpireWsdbCache = -1
 
 // WsDBConfig holds config values specfic to WorkspaceDB API

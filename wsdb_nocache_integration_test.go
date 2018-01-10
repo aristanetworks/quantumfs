@@ -25,8 +25,8 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	suite.Require().NoError(err, "Error during configuration read")
 	err = SetupIntegTestKeyspace(confFile)
 	suite.Require().NoError(err, "SetupIntegTestKeyspace returned an error")
-	err = DoTestSchemaOp(confFile, SCHEMA_CREATE)
-	suite.Require().NoError(err, "DoTestSchemaOp SCHEMA_CREATE returned an error")
+	err = DoTestSchemaOp(confFile, SchemaCreate)
+	suite.Require().NoError(err, "DoTestSchemaOp SchemaCreate returned an error")
 
 	var wsdb qwsdb.WorkspaceDB
 	cluster := NewRealCluster(cfg.Cluster)
@@ -95,7 +95,7 @@ func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegDeleteImmutableSet() {
 func (suite *wsdbNoCacheIntegTestSuite) TearDownTest() {
 	confFile, err := EtherConfFile()
 	suite.Require().NoError(err, "error in getting ether configuration file")
-	_ = DoTestSchemaOp(confFile, SCHEMA_DELETE)
+	_ = DoTestSchemaOp(confFile, SchemaDelete)
 	resetCqlStore()
 }
 

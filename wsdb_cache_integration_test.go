@@ -34,8 +34,8 @@ func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 	suite.Require().NoError(err, "error in getting ether configuration file")
 	err = SetupIntegTestKeyspace(confFile)
 	suite.Require().NoError(err, "SetupIntegTestKeyspace returned an error")
-	err = DoTestSchemaOp(confFile, SCHEMA_CREATE)
-	suite.Require().NoError(err, "DoTestSchemaOp SCHEMA_CREATE returned an error")
+	err = DoTestSchemaOp(confFile, SchemaCreate)
+	suite.Require().NoError(err, "DoTestSchemaOp SchemaCreate returned an error")
 
 	wsdb := NewWorkspaceDB(confFile)
 	cwsdb, ok := wsdb.(*cacheWsdb)
@@ -389,7 +389,7 @@ func ignoreDeadlineExceeded(c *testCtx) error {
 func (suite *wsdbCacheIntegTestSuite) TearDownTest() {
 	confFile, err := EtherConfFile()
 	suite.Require().NoError(err, "error in getting ether configuration file")
-	_ = DoTestSchemaOp(confFile, SCHEMA_DELETE)
+	_ = DoTestSchemaOp(confFile, SchemaDelete)
 	resetCqlStore()
 }
 

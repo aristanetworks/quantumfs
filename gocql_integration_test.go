@@ -298,12 +298,12 @@ func BenchmarkGoCQL(b *testing.B) {
 	}
 
 	// ensure a clean state
-	err = DoTestSchemaOp(confFile, SCHEMA_DELETE)
+	err = DoTestSchemaOp(confFile, SchemaDelete)
 	if err != nil {
 		b.Fatalf("TearDownScheme failed error: %s", err)
 	}
 	// clean up upon any b.Run failures
-	defer DoTestSchemaOp(confFile, SCHEMA_DELETE)
+	defer DoTestSchemaOp(confFile, SchemaDelete)
 
 	for _, subBmark := range bmarks {
 		// setup and teardown of schema for each kind of
@@ -311,8 +311,8 @@ func BenchmarkGoCQL(b *testing.B) {
 		if err = SetupIntegTestKeyspace(confFile); err != nil {
 			b.Fatalf("SetupIntegTestKeyspace returned an error: %s", err)
 		}
-		if err = DoTestSchemaOp(confFile, SCHEMA_CREATE); err != nil {
-			b.Fatalf("DoTestSchemaOp SCHEMA_CREATE returned an error: %s", err)
+		if err = DoTestSchemaOp(confFile, SchemaCreate); err != nil {
+			b.Fatalf("DoTestSchemaOp SchemaCreate returned an error: %s", err)
 		}
 
 		b.Run(fmt.Sprintf("%s", subBmark.name),
@@ -321,7 +321,7 @@ func BenchmarkGoCQL(b *testing.B) {
 					subBmark.ttl)
 			})
 
-		if err = DoTestSchemaOp(confFile, SCHEMA_DELETE); err != nil {
+		if err = DoTestSchemaOp(confFile, SchemaDelete); err != nil {
 			b.Fatalf("TearDownSchema returned an error: %s", err)
 		}
 	}

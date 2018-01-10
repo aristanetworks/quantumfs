@@ -6,58 +6,39 @@ package cql
 import (
 	"fmt"
 	"os"
-	"time"
 
+	"github.com/aristanetworks/ether/utils"
 	"github.com/gocql/gocql"
 )
 
-var schemaRetries = 20
-var schemaTimeout = 3 * time.Second
-
-func execWithRetry(q *gocql.Query) error {
-	var err error
-	var i int
-	for i = 0; i < schemaRetries; i++ {
-		err = q.Exec()
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Second)
-	}
-
-	if err != nil {
-		fmt.Printf("ETHER: Failed after %d attempts query: %q\n", i, q)
-	} else {
-		if i > 0 {
-			fmt.Printf("ETHER: Took %d attempts query: %q\n", i+1, q)
-		}
-	}
-	return err
-}
-
+// SchemaOp is a type for Schema operations
 type SchemaOp int
 
+// Constants to define Schema operations
 const (
-	SCHEMA_CREATE SchemaOp = iota
-	SCHEMA_DELETE
+	SchemaCreate SchemaOp = iota
+	SchemaDelete
 )
 
 func (s SchemaOp) String() string {
 	switch s {
-	case SCHEMA_CREATE:
+	case SchemaCreate:
 		return "create"
-	case SCHEMA_DELETE:
+	case SchemaDelete:
 		return "delete"
 	}
 
 	return fmt.Sprintf("unknown schema op(%d)", s)
 }
 
-func doTableOp(sess *gocql.Session, op SchemaOp,
+var schemaRetries = 20
+
+// DoTableOp is used to CREATE or DROP tables
+func DoTableOp(sess *gocql.Session, op SchemaOp,
 	keyspace string, bsName string, wsdbName string) error {
 
 	var ddls []string
-	if op == SCHEMA_CREATE {
+	if op == SchemaCreate {
 		ddls = []string{
 			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s"+
 				" ( key blob PRIMARY KEY, value blob )"+
@@ -80,7 +61,7 @@ func doTableOp(sess *gocql.Session, op SchemaOp,
 
 	for _, stmt := range ddls {
 		query := sess.Query(stmt)
-		err := execWithRetry(query)
+		err := utils.ExecWithRetry(query, schemaRetries)
 		if err != nil {
 			return fmt.Errorf("error %q during %s", err.Error(), stmt)
 		}
@@ -93,6 +74,7 @@ func doTableOp(sess *gocql.Session, op SchemaOp,
 // we restrict the max length of prefix to 30 chars
 const maxKsTblPrefixLen = 30
 
+// DoTestSchemaOp creates the test Schema
 func DoTestSchemaOp(confFile string, op SchemaOp) error {
 	prefix := os.Getenv("CFNAME_PREFIX")
 	perr := checkCfNamePrefix(prefix)
@@ -114,7 +96,7 @@ func DoTestSchemaOp(confFile string, op SchemaOp) error {
 	}
 	defer sess.Close()
 
-	doTableOp(sess, op, cfg.Cluster.KeySpace, bsName, wsdbName)
+	DoTableOp(sess, op, cfg.Cluster.KeySpace, bsName, wsdbName)
 
 	return nil
 }
@@ -140,7 +122,7 @@ func SetupIntegTestKeyspace(confFile string) error {
 		"{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }", cfg.Cluster.KeySpace)
 
 	query := sess.Query(queryStr)
-	err = execWithRetry(query)
+	err = utils.ExecWithRetry(query, schemaRetries)
 
 	if err != nil {
 		return fmt.Errorf("error in creating keyspace %s: %s", cfg.Cluster.KeySpace, err.Error())

@@ -70,6 +70,8 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 
 // InsertLog can be used in external tool for log parsing
 const InsertLog = "Cql::Insert"
+
+// GoCqlInsertLog can be used in external tool for log parsing
 const GoCqlInsertLog = "GoCql::Insert"
 
 // KeyTTLLog can be used in external tool for log parsing
@@ -118,6 +120,8 @@ USING TTL %s`, b.keyspace, b.cfName, ttl)
 
 // GetLog can be used in external tool for log parsing
 const GetLog = "Cql::Get"
+
+// GoCqlGetLog can be used in external tool for log parsing
 const GoCqlGetLog = "GoCql::Get"
 
 // KeyLog can be used in external tool for log parsing
@@ -173,6 +177,8 @@ func (b *cqlBlobStore) Delete(c ether.Ctx, key []byte) error {
 
 // MetadataLog can be used in external tool for log parsing
 const MetadataLog = "Cql::Metadata"
+
+// GoCqlMetadataLog can be used in external tool for log parsing
 const GoCqlMetadataLog = "GoCql::Metadata"
 
 // Metadata is the CQL implementation of blobstore.Metadata()
