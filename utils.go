@@ -14,6 +14,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/gocql/gocql"
 )
 
 //Semaphore implements semaphore using chan
@@ -310,5 +312,26 @@ func RandomizeData(srcDir string) error {
 	}
 
 	err := filepath.Walk(srcDir, randDataFunc)
+	return err
+}
+
+func ExecWithRetry(q *gocql.Query, retries int) error {
+	var err error
+	var i int
+	for i = 0; i < retries; i++ {
+		err = q.Exec()
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	if err != nil {
+		fmt.Printf("ETHER: Failed after %d attempts query: %q\n", i, q)
+	} else {
+		if i > 0 {
+			fmt.Printf("ETHER: Took %d attempts query: %q\n", i+1, q)
+		}
+	}
 	return err
 }
