@@ -924,9 +924,11 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	parent := asDirectory(p)
 	target := dst[len(dst)-1]
 
-	if parent.childExists(c, target) == fuse.Status(syscall.EEXIST) {
+	status := parent.Unlink(c, target)
+	if status != fuse.OK && status != fuse.ENOENT {
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
-			"Inode %s should not exist", target)
+			"Inode %s should not exist, error unlinking %d", target,
+			status)
 	}
 
 	c.vlog("Api::insertInode put key %v into node %d - %s",
