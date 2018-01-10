@@ -162,3 +162,40 @@ func TestAccessDirectory(t *testing.T) {
 		accessTestBothUsers(test, workspace+"/subdir")
 	})
 }
+
+func TestRootAccessRegularFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		test.createFile(workspace, "testFile", 1000)
+		filename := workspace + "/testFile"
+
+		for _, perm := range []uint32{0000, 0666, 0402, 0642} {
+			test.AssertNoErr(syscall.Chmod(filename, perm))
+			permTest(test, filename, X_OK, false)
+			permTest(test, filename, R_OK, true)
+			permTest(test, filename, W_OK, true)
+		}
+
+		for _, perm := range []uint32{0001, 0100, 0777, 0700} {
+			test.AssertNoErr(syscall.Chmod(filename, perm))
+			permTest(test, filename, X_OK, true)
+			permTest(test, filename, R_OK, true)
+			permTest(test, filename, W_OK, true)
+		}
+	})
+}
+
+func TestRootAccessDirectory(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		utils.MkdirAll(workspace+"/subdir", 0777)
+		dir := workspace + "/subdir"
+
+		for _, perm := range []uint32{0000, 0666, 0402, 0642} {
+			test.AssertNoErr(syscall.Chmod(dir, perm))
+			permTest(test, dir, X_OK, true)
+			permTest(test, dir, R_OK, true)
+			permTest(test, dir, W_OK, true)
+		}
+	})
+}

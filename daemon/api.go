@@ -911,9 +911,17 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 			"Path %s does not exist", cmd.DstPath)
 	}
 
-	defer p.RLockTree().RUnlock()
+	p, treeUnlock := c.qfs.RLockTreeGetInode(c, p.inodeNum())
+	defer treeUnlock.RUnlock()
 
-	parent := p.(*Directory)
+	// The parent may have been deleted between the search and locking its tree.
+	if p == nil {
+		c.vlog("Path does not exist: %s", cmd.DstPath)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Path %s does not exist", cmd.DstPath)
+	}
+
+	parent := asDirectory(p)
 	target := dst[len(dst)-1]
 
 	status := parent.Unlink(c, target)

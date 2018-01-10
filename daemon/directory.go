@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -389,6 +390,14 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrI
 
 	defer c.funcIn("Directory::setChildAttr").Out()
 
+	if c.fuseCtx != nil && utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_UID) {
+		userUid := c.fuseCtx.Owner.Uid
+		if userUid != 0 && userUid != attr.Owner.Uid {
+			c.vlog("Non-root cannot change UID")
+			return fuse.EPERM
+		}
+	}
+
 	if dir.isOrphaned() && dir.id == inodeNum {
 		return dir.setOrphanChildAttr(c, inodeNum, attr, out, updateMtime)
 	}
@@ -597,6 +606,13 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 		children = append(children, entryInfo)
 	}
+
+	// Sort the dentries so that their order is deterministic
+	// on every invocation
+	sort.Slice(children,
+		func(i, j int) bool {
+			return children[i].filename < children[j].filename
+		})
 
 	return children
 }
@@ -872,6 +888,11 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 			// objectTypeToFileType
 			record := record_.AsImmutableDirectoryRecord()
 
+			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
+			if err != fuse.OK {
+				return err
+			}
+
 			type_ := objectTypeToFileType(c, record.Type())
 			if type_ != fuse.S_IFDIR {
 				return fuse.ENOTDIR
@@ -931,6 +952,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 		// Update the outgoing entry size
 		out.Attr.Size = uint64(len(pointedTo))
+		out.Attr.Blocks = utils.BlocksRoundUp(out.Attr.Size, statBlockSize)
 
 		return fuse.OK
 	}()
@@ -1739,7 +1761,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 
-	go c.qfs.noteChildCreated(dir.inodeNum(), name)
+	c.qfs.noteChildCreated(c, dir.inodeNum(), name)
 
 	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
 }

@@ -228,10 +228,7 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 	// Allocate a new inode for regular files or return an already
 	// existing inode for hardlinks to existing inodes
 	inodeId = dir.children.loadPublishableChild(c, remoteRecord, inodeId)
-	status := c.qfs.noteChildCreated(dir.id, remoteRecord.Filename())
-	utils.Assert(status == fuse.OK,
-		"marking %s created failed with %d", remoteRecord.Filename(),
-		status)
+	c.qfs.noteChildCreated(c, dir.id, remoteRecord.Filename())
 	return inodeId
 }
 
@@ -269,9 +266,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
 		reload(c, dir.hardlinkTable, rc, inode, record)
 	}
-	status := c.qfs.invalidateInode(childId)
-	utils.Assert(status == fuse.OK,
-		"invalidating %d failed with %d", childId, status)
+	c.qfs.invalidateInode(c, childId)
 }
 
 func updateMapDescend_DOWN(c *ctx, rc *RefreshContext,
@@ -308,7 +303,7 @@ func (dir *Directory) hideEntry_DOWN_(c *ctx, childId InodeId,
 			utils.RandomNumberGenerator.Uint64())
 	}
 	dir.children.renameChild(c, oldName, hiddenName)
-	c.qfs.noteDeletedInode(dir.inodeNum(), childId, oldName)
+	c.qfs.noteDeletedInode(c, dir.inodeNum(), childId, oldName)
 }
 
 func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
