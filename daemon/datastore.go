@@ -42,6 +42,17 @@ func (store *dataStore) shutdown() {
 const CacheHitLog = "Found key in readcache"
 const CacheMissLog = "Cache miss"
 
+func (store *dataStore) Freshen(c *quantumfs.Ctx, key quantumfs.ObjectKey) {
+	// TODO: Make this function part of the quantumfs datastore interface
+	buf := store.Get(c, key)
+	if buf == nil {
+		return nil, false
+	}
+
+	err := store.durableStore.Set(c, key, buf)
+	return buf, err == nil
+}
+
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) quantumfs.Buffer {
 

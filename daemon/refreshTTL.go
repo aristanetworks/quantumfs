@@ -7,55 +7,45 @@ import (
 	"github.com/aristanetworks/quantumfs"
 )
 
-func refreshKeyTTLs(c *ctx, key quantumfs.ObjectKey,
+func freshenKeys(c *ctx, key quantumfs.ObjectKey,
 	type_ quantumfs.ObjectType) bool {
 
-	defer c.FuncIn("daemon::refreshKeyTTLs", "%d", type_).Out()
+	defer c.FuncIn("daemon::freshenKeys", "%d", type_).Out()
 
 	switch type_ {
 	default:
-		c.elog("Unsupported type for key TTL refresh: %d", type_)
+		c.elog("Unsupported type for key freshen: %d", type_)
 		return false
 	case quantumfs.ObjectTypeSmallFile:
-		return refreshSmallFileTTL(c, key)
+		return freshenSmallFile(c, key)
 	case quantumfs.ObjectTypeLargeFile:
 		fallthrough
 	case quantumfs.ObjectTypeMediumFile:
-		return refreshMultiBlockTTL(c, key)
+		return freshenMultiBlock(c, key)
 	case quantumfs.ObjectTypeVeryLargeFile:
-		return refreshVeryLargeFileTTL(c, key)
+		return freshenVeryLargeFile(c, key)
 	case quantumfs.ObjectTypeSymlink:
-		return refreshSymlinkTTL(c, key)
+		return freshenSymlink(c, key)
 	case quantumfs.ObjectTypeSpecial:
 		// nothing to do for embedded keys
 		return true
 	}
 }
 
-func refreshTTL(c *ctx, key quantumfs.ObjectKey) (quantumfs.Buffer, bool) {
-	buf := c.dataStore.Get(&c.Ctx, key)
-	if buf == nil {
-		return nil, false
-	}
-
-	err := c.dataStore.durableStore.Set(&c.Ctx, key, buf)
-	return buf, err == nil
-}
-
-func refreshSmallFileTTL(c *ctx, key quantumfs.ObjectKey) bool {
-	_, success := refreshTTL(c, key)
+func freshenSmallFile(c *ctx, key quantumfs.ObjectKey) bool {
+	_, success := c.dataStore.Freshen(c, key)
 	return success
 }
 
-func refreshMultiBlockTTL(c *ctx, key quantumfs.ObjectKey) bool {
-	buf, success := refreshTTL(c, key)
+func freshenMultiBlock(c *ctx, key quantumfs.ObjectKey) bool {
+	buf, success := c.dataStore.Freshen(c, key)
 	if !success {
 		return false
 	}
 
 	store := buf.AsMultiBlockFile()
 	for _, block := range store.ListOfBlocks() {
-		_, success = refreshTTL(c, block)
+		_, success = c.dataStore.Freshen(c, block)
 		if !success {
 			return false
 		}
@@ -64,15 +54,15 @@ func refreshMultiBlockTTL(c *ctx, key quantumfs.ObjectKey) bool {
 	return true
 }
 
-func refreshVeryLargeFileTTL(c *ctx, key quantumfs.ObjectKey) bool {
-	buf, success := refreshTTL(c, key)
+func freshenVeryLargeFile(c *ctx, key quantumfs.ObjectKey) bool {
+	buf, success := c.dataStore.Freshen(c, key)
 	if !success {
 		return false
 	}
 
 	store := buf.AsVeryLargeFile()
 	for i := 0; i < store.NumberOfParts(); i++ {
-		success = refreshMultiBlockTTL(c, store.LargeFileKey(i))
+		success = freshenMultiBlock(c, store.LargeFileKey(i))
 		if !success {
 			return false
 		}
@@ -81,7 +71,7 @@ func refreshVeryLargeFileTTL(c *ctx, key quantumfs.ObjectKey) bool {
 	return true
 }
 
-func refreshSymlinkTTL(c *ctx, key quantumfs.ObjectKey) bool {
-	_, success := refreshTTL(c, key)
+func freshenSymlink(c *ctx, key quantumfs.ObjectKey) bool {
+	_, success := c.dataStore.Freshen(c, key)
 	return success
 }
