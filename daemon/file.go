@@ -465,7 +465,7 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	var readCount int
 	readResult, status := func() (fuse.ReadResult, fuse.Status) {
-		defer fi.Lock().Unlock()
+		defer fi.RLock().RUnlock()
 
 		// Ensure size and buf are consistent
 		buf = buf[:size]
