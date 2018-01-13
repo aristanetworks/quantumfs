@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
@@ -42,15 +43,18 @@ func (store *dataStore) shutdown() {
 const CacheHitLog = "Found key in readcache"
 const CacheMissLog = "Cache miss"
 
-func (store *dataStore) Freshen(c *quantumfs.Ctx, key quantumfs.ObjectKey) {
+func (store *dataStore) Freshen(c *ctx, key quantumfs.ObjectKey) (quantumfs.Buffer,
+	error) {
+
 	// TODO: Make this function part of the quantumfs datastore interface
-	buf := store.Get(c, key)
+	buf := store.Get(&c.Ctx, key)
 	if buf == nil {
-		return nil, false
+		return nil, errors.New(fmt.Sprintf("Cannot freshen %s, "+
+			"block missing from db", key.String()))
 	}
 
-	err := store.durableStore.Set(c, key, buf)
-	return buf, err == nil
+	err := store.durableStore.Set(&c.Ctx, key, buf)
+	return buf, err
 }
 
 func (store *dataStore) Get(c *quantumfs.Ctx,

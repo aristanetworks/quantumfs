@@ -8,14 +8,14 @@ import (
 )
 
 func freshenKeys(c *ctx, key quantumfs.ObjectKey,
-	type_ quantumfs.ObjectType) bool {
+	type_ quantumfs.ObjectType) error {
 
 	defer c.FuncIn("daemon::freshenKeys", "%d", type_).Out()
 
 	switch type_ {
 	default:
 		c.elog("Unsupported type for key freshen: %d", type_)
-		return false
+		return nil
 	case quantumfs.ObjectTypeSmallFile:
 		return freshenSmallFile(c, key)
 	case quantumfs.ObjectTypeLargeFile:
@@ -28,50 +28,50 @@ func freshenKeys(c *ctx, key quantumfs.ObjectKey,
 		return freshenSymlink(c, key)
 	case quantumfs.ObjectTypeSpecial:
 		// nothing to do for embedded keys
-		return true
+		return nil
 	}
 }
 
-func freshenSmallFile(c *ctx, key quantumfs.ObjectKey) bool {
-	_, success := c.dataStore.Freshen(c, key)
-	return success
+func freshenSmallFile(c *ctx, key quantumfs.ObjectKey) error {
+	_, err := c.dataStore.Freshen(c, key)
+	return err
 }
 
-func freshenMultiBlock(c *ctx, key quantumfs.ObjectKey) bool {
-	buf, success := c.dataStore.Freshen(c, key)
-	if !success {
-		return false
+func freshenMultiBlock(c *ctx, key quantumfs.ObjectKey) error {
+	buf, err := c.dataStore.Freshen(c, key)
+	if err != nil {
+		return err
 	}
 
 	store := buf.AsMultiBlockFile()
 	for _, block := range store.ListOfBlocks() {
-		_, success = c.dataStore.Freshen(c, block)
-		if !success {
-			return false
+		_, err = c.dataStore.Freshen(c, block)
+		if err != nil {
+			return err
 		}
 	}
 
-	return true
+	return nil
 }
 
-func freshenVeryLargeFile(c *ctx, key quantumfs.ObjectKey) bool {
-	buf, success := c.dataStore.Freshen(c, key)
-	if !success {
-		return false
+func freshenVeryLargeFile(c *ctx, key quantumfs.ObjectKey) error {
+	buf, err := c.dataStore.Freshen(c, key)
+	if err != nil {
+		return err
 	}
 
 	store := buf.AsVeryLargeFile()
 	for i := 0; i < store.NumberOfParts(); i++ {
-		success = freshenMultiBlock(c, store.LargeFileKey(i))
-		if !success {
-			return false
+		err = freshenMultiBlock(c, store.LargeFileKey(i))
+		if err != nil {
+			return err
 		}
 	}
 
-	return true
+	return nil
 }
 
-func freshenSymlink(c *ctx, key quantumfs.ObjectKey) bool {
-	_, success := c.dataStore.Freshen(c, key)
-	return success
+func freshenSymlink(c *ctx, key quantumfs.ObjectKey) error {
+	_, err := c.dataStore.Freshen(c, key)
+	return err
 }

@@ -932,10 +932,10 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	c.vlog("Api::insertInode put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
 
-	success := refreshKeyTTLs(c, key, type_)
-	if !success {
+	err = freshenKeys(c, key, type_)
+	if err != nil {
 		return api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
-			"Unable to refresh all block TTLs for key")
+			"Unable to refresh all block TTLs for key: %s", err)
 	}
 
 	func() {
