@@ -387,6 +387,16 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 		return err == nil
 	})
 
+	// Ensure we can overwrite a file
+	overwriteFilename := workspaceDst + "/overwrite"
+	fd2, err := syscall.Creat(overwriteFilename, PermissionB)
+	test.Assert(err == nil, "Error creating a file to overwrite: %v", err)
+	syscall.Close(fd2)
+
+	err = api.InsertInode(dst+"/overwrite", keyF, PermissionA, uid, gid)
+	test.Assert(err == nil,
+		"Error overwriting a file: %v", err)
+
 	// InsertInode with an empty key should fail
 	err = api.InsertInode(dst+"/test/a/file1", "", PermissionA, uid, gid)
 	test.Assert(err != nil, "Unexpected success inserting empty key")
