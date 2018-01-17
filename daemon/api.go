@@ -937,7 +937,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	err = freshenKeys(c, key, type_)
 	if err != nil {
 		return api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
-			"Unable to refresh all block TTLs for key: %s", err)
+			"Unable to freshen all blocks for key: %s", err)
 	}
 
 	func() {

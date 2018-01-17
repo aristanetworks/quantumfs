@@ -672,15 +672,6 @@ func insertInodeTraversal(test *testHelper, createFn func(string)) {
 		refreshed)
 }
 
-func reinsertNode(test *testHelper, workspace string, relfilepath string) {
-	api := test.getApi()
-	permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP | syscall.S_IROTH)
-
-	key := getExtendedKeyHelper(test, workspace+relfilepath, "file")
-	test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+
-		"/insertedFile", key, permission, 0, 0))
-}
-
 func TestInsertInodeSmallFile(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		insertInodeTraversal(test, func(workspace string) {
