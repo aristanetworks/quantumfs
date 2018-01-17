@@ -4,7 +4,6 @@
 package daemon
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
@@ -48,8 +47,8 @@ func freshenMultiBlock(c *ctx, key quantumfs.ObjectKey) error {
 
 	buf := c.dataStore.Get(&c.Ctx, key)
 	if buf == nil {
-		return errors.New(fmt.Sprintf("Cannot freshen %s, "+
-			"block missing from db", key.String()))
+		return fmt.Errorf("Cannot freshen %s, "+
+			"block missing from db", key.String())
 	}
 
 	store := buf.AsMultiBlockFile()
@@ -71,8 +70,8 @@ func freshenVeryLargeFile(c *ctx, key quantumfs.ObjectKey) error {
 
 	buf := c.dataStore.Get(&c.Ctx, key)
 	if buf == nil {
-		return errors.New(fmt.Sprintf("Cannot freshen %s, "+
-			"block missing from db", key.String()))
+		return fmt.Errorf("Cannot freshen %s, "+
+			"block missing from db", key.String())
 	}
 
 	store := buf.AsVeryLargeFile()

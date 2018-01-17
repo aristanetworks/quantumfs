@@ -5,7 +5,6 @@ package daemon
 
 import (
 	"container/list"
-	"errors"
 	"fmt"
 
 	"github.com/aristanetworks/quantumfs"
@@ -47,8 +46,8 @@ func (store *dataStore) Freshen(c *ctx, key quantumfs.ObjectKey) error {
 	// TODO: Make this function part of the quantumfs datastore interface
 	buf := store.Get(&c.Ctx, key)
 	if buf == nil {
-		return errors.New(fmt.Sprintf("Cannot freshen %s, "+
-			"block missing from db", key.String()))
+		return fmt.Errorf("Cannot freshen %s, "+
+			"block missing from db", key.String())
 	}
 
 	err := store.durableStore.Set(&c.Ctx, key, buf)
