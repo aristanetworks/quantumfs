@@ -474,21 +474,21 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 func TestInsertInodeDirties(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
-		filename := workspace + "/file"
-		copyname := workspace + "/copy"
+		filename := workspace + "/dir/file"
 		api := test.getApi()
 
 		test.MakeFile(filename)
 
 		key := getExtendedKeyHelper(test, filename, "file")
 
-		test.SyncWorkspace(workspace)
+		test.SyncWorkspace(test.RelPath(workspace))
 
-		test.AssertNoErr(api.InsertInode(copyname, key, 0777, 0, 0))
+		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+
+			"/dir/copy", key, 0777, 0, 0))
 
 		branch := test.AbsPath(test.branchWorkspace(workspace))
 
-		test.assertFileExists(branch + "/copy")
+		test.assertFileExists(branch + "/dir/copy")
 	})
 }
 
