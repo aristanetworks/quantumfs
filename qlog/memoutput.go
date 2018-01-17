@@ -381,7 +381,11 @@ func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
 }
 
 func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
-	format string) (uint16, error) {
+	_format string) (uint16, error) {
+
+	// the _format argument is allocated on the stack, therefore we have to
+	// make a copy to store it in any map for future references
+	format := string([]byte(_format))
 
 	defer strMap.lock.Lock().Unlock()
 
