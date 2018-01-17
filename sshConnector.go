@@ -31,7 +31,7 @@ func AuthFromPassword(pass string) ssh.AuthMethod {
 
 // SSHConnect is a helper function to open a SSH session with a given host.
 func SSHConnect(user string, ip string, port int, auth ssh.AuthMethod,
-	timeoutSec uint) (*ssh.Session, error) {
+	timeout time.Duration) (*ssh.Session, error) {
 
 	sshConfig := &ssh.ClientConfig{
 		User: user,
@@ -39,7 +39,7 @@ func SSHConnect(user string, ip string, port int, auth ssh.AuthMethod,
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			return nil
 		},
-		Timeout: time.Duration(timeoutSec) * time.Second,
+		Timeout: timeout,
 	}
 
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", ip, port), sshConfig)
