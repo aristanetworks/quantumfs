@@ -471,6 +471,27 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 	})
 }
 
+func TestInsertInodeDirties(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+		copyname := workspace + "/copy"
+		api := test.getApi()
+
+		test.MakeFile(filename)
+
+		key := getExtendedKeyHelper(test, filename, "file")
+
+		test.SyncWorkspace(workspace)
+
+		test.AssertNoErr(api.InsertInode(copyname, key, 0777, 0, 0))
+
+		branch := test.AbsPath(test.branchWorkspace(workspace))
+
+		test.assertFileExists(branch + "/copy")
+	})
+}
+
 func TestApiNoRequestBlockingRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api, err := os.OpenFile(test.AbsPath(quantumfs.ApiPath),
