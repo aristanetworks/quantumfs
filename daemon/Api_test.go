@@ -644,6 +644,11 @@ func insertInodeTraversal(test *testHelper, createFn func(string)) {
 		return len(dataStore.setCount)
 	}()
 
+	// When we insert the inode here we'll create new metadata blocks for the
+	// workspace root and its internal directory. Take these unaccessed blocks
+	// into account.
+	baseNumBlocks += 2
+
 	createFn(workspace)
 
 	test.SyncAllWorkspaces()
