@@ -3,7 +3,10 @@
 
 package quantumfs
 
-import "github.com/aristanetworks/quantumfs/qlog"
+import (
+	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
+)
 
 // Generic request context object
 type Ctx struct {
@@ -71,12 +74,20 @@ func (c Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLo
 func (c Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 	extraFmtStr string, args ...interface{}) ExitFuncLog {
 
-	format := qlog.FnEnterStr + funcName + " " + extraFmtStr
-	if len(c.Prefix) > 0 {
-		format = c.Prefix + format
-	}
+	// A format larger than LogStrSize bytes will be silently dropped
+	format := [qlog.LogStrSize]byte{}
+	index := 0
 
-	c.Qlog.Log(subsystem, c.RequestId, 3, format, args...)
+	if len(c.Prefix) > 0 {
+		index += copy(format[index:], c.Prefix)
+	}
+	index += copy(format[index:], qlog.FnEnterStr)
+	index += copy(format[index:], funcName)
+	index += copy(format[index:], " ")
+	index += copy(format[index:], extraFmtStr)
+	formatStr := utils.MoveByteSliceToString(format[:index])
+
+	c.Qlog.Log(subsystem, c.RequestId, 3, formatStr, args...)
 	return ExitFuncLog{
 		c:         &c,
 		subsystem: subsystem,
@@ -85,10 +96,16 @@ func (c Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 }
 
 func (e ExitFuncLog) Out() {
-	format := qlog.FnExitStr + e.funcName
-	if len(e.c.Prefix) > 0 {
-		format = e.c.Prefix + format
-	}
+	// A format larger than LogStrSize bytes will be silently dropped
+	format := [qlog.LogStrSize]byte{}
+	index := 0
 
-	e.c.Qlog.Log(e.subsystem, e.c.RequestId, 3, format)
+	if len(e.c.Prefix) > 0 {
+		index += copy(format[index:], e.c.Prefix)
+	}
+	index += copy(format[index:], qlog.FnExitStr)
+	index += copy(format[index:], e.funcName)
+	formatStr := utils.MoveByteSliceToString(format[:index])
+
+	e.c.Qlog.Log(e.subsystem, e.c.RequestId, 3, formatStr)
 }
