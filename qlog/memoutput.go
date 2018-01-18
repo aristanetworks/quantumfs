@@ -129,8 +129,6 @@ func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
 	return (dataEnd - dataLen) % circ.length
 }
 
-var wirtePacketCounter uint64
-
 // Note: in development code, you should never provide a True partialWrite
 func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 	formatId uint16, reqId uint64, timestamp int64, length uint64,
@@ -189,15 +187,13 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 	}
 
 	// Now that the entry is written completely, mark the packet as safe to read,
-
-	// We use an atomic operation to ensure a memory barrier
-	atomic.AddUint64(&wirtePacketCounter, 1)
-	flagAndLength += uint64(entryCompleteBit)
+	utils.MemFence(timestamp)
+	flagAndLength |= uint64(entryCompleteBit)
 
 	if fastpath {
-		insertUint16WithToken(buf, lenOffset, uint16(flagAndLength), offset)
+		insertUint16(buf, lenOffset, uint16(flagAndLength))
 	} else {
-		insertUint16WithToken(buf, length, uint16(flagAndLength), offset)
+		insertUint16(buf, length, uint16(flagAndLength))
 		circ.wrapWrite_(lenOffset, buf[length:])
 	}
 }
@@ -658,16 +654,6 @@ func insertUint8(buf []byte, offset uint64, input uint8) uint64 {
 	bufPtr := (*uint8)(unsafe.Pointer(&buf[offset]))
 	*bufPtr = input
 	return offset + 1
-}
-
-// The token argument is ignored, but it is necessary to make sure
-// this function is called only after the token is ready
-//go:noinline
-func insertUint16WithToken(buf []byte, offset uint64, input uint16,
-	token uint64) uint64 {
-	bufPtr := (*uint16)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 2
 }
 
 func insertUint16(buf []byte, offset uint64, input uint16) uint64 {
