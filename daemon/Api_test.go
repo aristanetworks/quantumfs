@@ -472,6 +472,27 @@ func TestApiInsertInodeAsUser(t *testing.T) {
 	})
 }
 
+func TestInsertInodeDirties(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/dir/file"
+		api := test.getApi()
+
+		test.MakeFile(filename)
+
+		key := getExtendedKeyHelper(test, filename, "file")
+
+		test.SyncWorkspace(test.RelPath(workspace))
+
+		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+
+			"/dir/copy", key, 0777, 0, 0))
+
+		branch := test.AbsPath(test.branchWorkspace(workspace))
+
+		test.assertFileExists(branch + "/dir/copy")
+	})
+}
+
 func TestApiNoRequestBlockingRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api, err := os.OpenFile(test.AbsPath(quantumfs.ApiPath),
@@ -622,6 +643,11 @@ func insertInodeTraversal(test *testHelper, createFn func(string)) {
 		defer dataStore.countLock.Lock().Unlock()
 		return len(dataStore.setCount)
 	}()
+
+	// When we insert the inode here we'll create new metadata blocks for the
+	// workspace root and its internal directory. Take these unaccessed blocks
+	// into account.
+	baseNumBlocks += 2
 
 	createFn(workspace)
 
