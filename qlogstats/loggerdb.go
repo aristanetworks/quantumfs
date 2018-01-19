@@ -28,6 +28,16 @@ type Measurement struct {
 	fields []quantumfs.Field
 }
 
+func appendNewTag(tags []quantumfs.Tag, name string, data string) []quantumfs.Tag {
+	return append(tags, quantumfs.NewTag(name, data))
+}
+
+func appendNewField(fields []quantumfs.Field, name string,
+	data int64) []quantumfs.Field {
+
+	return append(fields, quantumfs.NewField(name, data))
+}
+
 type StatExtractor interface {
 	// This is the list of strings that the extractor will be triggered on and
 	// receive. Note that full formats include a trailing \n.
