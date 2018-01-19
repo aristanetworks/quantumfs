@@ -94,8 +94,7 @@ func (ext *extPointStats) process() {
 	}
 }
 
-func (ext *extPointStats) Publish() (measurement string, tags []quantumfs.Tag,
-	fields []quantumfs.Field) {
+func (ext *extPointStats) Publish() []Measurement {
 
 	defer ext.lock.Lock().Unlock()
 	ext.pause <- struct{}{}
@@ -104,15 +103,19 @@ func (ext *extPointStats) Publish() (measurement string, tags []quantumfs.Tag,
 		ext.unpause <- struct{}{}
 	}()
 
-	tags = make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("statName", ext.name))
+	tags := make([]quantumfs.Tag, 0)
+	tags = appendNewTag(tags, "statName", ext.name)
 
-	fields = make([]quantumfs.Field, 0)
+	fields := make([]quantumfs.Field, 0)
 
-	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
+	fields = appendNewField(fields, "samples", ext.stats.Count())
 
 	ext.stats = basicStats{}
-	return "quantumFsPointCount", tags, fields
+	return []Measurement{{
+		name:   "quantumFsPointCount",
+		tags:   tags,
+		fields: fields,
+	}}
 }
 
 func (ext *extPointStats) GC() {

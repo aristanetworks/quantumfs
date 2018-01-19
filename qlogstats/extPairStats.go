@@ -120,8 +120,7 @@ func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 	delete(ext.requests, log.ReqId)
 }
 
-func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
-	fields []quantumfs.Field) {
+func (ext *extPairStats) Publish() []Measurement {
 
 	defer ext.lock.Lock().Unlock()
 	ext.pause <- struct{}{}
@@ -130,22 +129,25 @@ func (ext *extPairStats) Publish() (measurement string, tags []quantumfs.Tag,
 		ext.unpause <- struct{}{}
 	}()
 
-	tags = make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("statName", ext.name))
+	tags := make([]quantumfs.Tag, 0)
+	tags = appendNewTag(tags, "statName", ext.name)
 
-	fields = make([]quantumfs.Field, 0)
+	fields := make([]quantumfs.Field, 0)
 
-	fields = append(fields, quantumfs.NewField("average_ns",
-		ext.stats.Average()))
-	fields = append(fields, quantumfs.NewField("maximum_ns", ext.stats.Max()))
-	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
+	fields = appendNewField(fields, "average_ns", ext.stats.Average())
+	fields = appendNewField(fields, "maximum_ns", ext.stats.Max())
+	fields = appendNewField(fields, "samples", ext.stats.Count())
 
 	for name, data := range ext.stats.Percentiles() {
-		fields = append(fields, quantumfs.NewField(name, data))
+		fields = appendNewField(fields, name, data)
 	}
 
 	ext.stats = basicStats{}
-	return "quantumFsLatency", tags, fields
+	return []Measurement{{
+		name:   "quantumFsLatency",
+		tags:   tags,
+		fields: fields,
+	}}
 }
 
 func (ext *extPairStats) GC() {
