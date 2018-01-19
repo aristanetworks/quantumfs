@@ -260,6 +260,7 @@ func (agg *Aggregator) filterAndDistribute(log *qlog.LogOutput) {
 func (agg *Aggregator) publish() {
 	for {
 		time.Sleep(agg.publishInterval)
+		nowTime := time.Now()
 
 		results := make([]chan PublishResult, 0, len(agg.extractors))
 		// Trigger extractors to publish in parallel
@@ -283,7 +284,7 @@ func (agg *Aggregator) publish() {
 						agg.daemonVersion))
 
 				agg.db.Store(result.measurement, result.tags,
-					result.fields)
+					result.fields, nowTime)
 			}
 		}
 	}
