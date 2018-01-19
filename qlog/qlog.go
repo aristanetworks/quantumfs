@@ -348,7 +348,11 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	}
 
 	if q.getLogLevel(idx, level) {
-		q.Write(formatString(idx, reqId, t, format), args...)
+		argsCopy := make([]interface{}, 0, len(args))
+		for _, arg := range args {
+			argsCopy = append(argsCopy, arg)
+		}
+		q.Write(formatString(idx, reqId, t, format), argsCopy...)
 	}
 }
 
