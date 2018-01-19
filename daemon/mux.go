@@ -1491,6 +1491,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	defer qfs.instantiationLock.Lock().Unlock()
 
 	if inode := qfs.inodeNoInstantiate(c, InodeId(nodeID)); inode != nil {
+		logInodeWorkspace(c, inode)
 		inode.queueToForget(c)
 	} else {
 		c.dlog("Forgetting uninstantiated Inode %d", nodeID)
@@ -1887,6 +1888,7 @@ func getQuantumfsExtendedKey(c *ctx, qfs *QuantumFs, inodeId InodeId) ([]byte,
 
 	inode, unlock := qfs.LockTreeGetInode(c, inodeId)
 	defer unlock.Unlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return nil, fuse.ENOENT
