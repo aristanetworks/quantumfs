@@ -22,6 +22,12 @@ const (
 	OnAll                               // Match every message
 )
 
+type Measurement struct {
+	name   string
+	tags   []quantumfs.Tag
+	fields []quantumfs.Field
+}
+
 type StatExtractor interface {
 	// This is the list of strings that the extractor will be triggered on and
 	// receive. Note that full formats include a trailing \n.
@@ -29,7 +35,7 @@ type StatExtractor interface {
 	Chan() chan *qlog.LogOutput
 	Type() TriggerType
 
-	Publish() (string, []quantumfs.Tag, []quantumfs.Field)
+	Publish() []Measurement
 
 	// Cleanup any internal state which has accumulated. This is called
 	// periodically on an interval long enough to assume the request shall not
@@ -192,18 +198,27 @@ func (agg *Aggregator) filterAndDistribute(log *qlog.LogOutput) {
 }
 
 func (agg *Aggregator) publish() {
+	versionTag := quantumfs.NewTag("version", agg.daemonVersion)
+
 	for {
 		time.Sleep(agg.publishInterval)
 
 		for _, extractor := range agg.extractors {
-			measurement, tags,
-				fields := extractor.Publish()
-			if tags != nil && len(tags) > 0 {
-				// add the qfs version tag
-				tags = append(tags, quantumfs.NewTag("version",
-					agg.daemonVersion))
+			measurements := extractor.Publish()
 
-				agg.db.Store(measurement, tags, fields)
+			for _, measurement := range measurements {
+				name := measurement.name
+				tags := measurement.tags
+				fields := measurement.fields
+
+				if tags == nil || len(tags) == 0 {
+					continue
+				}
+
+				// add the qfs version tag
+				tags = append(tags, versionTag)
+
+				agg.db.Store(name, tags, fields)
 			}
 		}
 	}
