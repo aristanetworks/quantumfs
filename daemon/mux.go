@@ -1070,6 +1070,24 @@ func logRequestPanic(c *ctx) {
 		fmt.Sprintf("%v", exception), utils.BytesToString(stackTrace))
 }
 
+const FuseRequestWorkspace = "FUSE Request Workspace: %s"
+
+func logInodeWorkspace(c *ctx, inode Inode) {
+	wsName := "none"
+	if inode != nil {
+		wsName = inode.treeLock().name
+	}
+	c.vlog(FuseRequestWorkspace, wsName)
+}
+
+func logFilehandleWorkspace(c *ctx, filehandle FileHandle) {
+	wsName := "none"
+	if filehandle != nil {
+		wsName = filehandle.treeLock().name
+	}
+	c.vlog(FuseRequestWorkspace, wsName)
+}
+
 const LookupLog = "Mux::Lookup"
 
 func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
@@ -1090,6 +1108,7 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, inodeId)
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1492,6 +1511,7 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1514,6 +1534,7 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1539,6 +1560,7 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1564,6 +1586,7 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1589,6 +1612,7 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1614,6 +1638,7 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1641,6 +1666,7 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 
 	srcInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, srcInode)
 	if srcInode == nil {
 		c.dlog("Obsolete src inode")
 		return fuse.ENOENT
@@ -1694,6 +1720,7 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 		input.NodeId).Out()
 
 	srcInode := qfs.inode(c, InodeId(input.Oldnodeid))
+	logInodeWorkspace(c, srcInode)
 	if srcInode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1750,6 +1777,7 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1776,6 +1804,7 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return nil, fuse.ENOENT
@@ -1795,6 +1824,7 @@ func (qfs *QuantumFs) Access(input *fuse.AccessIn) (result fuse.Status) {
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1841,6 +1871,7 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return 0, fuse.ENOENT
@@ -1908,6 +1939,7 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return nil, fuse.ENOENT
@@ -1930,6 +1962,7 @@ func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return nil, fuse.ENOENT
@@ -1960,6 +1993,7 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -1990,6 +2024,7 @@ func (qfs *QuantumFs) RemoveXAttr(header *fuse.InHeader,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -2015,6 +2050,7 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.elog("Create failed", input)
 		return fuse.EACCES // TODO Confirm this is correct
@@ -2040,6 +2076,7 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -2066,6 +2103,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 
 	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	defer unlock.RUnlock()
+	logFilehandleWorkspace(c, fileHandle)
 	if fileHandle == nil {
 		c.elog("Read failed %d", fileHandle)
 		return nil, fuse.ENOENT
@@ -2099,6 +2137,7 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 
 	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	defer unlock.RUnlock()
+	logFilehandleWorkspace(c, fileHandle)
 	if fileHandle == nil {
 		c.elog("Write failed")
 		return 0, fuse.ENOENT
@@ -2160,6 +2199,7 @@ func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn,
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
+	logInodeWorkspace(c, inode)
 	if inode == nil {
 		c.dlog("Obsolete inode")
 		return fuse.ENOENT
@@ -2196,6 +2236,7 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 
 	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	defer unlock.RUnlock()
+	logFilehandleWorkspace(c, fileHandle)
 	if fileHandle == nil {
 		c.elog("ReadDirPlus failed", fileHandle)
 		return fuse.ENOENT
