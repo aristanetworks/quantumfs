@@ -261,6 +261,8 @@ func (agg *Aggregator) publish() {
 	for {
 		time.Sleep(agg.publishInterval)
 
+		results := make([]chan PublishResult, 0, len(agg.extractors))
+		// Trigger extractors to publish in parallel
 		for _, extractor := range agg.extractors {
 			targetChan := extractor.Chan()
 			resultChannel := make(chan PublishResult)
@@ -268,8 +270,12 @@ func (agg *Aggregator) publish() {
 				result: resultChannel,
 			}
 
-			result := <-resultChannel
+			results = append(results, resultChannel)
+		}
 
+		// Wait for all their results to come in
+		for _, resultChannel := range results {
+			result := <-resultChannel
 			if result.tags != nil && len(result.tags) > 0 {
 				// add the qfs version tag
 				result.tags = append(result.tags,
