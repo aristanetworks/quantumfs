@@ -5,6 +5,7 @@ package qlogstats
 
 import (
 	"container/list"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -22,19 +23,65 @@ const (
 	OnAll                               // Match every message
 )
 
+type CommandType int
+
+const (
+	MessageCommandType = CommandType(iota)
+	PublishCommandType
+	GcCommandType
+)
+
+type StatCommand interface {
+	Type() CommandType
+	Data() interface{}
+}
+
+type MessageCommand struct {
+	log *qlog.LogOutput
+}
+
+type GcCommand struct{}
+
+func (cmd *MessageCommand) Type() CommandType {
+	return MessageCommandType
+}
+
+func (cmd *MessageCommand) Data() interface{} {
+	return cmd.log
+}
+
+type PublishResult struct {
+	measurement string
+	tags        []quantumfs.Tag
+	fields      []quantumfs.Field
+}
+
+type PublishCommand struct {
+	result chan PublishResult
+}
+
+func (cmd *PublishCommand) Type() CommandType {
+	return PublishCommandType
+}
+
+func (cmd *PublishCommand) Data() interface{} {
+	return cmd.result
+}
+
+func (cmd *GcCommand) Type() CommandType {
+	return GcCommandType
+}
+
+func (cmd *GcCommand) Data() interface{} {
+	return nil
+}
+
 type StatExtractor interface {
 	// This is the list of strings that the extractor will be triggered on and
 	// receive. Note that full formats include a trailing \n.
 	TriggerStrings() []string
-	Chan() chan *qlog.LogOutput
+	Chan() chan StatCommand
 	Type() TriggerType
-
-	Publish() (string, []quantumfs.Tag, []quantumfs.Field)
-
-	// Cleanup any internal state which has accumulated. This is called
-	// periodically on an interval long enough to assume the request shall not
-	// continue.
-	GC()
 }
 
 func AggregateLogs(mode qlog.LogProcessMode, filename string,
@@ -64,14 +111,15 @@ type Aggregator struct {
 	requestSequence list.List
 
 	extractors             []StatExtractor
-	triggerByFormat        map[string][]chan *qlog.LogOutput
-	triggerByPartialFormat map[string][]chan *qlog.LogOutput
-	triggerAll             []chan *qlog.LogOutput
+	triggerByFormat        map[string][]chan StatCommand
+	triggerByPartialFormat map[string][]chan StatCommand
+	triggerAll             []chan StatCommand
 
 	gcInternval     time.Duration
 	publishInterval time.Duration
 
 	queueMutex   utils.DeferableMutex
+	queueService time.Time
 	queueLogs    []*qlog.LogOutput
 	notification chan struct{}
 }
@@ -84,12 +132,13 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		db:                     db_,
 		daemonVersion:          daemonVersion_,
 		extractors:             extractors,
-		triggerByFormat:        make(map[string][]chan *qlog.LogOutput),
-		triggerByPartialFormat: make(map[string][]chan *qlog.LogOutput),
-		triggerAll:             make([]chan *qlog.LogOutput, 0),
+		triggerByFormat:        make(map[string][]chan StatCommand),
+		triggerByPartialFormat: make(map[string][]chan StatCommand),
+		triggerAll:             make([]chan StatCommand, 0),
 		gcInternval:            time.Minute * 2,
 		publishInterval:        publishInterval,
 		queueLogs:              make([]*qlog.LogOutput, 0, 1000),
+		queueService:           time.Now(),
 		notification:           make(chan struct{}, 1),
 	}
 
@@ -104,7 +153,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 
 		triggers := extractor.TriggerStrings()
 		for _, trigger := range triggers {
-			var triggerList map[string][]chan *qlog.LogOutput
+			var triggerList map[string][]chan StatCommand
 			if extractor.Type() == OnFormat {
 				triggerList = agg.triggerByFormat
 			} else { // OnPartialFormat
@@ -113,7 +162,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 
 			newTriggers, exists := triggerList[trigger]
 			if !exists {
-				newTriggers = make([]chan *qlog.LogOutput, 0)
+				newTriggers = make([]chan StatCommand, 0)
 			}
 
 			newTriggers = append(newTriggers, c)
@@ -138,6 +187,10 @@ func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 
 	agg.queueLogs = append(agg.queueLogs, log)
 
+	if time.Since(agg.queueService) > time.Minute {
+		panic("Qloggerdb queue not serviced for over a minute!")
+	}
+
 	select {
 	case agg.notification <- struct{}{}:
 	default:
@@ -145,6 +198,12 @@ func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 }
 
 func (agg *Aggregator) processThread() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("processThread panicked: ", r)
+		}
+	}()
+
 	for {
 		logs := func() []*qlog.LogOutput {
 			<-agg.notification
@@ -160,6 +219,7 @@ func (agg *Aggregator) processThread() {
 			// but gain a much quicker mutex unlock
 			rtn := agg.queueLogs
 			agg.queueLogs = make([]*qlog.LogOutput, 0, 1000)
+			agg.queueService = time.Now()
 			return rtn
 		}()
 
@@ -172,20 +232,26 @@ func (agg *Aggregator) processThread() {
 func (agg *Aggregator) filterAndDistribute(log *qlog.LogOutput) {
 	// These always match
 	for _, extractor := range agg.triggerAll {
-		extractor <- log
+		extractor <- &MessageCommand{
+			log: log,
+		}
 	}
 
 	// These match the format string fully
 	matching := agg.triggerByFormat[log.Format]
 	for _, extractor := range matching {
-		extractor <- log
+		extractor <- &MessageCommand{
+			log: log,
+		}
 	}
 
 	// These partially match the format string
 	for trigger, extractors := range agg.triggerByPartialFormat {
 		if strings.Contains(log.Format, trigger) {
 			for _, extractor := range extractors {
-				extractor <- log
+				extractor <- &MessageCommand{
+					log: log,
+				}
 			}
 		}
 	}
@@ -196,14 +262,22 @@ func (agg *Aggregator) publish() {
 		time.Sleep(agg.publishInterval)
 
 		for _, extractor := range agg.extractors {
-			measurement, tags,
-				fields := extractor.Publish()
-			if tags != nil && len(tags) > 0 {
-				// add the qfs version tag
-				tags = append(tags, quantumfs.NewTag("version",
-					agg.daemonVersion))
+			targetChan := extractor.Chan()
+			resultChannel := make(chan PublishResult)
+			targetChan <- &PublishCommand{
+				result: resultChannel,
+			}
 
-				agg.db.Store(measurement, tags, fields)
+			result := <-resultChannel
+
+			if result.tags != nil && len(result.tags) > 0 {
+				// add the qfs version tag
+				result.tags = append(result.tags,
+					quantumfs.NewTag("version",
+						agg.daemonVersion))
+
+				agg.db.Store(result.measurement, result.tags,
+					result.fields)
 			}
 		}
 	}
@@ -214,7 +288,8 @@ func (agg *Aggregator) runGC() {
 		time.Sleep(agg.gcInternval)
 
 		for _, extractor := range agg.extractors {
-			extractor.GC()
+			targetChan := extractor.Chan()
+			targetChan <- &GcCommand{}
 		}
 	}
 }
