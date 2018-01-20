@@ -7,6 +7,7 @@ import (
 	"container/list"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -321,20 +322,20 @@ type histoStats struct {
 	count	int64
 }
 
-func NewHistoStats(min int64, max int64, buckets_ int64) *histoStats {
+func NewHistoStats(min int64, max int64, buckets_ int64) histoStats {
 	numRange := (1 + max) - min
 	width := numRange / buckets_
 	// when the range doesn't divide evenly, choose to have a smaller upper
 	// bucket than a really big one.
-	if numRange % buckets != 0 {
+	if numRange % buckets_ != 0 {
 		width++
 	}
 
-	return &histoStats {
+	return histoStats {
 		minVal:	min,
 		maxVal:	max,
 		bucketWidth:	width,
-		buckets:	make([]int, buckets_),
+		buckets:	make([]int64, buckets_),
 	}
 }
 
@@ -356,7 +357,7 @@ func (hs *histoStats) Count() int64 {
 }
 
 func (hs *histoStats) Clear() {
-	hs.buckets = make([]int, len(hs.buckets))
+	hs.buckets = make([]int64, len(hs.buckets))
 	hs.beforeCount = 0
 	hs.pastCount = 0
 	hs.count = 0
@@ -366,9 +367,11 @@ func (hs *histoStats) Histogram() map[string]int64 {
 	rtn := make(map[string]int64)
 
 	min := hs.minVal
-	for idx, count := range hs.buckets {
+	for _, count := range hs.buckets {
 		nextMin := min + hs.bucketWidth
-		rtn[strconv.Itoa(min) + "-" + strconv.Itoa(nextMin)] = count
+		// Normalize the histogram to a percentage for easier interpretation
+		rtn[strconv.Itoa(int(min)) + "-" + strconv.Itoa(int(nextMin))] = 100 *
+			(count / hs.count)
 		min = nextMin
 	}
 

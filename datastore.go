@@ -1291,8 +1291,8 @@ func (ea *ExtendedAttributes) String() (string, error) {
 // Buffer represents a bundle of data from a datastore.
 type Buffer interface {
 	Write(c *Ctx, in []byte, offset uint32) uint32
-	Read(out []byte, offset uint32) int
-	Get() []byte
+	Read(c *Ctx, out []byte, offset uint32) int
+	Get(c *Ctx) []byte
 	Set(data []byte, keyType KeyType)
 	ContentHash() [ObjectKeyLength - 1]byte
 	Key(c *Ctx) (ObjectKey, error)

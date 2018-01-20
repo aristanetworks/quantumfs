@@ -56,6 +56,15 @@ func newQfsExtPair(common string,
 		qlog.FnExitStr+common, common)
 }
 
+func getFirstParamInt(log *qlog.LogOutput) (int64, bool) {
+	if len(log.Args) == 0 {
+		return 0, false
+	}
+
+	num := log.Args[0].(int)
+	return int64(num), true
+}
+
 func createExtractors() []qlogstats.StatExtractor {
 	return []qlogstats.StatExtractor{
 		// Critical system errors
@@ -74,9 +83,11 @@ func createExtractors() []qlogstats.StatExtractor {
 
 		// Buffer usage statistics
 		qlogstats.NewExtLogDataStats(daemon.BufferReadLog, "buffer_read",
-			qlogstats.NewHistoStats(0, quantumfs.MaxBlockSize, 20)
+			qlogstats.NewHistoStats(0, int64(quantumfs.MaxBlockSize),
+			20), getFirstParamInt),
 		qlogstats.NewExtLogDataStats(daemon.BufferGetLog, "buffer_get",
-			qlogstats.NewHistoStats(0, quantumfs.MaxBlockSize, 20)
+			qlogstats.NewHistoStats(0, int64(quantumfs.MaxBlockSize),
+			20), getFirstParamInt),
 
 		// Data store latency
 		newQfsExtPair(thirdparty_backends.EtherGetLog,

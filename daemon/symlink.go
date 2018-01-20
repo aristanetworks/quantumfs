@@ -145,7 +145,7 @@ func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 		return nil, fuse.EIO
 	}
 
-	return data.Get(), fuse.OK
+	return data.Get(&c.Ctx), fuse.OK
 }
 
 func (link *Symlink) Mknod(c *ctx, name string, input *fuse.MknodIn,
