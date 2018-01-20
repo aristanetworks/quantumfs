@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/ether/blobstore"
 	"github.com/gocql/gocql"
@@ -254,6 +255,52 @@ WHERE key = ?`, s.bls.keyspace)
 	s.Require().Equal(blobstore.ErrOperationFailed, verr.Code,
 		"Invalid Error Code from Metadata")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrUnavailable")
+}
+
+func (s *storeTests) TestGetExtKeyInfoOK() {
+	mocksession := s.bls.store.session.(*MockSession)
+	mockquery := &MockQuery{}
+	qstr := fmt.Sprintf(`SELECT ttl(value), writetime(value)
+FROM %s.blobStore
+WHERE key = ?`, s.bls.keyspace)
+	mocksession.On("Query", qstr, []byte(testKey)).Return(mockquery)
+	mocksession.On("Close").Return()
+
+	secs := int64(2)
+	ttl := 99
+	readMockData := func(dest ...interface{}) error {
+		valPtr, _ := dest[0].(*int)
+		*valPtr = ttl
+		ivalPtr, _ := dest[1].(*int64)
+		*ivalPtr = secs * int64(time.Second/time.Microsecond)
+		return nil
+	}
+	mockquery.On("Scan", mock.AnythingOfType("*int"),
+		mock.AnythingOfType("*int64")).Return(readMockData)
+
+	info, err := s.bls.GetExtKeyInfo(unitTestEtherCtx, []byte(testKey))
+	s.Require().NoError(err, "GetExtKeyInfo returned error %s on failure", err)
+	s.Require().Equal(ttl, info.TTL, "TTL mismatch")
+	s.Require().Equal(secs, info.WriteTime.Unix(), "WriteTime mismatch")
+}
+
+func (s *storeTests) TestGetExtKeyInfoErr() {
+	mocksession := s.bls.store.session.(*MockSession)
+	mockquery := &MockQuery{}
+	qstr := fmt.Sprintf(`SELECT ttl(value), writetime(value)
+FROM %s.blobStore
+WHERE key = ?`, s.bls.keyspace)
+	mocksession.On("Query", qstr, []byte(testKey)).Return(mockquery)
+	mocksession.On("Close").Return()
+	mockquery.On("Scan", mock.AnythingOfType("*int"),
+		mock.AnythingOfType("*int64")).Return(gocql.ErrNotFound)
+
+	_, err := s.bls.GetExtKeyInfo(unitTestEtherCtx, []byte(testKey))
+	s.Require().Error(err, "GetExtKeyInfo did not return error")
+	verr, ok := err.(*blobstore.Error)
+	s.Require().Equal(true, ok, fmt.Sprintf("Error from GetExtKeyInfo is of type %T", err))
+	s.Require().Equal(blobstore.ErrKeyNotFound, verr.Code,
+		"Invalid Error Code %d from GetExtKeyInfo", verr.Code)
 }
 
 func TestStore(t *testing.T) {

@@ -182,6 +182,7 @@ const MetadataLog = "Cql::Metadata"
 const GoCqlMetadataLog = "GoCql::Metadata"
 
 // Metadata is the CQL implementation of blobstore.Metadata()
+// Note: retreiving this information does not have performance overhead
 func (b *cqlBlobStore) Metadata(c ether.Ctx, key []byte) (map[string]string, error) {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn(MetadataLog, KeyLog, keyHex).Out()
@@ -239,4 +240,51 @@ func (b *cqlBlobStore) Keyspace() string {
 	// the session has established, returning the configured
 	// keyspace is fine
 	return b.keyspace
+}
+
+// GetExtKeyInfoLog can be used in external tool for log parsing
+const GetExtKeyInfoLog = "Cql::GetExtKeyInfoLog"
+const GoGetExtKeyInfoLog = "GoCql::GetExtKeyInfoLog"
+
+// ExtKeyinfo returns Extended CQL specific information for a key from
+// CQL blobstore
+// Note: This API is intended to be used for debugging purposes.
+//       Since this API may be slow in collecting extended information
+//       use it with caution.
+func (b *cqlBlobStore) GetExtKeyInfo(c ether.Ctx,
+	key []byte) (ExtKeyInfo, error) {
+
+	keyHex := hex.EncodeToString(key)
+	defer c.FuncIn(GetExtKeyInfoLog, KeyLog, keyHex).Out()
+
+	var info ExtKeyInfo
+	queryStr := fmt.Sprintf(`SELECT ttl(value), writetime(value)
+FROM %s.%s
+WHERE key = ?`, b.keyspace, b.cfName)
+	query := b.store.session.Query(queryStr, key)
+
+	var err error
+	var writeTime int64
+	func() {
+		defer c.FuncIn(GoGetExtKeyInfoLog, KeyLog, keyHex).Out()
+		err = query.Scan(&info.TTL, &writeTime)
+	}()
+	if err != nil {
+		if err == gocql.ErrNotFound {
+			return ExtKeyInfo{},
+				blobstore.NewError(blobstore.ErrKeyNotFound,
+					"error ExtKeyInfo[%s] %s", keyHex,
+					err.Error())
+		}
+		return ExtKeyInfo{},
+			blobstore.NewError(blobstore.ErrOperationFailed,
+				"error in ExtKeyInfo[%s] %s", keyHex, err.Error())
+	}
+
+	// CQL's write time is in micro-seconds from epoch.
+	// convert it to golang's time.Time.
+	info.WriteTime = time.Unix(
+		writeTime/int64(time.Second/time.Microsecond), 0).UTC()
+
+	return info, nil
 }
