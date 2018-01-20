@@ -276,11 +276,16 @@ func (buf *buffer) Write(c *quantumfs.Ctx, in []byte, offset_ uint32) uint32 {
 	return uint32(copied)
 }
 
-func (buf *buffer) Read(out []byte, offset uint32) int {
-	return copy(out, buf.data[offset:])
+const BufferReadLog = "buffer::Read %d"
+func (buf *buffer) Read(c *ctx, out []byte, offset uint32) int {
+	copied := copy(out, buf.data[offset:])
+	c.vlog(BufferReadLog, copied)
+	return copied
 }
 
+const BufferGetLog = "buffer::Get %d"
 func (buf *buffer) Get() []byte {
+	c.vlog(BufferGetLog, len(buf.data))
 	return buf.data
 }
 

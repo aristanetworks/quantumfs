@@ -307,6 +307,77 @@ func (a byIncreasing) Len() int           { return len(a) }
 func (a byIncreasing) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
 
+// A data aggregator that outputs histogram based statistics
+type histoStats struct {
+	minVal	int64
+	maxVal	int64
+	bucketWidth	int64
+	buckets	[]int64
+
+	// Keep a bucket for data outside the range
+	beforeCount	int64
+	pastCount	int64
+
+	count	int64
+}
+
+func NewHistoStats(min int64, max int64, buckets_ int64) *histoStats {
+	numRange := (1 + max) - min
+	width := numRange / buckets_
+	// when the range doesn't divide evenly, choose to have a smaller upper
+	// bucket than a really big one.
+	if numRange % buckets != 0 {
+		width++
+	}
+
+	return &histoStats {
+		minVal:	min,
+		maxVal:	max,
+		bucketWidth:	width,
+		buckets:	make([]int, buckets_),
+	}
+}
+
+func (hs *histoStats) NewPoint(data int64) {
+	if data < hs.minVal {
+		hs.beforeCount++
+	} else if data > hs.maxVal {
+		hs.pastCount++
+	} else {
+		idx := (data - hs.minVal) / hs.bucketWidth
+		hs.buckets[idx]++
+	}
+
+	hs.count++
+}
+
+func (hs *histoStats) Count() int64 {
+	return hs.count
+}
+
+func (hs *histoStats) Clear() {
+	hs.buckets = make([]int, len(hs.buckets))
+	hs.beforeCount = 0
+	hs.pastCount = 0
+	hs.count = 0
+}
+
+func (hs *histoStats) Histogram() map[string]int64 {
+	rtn := make(map[string]int64)
+
+	min := hs.minVal
+	for idx, count := range hs.buckets {
+		nextMin := min + hs.bucketWidth
+		rtn[strconv.Itoa(min) + "-" + strconv.Itoa(nextMin)] = count
+		min = nextMin
+	}
+
+	rtn["BeforeHistogram"] = hs.beforeCount
+	rtn["PastHistogram"] = hs.pastCount
+
+	return rtn
+}
+
 // A data aggregator that outputs basic statistics such as the average
 // Intended to be used by data extractors.
 type basicStats struct {
