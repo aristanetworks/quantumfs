@@ -45,7 +45,7 @@ type extWorkspaceStats struct {
 	newRequests         map[uint64]newRequest
 	outstandingRequests map[uint64]outstandingRequest
 
-	stats map[string]map[string]basicStats // ie [workspace]["Mux::Read"]
+	stats map[string]map[string]*basicStats // ie [workspace]["Mux::Read"]
 }
 
 func NewExtWorkspaceStats(nametag string) StatExtractor {
@@ -54,7 +54,7 @@ func NewExtWorkspaceStats(nametag string) StatExtractor {
 		messages:            make(chan *qlog.LogOutput, 10000),
 		newRequests:         make(map[uint64]newRequest),
 		outstandingRequests: make(map[uint64]outstandingRequest),
-		stats:               make(map[string]map[string]basicStats),
+		stats:               make(map[string]map[string]*basicStats),
 	}
 
 	go ext.process()
@@ -149,14 +149,18 @@ func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
 
 		delta := msg.T - request.start
 
-		_, exists = ext.stats[request.workspace]
+		workspaceStats, exists := ext.stats[request.workspace]
 		if !exists {
-			ext.stats[request.workspace] = make(map[string]basicStats)
+			workspaceStats = make(map[string]*basicStats)
+			ext.stats[request.workspace] = workspaceStats
 		}
 
-		stats := ext.stats[request.workspace][request.requestType]
-		stats.NewPoint(int64(delta))
-		ext.stats[request.workspace][request.requestType] = stats
+		stat := workspaceStats[request.requestType]
+		if stat == nil {
+			stat = &basicStats{}
+			workspaceStats[request.requestType] = stat
+		}
+		stat.NewPoint(int64(delta))
 
 		delete(ext.outstandingRequests, msg.ReqId)
 	}
