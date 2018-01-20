@@ -18,14 +18,14 @@ import (
 
 type newRequest struct {
 	time                 int64
-	format               string
+	requestType          string
 	lastUpdateGeneration uint64
 }
 
 type outstandingRequest struct {
 	start                int64
 	workspace            string
-	request              string // ie Mux::Read
+	requestType          string // ie Mux::Read
 	lastUpdateGeneration uint64
 }
 
@@ -50,8 +50,11 @@ type extWorkspaceStats struct {
 
 func NewExtWorkspaceStats(nametag string) StatExtractor {
 	ext := &extWorkspaceStats{
-		name:     nametag,
-		messages: make(chan *qlog.LogOutput, 10000),
+		name:                nametag,
+		messages:            make(chan *qlog.LogOutput, 10000),
+		newRequests:         make(map[uint64]newRequest),
+		outstandingRequests: make(map[uint64]outstandingRequest),
+		stats:               make(map[string]map[string]basicStats),
 	}
 
 	go ext.process()
@@ -97,6 +100,10 @@ func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
 	}
 
 	switch {
+	default:
+		fmt.Printf("Unexpected log message in extWorkspaceStats %d '%s'\n",
+			msg.ReqId, msg.Format)
+
 	case strings.HasPrefix(msg.Format, qlog.FnEnterStr):
 		// Start of a FUSE request, we don't know the workspace yet
 		_, preexists := ext.newRequests[msg.ReqId]
@@ -105,13 +112,16 @@ func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
 				msg.ReqId)
 			return
 		}
+
+		request := strings.SplitN(msg.Format, " ", 3)[1]
+
 		ext.newRequests[msg.ReqId] = newRequest{
 			time:                 msg.T,
-			format:               msg.Format,
+			requestType:          request,
 			lastUpdateGeneration: ext.currentGeneration,
 		}
 
-	case msg.Format == daemon.FuseRequestWorkspace:
+	case strings.Compare(msg.Format, daemon.FuseRequestWorkspace+"\n") == 0:
 		// This message contains the request ID -> workspace mapping
 		startMsg, exists := ext.newRequests[msg.ReqId]
 		if !exists {
@@ -120,12 +130,10 @@ func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
 			return
 		}
 
-		request := strings.SplitN(startMsg.format, " ", 3)[1]
-
 		ext.outstandingRequests[msg.ReqId] = outstandingRequest{
 			start:                startMsg.time,
 			workspace:            msg.Args[0].(string),
-			request:              request,
+			requestType:          startMsg.requestType,
 			lastUpdateGeneration: ext.currentGeneration,
 		}
 		delete(ext.newRequests, msg.ReqId)
@@ -140,15 +148,21 @@ func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
 		}
 
 		delta := msg.T - request.start
-		stats := ext.stats[request.workspace][request.request]
+
+		_, exists = ext.stats[request.workspace]
+		if !exists {
+			ext.stats[request.workspace] = make(map[string]basicStats)
+		}
+
+		stats := ext.stats[request.workspace][request.requestType]
 		stats.NewPoint(int64(delta))
+		ext.stats[request.workspace][request.requestType] = stats
 
 		delete(ext.outstandingRequests, msg.ReqId)
 	}
 }
 
 func (ext *extWorkspaceStats) Publish() []Measurement {
-
 	measurements := make([]Measurement, 0)
 
 	for workspace, stats := range ext.stats {
