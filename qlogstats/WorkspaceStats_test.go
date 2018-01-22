@@ -58,7 +58,7 @@ func TestWorkspaceStats(t *testing.T) {
 				test.Assert(d.Tags["statName"] == "FUSE Requests",
 					"Incorrect statName %s", d.Tags["statName"])
 
-				ws := d.Tags["workspace"]
+				ws := d.Fields["workspace"]
 				op := d.Tags["operation"]
 
 				switch {

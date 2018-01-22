@@ -173,10 +173,10 @@ func (ext *extWorkspaceStats) Publish() []Measurement {
 		for requestType, stat := range stats {
 			tags := make([]quantumfs.Tag, 0, 10)
 			tags = appendNewTag(tags, "statName", ext.name)
-			tags = appendNewTag(tags, "workspace", workspace)
 			tags = appendNewTag(tags, "operation", requestType)
 
 			fields := make([]quantumfs.Field, 0, 10)
+			fields = appendNewField(fields, "workspace", workspace)
 			fields = appendNewField(fields, "average_ns", stat.Average())
 			fields = appendNewField(fields, "maximum_ns", stat.Max())
 			fields = appendNewField(fields, "samples", stat.Count())
