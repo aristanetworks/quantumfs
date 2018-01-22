@@ -265,13 +265,12 @@ func main() {
 			if outFile == "" {
 				reader.ProcessLogs(qlog.TailOnly,
 					func(log *qlog.LogOutput) {
-						fmt.Printf(log.Format, log.Args...)
+						fmt.Printf(log.ToString())
 					})
 			} else {
 				reader.ProcessLogs(qlog.TailOnly,
 					func(log *qlog.LogOutput) {
-						fmt.Fprintf(outFh, log.Format,
-							log.Args...)
+						fmt.Fprintf(outFh, log.ToString())
 					})
 			}
 
