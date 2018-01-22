@@ -84,10 +84,10 @@ func createExtractors() []qlogstats.StatExtractor {
 		// Buffer usage statistics
 		qlogstats.NewExtLogDataStats(daemon.BufferReadLog, "buffer_read",
 			qlogstats.NewHistoStats(0, int64(quantumfs.MaxBlockSize),
-			20), getFirstParamInt),
+				20), getFirstParamInt),
 		qlogstats.NewExtLogDataStats(daemon.BufferGetLog, "buffer_get",
 			qlogstats.NewHistoStats(0, int64(quantumfs.MaxBlockSize),
-			20), getFirstParamInt),
+				20), getFirstParamInt),
 
 		// Data store latency
 		newQfsExtPair(thirdparty_backends.EtherGetLog,
