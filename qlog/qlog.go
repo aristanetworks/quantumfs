@@ -350,7 +350,7 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	if q.getLogLevel(idx, level) {
 		argsCopy := make([]interface{}, 0, len(args))
 		for _, arg := range args {
-			argsCopy = append(argsCopy, arg)
+			argsCopy = append(argsCopy, utils.NoescapeInterface(arg))
 		}
 		q.Write(formatString(idx, reqId, t, format), argsCopy...)
 	}
