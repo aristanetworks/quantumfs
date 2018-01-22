@@ -119,7 +119,6 @@ type Aggregator struct {
 	publishInterval time.Duration
 
 	queueMutex   utils.DeferableMutex
-	queueService time.Time
 	queueLogs    []*qlog.LogOutput
 	notification chan struct{}
 }
@@ -138,7 +137,6 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		gcInternval:            time.Minute * 2,
 		publishInterval:        publishInterval,
 		queueLogs:              make([]*qlog.LogOutput, 0, 1000),
-		queueService:           time.Now(),
 		notification:           make(chan struct{}, 1),
 	}
 
@@ -187,10 +185,6 @@ func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 
 	agg.queueLogs = append(agg.queueLogs, log)
 
-	if time.Since(agg.queueService) > time.Minute {
-		panic("Qloggerdb queue not serviced for over a minute!")
-	}
-
 	select {
 	case agg.notification <- struct{}{}:
 	default:
@@ -219,7 +213,6 @@ func (agg *Aggregator) processThread() {
 			// but gain a much quicker mutex unlock
 			rtn := agg.queueLogs
 			agg.queueLogs = make([]*qlog.LogOutput, 0, 1000)
-			agg.queueService = time.Now()
 			return rtn
 		}()
 
