@@ -121,6 +121,9 @@ type Aggregator struct {
 	queueMutex   utils.DeferableMutex
 	queueLogs    []*qlog.LogOutput
 	notification chan struct{}
+
+	processDeadline	time.Time
+	lastProcess	time.Time
 }
 
 func NewAggregator(db_ quantumfs.TimeSeriesDB,
@@ -180,6 +183,8 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	return &agg
 }
 
+const processTimeout = time.Second
+
 func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 	defer agg.queueMutex.Lock().Unlock()
 
@@ -188,6 +193,14 @@ func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 	select {
 	case agg.notification <- struct{}{}:
 	default:
+	}
+
+	// Check if the process thread has deadlocked
+	if time.Since(agg.processDeadline) > time.Duration(0) {
+		if agg.processDeadline.Sub(agg.lastProcess) > processTimeout {
+			panic("Qlogger processThread probably locked due to timeout")
+		}
+		agg.processDeadline = time.Now().Add(processTimeout)
 	}
 }
 
@@ -213,6 +226,9 @@ func (agg *Aggregator) processThread() {
 			// but gain a much quicker mutex unlock
 			rtn := agg.queueLogs
 			agg.queueLogs = make([]*qlog.LogOutput, 0, 1000)
+
+			agg.lastProcess = time.Now()
+
 			return rtn
 		}()
 
