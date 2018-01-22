@@ -11,11 +11,11 @@ import (
 )
 
 type extLogDataStats struct {
-	format	string
-	name	string
-	messages	chan StatCommand
-	dataFetch	func (*qlog.LogOutput) (int64, bool)
-	errors	int64
+	format    string
+	name      string
+	messages  chan StatCommand
+	dataFetch func(*qlog.LogOutput) (int64, bool)
+	errors    int64
 
 	stats histoStats
 }
@@ -23,12 +23,12 @@ type extLogDataStats struct {
 func NewExtLogDataStats(format string, nametag string, histo histoStats,
 	fetchFn func(*qlog.LogOutput) (int64, bool)) StatExtractor {
 
-	ext := &extLogDataStats {
-		format:	format,
-		name:	nametag,
-		messages:	make(chan StatCommand, 10000),
-		dataFetch:	fetchFn,
-		stats:		histo,
+	ext := &extLogDataStats{
+		format:    format,
+		name:      nametag,
+		messages:  make(chan StatCommand, 10000),
+		dataFetch: fetchFn,
+		stats:     histo,
 	}
 
 	go ext.process()
@@ -79,7 +79,7 @@ func (ext *extLogDataStats) publish() PublishResult {
 	fields := make([]quantumfs.Field, 0)
 
 	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
-	
+
 	for name, data := range ext.stats.Histogram() {
 		fields = append(fields, quantumfs.NewField(name, data))
 	}
