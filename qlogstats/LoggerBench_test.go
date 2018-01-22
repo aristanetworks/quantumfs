@@ -17,7 +17,7 @@ import (
 func BenchmarkEndToEnd(test *testing.B) {
 	fmt := "This is a test format string, %d %f %s"
 
-	dir := utils.TmpDir()
+	dir := utils.TestTmpDir()
 	qlog_, err := qlog.NewQlog(dir)
 	utils.AssertNoErr(err)
 

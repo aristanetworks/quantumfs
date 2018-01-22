@@ -146,7 +146,7 @@ func MemFence(identifier int64) {
 	atomic.AddUint64(&memFenceArr[index], 1)
 }
 
-func TmpDir() string {
+func TestTmpDir() string {
 	testPc, _, _, _ := runtime.Caller(1)
 	testName := runtime.FuncForPC(testPc).Name()
 	lastSlash := strings.LastIndex(testName, "/")
