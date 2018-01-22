@@ -32,10 +32,16 @@ func appendNewTag(tags []quantumfs.Tag, name string, data string) []quantumfs.Ta
 	return append(tags, quantumfs.NewTag(name, data))
 }
 
-func appendNewField(fields []quantumfs.Field, name string,
+func appendNewFieldInt(fields []quantumfs.Field, name string,
 	data int64) []quantumfs.Field {
 
-	return append(fields, quantumfs.NewField(name, data))
+	return append(fields, quantumfs.NewFieldInt(name, data))
+}
+
+func appendNewFieldString(fields []quantumfs.Field, name string,
+	data string) []quantumfs.Field {
+
+	return append(fields, quantumfs.NewFieldString(name, data))
 }
 
 type StatExtractor interface {
