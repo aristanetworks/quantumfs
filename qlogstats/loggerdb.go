@@ -369,9 +369,15 @@ func (hs *histoStats) Histogram() map[string]int64 {
 	min := hs.minVal
 	for _, count := range hs.buckets {
 		nextMin := min + hs.bucketWidth
-		// Normalize the histogram to a percentage for easier interpretation
-		rtn[strconv.Itoa(int(min)) + "-" + strconv.Itoa(int(nextMin))] = 100 *
-			(count / hs.count)
+
+		tag := strconv.Itoa(int(min)) + "-" + strconv.Itoa(int(nextMin))
+		if hs.count == 0 {
+			rtn[tag] = 0
+		} else {
+			// Normalize the histogram to a percentage for
+			// easier interpretation
+			rtn[tag] = (100 * count) / hs.count
+		}
 		min = nextMin
 	}
 

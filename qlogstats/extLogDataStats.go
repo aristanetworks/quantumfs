@@ -23,13 +23,17 @@ type extLogDataStats struct {
 func NewExtLogDataStats(format string, nametag string, histo histoStats,
 	fetchFn func(*qlog.LogOutput) (int64, bool)) StatExtractor {
 
-	return &extLogDataStats {
+	ext := &extLogDataStats {
 		format:	format,
 		name:	nametag,
 		messages:	make(chan StatCommand, 10000),
 		dataFetch:	fetchFn,
 		stats:		histo,
 	}
+
+	go ext.process()
+
+	return ext
 }
 
 func (ext *extLogDataStats) TriggerStrings() []string {
