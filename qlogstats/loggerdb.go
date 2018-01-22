@@ -310,16 +310,16 @@ func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
 
 // A data aggregator that outputs histogram based statistics
 type histoStats struct {
-	minVal	int64
-	maxVal	int64
-	bucketWidth	int64
-	buckets	[]int64
+	minVal      int64
+	maxVal      int64
+	bucketWidth int64
+	buckets     []int64
 
 	// Keep a bucket for data outside the range
-	beforeCount	int64
-	pastCount	int64
+	beforeCount int64
+	pastCount   int64
 
-	count	int64
+	count int64
 }
 
 func NewHistoStats(min int64, max int64, buckets_ int64) histoStats {
@@ -327,15 +327,15 @@ func NewHistoStats(min int64, max int64, buckets_ int64) histoStats {
 	width := numRange / buckets_
 	// when the range doesn't divide evenly, choose to have a smaller upper
 	// bucket than a really big one.
-	if numRange % buckets_ != 0 {
+	if numRange%buckets_ != 0 {
 		width++
 	}
 
-	return histoStats {
-		minVal:	min,
-		maxVal:	max,
-		bucketWidth:	width,
-		buckets:	make([]int64, buckets_),
+	return histoStats{
+		minVal:      min,
+		maxVal:      max,
+		bucketWidth: width,
+		buckets:     make([]int64, buckets_),
 	}
 }
 
