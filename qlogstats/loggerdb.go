@@ -183,17 +183,12 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	return &agg
 }
 
-const processTimeout = time.Second
+const processTimeout = 5 * time.Second
 
 func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 	defer agg.queueMutex.Lock().Unlock()
 
 	agg.queueLogs = append(agg.queueLogs, log)
-
-	select {
-	case agg.notification <- struct{}{}:
-	default:
-	}
 
 	// Check if the process thread has deadlocked
 	if time.Since(agg.processDeadline) > time.Duration(0) {
@@ -201,6 +196,11 @@ func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 			panic("Qlogger processThread probably locked due to timeout")
 		}
 		agg.processDeadline = time.Now().Add(processTimeout)
+	}
+
+	select {
+	case agg.notification <- struct{}{}:
+	default:
 	}
 }
 
