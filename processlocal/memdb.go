@@ -12,7 +12,7 @@ import (
 type dataSeries struct {
 	Measurement string
 	Tags        map[string]string
-	Fields      map[string]quantumfs.Field
+	Fields      map[string]interface{}
 }
 
 type Memdb struct {
@@ -34,9 +34,9 @@ func (db *Memdb) Store(measurement string, tags_ []quantumfs.Tag,
 		tagMap[tag.Name] = tag.Data
 	}
 
-	fieldMap := make(map[string]quantumfs.Field)
+	fieldMap := make(map[string]interface{})
 	for _, field := range fields_ {
-		fieldMap[field.Name] = field
+		fieldMap[field.Name] = field.Data
 	}
 
 	db.Data = append(db.Data, dataSeries{
