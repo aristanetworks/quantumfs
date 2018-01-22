@@ -108,7 +108,7 @@ func (ext *extPointStats) Publish() []Measurement {
 
 	fields := make([]quantumfs.Field, 0)
 
-	fields = appendNewField(fields, "samples", ext.stats.Count())
+	fields = appendNewFieldInt(fields, "samples", ext.stats.Count())
 
 	ext.stats = basicStats{}
 	return []Measurement{{
