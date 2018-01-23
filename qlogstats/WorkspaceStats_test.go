@@ -45,6 +45,9 @@ func TestWorkspaceStats(t *testing.T) {
 
 		logOut(2, daemon.ReadlinkLog)
 
+		log(15, daemon.WorkspaceFinishedFormat, "req1/n/w")
+		log(16, daemon.WorkspaceFinishedFormat, "req2/n/w")
+
 		checked := false
 		checker := func(memdb *processlocal.Memdb) {
 			foundReq1Lookup := false
@@ -58,7 +61,7 @@ func TestWorkspaceStats(t *testing.T) {
 				test.Assert(d.Tags["statName"] == "FUSE Requests",
 					"Incorrect statName %s", d.Tags["statName"])
 
-				ws := d.Fields["workspace"]
+				ws := d.Fields["workspace"].(string)
 				op := d.Tags["operation"]
 
 				switch {

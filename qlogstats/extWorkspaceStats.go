@@ -36,7 +36,8 @@ type extWorkspaceStats struct {
 	newRequests         map[uint64]newRequest
 	outstandingRequests map[uint64]outstandingRequest
 
-	stats map[string]map[string]*basicStats // ie [workspace]["Mux::Read"]
+	stats         map[string]map[string]*basicStats // [workspace]["Mux::Read"]
+	finishedStats map[string]map[string]*basicStats
 }
 
 func NewExtWorkspaceStats(nametag string) StatExtractor {
@@ -44,10 +45,12 @@ func NewExtWorkspaceStats(nametag string) StatExtractor {
 		newRequests:         make(map[uint64]newRequest),
 		outstandingRequests: make(map[uint64]outstandingRequest),
 		stats:               make(map[string]map[string]*basicStats),
+		finishedStats:       make(map[string]map[string]*basicStats),
 	}
 
 	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnPartialFormat,
-		[]string{"Mux::", daemon.FuseRequestWorkspace})
+		[]string{"Mux::", daemon.FuseRequestWorkspace,
+			daemon.WorkspaceFinishedFormat})
 
 	ext.run()
 
@@ -124,13 +127,33 @@ func (ext *extWorkspaceStats) process(msg *qlog.LogOutput) {
 		stat.NewPoint(int64(delta))
 
 		delete(ext.outstandingRequests, msg.ReqId)
+
+	case strings.Compare(msg.Format, daemon.WorkspaceFinishedFormat+"\n") == 0:
+		// The user claims they are done with the workspace, aggregate the
+		// statistics for this workspace for upload.
+
+		workspace, ok := msg.Args[0].(string)
+		if !ok {
+			fmt.Printf("%s: Argument not string: %v\n", ext.Name,
+				msg.Args[0])
+			return
+		}
+
+		stats, exists := ext.stats[workspace]
+		if !exists {
+			fmt.Printf("%s: finishing unstarted workspace '%s'\n",
+				ext.Name, workspace)
+			return
+		}
+		ext.finishedStats[workspace] = stats
+		delete(ext.stats, workspace)
 	}
 }
 
 func (ext *extWorkspaceStats) publish() []Measurement {
 	measurements := make([]Measurement, 0)
 
-	for workspace, stats := range ext.stats {
+	for workspace, stats := range ext.finishedStats {
 		for requestType, stat := range stats {
 			tags := make([]quantumfs.Tag, 0, 10)
 			tags = appendNewTag(tags, "statName", ext.Name)
@@ -153,7 +176,7 @@ func (ext *extWorkspaceStats) publish() []Measurement {
 				fields: fields,
 			})
 
-			delete(ext.stats, workspace)
+			delete(ext.finishedStats, workspace)
 		}
 	}
 
