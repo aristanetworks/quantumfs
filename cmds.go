@@ -336,9 +336,12 @@ type Api interface {
 	// the other objects uploaded by QuantumFS.
 	SetBlock(key []byte, data []byte) error
 
-	// Retriece a block in the datastore stored using SetBlock() using the given
+	// Retrieve a block in the datastore stored using SetBlock() using the given
 	// key.
 	GetBlock(key []byte) ([]byte, error)
+
+	// Notify the end the use of a workspace
+	WorkspaceFinished(workspace string) error
 
 	// For testing only, may be removed in the future
 	AdvanceWSDB(workspace string, refWorkspace string) error
@@ -378,6 +381,7 @@ const (
 	CmdSetWorkspaceImmutable = 11
 	CmdMergeWorkspaces       = 12
 	CmdSyncWorkspace         = 13
+	CmdWorkspaceFinished     = 14
 
 	// The following commands might be removed in the future versions so we
 	// do not allocate a known id for them
@@ -499,6 +503,11 @@ type GetBlockResponse struct {
 }
 
 type SetWorkspaceImmutableRequest struct {
+	CommandCommon
+	WorkspacePath string
+}
+
+type WorkspaceFinishedRequest struct {
 	CommandCommon
 	WorkspacePath string
 }
@@ -775,6 +784,19 @@ func (api *apiImpl) GetBlock(key []byte) ([]byte, error) {
 	}
 
 	return getBlockResponse.Data, nil
+}
+
+func (api *apiImpl) WorkspaceFinished(workspacepath string) error {
+	if !isWorkspacePathValid(workspacepath) {
+		return fmt.Errorf("\"%s\" must contain at least two \"/\"\n",
+			workspacepath)
+	}
+
+	cmd := WorkspaceFinishedRequest{
+		CommandCommon: CommandCommon{CommandId: CmdWorkspaceFinished},
+		WorkspacePath: workspacepath,
+	}
+	return api.processCmd(cmd, nil)
 }
 
 func isWorkspaceNameValid(wsr string) bool {
