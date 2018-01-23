@@ -31,14 +31,7 @@ type outstandingRequest struct {
 
 type extWorkspaceStats struct {
 	name     string
-	messages chan *qlog.LogOutput
-
-	// These channels are used instead of a mutex to pause the processing thread
-	// so publishing or GC can occur. This eliminates the mutex overhead from the
-	// common mutex processing path.
-	pause   chan struct{}
-	paused  chan struct{}
-	unpause chan struct{}
+	messages chan StatCommand
 
 	lock                utils.DeferableMutex
 	currentGeneration   uint64
@@ -51,7 +44,7 @@ type extWorkspaceStats struct {
 func NewExtWorkspaceStats(nametag string) StatExtractor {
 	ext := &extWorkspaceStats{
 		name:                nametag,
-		messages:            make(chan *qlog.LogOutput, 10000),
+		messages:            make(chan StatCommand, 10000),
 		newRequests:         make(map[uint64]newRequest),
 		outstandingRequests: make(map[uint64]outstandingRequest),
 		stats:               make(map[string]map[string]*basicStats),
@@ -71,7 +64,7 @@ func (ext *extWorkspaceStats) TriggerStrings() []string {
 	return strings
 }
 
-func (ext *extWorkspaceStats) Chan() chan *qlog.LogOutput {
+func (ext *extWorkspaceStats) Chan() chan StatCommand {
 	return ext.messages
 }
 
@@ -81,14 +74,15 @@ func (ext *extWorkspaceStats) Type() TriggerType {
 
 func (ext *extWorkspaceStats) process() {
 	for {
-		select {
-		case msg := <-ext.messages:
-			ext.processMsg(msg)
-		case <-ext.pause:
-			// Notify the other goroutine that we are paused
-			ext.paused <- struct{}{}
-			// Wait until they are complete
-			<-ext.unpause
+		cmd := <-ext.messages
+		switch cmd.Type() {
+		case MessageCommandType:
+			ext.processMsg(cmd.Data().(*qlog.LogOutput))
+		case PublishCommandType:
+			resultChannel := cmd.Data().(chan []Measurement)
+			resultChannel <- ext.publish()
+		case GcCommandType:
+			ext.gc()
 		}
 	}
 }
@@ -166,7 +160,7 @@ func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
 	}
 }
 
-func (ext *extWorkspaceStats) Publish() []Measurement {
+func (ext *extWorkspaceStats) publish() []Measurement {
 	measurements := make([]Measurement, 0)
 
 	for workspace, stats := range ext.stats {
@@ -198,14 +192,7 @@ func (ext *extWorkspaceStats) Publish() []Measurement {
 	return measurements
 }
 
-func (ext *extWorkspaceStats) GC() {
-	defer ext.lock.Lock().Unlock()
-	ext.pause <- struct{}{}
-	<-ext.paused
-	defer func() {
-		ext.unpause <- struct{}{}
-	}()
-
+func (ext *extWorkspaceStats) gc() {
 	ext.currentGeneration++
 
 	for reqId, request := range ext.newRequests {
