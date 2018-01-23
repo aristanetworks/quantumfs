@@ -29,6 +29,11 @@ type outstandingRequest struct {
 	lastUpdateGeneration uint64
 }
 
+type accumulatingStats struct {
+	stats                map[string]*basicStats // ie. ["Mux::Read"]
+	lastUpdateGeneration uint64
+}
+
 type extWorkspaceStats struct {
 	StatExtractorBase
 
@@ -36,15 +41,15 @@ type extWorkspaceStats struct {
 	newRequests         map[uint64]newRequest
 	outstandingRequests map[uint64]outstandingRequest
 
-	stats         map[string]map[string]*basicStats // [workspace]["Mux::Read"]
-	finishedStats map[string]map[string]*basicStats
+	accumulatingStats map[string]*accumulatingStats
+	finishedStats     map[string]map[string]*basicStats // [workspace]["Mux::Read"]
 }
 
 func NewExtWorkspaceStats(nametag string) StatExtractor {
 	ext := &extWorkspaceStats{
 		newRequests:         make(map[uint64]newRequest),
 		outstandingRequests: make(map[uint64]outstandingRequest),
-		stats:               make(map[string]map[string]*basicStats),
+		accumulatingStats:   make(map[string]*accumulatingStats),
 		finishedStats:       make(map[string]map[string]*basicStats),
 	}
 
@@ -113,18 +118,21 @@ func (ext *extWorkspaceStats) process(msg *qlog.LogOutput) {
 
 		delta := msg.T - request.start
 
-		workspaceStats, exists := ext.stats[request.workspace]
+		workspaceStats, exists := ext.accumulatingStats[request.workspace]
 		if !exists {
-			workspaceStats = make(map[string]*basicStats)
-			ext.stats[request.workspace] = workspaceStats
+			workspaceStats = &accumulatingStats{
+				stats: make(map[string]*basicStats),
+			}
+			ext.accumulatingStats[request.workspace] = workspaceStats
 		}
 
-		stat := workspaceStats[request.requestType]
+		stat := workspaceStats.stats[request.requestType]
 		if stat == nil {
 			stat = &basicStats{}
-			workspaceStats[request.requestType] = stat
+			workspaceStats.stats[request.requestType] = stat
 		}
 		stat.NewPoint(int64(delta))
+		workspaceStats.lastUpdateGeneration = ext.CurrentGeneration
 
 		delete(ext.outstandingRequests, msg.ReqId)
 
@@ -139,14 +147,14 @@ func (ext *extWorkspaceStats) process(msg *qlog.LogOutput) {
 			return
 		}
 
-		stats, exists := ext.stats[workspace]
+		stats, exists := ext.accumulatingStats[workspace]
 		if !exists {
 			fmt.Printf("%s: finishing unstarted workspace '%s'\n",
 				ext.Name, workspace)
 			return
 		}
-		ext.finishedStats[workspace] = stats
-		delete(ext.stats, workspace)
+		ext.finishedStats[workspace] = stats.stats
+		delete(ext.accumulatingStats, workspace)
 	}
 }
 
@@ -199,6 +207,15 @@ func (ext *extWorkspaceStats) gc() {
 				"(%d/%d)\n", ext.Name, reqId,
 				request.lastUpdateGeneration, ext.CurrentGeneration)
 			delete(ext.outstandingRequests, reqId)
+		}
+	}
+
+	for workspace, wsStat := range ext.accumulatingStats {
+		if ext.AgedOut(wsStat.lastUpdateGeneration) {
+			fmt.Printf("%s: Deleting stale wsStats %s "+
+				"(%d/%d)\n", ext.Name, workspace,
+				wsStat.lastUpdateGeneration, ext.CurrentGeneration)
+			delete(ext.accumulatingStats, workspace)
 		}
 	}
 }
