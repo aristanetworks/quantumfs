@@ -96,8 +96,63 @@ type StatExtractor interface {
 	// This is the list of strings that the extractor will be triggered on and
 	// receive. Note that full formats include a trailing \n.
 	TriggerStrings() []string
-	Chan() chan StatCommand
 	Type() TriggerType
+
+	// Call this after the StatExtractor is fully initialized
+	run()
+
+	process(msg *qlog.LogOutput)
+	publish() []Measurement
+	gc()
+
+	// ExtractorBase below implements these
+	Chan() chan StatCommand
+}
+
+// A base class which handles the boiler plate for writing StatExtractors
+type StatExtractorBase struct {
+	Name     string
+	messages chan StatCommand
+	self     StatExtractor // Our superclass
+}
+
+func NewStatExtractorBase(name string, self StatExtractor) StatExtractorBase {
+	return StatExtractorBase{
+		Name:     name,
+		messages: make(chan StatCommand, 10000),
+		self:     self,
+	}
+}
+
+func (seb *StatExtractorBase) process(msg *qlog.LogOutput) {}
+
+func (seb *StatExtractorBase) publish() []Measurement {
+	return []Measurement{}
+}
+
+func (seb *StatExtractorBase) gc() {}
+
+func (seb *StatExtractorBase) run() {
+	go seb.listen()
+}
+
+func (seb *StatExtractorBase) listen() {
+	for {
+		cmd := <-seb.messages
+		switch cmd.Type() {
+		case MessageCommandType:
+			seb.self.process(cmd.Data().(*qlog.LogOutput))
+		case PublishCommandType:
+			resultChannel := cmd.Data().(chan []Measurement)
+			resultChannel <- seb.self.publish()
+		case GcCommandType:
+			seb.self.gc()
+		}
+	}
+}
+
+func (seb *StatExtractorBase) Chan() chan StatCommand {
+	return seb.messages
 }
 
 func AggregateLogs(mode qlog.LogProcessMode, filename string,

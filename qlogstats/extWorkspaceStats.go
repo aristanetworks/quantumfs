@@ -30,8 +30,7 @@ type outstandingRequest struct {
 }
 
 type extWorkspaceStats struct {
-	name     string
-	messages chan StatCommand
+	StatExtractorBase
 
 	lock                utils.DeferableMutex
 	currentGeneration   uint64
@@ -43,14 +42,13 @@ type extWorkspaceStats struct {
 
 func NewExtWorkspaceStats(nametag string) StatExtractor {
 	ext := &extWorkspaceStats{
-		name:                nametag,
-		messages:            make(chan StatCommand, 10000),
 		newRequests:         make(map[uint64]newRequest),
 		outstandingRequests: make(map[uint64]outstandingRequest),
 		stats:               make(map[string]map[string]*basicStats),
 	}
+	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext)
 
-	go ext.process()
+	ext.run()
 
 	return ext
 }
@@ -64,30 +62,11 @@ func (ext *extWorkspaceStats) TriggerStrings() []string {
 	return strings
 }
 
-func (ext *extWorkspaceStats) Chan() chan StatCommand {
-	return ext.messages
-}
-
 func (ext *extWorkspaceStats) Type() TriggerType {
 	return OnPartialFormat
 }
 
-func (ext *extWorkspaceStats) process() {
-	for {
-		cmd := <-ext.messages
-		switch cmd.Type() {
-		case MessageCommandType:
-			ext.processMsg(cmd.Data().(*qlog.LogOutput))
-		case PublishCommandType:
-			resultChannel := cmd.Data().(chan []Measurement)
-			resultChannel <- ext.publish()
-		case GcCommandType:
-			ext.gc()
-		}
-	}
-}
-
-func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
+func (ext *extWorkspaceStats) process(msg *qlog.LogOutput) {
 	if msg.ReqId >= qlog.MinSpecialReqId {
 		// The utility request ranges are never FUSE requests
 		return
@@ -166,7 +145,7 @@ func (ext *extWorkspaceStats) publish() []Measurement {
 	for workspace, stats := range ext.stats {
 		for requestType, stat := range stats {
 			tags := make([]quantumfs.Tag, 0, 10)
-			tags = appendNewTag(tags, "statName", ext.name)
+			tags = appendNewTag(tags, "statName", ext.Name)
 			tags = appendNewTag(tags, "operation", requestType)
 
 			fields := make([]quantumfs.Field, 0, 10)
@@ -198,7 +177,7 @@ func (ext *extWorkspaceStats) gc() {
 	for reqId, request := range ext.newRequests {
 		if request.lastUpdateGeneration+2 < ext.currentGeneration {
 			fmt.Printf("%s: Deleting stale newRequest %d (%d/%d)\n",
-				ext.name, reqId, request.lastUpdateGeneration,
+				ext.Name, reqId, request.lastUpdateGeneration,
 				ext.currentGeneration)
 			delete(ext.newRequests, reqId)
 		}
@@ -207,7 +186,7 @@ func (ext *extWorkspaceStats) gc() {
 	for reqId, request := range ext.outstandingRequests {
 		if request.lastUpdateGeneration+2 < ext.currentGeneration {
 			fmt.Printf("%s: Deleting stale outstandingRequest %d (%d/%d)\n",
-				ext.name, reqId, request.lastUpdateGeneration,
+				ext.Name, reqId, request.lastUpdateGeneration,
 				ext.currentGeneration)
 			delete(ext.outstandingRequests, reqId)
 		}

@@ -11,9 +11,9 @@ import (
 )
 
 type extPointStats struct {
+	StatExtractorBase
+
 	format        string
-	name          string
-	messages      chan StatCommand
 	partialFormat bool
 
 	stats basicStats
@@ -36,12 +36,12 @@ func newExtPointStats(format string, nametag string,
 
 	ext := &extPointStats{
 		format:        format,
-		name:          nametag,
-		messages:      make(chan StatCommand, 10000),
 		partialFormat: partialFormat,
 	}
 
-	go ext.process()
+	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext)
+
+	ext.run()
 
 	return ext
 }
@@ -53,10 +53,6 @@ func (ext *extPointStats) TriggerStrings() []string {
 	return rtn
 }
 
-func (ext *extPointStats) Chan() chan StatCommand {
-	return ext.messages
-}
-
 func (ext *extPointStats) Type() TriggerType {
 	if ext.partialFormat {
 		return OnPartialFormat
@@ -65,25 +61,13 @@ func (ext *extPointStats) Type() TriggerType {
 	}
 }
 
-func (ext *extPointStats) process() {
-	for {
-		cmd := <-ext.messages
-		switch cmd.Type() {
-		case MessageCommandType:
-			log := cmd.Data().(*qlog.LogOutput)
-			ext.stats.NewPoint(int64(log.T))
-		case PublishCommandType:
-			resultChannel := cmd.Data().(chan []Measurement)
-			resultChannel <- ext.publish()
-		case GcCommandType:
-			// do nothing since we store no state
-		}
-	}
+func (ext *extPointStats) process(msg *qlog.LogOutput) {
+	ext.stats.NewPoint(int64(msg.T))
 }
 
 func (ext *extPointStats) publish() []Measurement {
 	tags := make([]quantumfs.Tag, 0)
-	tags = appendNewTag(tags, "statName", ext.name)
+	tags = appendNewTag(tags, "statName", ext.Name)
 
 	fields := make([]quantumfs.Field, 0)
 

@@ -19,10 +19,10 @@ type request struct {
 }
 
 type extPairStats struct {
+	StatExtractorBase
+
 	fmtStart string
 	fmtStop  string
-	name     string
-	messages chan StatCommand
 
 	requests          map[uint64]request
 	currentGeneration uint64
@@ -34,12 +34,11 @@ func NewExtPairStats(start string, stop string, nametag string) StatExtractor {
 	ext := &extPairStats{
 		fmtStart: start + "\n",
 		fmtStop:  stop + "\n",
-		name:     nametag,
-		messages: make(chan StatCommand, 10000),
 		requests: make(map[uint64]request),
 	}
+	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext)
 
-	go ext.process()
+	ext.run()
 
 	return ext
 }
@@ -52,38 +51,22 @@ func (ext *extPairStats) TriggerStrings() []string {
 	return rtn
 }
 
-func (ext *extPairStats) Chan() chan StatCommand {
-	return ext.messages
-}
-
 func (ext *extPairStats) Type() TriggerType {
 	return OnFormat
 }
 
-func (ext *extPairStats) process() {
-	for {
-		cmd := <-ext.messages
-		switch cmd.Type() {
-		case MessageCommandType:
-			log := cmd.Data().(*qlog.LogOutput)
-			if log.Format == ext.fmtStart {
-				ext.startRequest(log)
-			} else if log.Format == ext.fmtStop {
-				ext.stopRequest(log)
-			}
-		case PublishCommandType:
-			resultChannel := cmd.Data().(chan []Measurement)
-			resultChannel <- ext.publish()
-		case GcCommandType:
-			ext.gc()
-		}
+func (ext *extPairStats) process(msg *qlog.LogOutput) {
+	if msg.Format == ext.fmtStart {
+		ext.startRequest(msg)
+	} else if msg.Format == ext.fmtStop {
+		ext.stopRequest(msg)
 	}
 }
 
 func (ext *extPairStats) startRequest(log *qlog.LogOutput) {
 	if previous, exists := ext.requests[log.ReqId]; exists {
 		fmt.Printf("%s: nested start %d at %d and %d\n",
-			ext.name, log.ReqId, previous.time, log.T)
+			ext.Name, log.ReqId, previous.time, log.T)
 	}
 
 	ext.requests[log.ReqId] = request{
@@ -95,7 +78,7 @@ func (ext *extPairStats) startRequest(log *qlog.LogOutput) {
 func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 	start, exists := ext.requests[log.ReqId]
 	if !exists {
-		fmt.Printf("%s: end without start '%s' at %d\n", ext.name,
+		fmt.Printf("%s: end without start '%s' at %d\n", ext.Name,
 			log.Format, log.T)
 		return
 	}
@@ -112,7 +95,7 @@ func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 
 func (ext *extPairStats) publish() []Measurement {
 	tags := make([]quantumfs.Tag, 0)
-	tags = appendNewTag(tags, "statName", ext.name)
+	tags = appendNewTag(tags, "statName", ext.Name)
 
 	fields := make([]quantumfs.Field, 0)
 
@@ -138,7 +121,7 @@ func (ext *extPairStats) gc() {
 	for reqId, request := range ext.requests {
 		if request.lastUpdateGeneration+2 < ext.currentGeneration {
 			fmt.Printf("%s: Deleting stale request %d (%d/%d)\n",
-				ext.name, reqId, request.lastUpdateGeneration,
+				ext.Name, reqId, request.lastUpdateGeneration,
 				ext.currentGeneration)
 			delete(ext.requests, reqId)
 		}
