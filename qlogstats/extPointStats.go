@@ -39,26 +39,16 @@ func newExtPointStats(format string, nametag string,
 		partialFormat: partialFormat,
 	}
 
-	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext)
+	type_ := OnFormat
+	if partialFormat {
+		type_ = OnPartialFormat
+	}
+	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, type_,
+		[]string{format})
 
 	ext.run()
 
 	return ext
-}
-
-func (ext *extPointStats) TriggerStrings() []string {
-	rtn := make([]string, 0)
-
-	rtn = append(rtn, ext.format)
-	return rtn
-}
-
-func (ext *extPointStats) Type() TriggerType {
-	if ext.partialFormat {
-		return OnPartialFormat
-	} else {
-		return OnFormat
-	}
 }
 
 func (ext *extPointStats) process(msg *qlog.LogOutput) {

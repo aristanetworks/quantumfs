@@ -93,19 +93,19 @@ func (cmd *GcCommand) Data() interface{} {
 }
 
 type StatExtractor interface {
-	// This is the list of strings that the extractor will be triggered on and
-	// receive. Note that full formats include a trailing \n.
-	TriggerStrings() []string
-	Type() TriggerType
-
 	// Call this after the StatExtractor is fully initialized
 	run()
 
+	// Do the real processing
 	process(msg *qlog.LogOutput)
 	publish() []Measurement
 	gc()
 
 	// ExtractorBase below implements these
+	// This is the list of strings that the extractor will be triggered on and
+	// receive. Note that full formats include a trailing \n.
+	TriggerStrings() []string
+	Type() TriggerType
 	Chan() chan StatCommand
 }
 
@@ -114,13 +114,19 @@ type StatExtractorBase struct {
 	Name     string
 	messages chan StatCommand
 	self     StatExtractor // Our superclass
+	type_    TriggerType
+	triggers []string
 }
 
-func NewStatExtractorBase(name string, self StatExtractor) StatExtractorBase {
+func NewStatExtractorBase(name string, self StatExtractor, type_ TriggerType,
+	triggerStrings []string) StatExtractorBase {
+
 	return StatExtractorBase{
 		Name:     name,
 		messages: make(chan StatCommand, 10000),
 		self:     self,
+		type_:    type_,
+		triggers: triggerStrings,
 	}
 }
 
@@ -153,6 +159,14 @@ func (seb *StatExtractorBase) listen() {
 
 func (seb *StatExtractorBase) Chan() chan StatCommand {
 	return seb.messages
+}
+
+func (seb *StatExtractorBase) TriggerStrings() []string {
+	return seb.triggers
+}
+
+func (seb *StatExtractorBase) Type() TriggerType {
+	return seb.type_
 }
 
 func AggregateLogs(mode qlog.LogProcessMode, filename string,

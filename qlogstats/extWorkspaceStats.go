@@ -46,24 +46,17 @@ func NewExtWorkspaceStats(nametag string) StatExtractor {
 		outstandingRequests: make(map[uint64]outstandingRequest),
 		stats:               make(map[string]map[string]*basicStats),
 	}
-	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext)
+
+	strings := make([]string, 2)
+	strings = append(strings, "Mux::")
+	strings = append(strings, daemon.FuseRequestWorkspace)
+
+	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnPartialFormat,
+		strings)
 
 	ext.run()
 
 	return ext
-}
-
-func (ext *extWorkspaceStats) TriggerStrings() []string {
-	strings := make([]string, 0)
-
-	strings = append(strings, "Mux::")
-	strings = append(strings, daemon.FuseRequestWorkspace)
-
-	return strings
-}
-
-func (ext *extWorkspaceStats) Type() TriggerType {
-	return OnPartialFormat
 }
 
 func (ext *extWorkspaceStats) process(msg *qlog.LogOutput) {

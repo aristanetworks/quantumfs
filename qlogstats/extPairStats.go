@@ -36,23 +36,16 @@ func NewExtPairStats(start string, stop string, nametag string) StatExtractor {
 		fmtStop:  stop + "\n",
 		requests: make(map[uint64]request),
 	}
-	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext)
+
+	strings := make([]string, 0)
+
+	strings = append(strings, ext.fmtStart)
+	strings = append(strings, ext.fmtStop)
+	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnFormat, strings)
 
 	ext.run()
 
 	return ext
-}
-
-func (ext *extPairStats) TriggerStrings() []string {
-	rtn := make([]string, 0)
-
-	rtn = append(rtn, ext.fmtStart)
-	rtn = append(rtn, ext.fmtStop)
-	return rtn
-}
-
-func (ext *extPairStats) Type() TriggerType {
-	return OnFormat
 }
 
 func (ext *extPairStats) process(msg *qlog.LogOutput) {
