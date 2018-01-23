@@ -262,47 +262,59 @@ func TestPairStatsGC(t *testing.T) {
 
 		c := ext.Chan()
 
-		c <- &qlog.LogOutput{
+		msg := &qlog.LogOutput{
 			Subsystem: qlog.LogTest,
 			ReqId:     1,
 			T:         1,
 			Format:    "Start match\n",
 			Args:      []interface{}{},
 		}
+		c <- &MessageCommand{
+			log: msg,
+		}
 		test.WaitFor("Request 1 to be started", func() bool {
 			return len(ext.requests) == 1
 		})
 
-		ext.GC()
+		c <- &GcCommand{}
 		test.Assert(len(ext.requests) == 1, "Request 1 deleted early")
-		c <- &qlog.LogOutput{
+		msg = &qlog.LogOutput{
 			Subsystem: qlog.LogTest,
 			ReqId:     2,
 			T:         2,
 			Format:    "Start match\n",
 			Args:      []interface{}{},
 		}
+		c <- &MessageCommand{
+			log: msg,
+		}
 		test.WaitFor("Request 2 to be started", func() bool {
 			return len(ext.requests) == 2
 		})
 
-		ext.GC()
+		c <- &GcCommand{}
 		test.Assert(len(ext.requests) == 2, "Request 2 deleted early")
 
-		c <- &qlog.LogOutput{
+		msg = &qlog.LogOutput{
 			Subsystem: qlog.LogTest,
 			ReqId:     2,
 			T:         3,
 			Format:    "Stop match\n",
 			Args:      []interface{}{},
 		}
+		c <- &MessageCommand{
+			log: msg,
+		}
+
 		test.WaitFor("Request 2 to be deleted", func() bool {
 			return len(ext.requests) == 1
 		})
 		_, exists := ext.requests[1]
 		test.Assert(exists, "Request 1 deleted early")
 
-		ext.GC()
-		test.Assert(len(ext.requests) == 0, "Request 1 didn't age out")
+		c <- &GcCommand{}
+		test.WaitFor("Request 1 to age out", func() bool {
+			return len(ext.requests) == 0
+		})
 	})
 }
