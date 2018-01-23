@@ -153,6 +153,9 @@ func createExtractors() []qlogstats.StatExtractor {
 		newQfsExtPair(cql.GoCqlGetLog, cql.KeyLog),
 		newQfsExtPair(cql.GoCqlInsertLog, cql.KeyTTLLog),
 		newQfsExtPair(cql.GoCqlMetadataLog, cql.KeyLog),
+
+		// Per QuBIT-task statistics
+		qlogstats.NewExtWorkspaceStats("per-Task"),
 	}
 }
 
