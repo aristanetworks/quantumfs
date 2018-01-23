@@ -206,9 +206,9 @@ func (ext *extWorkspaceStats) gc() {
 
 	for reqId, request := range ext.outstandingRequests {
 		if request.lastUpdateGeneration+2 < ext.currentGeneration {
-			fmt.Printf("%s: Deleting stale outstandingRequest %d (%d/%d)\n",
-				ext.name, reqId, request.lastUpdateGeneration,
-				ext.currentGeneration)
+			fmt.Printf("%s: Deleting stale outstandingRequest %d "+
+				"(%d/%d)\n", ext.name, reqId,
+				request.lastUpdateGeneration, ext.currentGeneration)
 			delete(ext.outstandingRequests, reqId)
 		}
 	}
