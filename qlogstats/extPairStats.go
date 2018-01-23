@@ -11,7 +11,6 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/utils"
 )
 
 type request struct {
@@ -23,16 +22,8 @@ type extPairStats struct {
 	fmtStart string
 	fmtStop  string
 	name     string
-	messages chan *qlog.LogOutput
+	messages chan StatCommand
 
-	// These channels are used instead of a mutex to pause the processing thread
-	// so publishing or GC can occur. This eliminates the mutex overhead from the
-	// common mutex processing path.
-	pause   chan struct{}
-	paused  chan struct{}
-	unpause chan struct{}
-
-	lock              utils.DeferableMutex
 	requests          map[uint64]request
 	currentGeneration uint64
 
@@ -44,11 +35,8 @@ func NewExtPairStats(start string, stop string, nametag string) StatExtractor {
 		fmtStart: start + "\n",
 		fmtStop:  stop + "\n",
 		name:     nametag,
-		messages: make(chan *qlog.LogOutput, 10000),
+		messages: make(chan StatCommand, 10000),
 		requests: make(map[uint64]request),
-		pause:    make(chan struct{}),
-		paused:   make(chan struct{}),
-		unpause:  make(chan struct{}),
 	}
 
 	go ext.process()
@@ -64,7 +52,7 @@ func (ext *extPairStats) TriggerStrings() []string {
 	return rtn
 }
 
-func (ext *extPairStats) Chan() chan *qlog.LogOutput {
+func (ext *extPairStats) Chan() chan StatCommand {
 	return ext.messages
 }
 
@@ -74,18 +62,20 @@ func (ext *extPairStats) Type() TriggerType {
 
 func (ext *extPairStats) process() {
 	for {
-		select {
-		case log := <-ext.messages:
+		cmd := <-ext.messages
+		switch cmd.Type() {
+		case MessageCommandType:
+			log := cmd.Data().(*qlog.LogOutput)
 			if log.Format == ext.fmtStart {
 				ext.startRequest(log)
 			} else if log.Format == ext.fmtStop {
 				ext.stopRequest(log)
 			}
-		case <-ext.pause:
-			// Notify the other goroutine that we are paused
-			ext.paused <- struct{}{}
-			// Wait until they are complete
-			<-ext.unpause
+		case PublishCommandType:
+			resultChannel := cmd.Data().(chan []Measurement)
+			resultChannel <- ext.publish()
+		case GcCommandType:
+			ext.gc()
 		}
 	}
 }
@@ -120,15 +110,7 @@ func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 	delete(ext.requests, log.ReqId)
 }
 
-func (ext *extPairStats) Publish() []Measurement {
-
-	defer ext.lock.Lock().Unlock()
-	ext.pause <- struct{}{}
-	<-ext.paused
-	defer func() {
-		ext.unpause <- struct{}{}
-	}()
-
+func (ext *extPairStats) publish() []Measurement {
 	tags := make([]quantumfs.Tag, 0)
 	tags = append(tags, quantumfs.NewTag("statName", ext.name))
 
@@ -151,14 +133,7 @@ func (ext *extPairStats) Publish() []Measurement {
 	}}
 }
 
-func (ext *extPairStats) GC() {
-	defer ext.lock.Lock().Unlock()
-	ext.pause <- struct{}{}
-	<-ext.paused
-	defer func() {
-		ext.unpause <- struct{}{}
-	}()
-
+func (ext *extPairStats) gc() {
 	ext.currentGeneration++
 
 	for reqId, request := range ext.requests {
