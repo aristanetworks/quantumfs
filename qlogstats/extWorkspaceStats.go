@@ -33,7 +33,6 @@ type extWorkspaceStats struct {
 	StatExtractorBase
 
 	lock                utils.DeferableMutex
-	currentGeneration   uint64
 	newRequests         map[uint64]newRequest
 	outstandingRequests map[uint64]outstandingRequest
 
@@ -84,7 +83,7 @@ func (ext *extWorkspaceStats) process(msg *qlog.LogOutput) {
 		ext.newRequests[msg.ReqId] = newRequest{
 			time:                 msg.T,
 			requestType:          request,
-			lastUpdateGeneration: ext.currentGeneration,
+			lastUpdateGeneration: ext.CurrentGeneration,
 		}
 
 	case strings.Compare(msg.Format, daemon.FuseRequestWorkspace+"\n") == 0:
@@ -100,7 +99,7 @@ func (ext *extWorkspaceStats) process(msg *qlog.LogOutput) {
 			start:                startMsg.time,
 			workspace:            msg.Args[0].(string),
 			requestType:          startMsg.requestType,
-			lastUpdateGeneration: ext.currentGeneration,
+			lastUpdateGeneration: ext.CurrentGeneration,
 		}
 		delete(ext.newRequests, msg.ReqId)
 
@@ -166,22 +165,20 @@ func (ext *extWorkspaceStats) publish() []Measurement {
 }
 
 func (ext *extWorkspaceStats) gc() {
-	ext.currentGeneration++
-
 	for reqId, request := range ext.newRequests {
-		if request.lastUpdateGeneration+2 < ext.currentGeneration {
+		if ext.AgedOut(request.lastUpdateGeneration) {
 			fmt.Printf("%s: Deleting stale newRequest %d (%d/%d)\n",
 				ext.Name, reqId, request.lastUpdateGeneration,
-				ext.currentGeneration)
+				ext.CurrentGeneration)
 			delete(ext.newRequests, reqId)
 		}
 	}
 
 	for reqId, request := range ext.outstandingRequests {
-		if request.lastUpdateGeneration+2 < ext.currentGeneration {
+		if ext.AgedOut(request.lastUpdateGeneration) {
 			fmt.Printf("%s: Deleting stale outstandingRequest %d "+
 				"(%d/%d)\n", ext.Name, reqId,
-				request.lastUpdateGeneration, ext.currentGeneration)
+				request.lastUpdateGeneration, ext.CurrentGeneration)
 			delete(ext.outstandingRequests, reqId)
 		}
 	}

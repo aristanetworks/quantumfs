@@ -102,6 +102,11 @@ type StatExtractor interface {
 	gc()
 
 	// ExtractorBase below implements these
+
+	// Returns true if the given generation has reached death when compared with
+	// StatExtractorBase.CurrentGeneration.
+	AgedOut(generation uint64) bool
+
 	// This is the list of strings that the extractor will be triggered on and
 	// receive. Note that full formats include a trailing \n.
 	TriggerStrings() []string
@@ -111,11 +116,12 @@ type StatExtractor interface {
 
 // A base class which handles the boiler plate for writing StatExtractors
 type StatExtractorBase struct {
-	Name     string
-	messages chan StatCommand
-	self     StatExtractor // Our superclass
-	type_    TriggerType
-	triggers []string
+	Name              string
+	CurrentGeneration uint64
+	messages          chan StatCommand
+	self              StatExtractor // Our superclass
+	type_             TriggerType
+	triggers          []string
 }
 
 func NewStatExtractorBase(name string, self StatExtractor, type_ TriggerType,
@@ -152,9 +158,17 @@ func (seb *StatExtractorBase) listen() {
 			resultChannel := cmd.Data().(chan []Measurement)
 			resultChannel <- seb.self.publish()
 		case GcCommandType:
+			seb.CurrentGeneration++
 			seb.self.gc()
 		}
 	}
+}
+
+func (seb *StatExtractorBase) AgedOut(generation uint64) bool {
+	if generation+2 < seb.CurrentGeneration {
+		return true
+	}
+	return false
 }
 
 func (seb *StatExtractorBase) Chan() chan StatCommand {

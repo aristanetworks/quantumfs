@@ -24,10 +24,8 @@ type extPairStats struct {
 	fmtStart string
 	fmtStop  string
 
-	requests          map[uint64]request
-	currentGeneration uint64
-
-	stats basicStats
+	requests map[uint64]request
+	stats    basicStats
 }
 
 func NewExtPairStats(start string, stop string, nametag string) StatExtractor {
@@ -63,7 +61,7 @@ func (ext *extPairStats) startRequest(log *qlog.LogOutput) {
 	}
 
 	ext.requests[log.ReqId] = request{
-		lastUpdateGeneration: ext.currentGeneration,
+		lastUpdateGeneration: ext.CurrentGeneration,
 		time:                 log.T,
 	}
 }
@@ -109,13 +107,11 @@ func (ext *extPairStats) publish() []Measurement {
 }
 
 func (ext *extPairStats) gc() {
-	ext.currentGeneration++
-
 	for reqId, request := range ext.requests {
-		if request.lastUpdateGeneration+2 < ext.currentGeneration {
+		if ext.AgedOut(request.lastUpdateGeneration) {
 			fmt.Printf("%s: Deleting stale request %d (%d/%d)\n",
 				ext.Name, reqId, request.lastUpdateGeneration,
-				ext.currentGeneration)
+				ext.CurrentGeneration)
 			delete(ext.requests, reqId)
 		}
 	}
