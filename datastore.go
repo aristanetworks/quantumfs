@@ -205,9 +205,23 @@ func (key ObjectKey) Type() KeyType {
 	return KeyType(key.key.KeyType())
 }
 
+// The output of this function would be something like
+// (Metadata: 000000000000000000000000000000000000000000)
+// Which should be at most 54 bytes. This value must be
+// increased if a larger string is added to the
+// KeyTypeToString function.
+const keyStrMaxSize = 54
+
 func (key ObjectKey) String() string {
-	return fmt.Sprintf("(%s: %s)", KeyTypeToString(key.Type()),
-		hex.EncodeToString(key.Value()))
+	byteArr := [keyStrMaxSize]byte{}
+	index := 0
+	index += copy(byteArr[index:], "(")
+	index += copy(byteArr[index:], KeyTypeToString(key.Type()))
+	index += copy(byteArr[index:], ": ")
+	index += hex.Encode(byteArr[index:], key.Value())
+	index += copy(byteArr[index:], ")")
+
+	return string(byteArr[:index])
 }
 
 func FromString(text string) (ObjectKey, error) {
