@@ -122,7 +122,12 @@ const (
 	KeyTypeEmbedded = 7
 
 	KeyTypeApi = 8 // A key-value pair provided entirely by the api
+
+	KeyTypeInvalidLast = 9
 )
+
+const KeyTypeStrMaxSize = 10
+const KeyValueStrSize = 42
 
 // String names for KeyTypes
 func KeyTypeToString(keyType KeyType) string {
@@ -205,12 +210,9 @@ func (key ObjectKey) Type() KeyType {
 	return KeyType(key.key.KeyType())
 }
 
-// The output of this function would be something like
-// (Metadata: 000000000000000000000000000000000000000000)
-// Which should be at most 54 bytes. This value must be
-// increased if a larger string is added to the
-// KeyTypeToString function.
-const keyStrMaxSize = 54
+// There are 4 characters in the output String in addition to
+// the type and the value strings
+const keyStrMaxSize = KeyTypeStrMaxSize + KeyValueStrSize + 4
 
 func (key ObjectKey) String() string {
 	byteArr := [keyStrMaxSize]byte{}
@@ -1469,6 +1471,20 @@ func init() {
 	EmptyDirKey = emptyDirKey
 	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
+
+	// Assert that all types have a string representation shorter than
+	// KeyTypeStrMaxSize bytes.
+	for keyType := KeyTypeInvalid; keyType < KeyTypeInvalidLast; keyType++ {
+		str := KeyTypeToString(KeyType(keyType))
+		utils.Assert(len(str) <= KeyTypeStrMaxSize,
+			"KeyType %s is too large, please adjust KeyTypeStrMaxSize",
+			str)
+	}
+
+	emptyDirValueStrSize := len(hex.EncodeToString(emptyDirKey.Value()))
+	utils.Assert(emptyDirValueStrSize == KeyValueStrSize,
+		"Values are encoded to %d bytes. Expected %d bytes.",
+		emptyDirValueStrSize, KeyValueStrSize)
 }
 
 func NewImmutableRecord(filename string, id ObjectKey, filetype ObjectType,
