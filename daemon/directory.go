@@ -1421,7 +1421,7 @@ func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 	if status != fuse.OK {
 		return []byte{}, status
 	}
-	return buffer.Get(&c.Ctx), fuse.OK
+	return buffer.Get(), fuse.OK
 }
 
 func (dir *Directory) listChildXAttr(c *ctx,

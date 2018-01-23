@@ -110,7 +110,7 @@ func (fi *MultiBlockFile) readBlock(c *ctx, blockIdx int, offset uint64,
 	// Copy only what we have, and then zero out the rest
 	copied := 0
 	if offset < uint64(block.Size()) {
-		copied = block.Read(&c.Ctx, buf, uint32(offset))
+		copied = block.Read(buf, uint32(offset))
 	}
 	remainingLen := int(expectedSize) - (int(offset) + copied)
 

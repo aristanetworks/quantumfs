@@ -71,7 +71,7 @@ func (inode *InodeCommon) parseExtendedAttributes_(c *ctx) {
 			continue
 		}
 
-		inode.unlinkXAttr[name] = buffer.Get(&c.Ctx)
+		inode.unlinkXAttr[name] = buffer.Get()
 	}
 }
 
