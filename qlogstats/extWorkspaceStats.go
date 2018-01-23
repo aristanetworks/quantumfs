@@ -143,7 +143,8 @@ func (ext *extWorkspaceStats) publish() []Measurement {
 
 			fields := make([]quantumfs.Field, 0, 10)
 			fields = appendNewFieldString(fields, "workspace", workspace)
-			fields = appendNewFieldInt(fields, "average_ns", stat.Average())
+			fields = appendNewFieldInt(fields, "average_ns",
+				stat.Average())
 			fields = appendNewFieldInt(fields, "maximum_ns", stat.Max())
 			fields = appendNewFieldInt(fields, "samples", stat.Count())
 
@@ -178,9 +179,9 @@ func (ext *extWorkspaceStats) gc() {
 
 	for reqId, request := range ext.outstandingRequests {
 		if request.lastUpdateGeneration+2 < ext.currentGeneration {
-			fmt.Printf("%s: Deleting stale outstandingRequest %d (%d/%d)\n",
-				ext.Name, reqId, request.lastUpdateGeneration,
-				ext.currentGeneration)
+			fmt.Printf("%s: Deleting stale outstandingRequest %d "+
+				"(%d/%d)\n", ext.Name, reqId,
+				request.lastUpdateGeneration, ext.currentGeneration)
 			delete(ext.outstandingRequests, reqId)
 		}
 	}
