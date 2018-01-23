@@ -1197,5 +1197,6 @@ func (api *ApiHandle) workspaceFinished(c *ctx, buf []byte) int {
 
 	c.vlog(WorkspaceFinishedFormat, cmd.WorkspacePath)
 
-	return api.queueErrorResponse(quantumfs.ErrorOK, "WorkspaceFinished Succeeded")
+	return api.queueErrorResponse(quantumfs.ErrorOK,
+		"WorkspaceFinished Succeeded")
 }
