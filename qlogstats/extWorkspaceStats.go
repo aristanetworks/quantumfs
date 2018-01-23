@@ -41,8 +41,9 @@ type extWorkspaceStats struct {
 	newRequests         map[uint64]newRequest
 	outstandingRequests map[uint64]outstandingRequest
 
-	accumulatingStats map[string]*accumulatingStats
-	finishedStats     map[string]map[string]*basicStats // [workspace]["Mux::Read"]
+	accumulatingStats map[string]*accumulatingStats // ie. [workspace]
+	// ie [workspace]["Mux::Read"]
+	finishedStats map[string]map[string]*basicStats
 }
 
 func NewExtWorkspaceStats(nametag string) StatExtractor {
