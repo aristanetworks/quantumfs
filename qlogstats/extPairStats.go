@@ -35,11 +35,8 @@ func NewExtPairStats(start string, stop string, nametag string) StatExtractor {
 		requests: make(map[uint64]request),
 	}
 
-	strings := make([]string, 0)
-
-	strings = append(strings, ext.fmtStart)
-	strings = append(strings, ext.fmtStop)
-	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnFormat, strings)
+	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnFormat,
+		[]string{ext.fmtStart, ext.fmtStop})
 
 	ext.run()
 

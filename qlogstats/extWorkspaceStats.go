@@ -46,12 +46,8 @@ func NewExtWorkspaceStats(nametag string) StatExtractor {
 		stats:               make(map[string]map[string]*basicStats),
 	}
 
-	strings := make([]string, 2)
-	strings = append(strings, "Mux::")
-	strings = append(strings, daemon.FuseRequestWorkspace)
-
 	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnPartialFormat,
-		strings)
+		[]string{"Mux::", daemon.FuseRequestWorkspace})
 
 	ext.run()
 
