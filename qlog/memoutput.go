@@ -533,8 +533,8 @@ func writeArg(buf []byte, offset uint64, format string, arg interface{},
 		offset = insertUint16(buf, offset, TypeUint64)
 		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
 	case reflect.String:
-		offset = writeArray(buf, offset, format, []byte(arg.(string)),
-			TypeString)
+		offset = writeArray(buf, offset, format,
+			utils.MoveStringToByteSlice(arg.(string)), TypeString)
 	case sliceOfBytesKind:
 		offset = writeArray(buf, offset, format, interfaceAsByteSlice(arg),
 			TypeByteArray)
@@ -625,7 +625,7 @@ func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 
 		case reflect.String:
 			size += 2 // Length of string
-			size += len([]byte(arg.(string)))
+			size += len(arg.(string))
 
 		default:
 			// The if-else form of switch is slower, so avoid it and
