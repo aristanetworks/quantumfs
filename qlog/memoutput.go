@@ -728,7 +728,8 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	// Create the string map entry / fetch existing one
 	formatId, err := mem.strIdMap.fetchLogIdx(idx, level, format)
 	if err != nil {
-		mem.errOut.Log(LogQlog, reqId, 1, err.Error())
+		mem.errOut.Log(LogQlog, reqId, 1, err.Error()+": %s\n",
+			utils.NoescapeInterface(format))
 		return
 	}
 
