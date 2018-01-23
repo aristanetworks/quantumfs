@@ -88,9 +88,9 @@ func TestMatches(t *testing.T) {
 
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "average_ns" {
-					test.Assert(
-						v.Data.(int64) == int64(duration1+
-							duration2)/2, "incorrect delta %d",
+					test.Assert(v.Data.(int64) ==
+						int64(duration1+duration2)/2,
+						"incorrect delta %d",
 						v.Data)
 					checkedAvg = true
 				} else if v.Name == "samples" {
