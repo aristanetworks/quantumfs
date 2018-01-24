@@ -57,7 +57,7 @@ type ExitFuncLog struct {
 	funcName  string
 }
 
-func (c Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLog {
+func (c *Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLog {
 	format := qlog.FnEnterStr + funcName
 	if len(c.Prefix) > 0 {
 		format = c.Prefix + format
@@ -65,13 +65,13 @@ func (c Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLo
 
 	c.Qlog.Log(subsystem, c.RequestId, 3, format)
 	return ExitFuncLog{
-		c:         &c,
+		c:         c,
 		subsystem: subsystem,
 		funcName:  funcName,
 	}
 }
 
-func (c Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
+func (c *Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 	extraFmtStr string, args ...interface{}) ExitFuncLog {
 
 	// A format larger than LogStrSize bytes will be silently dropped
@@ -89,7 +89,7 @@ func (c Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 
 	c.Qlog.Log(subsystem, c.RequestId, 3, formatStr, args...)
 	return ExitFuncLog{
-		c:         &c,
+		c:         c,
 		subsystem: subsystem,
 		funcName:  funcName,
 	}
