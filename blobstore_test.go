@@ -33,6 +33,7 @@ func (s *storeTests) SetupTest() {
 	mocksession := &MockSession{}
 	mocksession.On("Close").Return()
 	mockcc.On("CreateSession").Return(mocksession, nil)
+	mockIsTablePresent(mocksession, "blobStore", nil)
 
 	mockCfg := &Config{
 		Cluster: ClusterConfig{

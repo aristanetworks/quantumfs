@@ -35,6 +35,8 @@ func (suite *wsdbCacheTestSuite) SetupTest() {
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
 
+	mockIsTablePresent(mockSession, "workspacedb", nil)
+
 	mockCfg := &Config{
 		Cluster: ClusterConfig{
 			KeySpace: "ether",
@@ -61,6 +63,7 @@ func (suite *wsdbCacheTestSuite) TestWsdbConfigDefault() {
 	var config2 *Config
 
 	config.Cluster.Nodes = []string{"node1", "node2"}
+	config.Cluster.KeySpace = "ether"
 	// no wsdb configuration
 
 	file, err := ioutil.TempFile(os.TempDir(), "ether")
@@ -87,7 +90,6 @@ func (suite *wsdbCacheTestSuite) TestWsdbConfigDefault() {
 	suite.Require().True(cwsdb.cache.expiryDuration ==
 		time.Duration(defaultCacheTimeoutSecs)*time.Second,
 		"bad default found %s", cwsdb.cache.expiryDuration)
-
 }
 
 func (suite *wsdbCacheTestSuite) TestCacheBadConfig() {

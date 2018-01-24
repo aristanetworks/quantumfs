@@ -53,13 +53,18 @@ func NewRealCluster(clusterCfg ClusterConfig) Cluster {
 		}
 	}
 
-	if clusterCfg.NumRetries == 0 {
-		clusterCfg.NumRetries = 2
+	if clusterCfg.QueryNumRetries == 0 {
+		clusterCfg.QueryNumRetries = 2
 	}
-	c.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: clusterCfg.NumRetries}
 
-	if clusterCfg.Timeout != 0 {
-		c.Timeout = clusterCfg.Timeout * time.Second
+	if clusterCfg.CheckSchemaRetries == 0 {
+		clusterCfg.CheckSchemaRetries = 2
+	}
+
+	c.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: clusterCfg.QueryNumRetries}
+
+	if clusterCfg.ConnTimeoutSec != 0 {
+		c.Timeout = time.Duration(clusterCfg.ConnTimeoutSec) * time.Second
 	}
 
 	cc := &RealCluster{

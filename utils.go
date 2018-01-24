@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"time"
 )
 
 func checkCfNamePrefix(prefix string) error {
@@ -69,4 +70,19 @@ func readCqlConfig(fileName string) (*Config, error) {
 
 	file.Close()
 	return &config, nil
+}
+
+// Check if the table is present. Loop (1 + cfg.Cluster.CheckSchemaRetries) times
+func isTablePresent(store *cqlStore, cfg *Config, tableName string) error {
+	var err error
+	// NOTE: gocql does not support DESCRIBE, as per experiments.
+	queryStr := fmt.Sprintf("SELECT * FROM %s.%s LIMIT 1", cfg.Cluster.KeySpace, tableName)
+	for retry := 0; retry <= cfg.Cluster.CheckSchemaRetries; retry++ {
+		time.Sleep(5 * time.Second)
+		if err = store.session.Query(queryStr).Exec(); err != nil {
+			continue
+		}
+		return nil
+	}
+	return fmt.Errorf("%s.%s table not found in CQL datastore", cfg.Cluster.KeySpace, tableName)
 }

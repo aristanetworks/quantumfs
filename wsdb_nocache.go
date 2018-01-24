@@ -36,6 +36,10 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 	}
 
 	_, wsdbName := prefixToTblNames(os.Getenv("CFNAME_PREFIX"))
+	if err := isTablePresent(&store, cfg, wsdbName); err != nil {
+		return nil, wsdb.NewError(wsdb.ErrFatal, "%s", err.Error())
+	}
+
 	wsdbInst := &noCacheWsdb{
 		store:    &store,
 		keyspace: cfg.Cluster.KeySpace,

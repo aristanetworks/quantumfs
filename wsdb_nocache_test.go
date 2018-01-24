@@ -24,6 +24,7 @@ func (suite *wsdbNoCacheTestSuite) SetupTest() {
 	mockSession := new(MockSession)
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
+	mockIsTablePresent(mockSession, "workspacedb", nil)
 
 	mockCfg := &Config{
 		Cluster: ClusterConfig{

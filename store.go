@@ -6,7 +6,6 @@ package cql
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/aristanetworks/ether/utils"
 )
@@ -25,14 +24,15 @@ type Config struct {
 
 // ClusterConfig struct holds the info needed to connect to a cql cluster
 type ClusterConfig struct {
-	Nodes       []string      `json:"nodes"`
-	ClusterName string        `json:"clusterName"`
-	NumConns    int           `json:"numconnections"`
-	NumRetries  int           `json:"numretries"`
-	KeySpace    string        `json:"keyspace"`
-	Timeout     time.Duration `json:"timeout"`
-	Username    string        `json:"username"`
-	Password    string        `json:"password"`
+	Nodes              []string `json:"nodes"`
+	ClusterName        string   `json:"clusterName"`
+	NumConns           int      `json:"numconnections"`
+	QueryNumRetries    int      `json:"querynumretries"`
+	KeySpace           string   `json:"keyspace"`
+	ConnTimeoutSec     int      `json:"conntimeoutsec"`
+	Username           string   `json:"username"`
+	Password           string   `json:"password"`
+	CheckSchemaRetries int      `json:"checkschemaretries"`
 }
 
 // BlobStoreConfig holds config values specific to BlobStore API

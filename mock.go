@@ -8,6 +8,7 @@
 package cql
 
 import (
+	"fmt"
 	"reflect"
 
 	mock "github.com/stretchr/testify/mock"
@@ -626,4 +627,17 @@ func mockBranchWorkspace(sess *MockSession, srcTypespace string,
 		nil, nonce, dstErr)
 	mockWsdbKeyPut(sess, dstTypespace, dstNamespace, dstWorkspace,
 		srcKey, 0, nil)
+}
+
+const isTablePresentQuery = `SELECT * FROM ether.%s LIMIT 1`
+
+func mockIsTablePresent(sess *MockSession, tableName string, err error) {
+	mockquery := &MockQuery{}
+	qstr := fmt.Sprintf(isTablePresentQuery, tableName)
+	sess.On("Query", qstr).Return(mockquery)
+	if err != nil {
+		mockquery.On("Exec").Return(err)
+	} else {
+		mockquery.On("Exec").Return(nil)
+	}
 }

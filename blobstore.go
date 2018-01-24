@@ -44,6 +44,10 @@ func newCqlBS(cluster Cluster, cfg *Config) (blobstore.BlobStore, error) {
 	}
 
 	bsName, _ := prefixToTblNames(os.Getenv("CFNAME_PREFIX"))
+	if err := isTablePresent(&store, cfg, bsName); err != nil {
+		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "%s", err.Error())
+	}
+
 	cbs := &cqlBlobStore{
 		store:       &store,
 		keyspace:    cfg.Cluster.KeySpace,
@@ -52,7 +56,6 @@ func newCqlBS(cluster Cluster, cfg *Config) (blobstore.BlobStore, error) {
 		getStats:    inmem.NewOpStatsInMem("getBlobStore"),
 	}
 	return cbs, nil
-
 }
 
 // NewCqlBlobStore initializes a blobstore.BlobStore to be used with a CQL cluster.
