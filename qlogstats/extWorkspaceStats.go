@@ -46,7 +46,7 @@ type extWorkspaceStats struct {
 	finishedStats map[string]map[string]*basicStats
 }
 
-func NewExtWorkspaceStats(nametag string) StatExtractor {
+func NewExtWorkspaceStats(nametag string, operations []string) StatExtractor {
 	ext := &extWorkspaceStats{
 		newRequests:         make(map[uint64]newRequest),
 		outstandingRequests: make(map[uint64]outstandingRequest),
@@ -54,9 +54,11 @@ func NewExtWorkspaceStats(nametag string) StatExtractor {
 		finishedStats:       make(map[string]map[string]*basicStats),
 	}
 
+	operations = append(operations, daemon.FuseRequestWorkspace)
+	operations = append(operations, daemon.WorkspaceFinishedFormat)
+
 	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnPartialFormat,
-		[]string{"Mux::", daemon.FuseRequestWorkspace,
-			daemon.WorkspaceFinishedFormat})
+		operations)
 
 	ext.run()
 
