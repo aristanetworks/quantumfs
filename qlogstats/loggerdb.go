@@ -24,6 +24,12 @@ const (
 	OnAll                               // Match every message
 )
 
+type Measurement struct {
+	name   string
+	tags   []quantumfs.Tag
+	fields []quantumfs.Field
+}
+
 type CommandType int
 
 const (
@@ -51,14 +57,8 @@ func (cmd *MessageCommand) Data() interface{} {
 	return cmd.log
 }
 
-type PublishResult struct {
-	measurement string
-	tags        []quantumfs.Tag
-	fields      []quantumfs.Field
-}
-
 type PublishCommand struct {
-	result chan PublishResult
+	result chan []Measurement
 }
 
 func (cmd *PublishCommand) Type() CommandType {
@@ -272,14 +272,16 @@ func (agg *Aggregator) filterAndDistribute(log *qlog.LogOutput) {
 }
 
 func (agg *Aggregator) publish() {
+	versionTag := quantumfs.NewTag("version", agg.daemonVersion)
+
 	for {
 		time.Sleep(agg.publishInterval)
 
-		results := make([]chan PublishResult, 0, len(agg.extractors))
+		results := make([]chan []Measurement, 0, len(agg.extractors))
 		// Trigger extractors to publish in parallel
 		for _, extractor := range agg.extractors {
 			targetChan := extractor.Chan()
-			resultChannel := make(chan PublishResult)
+			resultChannel := make(chan []Measurement, 1)
 			targetChan <- &PublishCommand{
 				result: resultChannel,
 			}
@@ -289,15 +291,21 @@ func (agg *Aggregator) publish() {
 
 		// Wait for all their results to come in
 		for _, resultChannel := range results {
-			result := <-resultChannel
-			if result.tags != nil && len(result.tags) > 0 {
-				// add the qfs version tag
-				result.tags = append(result.tags,
-					quantumfs.NewTag("version",
-						agg.daemonVersion))
+			measurements := <-resultChannel
 
-				agg.db.Store(result.measurement, result.tags,
-					result.fields)
+			for _, measurement := range measurements {
+				name := measurement.name
+				tags := measurement.tags
+				fields := measurement.fields
+
+				if tags == nil || len(tags) == 0 {
+					continue
+				}
+
+				// add the qfs version tag
+				tags = append(tags, versionTag)
+
+				agg.db.Store(name, tags, fields)
 			}
 		}
 	}

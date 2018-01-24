@@ -72,7 +72,7 @@ func (ext *extPairStats) process() {
 				ext.stopRequest(log)
 			}
 		case PublishCommandType:
-			resultChannel := cmd.Data().(chan PublishResult)
+			resultChannel := cmd.Data().(chan []Measurement)
 			resultChannel <- ext.publish()
 		case GcCommandType:
 			ext.gc()
@@ -110,7 +110,7 @@ func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 	delete(ext.requests, log.ReqId)
 }
 
-func (ext *extPairStats) publish() PublishResult {
+func (ext *extPairStats) publish() []Measurement {
 	tags := make([]quantumfs.Tag, 0)
 	tags = append(tags, quantumfs.NewTag("statName", ext.name))
 
@@ -126,11 +126,11 @@ func (ext *extPairStats) publish() PublishResult {
 	}
 
 	ext.stats = basicStats{}
-	return PublishResult{
-		measurement: "quantumFsLatency",
-		tags:        tags,
-		fields:      fields,
-	}
+	return []Measurement{{
+		name:   "quantumFsLatency",
+		tags:   tags,
+		fields: fields,
+	}}
 }
 
 func (ext *extPairStats) gc() {

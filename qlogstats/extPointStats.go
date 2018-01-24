@@ -73,7 +73,7 @@ func (ext *extPointStats) process() {
 			log := cmd.Data().(*qlog.LogOutput)
 			ext.stats.NewPoint(int64(log.T))
 		case PublishCommandType:
-			resultChannel := cmd.Data().(chan PublishResult)
+			resultChannel := cmd.Data().(chan []Measurement)
 			resultChannel <- ext.publish()
 		case GcCommandType:
 			// do nothing since we store no state
@@ -81,7 +81,7 @@ func (ext *extPointStats) process() {
 	}
 }
 
-func (ext *extPointStats) publish() PublishResult {
+func (ext *extPointStats) publish() []Measurement {
 	tags := make([]quantumfs.Tag, 0)
 	tags = append(tags, quantumfs.NewTag("statName", ext.name))
 
@@ -90,9 +90,9 @@ func (ext *extPointStats) publish() PublishResult {
 	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
 
 	ext.stats = basicStats{}
-	return PublishResult{
-		measurement: "quantumFsPointCount",
-		tags:        tags,
-		fields:      fields,
-	}
+	return []Measurement{{
+		name:   "quantumFsPointCount",
+		tags:   tags,
+		fields: fields,
+	}}
 }
