@@ -102,6 +102,7 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	if !exists {
 		c.vlog("New child")
 		names = make(map[string]quantumfs.DirectoryRecord)
+		container.children[record.Filename()] = inodeId
 	}
 
 	names[record.Filename()] = record
