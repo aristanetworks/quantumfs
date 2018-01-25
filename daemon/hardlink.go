@@ -11,7 +11,7 @@ import (
 )
 
 // Should implement quantumfs.DirectoryRecord
-type Hardlink struct {
+type HardlinkLeg struct {
 	name   string
 	fileId quantumfs.FileId
 
@@ -23,12 +23,12 @@ type Hardlink struct {
 	publishRecord quantumfs.DirectoryRecord
 }
 
-func newHardlink(name string, fileId quantumfs.FileId, creationTime quantumfs.Time,
-	hardlinkTable HardlinkTable) *Hardlink {
+func newHardlinkLeg(name string, fileId quantumfs.FileId,
+	creationTime quantumfs.Time, hardlinkTable HardlinkTable) *HardlinkLeg {
 
 	utils.Assert(fileId != quantumfs.InvalidFileId,
 		"invalid fileId for %s", name)
-	var newLink Hardlink
+	var newLink HardlinkLeg
 	newLink.name = name
 	newLink.hardlinkTable = hardlinkTable
 	newLink.fileId = fileId
@@ -45,7 +45,7 @@ func newHardlink(name string, fileId quantumfs.FileId, creationTime quantumfs.Ti
 	return &newLink
 }
 
-func (link *Hardlink) get() quantumfs.ImmutableDirectoryRecord {
+func (link *HardlinkLeg) get() quantumfs.ImmutableDirectoryRecord {
 	valid, link_ := link.hardlinkTable.getHardlink(link.fileId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
@@ -56,34 +56,34 @@ func (link *Hardlink) get() quantumfs.ImmutableDirectoryRecord {
 	return link_
 }
 
-func (link *Hardlink) set(fnSetter func(dir quantumfs.DirectoryRecord)) {
+func (link *HardlinkLeg) set(fnSetter func(dir quantumfs.DirectoryRecord)) {
 	link.hardlinkTable.setHardlink(link.fileId, fnSetter)
 }
 
-func (link *Hardlink) Filename() string {
+func (link *HardlinkLeg) Filename() string {
 	return link.name
 }
 
-func (link *Hardlink) SetFilename(v string) {
+func (link *HardlinkLeg) SetFilename(v string) {
 	link.name = v
 }
 
-func (link *Hardlink) ID() quantumfs.ObjectKey {
+func (link *HardlinkLeg) ID() quantumfs.ObjectKey {
 	var empty [quantumfs.ObjectKeyLength - 1]byte
 	return quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded, empty)
 }
 
-func (link *Hardlink) SetID(v quantumfs.ObjectKey) {
+func (link *HardlinkLeg) SetID(v quantumfs.ObjectKey) {
 	utils.Assert(v.Type() == quantumfs.KeyTypeEmbedded,
 		"invalid key type %d", v.Type())
 }
 
-func (link *Hardlink) Type() quantumfs.ObjectType {
+func (link *HardlinkLeg) Type() quantumfs.ObjectType {
 	// Don't return the actual file type, just the hardlink
 	return quantumfs.ObjectTypeHardlink
 }
 
-func (link *Hardlink) SetType(v quantumfs.ObjectType) {
+func (link *HardlinkLeg) SetType(v quantumfs.ObjectType) {
 	if v == quantumfs.ObjectTypeHardlink {
 		panic("SetType called making hardlink")
 	}
@@ -93,86 +93,86 @@ func (link *Hardlink) SetType(v quantumfs.ObjectType) {
 	})
 }
 
-func (link *Hardlink) Permissions() uint32 {
+func (link *HardlinkLeg) Permissions() uint32 {
 	return link.get().Permissions()
 }
 
-func (link *Hardlink) SetPermissions(v uint32) {
+func (link *HardlinkLeg) SetPermissions(v uint32) {
 	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetPermissions(v)
 	})
 }
 
-func (link *Hardlink) Owner() quantumfs.UID {
+func (link *HardlinkLeg) Owner() quantumfs.UID {
 	return link.get().Owner()
 }
 
-func (link *Hardlink) SetOwner(v quantumfs.UID) {
+func (link *HardlinkLeg) SetOwner(v quantumfs.UID) {
 	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetOwner(v)
 	})
 }
 
-func (link *Hardlink) Group() quantumfs.GID {
+func (link *HardlinkLeg) Group() quantumfs.GID {
 	return link.get().Group()
 }
 
-func (link *Hardlink) SetGroup(v quantumfs.GID) {
+func (link *HardlinkLeg) SetGroup(v quantumfs.GID) {
 	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetGroup(v)
 	})
 }
 
-func (link *Hardlink) Size() uint64 {
+func (link *HardlinkLeg) Size() uint64 {
 	return link.get().Size()
 }
 
-func (link *Hardlink) SetSize(v uint64) {
+func (link *HardlinkLeg) SetSize(v uint64) {
 	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetSize(v)
 	})
 }
 
-func (link *Hardlink) ExtendedAttributes() quantumfs.ObjectKey {
+func (link *HardlinkLeg) ExtendedAttributes() quantumfs.ObjectKey {
 	return link.get().ExtendedAttributes()
 }
 
-func (link *Hardlink) SetExtendedAttributes(v quantumfs.ObjectKey) {
+func (link *HardlinkLeg) SetExtendedAttributes(v quantumfs.ObjectKey) {
 	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetExtendedAttributes(v)
 	})
 }
 
-func (link *Hardlink) ContentTime() quantumfs.Time {
+func (link *HardlinkLeg) ContentTime() quantumfs.Time {
 	return link.get().ContentTime()
 }
 
-func (link *Hardlink) SetContentTime(v quantumfs.Time) {
+func (link *HardlinkLeg) SetContentTime(v quantumfs.Time) {
 	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetContentTime(v)
 	})
 }
 
-func (link *Hardlink) ModificationTime() quantumfs.Time {
+func (link *HardlinkLeg) ModificationTime() quantumfs.Time {
 	return link.get().ModificationTime()
 }
 
-func (link *Hardlink) SetModificationTime(v quantumfs.Time) {
+func (link *HardlinkLeg) SetModificationTime(v quantumfs.Time) {
 	link.set(func(dir quantumfs.DirectoryRecord) {
 		dir.SetModificationTime(v)
 	})
 }
 
-func (link *Hardlink) FileId() quantumfs.FileId {
+func (link *HardlinkLeg) FileId() quantumfs.FileId {
 	return link.fileId
 }
 
-func (link *Hardlink) SetFileId(fileId quantumfs.FileId) {
+func (link *HardlinkLeg) SetFileId(fileId quantumfs.FileId) {
 	utils.Assert(fileId == link.fileId,
 		"attempt to change fileId %d -> %d", fileId, link.fileId)
 }
 
-func (link *Hardlink) Publishable() quantumfs.PublishableRecord {
+func (link *HardlinkLeg) Publishable() quantumfs.PublishableRecord {
 
 	// The immutable parts of the publishRecord are always correct,
 	// just update the file name and creationTime as they might have
@@ -183,11 +183,11 @@ func (link *Hardlink) Publishable() quantumfs.PublishableRecord {
 	return quantumfs.AsPublishableRecord(link.publishRecord)
 }
 
-func (link *Hardlink) Nlinks() uint32 {
+func (link *HardlinkLeg) Nlinks() uint32 {
 	return link.hardlinkTable.nlinks(link.fileId)
 }
 
-func (link *Hardlink) EncodeExtendedKey() []byte {
+func (link *HardlinkLeg) EncodeExtendedKey() []byte {
 	valid, realRecord := link.hardlinkTable.getHardlink(link.fileId)
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
@@ -199,7 +199,7 @@ func (link *Hardlink) EncodeExtendedKey() []byte {
 		realRecord.Size())
 }
 
-func (l *Hardlink) AsImmutable() quantumfs.ImmutableDirectoryRecord {
+func (l *HardlinkLeg) AsImmutable() quantumfs.ImmutableDirectoryRecord {
 	// Sorry, this seems to be the only way to get the signature under 85
 	// characters per line and appease gofmt.
 	link := l
@@ -226,7 +226,7 @@ func (l *Hardlink) AsImmutable() quantumfs.ImmutableDirectoryRecord {
 	)
 }
 
-func (link *Hardlink) Clone() quantumfs.DirectoryRecord {
-	return newHardlink(link.name, link.fileId, link.creationTime,
+func (link *HardlinkLeg) Clone() quantumfs.DirectoryRecord {
+	return newHardlinkLeg(link.name, link.fileId, link.creationTime,
 		link.hardlinkTable)
 }

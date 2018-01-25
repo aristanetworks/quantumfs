@@ -462,7 +462,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		checkLink, inodeNum := func() (bool, InodeId) {
 			defer dir.childRecordLock.Lock().Unlock()
 			record := dir.children.recordByName(c, name)
-			_, isHardlink := record.(*Hardlink)
+			_, isHardlink := record.(*HardlinkLeg)
 			return isHardlink, dir.children.inodeNum(name)
 		}()
 		if inodeNum == quantumfs.InodeIdInvalid {
@@ -1216,7 +1216,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	// fix the name on the copy
 	newEntry.SetFilename(newName)
 
-	hardlink, isHardlink := newEntry.(*Hardlink)
+	hardlink, isHardlink := newEntry.(*HardlinkLeg)
 	if !isHardlink {
 		// Update the inode to point to the new name and
 		// mark as accessed in both parents.
@@ -1631,7 +1631,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	}
 
 	// add a check incase there's an inconsistency
-	if hardlink, isHardlink := entry.(*Hardlink); isHardlink {
+	if hardlink, isHardlink := entry.(*HardlinkLeg); isHardlink {
 		panic(fmt.Sprintf("Hardlink not recognized by workspaceroot: %d, %d",
 			inodeNum, hardlink.fileId))
 	}

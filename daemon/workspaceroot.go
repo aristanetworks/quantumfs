@@ -58,7 +58,7 @@ type HardlinkTable interface {
 	hardlinkDec(fileId quantumfs.FileId) bool
 	hardlinkInc(fileId quantumfs.FileId)
 	newHardlink(c *ctx, inodeId InodeId,
-		record quantumfs.DirectoryRecord) *Hardlink
+		record quantumfs.DirectoryRecord) *HardlinkLeg
 	getHardlink(fileId quantumfs.FileId) (valid bool,
 		record quantumfs.ImmutableDirectoryRecord)
 	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
@@ -234,11 +234,11 @@ func (wsr *WorkspaceRoot) removeHardlink_(fileId quantumfs.FileId, inodeId Inode
 }
 
 func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
-	record quantumfs.DirectoryRecord) *Hardlink {
+	record quantumfs.DirectoryRecord) *HardlinkLeg {
 
 	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).Out()
 
-	if _, isLink := record.(*Hardlink); isLink {
+	if _, isLink := record.(*HardlinkLeg); isLink {
 		panic("newHardlink called on existing hardlink")
 	}
 
@@ -259,8 +259,8 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	// parent lock
 	wsr.dirty(c)
 
-	return newHardlink(record.Filename(), fileId, quantumfs.NewTime(time.Now()),
-		wsr)
+	return newHardlinkLeg(record.Filename(), fileId,
+		quantumfs.NewTime(time.Now()), wsr)
 }
 
 func (wsr *WorkspaceRoot) instantiateHardlink(c *ctx, inodeId InodeId) Inode {
@@ -351,8 +351,8 @@ func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
 		return false, nil
 	}
 
-	return true, newHardlink(link.record.Filename(), fileId, quantumfs.Time(0),
-		wsr)
+	return true, newHardlinkLeg(link.record.Filename(), fileId,
+		quantumfs.Time(0), wsr)
 }
 
 func (wsr *WorkspaceRoot) getHardlink(fileId quantumfs.FileId) (valid bool,

@@ -426,7 +426,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 		return
 	}
 
-	link := record.(*Hardlink)
+	link := record.(*HardlinkLeg)
 
 	// This may need to be turned back into a normal file
 	newRecord, inodeId := parent.hardlinkTable.removeHardlink(c, link.fileId)
