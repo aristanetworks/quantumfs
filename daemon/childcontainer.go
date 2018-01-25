@@ -33,6 +33,8 @@ type ChildContainer struct {
 func newChildContainer(c *ctx, dir *Directory,
 	baseLayerId quantumfs.ObjectKey) (*ChildContainer, []InodeId) {
 
+	defer c.funcIn("newChildContainer").Out()
+
 	container := &ChildContainer{
 		dir:         dir,
 		children:    make(map[string]InodeId),
@@ -91,11 +93,14 @@ func (container *ChildContainer) loadChild(c *ctx,
 func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	record quantumfs.DirectoryRecord) {
 
+	defer c.FuncIn("ChildContainer::setRecord", "inode %d", inodeId).Out()
+
 	// Since we have an inodeId this child is or will be instantiated and so is
 	// placed in the effective set.
 
 	names, exists := container.effective[inodeId]
 	if !exists {
+		c.vlog("New child")
 		names = make(map[string]quantumfs.DirectoryRecord)
 	}
 
@@ -112,8 +117,12 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 func (container *ChildContainer) delRecord(c *ctx, inodeId InodeId,
 	name string) quantumfs.DirectoryRecord {
 
+	defer c.FuncIn("ChildContainer::delRecord", "inode %d name '%s'", inodeId,
+		name).Out()
+
 	record := container.recordByName(c, name)
 	if record == nil {
+		c.vlog("Does not exist")
 		return nil // Doesn't exist
 	}
 
@@ -136,6 +145,7 @@ func (container *ChildContainer) recordByName(c *ctx,
 	}
 
 	if records == nil {
+		c.vlog("Does not exist")
 		return nil // Does not exist
 	}
 	return records[name]
@@ -146,15 +156,19 @@ func (container *ChildContainer) recordByName(c *ctx,
 func (container *ChildContainer) recordById(c *ctx,
 	inodeId InodeId) quantumfs.DirectoryRecord {
 
+	defer c.FuncIn("ChildContainer::recordById", "inodeId %d", inodeId).Out()
+
 	records := container.effective[inodeId]
 	if records == nil {
 		records = container.publishable[inodeId]
 	}
 
 	if records == nil {
+		c.vlog("Does not exist")
 		return nil // Does not exist
 	}
 	for _, record := range records {
+		c.vlog("Returning %s", record.Filename())
 		return record
 	}
 	utils.Assert(false, "Empty records listing")
@@ -312,6 +326,7 @@ func (container *ChildContainer) makeHardlink(c *ctx, childId InodeId) (
 	copy quantumfs.DirectoryRecord, err fuse.Status) {
 
 	defer c.FuncIn("ChildContainer::makeHardlink", "inode %d", childId).Out()
+
 	child := container.recordById(c, childId)
 	if child == nil {
 		c.elog("No child record for inode %d", childId)
