@@ -384,7 +384,10 @@ func (container *ChildContainer) makePublishable(c *ctx, name string) {
 	utils.Assert(inodeId != quantumfs.InodeIdInvalid, "No such child %s", name)
 
 	record := container.effective[inodeId][name]
-	utils.Assert(record != nil, "No effective record for name: %s", name)
+	if record == nil {
+		c.vlog("Already publishable")
+		return
+	}
 
 	records := container.publishable[inodeId]
 	if records == nil {
