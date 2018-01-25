@@ -161,6 +161,7 @@ func (container *ChildContainer) recordById(c *ctx,
 
 	records := container.effective[inodeId]
 	if records == nil {
+		c.vlog("No effective record")
 		records = container.publishable[inodeId]
 	}
 
