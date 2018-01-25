@@ -188,7 +188,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	// Ensure we have a flattened DirectoryRecord to ensure the type is the
 	// underlying type for Hardlinks. This is required in order for
 	// objectTypeToFileType() to have access to the correct type to report.
-	entry := entry_.AsImmutableDirectoryRecord()
+	entry := entry_.AsImmutable()
 
 	attr.Ino = uint64(inodeNum)
 
@@ -770,7 +770,7 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 
 	record := dir.getRecordChildCall_(c, inodeNum)
 	if record != nil {
-		return record.AsImmutableDirectoryRecord(), nil
+		return record.AsImmutable(), nil
 	}
 
 	return nil, errors.New("Inode given is not a child of this directory")
@@ -835,7 +835,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 				return fuse.ENOENT
 			}
 
-			recordCopy = record.AsImmutableDirectoryRecord()
+			recordCopy = record.AsImmutable()
 			return fuse.OK
 		}()
 		if err != fuse.OK {
@@ -886,7 +886,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 
 			// Use a shallow copy of record to ensure the right type for
 			// objectTypeToFileType
-			record := record_.AsImmutableDirectoryRecord()
+			record := record_.AsImmutable()
 
 			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
 			if err != fuse.OK {

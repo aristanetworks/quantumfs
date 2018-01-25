@@ -199,7 +199,7 @@ func (link *Hardlink) EncodeExtendedKey() []byte {
 		realRecord.Size())
 }
 
-func (l *Hardlink) AsImmutableDirectoryRecord() quantumfs.ImmutableDirectoryRecord {
+func (l *Hardlink) AsImmutable() quantumfs.ImmutableDirectoryRecord {
 	// Sorry, this seems to be the only way to get the signature under 85
 	// characters per line and appease gofmt.
 	link := l
