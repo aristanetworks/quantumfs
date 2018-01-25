@@ -123,8 +123,8 @@ type Aggregator struct {
 	queueLogs    []*qlog.LogOutput
 	notification chan struct{}
 
-	processDeadline	time.Time
-	lastProcess	time.Time
+	processDeadline time.Time
+	lastProcess     time.Time
 }
 
 func NewAggregator(db_ quantumfs.TimeSeriesDB,

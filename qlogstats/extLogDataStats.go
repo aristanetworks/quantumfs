@@ -39,7 +39,7 @@ func NewExtLogDataStats(format string, nametag string, histo histoStats,
 func (ext *extLogDataStats) TriggerStrings() []string {
 	rtn := make([]string, 0)
 
-	rtn = append(rtn, ext.format + "\n")
+	rtn = append(rtn, ext.format+"\n")
 	return rtn
 }
 
