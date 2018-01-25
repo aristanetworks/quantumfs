@@ -394,7 +394,7 @@ func (container *ChildContainer) makePublishable(c *ctx, name string) {
 	container.publishable[inodeId] = records
 
 	records = container.effective[inodeId]
-	if len(records) == 0 {
+	if len(records) == 1 {
 		delete(container.effective, inodeId)
 	} else {
 		delete(container.effective[inodeId], name)
