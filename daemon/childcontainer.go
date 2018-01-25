@@ -54,8 +54,7 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 
 	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
 		c.vlog("Loading child %s", record.Filename())
-		childInodeNum := container.loadChild(c, record,
-			quantumfs.InodeIdInvalid)
+		childInodeNum := container.loadChild(c, record)
 		container.children[record.Filename()] = childInodeNum
 		c.vlog("loaded child %d", childInodeNum)
 		uninstantiated = append(uninstantiated, childInodeNum)
@@ -64,15 +63,16 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 	return uninstantiated
 }
 
-func (container *ChildContainer) loadChild(c *ctx, record quantumfs.DirectoryRecord
-	) InodeId {
+func (container *ChildContainer) loadChild(c *ctx,
+	record quantumfs.DirectoryRecord) InodeId {
 
-	defer c.FuncIn("ChildContainer::loadChild", "inode %d", inodeId).Out()
+	defer c.FuncIn("ChildContainer::loadChild", "inode %s",
+		record.Filename()).Out()
 
 	// Since we do not have an inodeId this child is/will not be instantiated and
 	// so it placed in the publishable set.
-	
-	inodeId = c.qfs.newInodeId()
+
+	inodeId := c.qfs.newInodeId()
 
 	names, exists := container.publishable[inodeId]
 	if !exists {
@@ -112,7 +112,7 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 func (container *ChildContainer) delRecord(c *ctx, inodeId InodeId,
 	name string) quantumfs.DirectoryRecord {
 
-	record := container.getRecordByName(c, name)
+	record := container.recordByName(c, name)
 	if record == nil {
 		return nil // Doesn't exist
 	}
@@ -124,7 +124,7 @@ func (container *ChildContainer) delRecord(c *ctx, inodeId InodeId,
 	return record
 }
 
-func (container *ChildContainer) getRecordByName(c *ctx,
+func (container *ChildContainer) recordByName(c *ctx,
 	name string) quantumfs.DirectoryRecord {
 
 	defer c.FuncIn("ChildContainer::getRecordByName", "%s", name).Out()
@@ -143,7 +143,7 @@ func (container *ChildContainer) getRecordByName(c *ctx,
 
 // Note that this will return one arbitrary record in cases where that inode has
 // multiple names in this container/directory.
-func (container *ChildContainer) getRecordById(c *ctx,
+func (container *ChildContainer) recordById(c *ctx,
 	inodeId InodeId) quantumfs.DirectoryRecord {
 
 	records := container.effective[inodeId]
@@ -158,6 +158,7 @@ func (container *ChildContainer) getRecordById(c *ctx,
 		return record
 	}
 	utils.Assert(false, "Empty records listing")
+	return nil
 }
 
 func (container *ChildContainer) inodeNum(name string) InodeId {
@@ -190,7 +191,7 @@ func (container *ChildContainer) deleteChild(c *ctx, name string,
 		c.vlog("name %s does not exist", name)
 		return nil
 	}
-	record := container.getRecordByName(name)
+	record := container.recordByName(c, name)
 
 	// This may be a hardlink that is due to be converted.
 	if hardlink, isHardlink := record.(*Hardlink); isHardlink && fixHardlinks {
@@ -201,7 +202,7 @@ func (container *ChildContainer) deleteChild(c *ctx, name string,
 		if newRecord != nil {
 			newRecord.SetFilename(hardlink.Filename())
 			record = newRecord
-			container.setRecord(c, newRecord, inodeId)
+			container.setRecord(c, inodeId, newRecord)
 		}
 	}
 
@@ -211,11 +212,11 @@ func (container *ChildContainer) deleteChild(c *ctx, name string,
 		if !fixHardlinks {
 			return nil
 		}
-		if !cmap.dir.hardlinkTable.hardlinkExists(c, link.fileId) {
+		if !container.dir.hardlinkTable.hardlinkExists(c, link.fileId) {
 			c.vlog("hardlink does not exist")
 			return nil
 		}
-		if cmap.dir.hardlinkTable.hardlinkDec(link.fileId) {
+		if container.dir.hardlinkTable.hardlinkDec(link.fileId) {
 			// If the refcount was greater than one we shouldn't
 			// reparent.
 			c.vlog("Hardlink referenced elsewhere")
@@ -238,7 +239,7 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 
 	inodeId := container.inodeNum(oldName)
 	c.vlog("child %s has inode %d", oldName, inodeId)
-	record := container.getRecordByName(c, oldName)
+	record := container.recordByName(c, oldName)
 	if record == nil {
 		c.vlog("oldName doesn't exist")
 		return
@@ -253,7 +254,7 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 		hardlink.creationTime = quantumfs.NewTime(time.Now())
 		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
-	container.setRecord(c, record, inodeId)
+	container.setRecord(c, inodeId, record)
 	container.makePublishable(c, newName)
 }
 
@@ -286,8 +287,6 @@ func (container *ChildContainer) publishableRecords(
 }
 
 func (container *ChildContainer) records() []quantumfs.DirectoryRecord {
-	publishableRecords := container.publishable.records()
-
 	records := make([]quantumfs.DirectoryRecord, 0, container.count())
 	seen := make(map[string]bool, container.count())
 
@@ -313,7 +312,7 @@ func (container *ChildContainer) makeHardlink(c *ctx, childId InodeId) (
 	copy quantumfs.DirectoryRecord, err fuse.Status) {
 
 	defer c.FuncIn("ChildContainer::makeHardlink", "inode %d", childId).Out()
-	child := container.getRecordById(childId)
+	child := container.recordById(c, childId)
 	if child == nil {
 		c.elog("No child record for inode %d", childId)
 		return nil, fuse.ENOENT
@@ -336,13 +335,13 @@ func (container *ChildContainer) makeHardlink(c *ctx, childId InodeId) (
 		child.Type() != quantumfs.ObjectTypeSymlink &&
 		child.Type() != quantumfs.ObjectTypeSpecial {
 
-		c.dlog("Cannot hardlink %s - not a file", record.Filename())
+		c.dlog("Cannot hardlink %s - not a file", child.Filename())
 		return nil, fuse.EINVAL
 	}
 
 	childname := child.Filename()
 	// remove the record from the childmap before donating it to be a hardlink
-	container.delRecord(childId, childname)
+	container.delRecord(c, childId, childname)
 
 	c.vlog("Converting %s into a hardlink", childname)
 	newLink := container.dir.hardlinkTable.newHardlink(c, childId, child)

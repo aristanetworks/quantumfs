@@ -636,7 +636,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.loadChild(c, entry, inodeNum)
+		dir.children.setRecord(c, inodeNum, entry)
 	}()
 
 	c.qfs.setInode(c, inodeNum, newEntity)
@@ -785,7 +785,7 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	defer c.FuncIn("DirectoryRecord::getRecordChildCall_", "inode %d",
 		inodeNum).Out()
 
-	record := dir.children.record(inodeNum)
+	record := dir.children.recordById(c, inodeNum)
 	if record != nil {
 		c.vlog("Record found")
 		return record
@@ -946,7 +946,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			defer dir.childRecordLock.Lock().Unlock()
 
 			// Update the record's size
-			record := dir.children.record(inode.inodeNum())
+			record := dir.children.recordById(c, inode.inodeNum())
 			record.SetSize(uint64(len(pointedTo)))
 		}()
 
@@ -1233,7 +1233,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	func() {
 		defer dst.childRecordLock.Lock().Unlock()
 		dst.orphanChild_(c, newName, overwrittenInode)
-		dst.children.loadChild(c, newEntry, childInodeId)
+		dst.children.setRecord(c, childInodeId, newEntry)
 
 		// being inserted means you're dirty and need to be synced
 		if childInode != nil {
@@ -1618,7 +1618,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 		return inode, nil
 	}
 
-	entry := dir.children.record(inodeNum)
+	entry := dir.children.recordById(c, inodeNum)
 	if entry == nil {
 		c.elog("Cannot instantiate child with no record: %d", inodeNum)
 		return nil, nil
@@ -1756,7 +1756,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.loadChild(c, entry, quantumfs.InodeIdInvalid)
+		return dir.children.loadChild(c, entry)
 	}()
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
