@@ -112,6 +112,10 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	// Build the hardlink path list if we just set a hardlink record
 	if record.Type() == quantumfs.ObjectTypeHardlink {
 		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
+
+		// Hardlink legs are always immediately publishable as they only
+		// point into the hardlink table.
+		container.makePublishable(c, record.Filename())
 	}
 }
 
