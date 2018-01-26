@@ -43,7 +43,7 @@ func (test *testHelper) runExtractorTest(qlogHandle *qlog.Qlog,
 
 		// Check if we're too early
 		for _, v := range memdb.Data[0].Fields {
-			if v.Name == "samples" && v.Data == 0 {
+			if v.Name == "samples" && v.Data.(int64) == 0 {
 				return false
 			}
 		}
@@ -88,12 +88,13 @@ func TestMatches(t *testing.T) {
 
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "average_ns" {
-					test.Assert(v.Data == int64(duration1+
-						duration2)/2, "incorrect delta %d",
+					test.Assert(v.Data.(int64) ==
+						int64(duration1+duration2)/2,
+						"incorrect delta %d",
 						v.Data)
 					checkedAvg = true
 				} else if v.Name == "samples" {
-					test.Assert(v.Data == 2,
+					test.Assert(v.Data.(int64) == 2,
 						"incorrect samples %d", v.Data)
 					checkedSamples = true
 				}
@@ -132,31 +133,31 @@ func TestPercentiles(t *testing.T) {
 
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "average_ns" {
-					test.Assert(v.Data == 50,
+					test.Assert(v.Data.(int64) == 50,
 						"incorrect delta %d", v.Data)
 					checked[0] = true
 				} else if v.Name == "maximum_ns" {
-					test.Assert(v.Data == 100,
+					test.Assert(v.Data.(int64) == 100,
 						"incorrect delta %d", v.Data)
 					checked[1] = true
 				} else if v.Name == "samples" {
-					test.Assert(v.Data == 101,
+					test.Assert(v.Data.(int64) == 101,
 						"incorrect samples %d", v.Data)
 					checked[2] = true
 				} else if v.Name == "50pct_ns" {
-					test.Assert(v.Data == 50,
+					test.Assert(v.Data.(int64) == 50,
 						"50th percentile is %d", v.Data)
 					checked[3] = true
 				} else if v.Name == "90pct_ns" {
-					test.Assert(v.Data == 90,
+					test.Assert(v.Data.(int64) == 90,
 						"90th percentile is %d", v.Data)
 					checked[4] = true
 				} else if v.Name == "95pct_ns" {
-					test.Assert(v.Data == 95,
+					test.Assert(v.Data.(int64) == 95,
 						"95th percentile is %d", v.Data)
 					checked[5] = true
 				} else if v.Name == "99pct_ns" {
-					test.Assert(v.Data == 99,
+					test.Assert(v.Data.(int64) == 99,
 						"99th percentile is %d", v.Data)
 					checked[6] = true
 				}
@@ -198,7 +199,7 @@ func TestPointCount(t *testing.T) {
 
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "samples" {
-					test.Assert(v.Data == 123,
+					test.Assert(v.Data.(int64) == 123,
 						"incorrect samples %d", v.Data)
 					checked = true
 				}
@@ -225,7 +226,7 @@ func TestPartialFormatMatch(t *testing.T) {
 		checker := func(memdb *processlocal.Memdb) {
 			for _, v := range memdb.Data[0].Fields {
 				if v.Name == "samples" {
-					test.Assert(v.Data == 123,
+					test.Assert(v.Data.(int64) == 123,
 						"incorrect count %d", v.Data)
 					checked = true
 				}

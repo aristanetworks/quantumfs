@@ -116,13 +116,13 @@ func (ext *extPairStats) publish() []Measurement {
 
 	fields := make([]quantumfs.Field, 0)
 
-	fields = append(fields, quantumfs.NewField("average_ns",
+	fields = append(fields, quantumfs.NewFieldInt("average_ns",
 		ext.stats.Average()))
-	fields = append(fields, quantumfs.NewField("maximum_ns", ext.stats.Max()))
-	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
+	fields = append(fields, quantumfs.NewFieldInt("maximum_ns", ext.stats.Max()))
+	fields = append(fields, quantumfs.NewFieldInt("samples", ext.stats.Count()))
 
 	for name, data := range ext.stats.Percentiles() {
-		fields = append(fields, quantumfs.NewField(name, data))
+		fields = append(fields, quantumfs.NewFieldInt(name, data))
 	}
 
 	ext.stats = basicStats{}
