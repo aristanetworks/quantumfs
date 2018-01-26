@@ -10,17 +10,10 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-// Should implement quantumfs.DirectoryRecord
+// implements quantumfs.DirectoryRecord
 type HardlinkLeg struct {
-	name   string
-	fileId quantumfs.FileId
-
-	// hidden field only used for merging. Stored in the ContentTime field.
-	creationTime quantumfs.Time
-
 	hardlinkTable HardlinkTable
-
-	publishRecord quantumfs.DirectoryRecord
+	record        quantumfs.DirectoryRecord
 }
 
 func newHardlinkLeg(name string, fileId quantumfs.FileId,
@@ -28,44 +21,45 @@ func newHardlinkLeg(name string, fileId quantumfs.FileId,
 
 	utils.Assert(fileId != quantumfs.InvalidFileId,
 		"invalid fileId for %s", name)
+
 	var newLink HardlinkLeg
-	newLink.name = name
+
+	record := quantumfs.NewDirectoryRecord()
+	record.SetType(quantumfs.ObjectTypeHardlink)
+	record.SetID(newLink.ID())
+	record.SetFileId(fileId)
+	record.SetExtendedAttributes(quantumfs.EmptyBlockKey)
+	record.SetFilename(name)
+	record.SetContentTime(creationTime)
+
+	newLink.record = record
 	newLink.hardlinkTable = hardlinkTable
-	newLink.fileId = fileId
-	newLink.creationTime = creationTime
-
-	publishRecord := quantumfs.NewDirectoryRecord()
-	publishRecord.SetType(quantumfs.ObjectTypeHardlink)
-	publishRecord.SetID(newLink.ID())
-	publishRecord.SetFileId(newLink.fileId)
-	publishRecord.SetExtendedAttributes(quantumfs.EmptyBlockKey)
-
-	newLink.publishRecord = publishRecord
 
 	return &newLink
 }
 
 func (link *HardlinkLeg) get() quantumfs.ImmutableDirectoryRecord {
-	valid, link_ := link.hardlinkTable.getHardlink(link.fileId)
+	valid, link_ := link.hardlinkTable.getHardlink(link.FileId())
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
-			link.fileId))
+			link.FileId()))
 	}
 
 	return link_
 }
 
 func (link *HardlinkLeg) set(fnSetter func(dir quantumfs.DirectoryRecord)) {
-	link.hardlinkTable.setHardlink(link.fileId, fnSetter)
+	link.hardlinkTable.setHardlink(link.FileId(), fnSetter)
 }
 
 func (link *HardlinkLeg) Filename() string {
-	return link.name
+	return link.record.Filename()
 }
 
 func (link *HardlinkLeg) SetFilename(v string) {
-	link.name = v
+	link.record.SetFilename(v)
+
 }
 
 func (link *HardlinkLeg) ID() quantumfs.ObjectKey {
@@ -143,6 +137,16 @@ func (link *HardlinkLeg) SetExtendedAttributes(v quantumfs.ObjectKey) {
 	})
 }
 
+// The creationTime of a hardlink is used for merging and persists
+// in the contentTime field of the hardlink leg
+func (link *HardlinkLeg) creationTime() quantumfs.Time {
+	return link.record.ContentTime()
+}
+
+func (link *HardlinkLeg) setCreationTime(v quantumfs.Time) {
+	link.record.SetContentTime(v)
+}
+
 func (link *HardlinkLeg) ContentTime() quantumfs.Time {
 	return link.get().ContentTime()
 }
@@ -164,35 +168,28 @@ func (link *HardlinkLeg) SetModificationTime(v quantumfs.Time) {
 }
 
 func (link *HardlinkLeg) FileId() quantumfs.FileId {
-	return link.fileId
+	return link.record.FileId()
 }
 
 func (link *HardlinkLeg) SetFileId(fileId quantumfs.FileId) {
-	utils.Assert(fileId == link.fileId,
-		"attempt to change fileId %d -> %d", fileId, link.fileId)
+	utils.Assert(fileId == link.FileId(),
+		"attempt to change fileId %d -> %d", fileId, link.FileId())
 }
 
 func (link *HardlinkLeg) Publishable() quantumfs.PublishableRecord {
-
-	// The immutable parts of the publishRecord are always correct,
-	// just update the file name and creationTime as they might have
-	// changed.
-	link.publishRecord.SetFilename(link.name)
-	link.publishRecord.SetContentTime(link.creationTime)
-
-	return quantumfs.AsPublishableRecord(link.publishRecord)
+	return quantumfs.AsPublishableRecord(link.record)
 }
 
 func (link *HardlinkLeg) Nlinks() uint32 {
-	return link.hardlinkTable.nlinks(link.fileId)
+	return link.hardlinkTable.nlinks(link.FileId())
 }
 
 func (link *HardlinkLeg) EncodeExtendedKey() []byte {
-	valid, realRecord := link.hardlinkTable.getHardlink(link.fileId)
+	valid, realRecord := link.hardlinkTable.getHardlink(link.FileId())
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
-			link.fileId))
+			link.FileId()))
 	}
 
 	return quantumfs.EncodeExtendedKey(realRecord.ID(), realRecord.Type(),
@@ -203,11 +200,11 @@ func (l *HardlinkLeg) AsImmutable() quantumfs.ImmutableDirectoryRecord {
 	// Sorry, this seems to be the only way to get the signature under 85
 	// characters per line and appease gofmt.
 	link := l
-	valid, realRecord := link.hardlinkTable.getHardlink(link.fileId)
+	valid, realRecord := link.hardlinkTable.getHardlink(link.FileId())
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
-			link.fileId))
+			link.FileId()))
 	}
 
 	return quantumfs.NewImmutableRecord(
@@ -227,6 +224,6 @@ func (l *HardlinkLeg) AsImmutable() quantumfs.ImmutableDirectoryRecord {
 }
 
 func (link *HardlinkLeg) Clone() quantumfs.DirectoryRecord {
-	return newHardlinkLeg(link.name, link.fileId, link.creationTime,
+	return newHardlinkLeg(link.Filename(), link.FileId(), link.creationTime(),
 		link.hardlinkTable)
 }

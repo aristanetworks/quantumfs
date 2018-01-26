@@ -1226,8 +1226,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			childInode.clearAccessedCache()
 		}
 	} else {
-		hardlink.creationTime = quantumfs.NewTime(time.Now())
-		newEntry.SetContentTime(hardlink.creationTime)
+		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
+		newEntry.SetContentTime(hardlink.creationTime())
 	}
 
 	func() {
@@ -1633,7 +1633,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	// add a check incase there's an inconsistency
 	if hardlink, isHardlink := entry.(*HardlinkLeg); isHardlink {
 		panic(fmt.Sprintf("Hardlink not recognized by workspaceroot: %d, %d",
-			inodeNum, hardlink.fileId))
+			inodeNum, hardlink.FileId()))
 	}
 
 	return dir.recordToChild(c, inodeNum, entry)

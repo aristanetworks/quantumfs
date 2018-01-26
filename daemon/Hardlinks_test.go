@@ -753,23 +753,23 @@ func TestHardlinkCreatedTime(t *testing.T) {
 		test.Assert(statC.Ctim == statD.Ctim && statD.Ctim == statE.Ctim,
 			"Second link time changed")
 
-		test.Assert(recordA.creationTime < recordB.creationTime &&
-			recordB.creationTime != recordC.creationTime &&
-			recordC.creationTime < recordD.creationTime &&
-			recordD.creationTime < recordE.creationTime,
+		test.Assert(recordA.creationTime() < recordB.creationTime() &&
+			recordB.creationTime() != recordC.creationTime() &&
+			recordC.creationTime() < recordD.creationTime() &&
+			recordD.creationTime() < recordE.creationTime(),
 			"Records not all different: %d %d %d %d %d",
-			recordA.creationTime, recordB.creationTime,
-			recordC.creationTime, recordD.creationTime,
-			recordE.creationTime)
+			recordA.creationTime(), recordB.creationTime(),
+			recordC.creationTime(), recordD.creationTime(),
+			recordE.creationTime())
 
-		test.Assert(recordA.creationTime != quantumfs.Time(0) &&
-			recordB.creationTime != quantumfs.Time(0) &&
-			recordC.creationTime != quantumfs.Time(0) &&
-			recordD.creationTime != quantumfs.Time(0) &&
-			recordE.creationTime != quantumfs.Time(0),
-			"hardlink instance creationTime time not set")
+		test.Assert(recordA.creationTime() != quantumfs.Time(0) &&
+			recordB.creationTime() != quantumfs.Time(0) &&
+			recordC.creationTime() != quantumfs.Time(0) &&
+			recordD.creationTime() != quantumfs.Time(0) &&
+			recordE.creationTime() != quantumfs.Time(0),
+			"hardlink instance creationTime() time not set")
 
-		// ensure creationTime field is preserved across branching
+		// ensure creationTime() field is preserved across branching
 		workspaceB := "branch/copyWorkspace/test"
 		api := test.getApi()
 		test.AssertNoErr(api.Branch(test.RelPath(workspace), workspaceB))
@@ -786,22 +786,22 @@ func TestHardlinkCreatedTime(t *testing.T) {
 		recordD2 := test.getHardlinkLeg(workspaceB, "fileD")
 		recordE2 := test.getHardlinkLeg(dirA, "fileE")
 
-		test.Assert(recordA.creationTime == recordA2.creationTime &&
-			recordB.creationTime == recordB2.creationTime &&
-			recordC.creationTime == recordC2.creationTime &&
-			recordD.creationTime == recordD2.creationTime &&
-			recordE.creationTime == recordE2.creationTime,
-			"creationTime field not preserved across branching, "+
+		test.Assert(recordA.creationTime() == recordA2.creationTime() &&
+			recordB.creationTime() == recordB2.creationTime() &&
+			recordC.creationTime() == recordC2.creationTime() &&
+			recordD.creationTime() == recordD2.creationTime() &&
+			recordE.creationTime() == recordE2.creationTime(),
+			"creationTime() field not preserved across branching, "+
 				"%d %d, %d %d, %d %d, %d %d, %d %d",
-			recordA.creationTime, recordA2.creationTime,
-			recordB.creationTime, recordB2.creationTime,
-			recordC.creationTime, recordC2.creationTime,
-			recordD.creationTime, recordD2.creationTime,
-			recordE.creationTime, recordE2.creationTime)
+			recordA.creationTime(), recordA2.creationTime(),
+			recordB.creationTime(), recordB2.creationTime(),
+			recordC.creationTime(), recordC2.creationTime(),
+			recordD.creationTime(), recordD2.creationTime(),
+			recordE.creationTime(), recordE2.creationTime())
 	})
 }
 
-// test to ensure that renaming a hardlink resets its creationTime
+// test to ensure that renaming a hardlink resets its creationTime()
 func TestHardlinkRenameCreation(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -828,10 +828,10 @@ func TestHardlinkRenameCreation(t *testing.T) {
 		recordD := test.getHardlinkLeg(dirB, "fileD")
 
 		// test both rename and mvchild
-		test.Assert(recordA.creationTime < recordC.creationTime,
-			"Rename of hardlink doesn't reset creationTime")
-		test.Assert(recordB.creationTime < recordD.creationTime,
-			"Mvchild of hardlink doesn't reset creationTime")
+		test.Assert(recordA.creationTime() < recordC.creationTime(),
+			"Rename of hardlink doesn't reset creationTime()")
+		test.Assert(recordB.creationTime() < recordD.creationTime(),
+			"Mvchild of hardlink doesn't reset creationTime()")
 	})
 }
 

@@ -429,7 +429,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	link := record.(*HardlinkLeg)
 
 	// This may need to be turned back into a normal file
-	newRecord, inodeId := parent.hardlinkTable.removeHardlink(c, link.fileId)
+	newRecord, inodeId := parent.hardlinkTable.removeHardlink(c, link.FileId())
 
 	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
 		// wsr says hardlink isn't ready for removal yet
