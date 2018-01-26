@@ -357,6 +357,7 @@ func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 				entryCapacity)
 			entryIdx = 0
 		}
+		c.vlog("Setting merged child %s", record.Filename())
 		baseLayer.SetEntry(entryIdx, record.Publishable())
 
 		entryIdx++
