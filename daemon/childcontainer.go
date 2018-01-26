@@ -100,7 +100,7 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 
 	names, exists := container.effective[inodeId]
 	if !exists {
-		c.vlog("New child")
+		c.vlog("New effective child")
 		names = make(map[string]quantumfs.DirectoryRecord)
 		container.children[record.Filename()] = inodeId
 	}
@@ -303,6 +303,7 @@ func (container *ChildContainer) publishableRecords(
 		}
 	}
 
+	c.vlog("Returning %d records", len(records))
 	return records
 }
 
@@ -399,6 +400,7 @@ func (container *ChildContainer) makePublishable(c *ctx, name string) {
 	}
 	records[name] = record
 	container.publishable[inodeId] = records
+	c.vlog("Inode has %d names in this directory", len(records))
 
 	records = container.effective[inodeId]
 	if len(records) == 1 {
