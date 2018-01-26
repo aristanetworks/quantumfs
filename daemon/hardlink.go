@@ -45,6 +45,13 @@ func newHardlink(name string, fileId quantumfs.FileId, creationTime quantumfs.Ti
 	return &newLink
 }
 
+func newHardlinkLegFromRecord(record quantumfs.DirectoryRecord,
+	hardlinkTable HardlinkTable) quantumfs.DirectoryRecord {
+
+	return newHardlink(record.Filename(), record.FileId(), record.ContentTime(),
+		hardlinkTable)
+}
+
 func (link *Hardlink) get() quantumfs.ImmutableDirectoryRecord {
 	valid, link_ := link.hardlinkTable.getHardlink(link.fileId)
 	if !valid {
