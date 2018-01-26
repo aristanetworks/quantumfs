@@ -227,7 +227,7 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 
 	// Allocate a new inode for regular files or return an already
 	// existing inode for hardlinks to existing inodes
-	if inodeId != quantumfs.InodeIdInvalid {
+	if inodeId == quantumfs.InodeIdInvalid {
 		inodeId = c.qfs.newInodeId()
 	}
 	dir.children.setRecord(c, inodeId, remoteRecord)

@@ -109,6 +109,9 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	// Since we have an inodeId this child is or will be instantiated and so is
 	// placed in the effective set.
 
+	utils.Assert(inodeId != quantumfs.InodeIdInvalid,
+		"setRecord without inodeId")
+
 	names, exists := container.effective[inodeId]
 	if !exists {
 		c.vlog("New effective child")
