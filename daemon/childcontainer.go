@@ -82,6 +82,7 @@ func (container *ChildContainer) loadChild(c *ctx,
 			fileId, quantumfs.InodeIdInvalid)
 		record = newHardlinkLegFromRecord(record,
 			container.dir.hardlinkTable)
+		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	} else {
 		inodeId = c.qfs.newInodeId()
 	}
