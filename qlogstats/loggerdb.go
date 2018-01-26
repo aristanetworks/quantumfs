@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -136,6 +137,7 @@ type Aggregator struct {
 
 	queueMutex   utils.DeferableMutex
 	queueLogs    []*qlog.LogOutput
+	queueSize    int64
 	notification chan struct{}
 }
 
@@ -196,10 +198,27 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	return &agg
 }
 
+const maxQueueSize_bytes = 10 * 1024 * 1024 * 1024
+
+func logSize(log *qlog.LogOutput) int64 {
+	rtn := int(unsafe.Sizeof(log))
+	rtn += len(log.Format)
+	for _, arg := range log.Args {
+		rtn += int(unsafe.Sizeof(arg))
+	}
+
+	return int64(rtn)
+}
+
 func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 	defer agg.queueMutex.Lock().Unlock()
 
 	agg.queueLogs = append(agg.queueLogs, log)
+
+	agg.queueSize += logSize(log)
+	if agg.queueSize > maxQueueSize_bytes {
+		panic("Qlogger processThread probably locked due to timeout")
+	}
 
 	select {
 	case agg.notification <- struct{}{}:
@@ -229,6 +248,8 @@ func (agg *Aggregator) processThread() {
 			// but gain a much quicker mutex unlock
 			rtn := agg.queueLogs
 			agg.queueLogs = make([]*qlog.LogOutput, 0, 1000)
+			agg.queueSize = 0
+
 			return rtn
 		}()
 
