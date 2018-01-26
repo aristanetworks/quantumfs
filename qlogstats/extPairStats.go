@@ -112,17 +112,16 @@ func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 
 func (ext *extPairStats) publish() []Measurement {
 	tags := make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("statName", ext.name))
+	tags = appendNewTag(tags, "statName", ext.name)
 
 	fields := make([]quantumfs.Field, 0)
 
-	fields = append(fields, quantumfs.NewFieldInt("average_ns",
-		ext.stats.Average()))
-	fields = append(fields, quantumfs.NewFieldInt("maximum_ns", ext.stats.Max()))
-	fields = append(fields, quantumfs.NewFieldInt("samples", ext.stats.Count()))
+	fields = appendNewFieldInt(fields, "average_ns", ext.stats.Average())
+	fields = appendNewFieldInt(fields, "maximum_ns", ext.stats.Max())
+	fields = appendNewFieldInt(fields, "samples", ext.stats.Count())
 
 	for name, data := range ext.stats.Percentiles() {
-		fields = append(fields, quantumfs.NewFieldInt(name, data))
+		fields = appendNewFieldInt(fields, name, data)
 	}
 
 	ext.stats = basicStats{}
