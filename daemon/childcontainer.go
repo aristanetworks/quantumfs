@@ -113,8 +113,9 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	if record.Type() == quantumfs.ObjectTypeHardlink {
 		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 
-		// Hardlink legs are always immediately publishable as they only
-		// point into the hardlink table.
+		// The child is a hardlink which means it will be part of the
+		// hardlink map in wsr the next time wsr gets published, therefore,
+		// we can mark it as publishable.
 		container.makePublishable(c, record.Filename())
 	}
 }
@@ -371,11 +372,6 @@ func (container *ChildContainer) makeHardlink(c *ctx, childId InodeId) (
 	linkSrcCopy := newLink.Clone()
 	linkSrcCopy.SetFilename(childname)
 	container.setRecord(c, childId, linkSrcCopy)
-
-	// The child is becoming a hardlink which means it will be part of the
-	// hardlink map in wsr the next time wsr gets published, therefore,
-	// we can mark it as publishable
-	container.makePublishable(c, childname)
 
 	newLink.creationTime = quantumfs.NewTime(time.Now())
 	newLink.SetContentTime(newLink.creationTime)
