@@ -11,7 +11,6 @@ import (
 	"math"
 	"os"
 	"reflect"
-	"strings"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
@@ -212,7 +211,8 @@ func checkRecursion(errorPrefix string, format string) {
 	if len(format) >= len(errorPrefix) &&
 		errorPrefix == format[:len(errorPrefix)] {
 
-		panic(fmt.Sprintf("Stuck in infinite recursion: %s", format))
+		panic(fmt.Sprintf("Stuck in infinite recursion: %s",
+			utils.NoescapeInterface(format)))
 	}
 }
 
@@ -484,7 +484,7 @@ func errorUnknownType(arg interface{}) (msgSize int,
 	msg string) {
 
 	str := fmt.Sprintf("ERROR: Unsupported qlog type %s",
-		reflect.TypeOf(arg).String())
+		reflect.TypeOf(utils.NoescapeInterface(arg)).String())
 
 	return len(str), str
 }
@@ -533,8 +533,8 @@ func writeArg(buf []byte, offset uint64, format string, arg interface{},
 		offset = insertUint16(buf, offset, TypeUint64)
 		offset = insertUint64(buf, offset, interfaceAsUint64(arg))
 	case reflect.String:
-		offset = writeArray(buf, offset, format, []byte(arg.(string)),
-			TypeString)
+		offset = writeArray(buf, offset, format,
+			utils.MoveStringToByteSlice(arg.(string)), TypeString)
 	case sliceOfBytesKind:
 		offset = writeArray(buf, offset, format, interfaceAsByteSlice(arg),
 			TypeByteArray)
@@ -551,7 +551,7 @@ func writeArray(buf []byte, offset uint64, format string, data []byte,
 
 	if len(data) > math.MaxUint16 {
 		panic(fmt.Sprintf("String len > 65535 unsupported: "+
-			"%s", format))
+			"%s", utils.NoescapeInterface(format)))
 	}
 
 	offset = insertUint16(buf, offset, byteType)
@@ -589,7 +589,7 @@ func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 	size += 8 // LogEntry.timestamp
 
 	for i, arg := range args {
-		argType := reflect.TypeOf(arg)
+		argType := reflect.TypeOf(utils.NoescapeInterface(arg))
 		argKind := argType.Kind()
 
 		kinds[i] = argKind
@@ -625,7 +625,7 @@ func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 
 		case reflect.String:
 			size += 2 // Length of string
-			size += len([]byte(arg.(string)))
+			size += len(arg.(string))
 
 		default:
 			// The if-else form of switch is slower, so avoid it and
@@ -710,7 +710,7 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	// Make sure length isn't too long, excluding the packet size bytes
 	if packetSize > MaxPacketLen {
 		args = make([]interface{}, 1)
-		args[0] = format
+		args[0] = utils.NoescapeInterface(format)
 		argumentKinds[0] = reflect.String
 		format = "Log data exceeds allowable length: %s"
 		level = 0
@@ -720,8 +720,7 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 
 	partialWrite := false
 	if mem.testMode && len(mem.testDropStr) < len(format) &&
-		strings.Compare(mem.testDropStr,
-			format[:len(mem.testDropStr)]) == 0 {
+		mem.testDropStr == format[:len(mem.testDropStr)] {
 
 		partialWrite = true
 	}
@@ -729,7 +728,8 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	// Create the string map entry / fetch existing one
 	formatId, err := mem.strIdMap.fetchLogIdx(idx, level, format)
 	if err != nil {
-		mem.errOut.Log(LogQlog, reqId, 1, err.Error()+": %s\n", format)
+		mem.errOut.Log(LogQlog, reqId, 1, err.Error()+": %s\n",
+			utils.NoescapeInterface(format))
 		return
 	}
 
