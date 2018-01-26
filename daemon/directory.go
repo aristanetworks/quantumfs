@@ -110,7 +110,7 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	case *Directory:
 		hardlinkTable = v.hardlinkTable
 	case *WorkspaceRoot:
-		hardlinkTable = v
+		hardlinkTable = v.hardlinkTable
 	default:
 		panic(fmt.Sprintf("Parent of inode %d is neither "+
 			"Directory nor WorkspaceRoot", inodeNum))
