@@ -378,7 +378,7 @@ func (container *ChildContainer) makeHardlink(c *ctx, childId InodeId) (
 
 	newLink.creationTime = quantumfs.NewTime(time.Now())
 	newLink.SetContentTime(newLink.creationTime)
-	return newLink, fuse.OK
+	return newLink.Clone(), fuse.OK
 }
 
 func (container *ChildContainer) makePublishable(c *ctx, name string) {
