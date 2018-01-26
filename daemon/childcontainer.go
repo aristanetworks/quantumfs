@@ -68,8 +68,8 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 func (container *ChildContainer) loadChild(c *ctx,
 	record quantumfs.DirectoryRecord) InodeId {
 
-	defer c.FuncIn("ChildContainer::loadChild", "inode %s",
-		record.Filename()).Out()
+	defer c.FuncIn("ChildContainer::loadChild", "name %s type %d",
+		record.Filename(), record.Type()).Out()
 
 	// Since we do not have an inodeId this child is/will not be instantiated and
 	// so it placed in the publishable set.
