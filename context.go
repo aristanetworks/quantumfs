@@ -83,11 +83,8 @@ func (c Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 	}
 	index += copy(format[index:], qlog.FnEnterStr)
 	index += copy(format[index:], funcName)
-
-	if len(extraFmtStr) != 0 {
-		index += copy(format[index:], " ")
-		index += copy(format[index:], extraFmtStr)
-	}
+	index += copy(format[index:], " ")
+	index += copy(format[index:], extraFmtStr)
 	formatStr := utils.MoveByteSliceToString(format[:index])
 
 	c.Qlog.Log(subsystem, c.RequestId, 3, formatStr, args...)
