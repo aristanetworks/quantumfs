@@ -136,9 +136,9 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		fileId := entry.FileId()
-		if _, isHardlink := entry.(*Hardlink); !isHardlink {
+		if _, isHardlink := entry.(*HardlinkLeg); !isHardlink {
 			// hardlink leg creation time is stored in its ContentTime
-			entry = newHardlink(entry.Filename(), fileId,
+			entry = newHardlinkLeg(entry.Filename(), fileId,
 				entry.ContentTime(), cmap.dir.hardlinkTable)
 		}
 
@@ -174,7 +174,7 @@ func (cmap *ChildMap) deleteChild(c *ctx, inodeId InodeId,
 	}
 
 	// This may be a hardlink that is due to be converted.
-	if hardlink, isHardlink := record.(*Hardlink); isHardlink && fixHardlinks {
+	if hardlink, ok := record.(*HardlinkLeg); ok && fixHardlinks {
 		newRecord, inodeId := cmap.dir.hardlinkTable.removeHardlink(c,
 			hardlink.fileId)
 
@@ -188,7 +188,7 @@ func (cmap *ChildMap) deleteChild(c *ctx, inodeId InodeId,
 	}
 	result := cmap.delRecord(inodeId, name)
 
-	if link, isHardlink := record.(*Hardlink); isHardlink {
+	if link, ok := record.(*HardlinkLeg); ok {
 		if !fixHardlinks {
 			return nil
 		}
@@ -231,7 +231,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
 	}
 
 	// If it's already a hardlink, great no more work is needed
-	if link, isLink := child.(*Hardlink); isLink {
+	if link, isLink := child.(*HardlinkLeg); isLink {
 		c.vlog("Already a hardlink")
 
 		recordCopy := *link

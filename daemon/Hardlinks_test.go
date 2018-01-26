@@ -706,14 +706,14 @@ func TestHardlinkDeleteFromDirectory(t *testing.T) {
 }
 
 func (th *TestHelper) getHardlinkLeg(parentPath string,
-	leg string) *Hardlink {
+	leg string) *HardlinkLeg {
 
 	parent := th.getInode(parentPath)
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()
 	record := parentDir.children.recordByName(&th.qfs.c, leg).Clone()
-	return record.(*Hardlink)
+	return record.(*HardlinkLeg)
 }
 
 func TestHardlinkCreatedTime(t *testing.T) {
