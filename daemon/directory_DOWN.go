@@ -250,6 +250,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 		c.wlog("No changes to record %s", remoteRecord.Filename())
 		if localRecord.Type() != quantumfs.ObjectTypeHardlink {
 			dir.children.setRecord(c, childId, remoteRecord)
+			dir.children.makePublishable(c, remoteRecord.Filename())
 		}
 		return
 	}
@@ -269,6 +270,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 			remoteRecord)
 	}
 	dir.children.setRecord(c, childId, record)
+	dir.children.makePublishable(c, record.Filename())
 	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
 		reload(c, dir.hardlinkTable, rc, inode, record)
 	}
