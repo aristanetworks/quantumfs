@@ -60,9 +60,9 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
-	inodeNum := func() InodeId {
+	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.loadChild(c, newRecord)
+		dir.children.setRecord(c, srcInode.inodeNum(), newRecord)
 	}()
 
 	dir.self.markAccessed(c, newName,
@@ -70,6 +70,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	c.dlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
+	inodeNum := srcInode.inodeNum()
 	out.NodeId = uint64(inodeNum)
 	c.qfs.increaseLookupCount(c, inodeNum)
 	fillEntryOutCacheData(c, out)
