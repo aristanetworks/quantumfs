@@ -74,7 +74,17 @@ func (container *ChildContainer) loadChild(c *ctx,
 	// Since we do not have an inodeId this child is/will not be instantiated and
 	// so it placed in the publishable set.
 
-	inodeId := c.qfs.newInodeId()
+	var inodeId InodeId
+	if record.Type() == quantumfs.ObjectTypeHardlink {
+		// The hardlink table will have/create an InodeId for us
+		fileId := record.FileId()
+		inodeId = container.dir.hardlinkTable.findHardlinkInodeId(c,
+			fileId, quantumfs.InodeIdInvalid)
+		record = newHardlinkLegFromRecord(record,
+			container.dir.hardlinkTable)
+	} else {
+		inodeId = c.qfs.newInodeId()
+	}
 
 	names, exists := container.publishable[inodeId]
 	if !exists {
