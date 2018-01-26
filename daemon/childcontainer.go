@@ -108,6 +108,7 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	names[record.Filename()] = record
 
 	container.effective[inodeId] = names
+	container.children[record.Filename()] = inodeId
 
 	// Build the hardlink path list if we just set a hardlink record
 	if record.Type() == quantumfs.ObjectTypeHardlink {
