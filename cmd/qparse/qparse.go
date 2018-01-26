@@ -250,39 +250,31 @@ func main() {
 
 		var outFh *os.File
 		var err error
-		if outFile != "" {
+		if outFile == "" {
+			outFh = os.Stdout
+		} else {
 			outFh, err = os.Create(outFile)
 			if err != nil {
 				fmt.Printf("Unable to create output file: %s\n", err)
 				os.Exit(1)
 			}
-			defer outFh.Close()
 		}
+		defer outFh.Close()
 
 		if logAttach {
 			reader := qlog.NewReader(inFile)
 
-			if outFile == "" {
-				reader.ProcessLogs(qlog.TailOnly,
-					func(log *qlog.LogOutput) {
-						fmt.Printf(log.ToString())
-					})
-			} else {
-				reader.ProcessLogs(qlog.TailOnly,
-					func(log *qlog.LogOutput) {
-						fmt.Fprintf(outFh, log.ToString())
-					})
-			}
+			reader.ProcessLogs(qlog.TailOnly,
+				func(log *qlog.LogOutput) {
+					fmt.Fprintf(outFh, log.ToString())
+				})
 
 		} else if patternFile != "" {
 			filterLogOut(inFile, patternFile, true, tabSpaces)
-		} else if outFile == "" {
-			// Log parse mode only
-			qlog.ParseLogsExt(inFile, tabSpaces,
-				maxThreads, false, fmt.Printf)
 		} else {
 			qlog.ParseLogsExt(inFile, tabSpaces, maxThreads,
-				true, func(format string, args ...interface{}) (int,
+				false,
+				func(format string, args ...interface{}) (int,
 					error) {
 
 					return fmt.Fprintf(outFh, format, args...)
