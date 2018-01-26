@@ -225,12 +225,15 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 	defer c.FuncIn("Directory::loadNewChild_DOWN_", "%d : %s : %d",
 		dir.inodeNum(), remoteRecord.Filename(), inodeId).Out()
 
-	// Allocate a new inode for regular files or return an already
-	// existing inode for hardlinks to existing inodes
 	if inodeId == quantumfs.InodeIdInvalid {
-		inodeId = c.qfs.newInodeId()
+		// Allocate a new inode for regular files
+		inodeId = dir.children.loadChild(c, remoteRecord)
+	} else {
+		// An already existing inode for hardlinks to existing inodes
+		utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
+			"Child is of type %d not hardlink", remoteRecord.Type())
+		dir.children.setRecord(c, inodeId, remoteRecord)
 	}
-	dir.children.setRecord(c, inodeId, remoteRecord)
 	c.qfs.noteChildCreated(c, dir.id, remoteRecord.Filename())
 	return inodeId
 }
