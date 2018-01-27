@@ -77,9 +77,19 @@ func NewTestHelper(testName string, testRunDir string,
 	t *testing.T) TestHelper {
 
 	cachePath := testRunDir + "/" + testName
+
+	printer := NoStdOut
+	if testing.Verbose() {
+		printer = qlog.PrintToStdout
+	}
+
 	logger, err := qlog.NewQlogExt(cachePath+"/ramfs",
-		60*10000*24, "noVersion", NoStdOut)
+		60*10000*24, "noVersion", printer)
 	utils.AssertNoErr(err)
+
+	if testing.Verbose() {
+		logger.SetLogLevels("*/*")
+	}
 
 	return TestHelper{
 		T:          t,
