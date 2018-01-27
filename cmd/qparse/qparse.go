@@ -273,7 +273,7 @@ func main() {
 			filterLogOut(inFile, patternFile, true, tabSpaces)
 		} else {
 			qlog.ParseLogsExt(inFile, tabSpaces, maxThreads,
-				false,
+				(outFile != ""),
 				func(format string, args ...interface{}) (int,
 					error) {
 
