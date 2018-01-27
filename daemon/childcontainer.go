@@ -47,6 +47,16 @@ func newChildContainer(c *ctx, dir *Directory,
 	return container, uninstantiated
 }
 
+func removeFromMap(m map[InodeId]map[string]quantumfs.DirectoryRecord,
+	inodeId InodeId, name string) {
+
+	if len(m[inodeId]) == 1 {
+		delete(m, inodeId)
+	} else {
+		delete(m[inodeId], name)
+	}
+}
+
 func (container *ChildContainer) loadAllChildren(c *ctx,
 	baseLayerId quantumfs.ObjectKey) []InodeId {
 
@@ -147,8 +157,8 @@ func (container *ChildContainer) delRecord(c *ctx, inodeId InodeId,
 		return nil // Doesn't exist
 	}
 
-	delete(container.publishable[inodeId], name)
-	delete(container.effective[inodeId], name)
+	removeFromMap(container.publishable, inodeId, name)
+	removeFromMap(container.effective, inodeId, name)
 	delete(container.children, name)
 
 	return record
@@ -413,10 +423,5 @@ func (container *ChildContainer) makePublishable(c *ctx, name string) {
 	container.publishable[inodeId] = records
 	c.vlog("Inode has %d names in this directory", len(records))
 
-	records = container.effective[inodeId]
-	if len(records) == 1 {
-		delete(container.effective, inodeId)
-	} else {
-		delete(container.effective[inodeId], name)
-	}
+	removeFromMap(container.effective, inodeId, name)
 }
