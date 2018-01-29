@@ -56,15 +56,6 @@ func newQfsExtPair(common string,
 		qlog.FnExitStr+common, common)
 }
 
-func getFirstParamInt(log *qlog.LogOutput) (int64, bool) {
-	if len(log.Args) == 0 {
-		return 0, false
-	}
-
-	num := log.Args[0].(int64)
-	return num, true
-}
-
 func createExtractors() []qlogstats.StatExtractor {
 	return []qlogstats.StatExtractor{
 		// Critical system errors

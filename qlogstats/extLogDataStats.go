@@ -95,3 +95,12 @@ func (ext *extLogDataStats) publish() []Measurement {
 		fields:      fields,
 	}}
 }
+
+func GetFirstParamInt(log *qlog.LogOutput) (int64, bool) {
+	if len(log.Args) == 0 {
+		return 0, false
+	}
+
+	num := log.Args[0].(int64)
+	return num, true
+}

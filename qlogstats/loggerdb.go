@@ -358,9 +358,10 @@ type histoStats struct {
 	pastCount   int64
 
 	count int64
+	normalize bool
 }
 
-func NewHistoStats(min int64, max int64, buckets_ int64) histoStats {
+func NewHistoStats(min int64, max int64, buckets_ int64, normalize bool) histoStats {
 	numRange := (1 + max) - min
 	width := numRange / buckets_
 	// when the range doesn't divide evenly, choose to have a smaller upper
@@ -374,6 +375,7 @@ func NewHistoStats(min int64, max int64, buckets_ int64) histoStats {
 		maxVal:      max,
 		bucketWidth: width,
 		buckets:     make([]int64, buckets_),
+		normalize:   normalize,
 	}
 }
 
@@ -411,10 +413,12 @@ func (hs *histoStats) Histogram() map[string]int64 {
 		tag := strconv.Itoa(int(min)) + "-" + strconv.Itoa(int(nextMin))
 		if hs.count == 0 {
 			rtn[tag] = 0
-		} else {
+		} else if hs.normalize {
 			// Normalize the histogram to a percentage for
 			// easier interpretation
 			rtn[tag] = (100 * count) / hs.count
+		} else {
+			rtn[tag] = count
 		}
 		min = nextMin
 	}
