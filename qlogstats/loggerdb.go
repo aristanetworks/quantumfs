@@ -292,6 +292,7 @@ func (agg *Aggregator) publish() {
 
 	for {
 		time.Sleep(agg.publishInterval)
+		nowTime := time.Now()
 
 		results := make([]chan []Measurement, 0, len(agg.extractors))
 		// Trigger extractors to publish in parallel
@@ -321,7 +322,7 @@ func (agg *Aggregator) publish() {
 				// add the qfs version tag
 				tags = append(tags, versionTag)
 
-				agg.db.Store(name, tags, fields)
+				agg.db.Store(name, tags, fields, nowTime)
 			}
 		}
 	}

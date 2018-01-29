@@ -6,6 +6,8 @@
 package processlocal
 
 import (
+	"time"
+
 	"github.com/aristanetworks/quantumfs"
 )
 
@@ -26,7 +28,7 @@ func NewMemdb(conf string) quantumfs.TimeSeriesDB {
 }
 
 func (db *Memdb) Store(measurement string, tags_ []quantumfs.Tag,
-	fields_ []quantumfs.Field) {
+	fields_ []quantumfs.Field, t time.Time) {
 
 	tagMap := make(map[string]string)
 	// Use a set to make Fetch faster, but use maps because Golang has no sets
