@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -23,6 +24,28 @@ const (
 	OnPartialFormat                     // Match log format substring
 	OnAll                               // Match every message
 )
+
+type Measurement struct {
+	name   string
+	tags   []quantumfs.Tag
+	fields []quantumfs.Field
+}
+
+func appendNewTag(tags []quantumfs.Tag, name string, data string) []quantumfs.Tag {
+	return append(tags, quantumfs.NewTag(name, data))
+}
+
+func appendNewFieldInt(fields []quantumfs.Field, name string,
+	data int64) []quantumfs.Field {
+
+	return append(fields, quantumfs.NewFieldInt(name, data))
+}
+
+func appendNewFieldString(fields []quantumfs.Field, name string,
+	data string) []quantumfs.Field {
+
+	return append(fields, quantumfs.NewFieldString(name, data))
+}
 
 type CommandType int
 
@@ -51,14 +74,8 @@ func (cmd *MessageCommand) Data() interface{} {
 	return cmd.log
 }
 
-type PublishResult struct {
-	measurement string
-	tags        []quantumfs.Tag
-	fields      []quantumfs.Field
-}
-
 type PublishCommand struct {
-	result chan PublishResult
+	result chan []Measurement
 }
 
 func (cmd *PublishCommand) Type() CommandType {
@@ -121,10 +138,8 @@ type Aggregator struct {
 
 	queueMutex   utils.DeferableMutex
 	queueLogs    []*qlog.LogOutput
+	queueSize    int64
 	notification chan struct{}
-
-	processDeadline time.Time
-	lastProcess     time.Time
 }
 
 func NewAggregator(db_ quantumfs.TimeSeriesDB,
@@ -184,24 +199,31 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	return &agg
 }
 
-const processTimeout = time.Second
+const maxQueueSize_bytes = 10 * 1024 * 1024 * 1024
+
+func logSize(log *qlog.LogOutput) int64 {
+	rtn := int(unsafe.Sizeof(log))
+	rtn += len(log.Format)
+	for _, arg := range log.Args {
+		rtn += int(unsafe.Sizeof(arg))
+	}
+
+	return int64(rtn)
+}
 
 func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 	defer agg.queueMutex.Lock().Unlock()
 
 	agg.queueLogs = append(agg.queueLogs, log)
 
+	agg.queueSize += logSize(log)
+	if agg.queueSize > maxQueueSize_bytes {
+		panic("Qlogger processThread probably locked due to timeout")
+	}
+
 	select {
 	case agg.notification <- struct{}{}:
 	default:
-	}
-
-	// Check if the process thread has deadlocked
-	if time.Since(agg.processDeadline) > time.Duration(0) {
-		if agg.processDeadline.Sub(agg.lastProcess) > processTimeout {
-			panic("Qlogger processThread probably locked due to timeout")
-		}
-		agg.processDeadline = time.Now().Add(processTimeout)
 	}
 }
 
@@ -227,8 +249,7 @@ func (agg *Aggregator) processThread() {
 			// but gain a much quicker mutex unlock
 			rtn := agg.queueLogs
 			agg.queueLogs = make([]*qlog.LogOutput, 0, 1000)
-
-			agg.lastProcess = time.Now()
+			agg.queueSize = 0
 
 			return rtn
 		}()
@@ -268,15 +289,17 @@ func (agg *Aggregator) filterAndDistribute(log *qlog.LogOutput) {
 }
 
 func (agg *Aggregator) publish() {
+	versionTag := quantumfs.NewTag("version", agg.daemonVersion)
+
 	for {
 		time.Sleep(agg.publishInterval)
 		nowTime := time.Now()
 
-		results := make([]chan PublishResult, 0, len(agg.extractors))
+		results := make([]chan []Measurement, 0, len(agg.extractors))
 		// Trigger extractors to publish in parallel
 		for _, extractor := range agg.extractors {
 			targetChan := extractor.Chan()
-			resultChannel := make(chan PublishResult)
+			resultChannel := make(chan []Measurement, 1)
 			targetChan <- &PublishCommand{
 				result: resultChannel,
 			}
@@ -286,15 +309,21 @@ func (agg *Aggregator) publish() {
 
 		// Wait for all their results to come in
 		for _, resultChannel := range results {
-			result := <-resultChannel
-			if result.tags != nil && len(result.tags) > 0 {
-				// add the qfs version tag
-				result.tags = append(result.tags,
-					quantumfs.NewTag("version",
-						agg.daemonVersion))
+			measurements := <-resultChannel
 
-				agg.db.Store(result.measurement, result.tags,
-					result.fields, nowTime)
+			for _, measurement := range measurements {
+				name := measurement.name
+				tags := measurement.tags
+				fields := measurement.fields
+
+				if tags == nil || len(tags) == 0 {
+					continue
+				}
+
+				// add the qfs version tag
+				tags = append(tags, versionTag)
+
+				agg.db.Store(name, tags, fields, nowTime)
 			}
 		}
 	}

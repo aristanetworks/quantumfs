@@ -214,7 +214,7 @@ func (read *Reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
 		distanceToEnd = newDistanceToEnd
 
 		if ready {
-			logs = append(logs, &logOutput)
+			logs = append(logs, logOutput)
 		} else {
 			logs = make([]*LogOutput, 0, 1000000)
 			lastReadyIdx = readTo
@@ -274,7 +274,7 @@ func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []*LogOutput,
 		pastDataIdx -= int64(readLen)
 
 		if ready {
-			logs = append(logs, &logOutput)
+			logs = append(logs, logOutput)
 		} else {
 			pastEndIdx = readFrom
 			wrapPlusEquals(&pastEndIdx, uint64(pastDataIdx),
@@ -291,12 +291,12 @@ func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []*LogOutput,
 	return logs, pastEndIdx
 }
 
-func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput,
+func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, *LogOutput,
 	bool) {
 
 	if pastEndIdx < 2 {
 		fmt.Println("Partial packet - not enough data to even read size")
-		return 0, LogOutput{}, false
+		return 0, nil, false
 	}
 
 	var packetLen uint16
@@ -309,24 +309,26 @@ func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, LogOutput
 		packetLen < PacketHeaderLen {
 
 		// Not enough data to read packet
-		return 0, LogOutput{}, false
+		return 0, nil, false
 	}
 
 	if !packetReady {
 		// packet not ready yet
-		return 2 + uint64(packetLen), LogOutput{}, false
+		return 2 + uint64(packetLen), nil, false
 	}
 
 	// now read the data
 	packetData := data[pastEndIdx-uint64(packetLen) : pastEndIdx]
-	return 2 + uint64(packetLen), read.dataToLog(packetData), true
+	output := read.dataToLog(packetData)
+	return 2 + uint64(packetLen), output, true
 }
 
-func (read *Reader) dataToLog(packetData []byte) LogOutput {
+func (read *Reader) dataToLog(packetData []byte) *LogOutput {
 	var numFields uint16
 	var strMapId uint16
 	var reqId uint64
 	var timestamp int64
+	var rtn LogOutput
 
 	numFields = *(*uint16)(unsafe.Pointer(&packetData[0]))
 	strMapId = *(*uint16)(unsafe.Pointer(&packetData[2]))
@@ -348,11 +350,12 @@ func (read *Reader) dataToLog(packetData []byte) LogOutput {
 	if err != nil {
 		// If the timestamp is zero, we will fill it in later with
 		// the previous log's timestamp
-		return newLog(LogQlog, QlogReqId, 0,
+		rtn = newLog(LogQlog, QlogReqId, 0,
 			"ERROR: Packet read error (%s). i"+
 				"Dump of %d bytes:\n%x\n",
 			[]interface{}{err, len(packetData),
 				packetData})
+		return &rtn
 	}
 
 	// Grab the string and output
@@ -360,16 +363,18 @@ func (read *Reader) dataToLog(packetData []byte) LogOutput {
 		read.RefreshStrMap()
 
 		if int(strMapId) >= len(read.strMap) {
-			return newLog(LogQlog, QlogReqId, 0,
+			rtn = newLog(LogQlog, QlogReqId, 0,
 				"Not enough entries in string map (%d %d)\n",
 				[]interface{}{strMapId,
 					len(read.strMap) / LogStrSize})
+			return &rtn
 		}
 	}
 	mapEntry := read.strMap[strMapId]
 	logSubsystem := (LogSubsystem)(mapEntry.LogSubsystem)
 
-	return newLog(logSubsystem, reqId, timestamp, mapEntry.Text, args)
+	rtn = newLog(logSubsystem, reqId, timestamp, mapEntry.Text, args)
+	return &rtn
 }
 
 func (read *Reader) wrapRead(idx uint64, num uint64) []byte {

@@ -78,7 +78,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 			buf := newEmptyBuffer()
 			initBuffer(&buf, store, key)
 
-			err = store.durableStore.Get(c, key, &buf)
+			err := store.durableStore.Get(c, key, &buf)
 			if err == nil {
 				c.Vlog(qlog.LogDaemon, "Found key in durable store")
 				return &buf
