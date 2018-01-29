@@ -71,7 +71,7 @@ func (inode *InodeCommon) parseExtendedAttributes_(c *ctx) {
 			continue
 		}
 
-		inode.unlinkXAttr[name] = buffer.Get(&c.Ctx)
+		inode.unlinkXAttr[name] = buffer.Get()
 	}
 }
 
@@ -178,7 +178,7 @@ func (inode *InodeCommon) getOrphanChildRecordCopy(c *ctx,
 		panic("getChildRecord on self file before unlinking")
 	}
 
-	return inode.unlinkRecord.AsImmutableDirectoryRecord(), nil
+	return inode.unlinkRecord.AsImmutable(), nil
 }
 
 func (inode *InodeCommon) setChildRecord(c *ctx, record quantumfs.DirectoryRecord) {

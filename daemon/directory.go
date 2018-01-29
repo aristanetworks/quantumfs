@@ -188,7 +188,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	// Ensure we have a flattened DirectoryRecord to ensure the type is the
 	// underlying type for Hardlinks. This is required in order for
 	// objectTypeToFileType() to have access to the correct type to report.
-	entry := entry_.AsImmutableDirectoryRecord()
+	entry := entry_.AsImmutable()
 
 	attr.Ino = uint64(inodeNum)
 
@@ -462,7 +462,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		checkLink, inodeNum := func() (bool, InodeId) {
 			defer dir.childRecordLock.Lock().Unlock()
 			record := dir.children.recordByName(c, name)
-			_, isHardlink := record.(*Hardlink)
+			_, isHardlink := record.(*HardlinkLeg)
 			return isHardlink, dir.children.inodeNum(name)
 		}()
 		if inodeNum == quantumfs.InodeIdInvalid {
@@ -770,7 +770,7 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 
 	record := dir.getRecordChildCall_(c, inodeNum)
 	if record != nil {
-		return record.AsImmutableDirectoryRecord(), nil
+		return record.AsImmutable(), nil
 	}
 
 	return nil, errors.New("Inode given is not a child of this directory")
@@ -835,7 +835,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 				return fuse.ENOENT
 			}
 
-			recordCopy = record.AsImmutableDirectoryRecord()
+			recordCopy = record.AsImmutable()
 			return fuse.OK
 		}()
 		if err != fuse.OK {
@@ -886,7 +886,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 
 			// Use a shallow copy of record to ensure the right type for
 			// objectTypeToFileType
-			record := record_.AsImmutableDirectoryRecord()
+			record := record_.AsImmutable()
 
 			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
 			if err != fuse.OK {
@@ -1216,7 +1216,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	// fix the name on the copy
 	newEntry.SetFilename(newName)
 
-	hardlink, isHardlink := newEntry.(*Hardlink)
+	hardlink, isHardlink := newEntry.(*HardlinkLeg)
 	if !isHardlink {
 		// Update the inode to point to the new name and
 		// mark as accessed in both parents.
@@ -1226,8 +1226,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			childInode.clearAccessedCache()
 		}
 	} else {
-		hardlink.creationTime = quantumfs.NewTime(time.Now())
-		newEntry.SetContentTime(hardlink.creationTime)
+		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
+		newEntry.SetContentTime(hardlink.creationTime())
 	}
 
 	func() {
@@ -1421,7 +1421,7 @@ func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 	if status != fuse.OK {
 		return []byte{}, status
 	}
-	return buffer.Get(&c.Ctx), fuse.OK
+	return buffer.Get(), fuse.OK
 }
 
 func (dir *Directory) listChildXAttr(c *ctx,
@@ -1631,9 +1631,9 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	}
 
 	// add a check incase there's an inconsistency
-	if hardlink, isHardlink := entry.(*Hardlink); isHardlink {
+	if hardlink, isHardlink := entry.(*HardlinkLeg); isHardlink {
 		panic(fmt.Sprintf("Hardlink not recognized by workspaceroot: %d, %d",
-			inodeNum, hardlink.fileId))
+			inodeNum, hardlink.FileId()))
 	}
 
 	return dir.recordToChild(c, inodeNum, entry)

@@ -66,7 +66,7 @@ func (fi *SmallFile) readBlock(c *ctx, blockIdx int, offset uint64, buf []byte) 
 		return 0, nil
 	}
 
-	copied := backingData.Read(&c.Ctx, buf, uint32(offset))
+	copied := backingData.Read(buf, uint32(offset))
 	return copied, nil
 }
 

@@ -86,8 +86,10 @@ func TestFileMatches(t *testing.T) {
 			func(recA quantumfs.DirectoryRecord,
 				recB quantumfs.DirectoryRecord) {
 
-				recADirect := recA.(*quantumfs.DirectRecord)
-				recBDirect := recB.(*quantumfs.DirectRecord)
+				recADirect :=
+					recA.(*quantumfs.EncodedDirectoryRecord)
+				recBDirect :=
+					recB.(*quantumfs.EncodedDirectoryRecord)
 
 				// Everything except fileId should match
 				recBDirect.SetFileId(recADirect.FileId())

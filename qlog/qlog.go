@@ -247,6 +247,9 @@ type Qlog struct {
 	// This is the logging system level store. Increase size as the number of
 	// LogSubsystems increases past your capacity
 	LogLevels uint32
+
+	// N.B. The format and args arguments are only valid until Write returns as
+	// they are forced to be allocated on the stack.
 	Write     func(format string, args ...interface{}) error
 	logBuffer *SharedMemory
 }
@@ -261,6 +264,11 @@ func NewQlog(ramfsPath string) (*Qlog, error) {
 	return NewQlogExt(ramfsPath, uint64(DefaultMmapSize), "noVersion",
 		PrintToStdout)
 }
+
+// N.B. The format and args arguments to the outLog are only valid
+// until outLog returns as they are forced to be allocated on the stack.
+// If a client wishes to read them after outLog returns, it must make a
+// copy for itself.
 
 func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 	outLog func(format string, args ...interface{}) error) (*Qlog, error) {
@@ -348,7 +356,11 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	}
 
 	if q.getLogLevel(idx, level) {
-		q.Write(formatString(idx, reqId, t, format), args...)
+		argsCopy := make([]interface{}, 0, len(args))
+		for _, arg := range args {
+			argsCopy = append(argsCopy, utils.NoescapeInterface(arg))
+		}
+		q.Write(formatString(idx, reqId, t, format), argsCopy...)
 	}
 }
 

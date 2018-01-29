@@ -318,7 +318,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 
 	switch {
 	case err != nil && err.(*blobstore.Error).Code == blobstore.ErrKeyNotFound:
-		err = refreshTTL(c, ebt.Blobstore, false, kv, nil, buf.Get(c))
+		err = refreshTTL(c, ebt.Blobstore, false, kv, nil, buf.Get())
 		if err != nil {
 			return err
 		}
@@ -327,7 +327,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 		return nil
 
 	case err == nil:
-		err = refreshTTL(c, ebt.Blobstore, true, kv, metadata, buf.Get(c))
+		err = refreshTTL(c, ebt.Blobstore, true, kv, metadata, buf.Get())
 		if err != nil {
 			return err
 		}
