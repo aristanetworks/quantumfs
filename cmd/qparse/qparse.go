@@ -258,8 +258,8 @@ func main() {
 				fmt.Printf("Unable to create output file: %s\n", err)
 				os.Exit(1)
 			}
+			defer outFh.Close()
 		}
-		defer outFh.Close()
 
 		if logAttach {
 			reader := qlog.NewReader(inFile)
@@ -268,7 +268,6 @@ func main() {
 				func(log *qlog.LogOutput) {
 					fmt.Fprintf(outFh, log.ToString())
 				})
-
 		} else if patternFile != "" {
 			filterLogOut(inFile, patternFile, true, tabSpaces)
 		} else {

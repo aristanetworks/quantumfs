@@ -72,8 +72,6 @@ func createExtractors() []qlogstats.StatExtractor {
 		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheEvict,
 			"ether_setcache_evict"),
 
-=======
->>>>>>> qloggerHisto
 		// Data store latency
 		newQfsExtPair(thirdparty_backends.EtherGetLog,
 			thirdparty_backends.KeyLog),
