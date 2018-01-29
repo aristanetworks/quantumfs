@@ -357,7 +357,7 @@ func TestExtLogDataExtractor(t *testing.T) {
 						"parse errors found")
 				default:
 					min, _ := histoTagToInts(test, key)
-					expected := 2*(min/10)
+					expected := 2 * (min / 10)
 					test.Assert(data.(int64) == expected,
 						"incorrect histogram bucket %d %d",
 						data, expected)

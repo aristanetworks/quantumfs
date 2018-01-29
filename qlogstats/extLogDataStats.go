@@ -90,9 +90,9 @@ func (ext *extLogDataStats) publish() []Measurement {
 	ext.stats.Clear()
 	ext.errors = 0
 	return []Measurement{{
-		name: "quantumFsLogDataStats",
-		tags:        tags,
-		fields:      fields,
+		name:   "quantumFsLogDataStats",
+		tags:   tags,
+		fields: fields,
 	}}
 }
 

@@ -357,7 +357,7 @@ type histoStats struct {
 	beforeCount int64
 	pastCount   int64
 
-	count int64
+	count     int64
 	normalize bool
 }
 
