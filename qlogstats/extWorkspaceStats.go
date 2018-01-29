@@ -115,7 +115,7 @@ func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
 			lastUpdateGeneration: ext.currentGeneration,
 		}
 
-	case strings.Compare(msg.Format, daemon.FuseRequestWorkspace+"\n") == 0:
+	case msg.Format == daemon.FuseRequestWorkspace+"\n":
 		// This message contains the request ID -> workspace mapping
 		startMsg, exists := ext.newRequests[msg.ReqId]
 		if !exists {
