@@ -85,15 +85,13 @@ func TestMatches(t *testing.T) {
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
-			data, exists := memdb.Data[0].Fields["average_ns"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["average_ns"]; ok {
 				test.Assert(data.(int64) == int64(duration1+
 					duration2)/2, "incorrect delta %d", data)
 				checkedAvg = true
 			}
 
-			data, exists = memdb.Data[0].Fields["samples"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["samples"]; ok {
 				test.Assert(data.(int64) == 2,
 					"incorrect samples %d", data)
 				checkedSamples = true
@@ -130,50 +128,43 @@ func TestPercentiles(t *testing.T) {
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
-			data, exists := memdb.Data[0].Fields["average_ns"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["average_ns"]; ok {
 				test.Assert(data.(int64) == 50,
 					"incorrect delta %d", data)
 				checked[0] = true
 			}
 
-			data, exists = memdb.Data[0].Fields["maximum_ns"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["maximum_ns"]; ok {
 				test.Assert(data.(int64) == 100,
 					"incorrect delta %d", data)
 				checked[1] = true
 			}
 
-			data, exists = memdb.Data[0].Fields["samples"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["samples"]; ok {
 				test.Assert(data.(int64) == 101,
 					"incorrect samples %d", data)
 				checked[2] = true
 			}
 
-			data, exists = memdb.Data[0].Fields["50pct_ns"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["50pct_ns"]; ok {
 				test.Assert(data.(int64) == 50,
 					"50th percentile is %d", data)
 				checked[3] = true
 			}
 
-			data, exists = memdb.Data[0].Fields["90pct_ns"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["90pct_ns"]; ok {
 				test.Assert(data.(int64) == 90,
 					"90th percentile is %d", data)
 				checked[4] = true
 			}
 
-			data, exists = memdb.Data[0].Fields["95pct_ns"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["95pct_ns"]; ok {
 				test.Assert(data.(int64) == 95,
 					"95th percentile is %d", data)
 				checked[5] = true
 			}
 
-			data, exists = memdb.Data[0].Fields["99pct_ns"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["99pct_ns"]; ok {
 				test.Assert(data.(int64) == 99,
 					"99th percentile is %d", data)
 				checked[6] = true
@@ -213,8 +204,7 @@ func TestPointCount(t *testing.T) {
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
-			data, exists := memdb.Data[0].Fields["samples"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["samples"]; ok {
 				test.Assert(data.(int64) == 123,
 					"incorrect samples %d", data)
 				checked = true
@@ -239,8 +229,7 @@ func TestPartialFormatMatch(t *testing.T) {
 
 		checked := false
 		checker := func(memdb *processlocal.Memdb) {
-			data, exists := memdb.Data[0].Fields["samples"]
-			if exists {
+			if data, ok := memdb.Data[0].Fields["samples"]; ok {
 				test.Assert(data.(int64) == 123,
 					"incorrect count %d", data)
 				checked = true
