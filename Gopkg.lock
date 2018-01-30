@@ -16,9 +16,9 @@
 [[projects]]
   name = "github.com/aristanetworks/ether"
   packages = [".","blobstore","cql","filesystem","qubit/wsdb","utils","utils/stats","utils/stats/inmem"]
-  revision = "d076331009b047b3af57d60039b2da4772c5c425"
+  revision = "e0ee367d791282f666c8cffc9ce0fed08789bb6c"
   source = "gerrit.corp.arista.io/ether"
-  version = "v0.9.1"
+  version = "v0.11"
 
 [[projects]]
   branch = "master"
@@ -148,6 +148,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0ddc53dab772d6f7630c7cdf7f5b23f8fd97b3da2deb12c24cb4dc88be85188b"
+  inputs-digest = "c9d1b3e8c1d3d99de99495d01012aa50fb8b4fb864df9be8f35dd56d3454652d"
   solver-name = "gps-cdcl"
   solver-version = 1
