@@ -238,9 +238,10 @@ func (container *ChildContainer) records() []quantumfs.DirectoryRecord {
 	return records
 }
 
-func (container *ChildContainer) recordById(
+func (container *ChildContainer) recordById(c *ctx,
 	inodeId InodeId) quantumfs.DirectoryRecord {
 
+	defer c.FuncIn("ChildContainer::recordById", "inodeId %d", inodeId).Out()
 	if record := container.effective.get(inodeId); record != nil {
 		return record
 	}
@@ -265,7 +266,7 @@ func (container *ChildContainer) makeHardlink(c *ctx, childId InodeId) (
 	copy quantumfs.DirectoryRecord, err fuse.Status) {
 
 	defer c.FuncIn("ChildContainer::makeHardlink", "inode %d", childId).Out()
-	record := container.recordById(childId)
+	record := container.recordById(c, childId)
 	if record == nil {
 		c.elog("No child record for inode %d", childId)
 		return nil, fuse.ENOENT
@@ -286,7 +287,7 @@ func (container *ChildContainer) makePublishable(c *ctx, name string) {
 		panic("No such child " + name)
 	}
 
-	record := container.recordById(inodeId)
+	record := container.recordById(c, inodeId)
 	container.deleteChild(c, name, false)
 	container.loadPublishableChild(c, record, inodeId)
 }
