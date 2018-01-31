@@ -12,6 +12,7 @@ import (
 	"flag"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aristanetworks/influxlib/go"
 	"github.com/aristanetworks/quantumfs"
@@ -50,7 +51,7 @@ func newInfluxDB(config string) quantumfs.TimeSeriesDB {
 }
 
 func (inf *influxlibAdapter) Store(measurement string, tags []quantumfs.Tag,
-	fields []quantumfs.Field) {
+	fields []quantumfs.Field, t time.Time) {
 
 	// InfluxDB automatically adds a timestamp field
 
@@ -72,7 +73,7 @@ func (inf *influxlibAdapter) Store(measurement string, tags []quantumfs.Tag,
 		fieldMap[v.Name] = v.Data
 	}
 
-	err = inf.connector.WritePoint(measurement, tagMap, fieldMap)
+	err = inf.connector.WritePointTimed(measurement, tagMap, fieldMap, t)
 	if err != nil {
 		panic(err)
 	}

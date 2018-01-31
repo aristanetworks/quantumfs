@@ -30,6 +30,22 @@ type Measurement struct {
 	fields []quantumfs.Field
 }
 
+func appendNewTag(tags []quantumfs.Tag, name string, data string) []quantumfs.Tag {
+	return append(tags, quantumfs.NewTag(name, data))
+}
+
+func appendNewFieldInt(fields []quantumfs.Field, name string,
+	data int64) []quantumfs.Field {
+
+	return append(fields, quantumfs.NewFieldInt(name, data))
+}
+
+func appendNewFieldString(fields []quantumfs.Field, name string,
+	data string) []quantumfs.Field {
+
+	return append(fields, quantumfs.NewFieldString(name, data))
+}
+
 type CommandType int
 
 const (
@@ -276,6 +292,7 @@ func (agg *Aggregator) publish() {
 
 	for {
 		time.Sleep(agg.publishInterval)
+		nowTime := time.Now()
 
 		results := make([]chan []Measurement, 0, len(agg.extractors))
 		// Trigger extractors to publish in parallel
@@ -305,7 +322,7 @@ func (agg *Aggregator) publish() {
 				// add the qfs version tag
 				tags = append(tags, versionTag)
 
-				agg.db.Store(name, tags, fields)
+				agg.db.Store(name, tags, fields, nowTime)
 			}
 		}
 	}
