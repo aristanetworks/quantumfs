@@ -20,6 +20,13 @@ type extLogDataStats struct {
 	stats histoStats
 }
 
+func NewHistogramFirstParamInt(format string, nametag string, min int64, max int64,
+	buckets int64, normalize bool) StatExtractor {
+
+	return NewExtLogDataStats(format, nametag, NewHistoStats(min, max, buckets,
+		normalize), GetFirstParamInt)
+}
+
 func NewExtLogDataStats(format string, nametag string, histo histoStats,
 	fetchFn func(*qlog.LogOutput) (int64, bool)) StatExtractor {
 

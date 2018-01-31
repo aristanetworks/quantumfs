@@ -315,8 +315,8 @@ func TestExtLogDataExtractor(t *testing.T) {
 
 		testFmt := "DATA POINT %d"
 
-		extractor := NewExtLogDataStats(testFmt, "test_ext",
-			NewHistoStats(0, 99, 10, false), GetFirstParamInt)
+		extractor := NewHistogramFirstParamInt(testFmt, "test_ext", 0, 99,
+			10, false)
 
 		// Setup a histogram where each bucket i has 2*i items in it
 		dataPoints := int64(0)
