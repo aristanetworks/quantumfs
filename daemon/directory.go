@@ -1298,7 +1298,7 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
+	newKey quantumfs.ObjectKey) {
 
 	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d %s",
 		dir.inodeNum(), inodeNum, newKey.String()).Out()
@@ -1315,10 +1315,6 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	}
 
 	entry.SetID(newKey)
-
-	if newType != quantumfs.ObjectTypeInvalid {
-		entry.SetType(newType)
-	}
 	dir.children.makePublishable(c, entry.Filename())
 }
 
@@ -1789,10 +1785,10 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
 		dir.name_).Out()
 
-	dir.parentSyncChild(c, func() (quantumfs.ObjectKey, quantumfs.ObjectType) {
+	dir.parentSyncChild(c, func() quantumfs.ObjectKey {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
-		return dir.baseLayerId, quantumfs.ObjectTypeDirectory
+		return dir.baseLayerId
 	})
 
 	return dir.baseLayerId

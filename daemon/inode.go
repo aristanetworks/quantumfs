@@ -77,8 +77,7 @@ type Inode interface {
 		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 
 	// Update the key for only this child
-	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey,
-		newType quantumfs.ObjectType)
+	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
 
 	setChildRecord(c *ctx, record quantumfs.DirectoryRecord)
 
@@ -136,8 +135,7 @@ type Inode interface {
 			err fuse.Status)) fuse.Status
 
 	parentMarkAccessed(c *ctx, path string, op quantumfs.PathFlags)
-	parentSyncChild(c *ctx, publishFn func() (quantumfs.ObjectKey,
-		quantumfs.ObjectType))
+	parentSyncChild(c *ctx, publishFn func() quantumfs.ObjectKey)
 	parentSetChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
@@ -283,7 +281,7 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 }
 
 func (inode *InodeCommon) parentSyncChild(c *ctx,
-	publishFn func() (quantumfs.ObjectKey, quantumfs.ObjectType)) {
+	publishFn func() quantumfs.ObjectKey) {
 
 	defer c.FuncIn("InodeCommon::parentSyncChild", "%d", inode.id).Out()
 
@@ -298,9 +296,9 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	}
 
 	// publish before we sync, once we know it's safe
-	baseLayerId, objectType := publishFn()
+	baseLayerId := publishFn()
 
-	inode.parent_(c).syncChild(c, inode.id, baseLayerId, objectType)
+	inode.parent_(c).syncChild(c, inode.id, baseLayerId)
 }
 
 func (inode *InodeCommon) parentUpdateSize(c *ctx,
