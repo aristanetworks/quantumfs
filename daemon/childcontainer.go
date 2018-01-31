@@ -179,8 +179,8 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 
 	// if this is a hardlink, we must update its creationTime and the accesslist
 	// path
-	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
-		hardlink.creationTime = quantumfs.NewTime(time.Now())
+	if hardlink, isHardlink := record.(*HardlinkLeg); isHardlink {
+		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
 		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
 	container.loadPublishableChild(c, record, inodeId)

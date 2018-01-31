@@ -111,7 +111,7 @@ func WriteFile(qctx *quantumfs.Ctx, ds quantumfs.DataStore,
 		// returned dir record
 		newLink := false
 		dirRecord, newLink = hl.SetHardLink(finfo,
-			dirRecord.(*quantumfs.DirectRecord))
+			dirRecord.(*quantumfs.EncodedDirectoryRecord))
 
 		// If this isn't a new hardlink, don't double count the contents
 		if !newLink {
