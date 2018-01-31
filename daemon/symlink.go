@@ -101,7 +101,8 @@ func (link *Symlink) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 	defer c.funcIn("Symlink::SetAttr").Out()
 
-	return link.parentSetChildAttr(c, link.InodeCommon.id, attr, out, false)
+	return link.parentSetChildAttr(c, link.InodeCommon.id, nil, attr, out,
+		false)
 }
 
 func (link *Symlink) Mkdir(c *ctx, name string, input *fuse.MkdirIn,

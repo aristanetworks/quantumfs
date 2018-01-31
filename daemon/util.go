@@ -22,10 +22,16 @@ const W_OK = 2
 const X_OK = 1
 const F_OK = 0
 
-func modifyEntryWithAttr(c *ctx, attr *fuse.SetAttrIn,
+func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	entry quantumfs.DirectoryRecord, updateMtime bool) {
 
 	defer c.funcIn("modifyEntryWithAttr").Out()
+
+	// Update the type if needed
+	if newType != nil {
+		entry.SetType(*newType)
+		c.vlog("Type now %d", *newType)
+	}
 
 	valid := uint(attr.SetAttrInCommon.Valid)
 	// We don't support file locks yet, but when we do we need
