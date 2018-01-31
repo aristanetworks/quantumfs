@@ -41,6 +41,9 @@ func newHardlinkLeg(name string, fileId quantumfs.FileId,
 func newHardlinkLegFromRecord(record quantumfs.DirectoryRecord,
 	hardlinkTable HardlinkTable) quantumfs.DirectoryRecord {
 
+	_, isHardlinkLeg := record.(*HardlinkLeg)
+	utils.Assert(!isHardlinkLeg, "Cannot re-wrap HardlinkLeg")
+
 	return newHardlinkLeg(record.Filename(), record.FileId(),
 		record.ContentTime(), hardlinkTable)
 }
