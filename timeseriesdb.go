@@ -4,12 +4,23 @@
 // The timeseriesDb interface
 package quantumfs
 
+import (
+	"time"
+)
+
 type Field struct {
 	Name string
-	Data int64
+	Data interface{}
 }
 
-func NewField(name_ string, data_ int64) Field {
+func NewFieldInt(name_ string, data_ int64) Field {
+	return Field{
+		Name: name_,
+		Data: data_,
+	}
+}
+
+func NewFieldString(name_ string, data_ string) Field {
 	return Field{
 		Name: name_,
 		Data: data_,
@@ -29,5 +40,5 @@ func NewTag(name_ string, data_ string) Tag {
 }
 
 type TimeSeriesDB interface {
-	Store(measurement string, tags []Tag, fields []Field)
+	Store(measurement string, tags []Tag, fields []Field, t time.Time)
 }

@@ -12,7 +12,7 @@ import (
 )
 
 type HardLinkInfo struct {
-	record *quantumfs.DirectRecord
+	record *quantumfs.EncodedDirectoryRecord
 	nlinks uint32
 }
 
@@ -73,7 +73,7 @@ func (hl *Hardlinks) IncrementHardLink(finfo os.FileInfo) (incSuccess bool,
 }
 
 func (hl *Hardlinks) SetHardLink(finfo os.FileInfo,
-	record *quantumfs.DirectRecord) (rtn quantumfs.DirectoryRecord,
+	record *quantumfs.EncodedDirectoryRecord) (rtn quantumfs.DirectoryRecord,
 	newLink bool) {
 
 	// need locks to protect the map

@@ -22,7 +22,7 @@ func NewAccessList() *accessList {
 }
 
 func (al *accessList) generate(c *ctx,
-	hardlinks map[quantumfs.FileId]linkEntry) quantumfs.PathsAccessed {
+	hardlinks map[quantumfs.FileId]HardlinkTableEntry) quantumfs.PathsAccessed {
 
 	defer c.funcIn("accessList::generate").Out()
 	defer al.lock.Lock().Unlock()
