@@ -42,10 +42,9 @@ func (test *testHelper) runExtractorTest(qlogHandle *qlog.Qlog,
 		}
 
 		// Check if we're too early
-		for _, v := range memdb.Data[0].Fields {
-			if v.Name == "samples" && v.Data == 0 {
-				return false
-			}
+		data, exists := memdb.Data[0].Fields["samples"]
+		if !exists || data.(int64) == 0 {
+			return false
 		}
 
 		// Data should be present now
@@ -86,17 +85,16 @@ func TestMatches(t *testing.T) {
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
-			for _, v := range memdb.Data[0].Fields {
-				if v.Name == "average_ns" {
-					test.Assert(v.Data == int64(duration1+
-						duration2)/2, "incorrect delta %d",
-						v.Data)
-					checkedAvg = true
-				} else if v.Name == "samples" {
-					test.Assert(v.Data == 2,
-						"incorrect samples %d", v.Data)
-					checkedSamples = true
-				}
+			if data, ok := memdb.Data[0].Fields["average_ns"]; ok {
+				test.Assert(data.(int64) == int64(duration1+
+					duration2)/2, "incorrect delta %d", data)
+				checkedAvg = true
+			}
+
+			if data, ok := memdb.Data[0].Fields["samples"]; ok {
+				test.Assert(data.(int64) == 2,
+					"incorrect samples %d", data)
+				checkedSamples = true
 			}
 		}
 
@@ -130,36 +128,46 @@ func TestPercentiles(t *testing.T) {
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
-			for _, v := range memdb.Data[0].Fields {
-				if v.Name == "average_ns" {
-					test.Assert(v.Data == 50,
-						"incorrect delta %d", v.Data)
-					checked[0] = true
-				} else if v.Name == "maximum_ns" {
-					test.Assert(v.Data == 100,
-						"incorrect delta %d", v.Data)
-					checked[1] = true
-				} else if v.Name == "samples" {
-					test.Assert(v.Data == 101,
-						"incorrect samples %d", v.Data)
-					checked[2] = true
-				} else if v.Name == "50pct_ns" {
-					test.Assert(v.Data == 50,
-						"50th percentile is %d", v.Data)
-					checked[3] = true
-				} else if v.Name == "90pct_ns" {
-					test.Assert(v.Data == 90,
-						"90th percentile is %d", v.Data)
-					checked[4] = true
-				} else if v.Name == "95pct_ns" {
-					test.Assert(v.Data == 95,
-						"95th percentile is %d", v.Data)
-					checked[5] = true
-				} else if v.Name == "99pct_ns" {
-					test.Assert(v.Data == 99,
-						"99th percentile is %d", v.Data)
-					checked[6] = true
-				}
+			if data, ok := memdb.Data[0].Fields["average_ns"]; ok {
+				test.Assert(data.(int64) == 50,
+					"incorrect delta %d", data)
+				checked[0] = true
+			}
+
+			if data, ok := memdb.Data[0].Fields["maximum_ns"]; ok {
+				test.Assert(data.(int64) == 100,
+					"incorrect delta %d", data)
+				checked[1] = true
+			}
+
+			if data, ok := memdb.Data[0].Fields["samples"]; ok {
+				test.Assert(data.(int64) == 101,
+					"incorrect samples %d", data)
+				checked[2] = true
+			}
+
+			if data, ok := memdb.Data[0].Fields["50pct_ns"]; ok {
+				test.Assert(data.(int64) == 50,
+					"50th percentile is %d", data)
+				checked[3] = true
+			}
+
+			if data, ok := memdb.Data[0].Fields["90pct_ns"]; ok {
+				test.Assert(data.(int64) == 90,
+					"90th percentile is %d", data)
+				checked[4] = true
+			}
+
+			if data, ok := memdb.Data[0].Fields["95pct_ns"]; ok {
+				test.Assert(data.(int64) == 95,
+					"95th percentile is %d", data)
+				checked[5] = true
+			}
+
+			if data, ok := memdb.Data[0].Fields["99pct_ns"]; ok {
+				test.Assert(data.(int64) == 99,
+					"99th percentile is %d", data)
+				checked[6] = true
 			}
 
 			for k, v := range memdb.Data[0].Tags {
@@ -196,12 +204,10 @@ func TestPointCount(t *testing.T) {
 				"%d fields produced from one matching log",
 				len(memdb.Data[0].Fields))
 
-			for _, v := range memdb.Data[0].Fields {
-				if v.Name == "samples" {
-					test.Assert(v.Data == 123,
-						"incorrect samples %d", v.Data)
-					checked = true
-				}
+			if data, ok := memdb.Data[0].Fields["samples"]; ok {
+				test.Assert(data.(int64) == 123,
+					"incorrect samples %d", data)
+				checked = true
 			}
 		}
 
@@ -223,12 +229,10 @@ func TestPartialFormatMatch(t *testing.T) {
 
 		checked := false
 		checker := func(memdb *processlocal.Memdb) {
-			for _, v := range memdb.Data[0].Fields {
-				if v.Name == "samples" {
-					test.Assert(v.Data == 123,
-						"incorrect count %d", v.Data)
-					checked = true
-				}
+			if data, ok := memdb.Data[0].Fields["samples"]; ok {
+				test.Assert(data.(int64) == 123,
+					"incorrect count %d", data)
+				checked = true
 			}
 		}
 

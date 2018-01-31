@@ -177,7 +177,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 		// Update the reference count
 		dir.hardlinkTable.hardlinkInc(id)
 
-		linkCopy := newHardlink(toLink.name(), id,
+		linkCopy := newHardlinkLeg(toLink.name(), id,
 			quantumfs.NewTime(time.Now()), dir.hardlinkTable)
 		return linkCopy, fuse.OK
 	}
@@ -214,7 +214,7 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 			dir.hardlinkTable.claimAsChild_(inode)
 		}()
 	}
-	return newHardlink(localRecord.Filename(), fileId,
+	return newHardlinkLeg(localRecord.Filename(), fileId,
 		remoteRecord.ContentTime(), dir.hardlinkTable)
 }
 
