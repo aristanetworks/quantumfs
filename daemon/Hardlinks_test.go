@@ -712,7 +712,7 @@ func (th *TestHelper) getHardlinkLeg(parentPath string,
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()
-	record := parentDir.children.recordByName(&th.qfs.c, leg).Clone()
+	record := parentDir.children.recordByName(&th.qfs.c, leg)
 	return record.(*HardlinkLeg)
 }
 
