@@ -123,13 +123,8 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 		"setRecord without inodeId")
 
 	_, isHardlinkLeg := record.(*HardlinkLeg)
-	if record.Type() == quantumfs.ObjectTypeHardlink && !isHardlinkLeg {
-		// TODO Ugly, but as far as I can see refresh doesn't have access to
-		// the WSR which is needed to create a HardlinkLeg from a publishable
-		// record to be passed into ChildContainer.
-		record = newHardlinkLegFromRecord(record,
-			container.dir.hardlinkTable)
-	}
+	utils.Assert(record.Type() != quantumfs.ObjectTypeHardlink || isHardlinkLeg,
+		"setRecord with non-HLL hardlink record")
 
 	names, exists := container.effective[inodeId]
 	if !exists {

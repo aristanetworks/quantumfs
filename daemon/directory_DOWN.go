@@ -232,7 +232,8 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 		// An already existing inode for hardlinks to existing inodes
 		utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
 			"Child is of type %d not hardlink", remoteRecord.Type())
-		dir.children.setRecord(c, inodeId, remoteRecord)
+		hll := newHardlinkLegFromRecord(remoteRecord, dir.hardlinkTable)
+		dir.children.setRecord(c, inodeId, hll)
 	}
 	c.qfs.noteChildCreated(c, dir.id, remoteRecord.Filename())
 	return inodeId
