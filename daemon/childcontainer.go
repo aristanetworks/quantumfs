@@ -124,7 +124,7 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 
 	_, isHardlinkLeg := record.(*HardlinkLeg)
 	utils.Assert(record.Type() != quantumfs.ObjectTypeHardlink || isHardlinkLeg,
-		"setRecord with non-HLL hardlink record")
+		"setRecord with naked hardlink record")
 
 	names, exists := container.effective[inodeId]
 	if !exists {
