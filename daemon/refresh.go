@@ -12,8 +12,8 @@ import (
 )
 
 type FileLoadRecord struct {
-	remoteRecord  quantumfs.DirectoryRecord
-	localRecord   quantumfs.DirectoryRecord
+	remoteRecord  quantumfs.ImmutableDirectoryRecord
+	localRecord   quantumfs.ImmutableDirectoryRecord
 	inodeId       InodeId
 	parentId      InodeId
 	newParentPath string
@@ -60,7 +60,7 @@ func newRefreshContext(c *ctx, rootId quantumfs.ObjectKey) *RefreshContext {
 }
 
 func (rc *RefreshContext) addStaleEntry(c *ctx, parentId InodeId, inodeId InodeId,
-	localRecord quantumfs.DirectoryRecord) {
+	localRecord quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.FuncIn("RefreshContext::addStaleEntry", "name %s inode %d",
 		localRecord.Filename(), inodeId).Out()
@@ -74,18 +74,19 @@ func (rc *RefreshContext) addStaleEntry(c *ctx, parentId InodeId, inodeId InodeI
 }
 
 func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
-	inodeId InodeId, moved bool, localRecord quantumfs.DirectoryRecord,
-	remoteRecord quantumfs.DirectoryRecord) {
+	inodeId InodeId, moved bool, localRecord quantumfs.ImmutableDirectoryRecord,
+	remoteRecord quantumfs.ImmutableDirectoryRecord) quantumfs.FileId {
 
 	defer c.FuncIn("RefreshContext::attachLocalRecord", "name %s inode %d",
 		localRecord.Filename(), inodeId).Out()
-	loadRecord, found := rc.fileMap[localRecord.FileId()]
+	fileId := localRecord.FileId()
+	loadRecord, found := rc.fileMap[fileId]
 	if !found {
 		utils.Assert(localRecord.Type() == quantumfs.ObjectTypeDirectory,
 			"Did not find loadRecord for %d", localRecord.FileId())
 		// The dentry has been re-created, update its fileId to match the new
 		// incarnation
-		localRecord.SetFileId(remoteRecord.FileId())
+		fileId = remoteRecord.FileId()
 		loadRecord = rc.fileMap[remoteRecord.FileId()]
 		moved = false
 	}
@@ -93,11 +94,12 @@ func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
 	loadRecord.inodeId = inodeId
 	loadRecord.parentId = parentId
 	loadRecord.moved = moved
-	rc.fileMap[localRecord.FileId()] = loadRecord
+	rc.fileMap[fileId] = loadRecord
+	return fileId
 }
 
 func (rc *RefreshContext) isInodeUsedAfterRefresh(c *ctx,
-	localRecord quantumfs.DirectoryRecord,
+	localRecord quantumfs.ImmutableDirectoryRecord,
 	remoteRecord quantumfs.DirectoryRecord) bool {
 
 	loadRecord := rc.fileMap[localRecord.FileId()]
@@ -140,8 +142,8 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, baseLayerId quantumfs.ObjectKe
 	})
 }
 
-func shouldHideLocalRecord(localRecord quantumfs.DirectoryRecord,
-	remoteRecord quantumfs.DirectoryRecord) bool {
+func shouldHideLocalRecord(localRecord quantumfs.ImmutableDirectoryRecord,
+	remoteRecord quantumfs.ImmutableDirectoryRecord) bool {
 	if remoteRecord == nil {
 		return false
 	}
@@ -228,7 +230,7 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx,
 
 // The caller must hold the tree lock
 func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
-	remoteRecord quantumfs.DirectoryRecord,
+	remoteRecord quantumfs.ImmutableDirectoryRecord,
 	inodeId InodeId, parentId InodeId, path string) {
 
 	defer c.FuncIn("WorkspaceRoot::moveDentry_", "%s %d %d",
