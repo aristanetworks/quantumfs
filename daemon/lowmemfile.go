@@ -224,7 +224,8 @@ func (lw *LowMemFile) syncChild(c *ctx, inodeNum InodeId,
 	c.elog("Invalid syncChild on LowMemFile")
 }
 
-func (lw *LowMemFile) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
+func (lw *LowMemFile) setChildAttr(c *ctx, inodeNum InodeId,
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on LowMemFile")
