@@ -5,9 +5,11 @@ package qlogstats
 
 import (
 	"container/list"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -22,19 +24,81 @@ const (
 	OnAll                               // Match every message
 )
 
+type Measurement struct {
+	name   string
+	tags   []quantumfs.Tag
+	fields []quantumfs.Field
+}
+
+func appendNewTag(tags []quantumfs.Tag, name string, data string) []quantumfs.Tag {
+	return append(tags, quantumfs.NewTag(name, data))
+}
+
+func appendNewFieldInt(fields []quantumfs.Field, name string,
+	data int64) []quantumfs.Field {
+
+	return append(fields, quantumfs.NewFieldInt(name, data))
+}
+
+func appendNewFieldString(fields []quantumfs.Field, name string,
+	data string) []quantumfs.Field {
+
+	return append(fields, quantumfs.NewFieldString(name, data))
+}
+
+type CommandType int
+
+const (
+	MessageCommandType = CommandType(iota)
+	PublishCommandType
+	GcCommandType
+)
+
+type StatCommand interface {
+	Type() CommandType
+	Data() interface{}
+}
+
+type MessageCommand struct {
+	log *qlog.LogOutput
+}
+
+type GcCommand struct{}
+
+func (cmd *MessageCommand) Type() CommandType {
+	return MessageCommandType
+}
+
+func (cmd *MessageCommand) Data() interface{} {
+	return cmd.log
+}
+
+type PublishCommand struct {
+	result chan []Measurement
+}
+
+func (cmd *PublishCommand) Type() CommandType {
+	return PublishCommandType
+}
+
+func (cmd *PublishCommand) Data() interface{} {
+	return cmd.result
+}
+
+func (cmd *GcCommand) Type() CommandType {
+	return GcCommandType
+}
+
+func (cmd *GcCommand) Data() interface{} {
+	return nil
+}
+
 type StatExtractor interface {
 	// This is the list of strings that the extractor will be triggered on and
 	// receive. Note that full formats include a trailing \n.
 	TriggerStrings() []string
-	Chan() chan *qlog.LogOutput
+	Chan() chan StatCommand
 	Type() TriggerType
-
-	Publish() (string, []quantumfs.Tag, []quantumfs.Field)
-
-	// Cleanup any internal state which has accumulated. This is called
-	// periodically on an interval long enough to assume the request shall not
-	// continue.
-	GC()
 }
 
 func AggregateLogs(mode qlog.LogProcessMode, filename string,
@@ -64,15 +128,16 @@ type Aggregator struct {
 	requestSequence list.List
 
 	extractors             []StatExtractor
-	triggerByFormat        map[string][]chan *qlog.LogOutput
-	triggerByPartialFormat map[string][]chan *qlog.LogOutput
-	triggerAll             []chan *qlog.LogOutput
+	triggerByFormat        map[string][]chan StatCommand
+	triggerByPartialFormat map[string][]chan StatCommand
+	triggerAll             []chan StatCommand
 
 	gcInternval     time.Duration
 	publishInterval time.Duration
 
 	queueMutex   utils.DeferableMutex
 	queueLogs    []*qlog.LogOutput
+	queueSize    int64
 	notification chan struct{}
 }
 
@@ -84,9 +149,9 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		db:                     db_,
 		daemonVersion:          daemonVersion_,
 		extractors:             extractors,
-		triggerByFormat:        make(map[string][]chan *qlog.LogOutput),
-		triggerByPartialFormat: make(map[string][]chan *qlog.LogOutput),
-		triggerAll:             make([]chan *qlog.LogOutput, 0),
+		triggerByFormat:        make(map[string][]chan StatCommand),
+		triggerByPartialFormat: make(map[string][]chan StatCommand),
+		triggerAll:             make([]chan StatCommand, 0),
 		gcInternval:            time.Minute * 2,
 		publishInterval:        publishInterval,
 		queueLogs:              make([]*qlog.LogOutput, 0, 1000),
@@ -104,7 +169,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 
 		triggers := extractor.TriggerStrings()
 		for _, trigger := range triggers {
-			var triggerList map[string][]chan *qlog.LogOutput
+			var triggerList map[string][]chan StatCommand
 			if extractor.Type() == OnFormat {
 				triggerList = agg.triggerByFormat
 			} else { // OnPartialFormat
@@ -113,7 +178,7 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 
 			newTriggers, exists := triggerList[trigger]
 			if !exists {
-				newTriggers = make([]chan *qlog.LogOutput, 0)
+				newTriggers = make([]chan StatCommand, 0)
 			}
 
 			newTriggers = append(newTriggers, c)
@@ -133,10 +198,27 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	return &agg
 }
 
+const maxQueueSize_bytes = 10 * 1024 * 1024 * 1024
+
+func logSize(log *qlog.LogOutput) int64 {
+	rtn := int(unsafe.Sizeof(log))
+	rtn += len(log.Format)
+	for _, arg := range log.Args {
+		rtn += int(unsafe.Sizeof(arg))
+	}
+
+	return int64(rtn)
+}
+
 func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 	defer agg.queueMutex.Lock().Unlock()
 
 	agg.queueLogs = append(agg.queueLogs, log)
+
+	agg.queueSize += logSize(log)
+	if agg.queueSize > maxQueueSize_bytes {
+		panic("Qlogger processThread probably locked due to timeout")
+	}
 
 	select {
 	case agg.notification <- struct{}{}:
@@ -145,6 +227,12 @@ func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 }
 
 func (agg *Aggregator) processThread() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("processThread panicked: ", r)
+		}
+	}()
+
 	for {
 		logs := func() []*qlog.LogOutput {
 			<-agg.notification
@@ -160,6 +248,8 @@ func (agg *Aggregator) processThread() {
 			// but gain a much quicker mutex unlock
 			rtn := agg.queueLogs
 			agg.queueLogs = make([]*qlog.LogOutput, 0, 1000)
+			agg.queueSize = 0
+
 			return rtn
 		}()
 
@@ -172,38 +262,67 @@ func (agg *Aggregator) processThread() {
 func (agg *Aggregator) filterAndDistribute(log *qlog.LogOutput) {
 	// These always match
 	for _, extractor := range agg.triggerAll {
-		extractor <- log
+		extractor <- &MessageCommand{
+			log: log,
+		}
 	}
 
 	// These match the format string fully
 	matching := agg.triggerByFormat[log.Format]
 	for _, extractor := range matching {
-		extractor <- log
+		extractor <- &MessageCommand{
+			log: log,
+		}
 	}
 
 	// These partially match the format string
 	for trigger, extractors := range agg.triggerByPartialFormat {
 		if strings.Contains(log.Format, trigger) {
 			for _, extractor := range extractors {
-				extractor <- log
+				extractor <- &MessageCommand{
+					log: log,
+				}
 			}
 		}
 	}
 }
 
 func (agg *Aggregator) publish() {
+	versionTag := quantumfs.NewTag("version", agg.daemonVersion)
+
 	for {
 		time.Sleep(agg.publishInterval)
+		nowTime := time.Now()
 
+		results := make([]chan []Measurement, 0, len(agg.extractors))
+		// Trigger extractors to publish in parallel
 		for _, extractor := range agg.extractors {
-			measurement, tags,
-				fields := extractor.Publish()
-			if tags != nil && len(tags) > 0 {
-				// add the qfs version tag
-				tags = append(tags, quantumfs.NewTag("version",
-					agg.daemonVersion))
+			targetChan := extractor.Chan()
+			resultChannel := make(chan []Measurement, 1)
+			targetChan <- &PublishCommand{
+				result: resultChannel,
+			}
 
-				agg.db.Store(measurement, tags, fields)
+			results = append(results, resultChannel)
+		}
+
+		// Wait for all their results to come in
+		for _, resultChannel := range results {
+			measurements := <-resultChannel
+
+			for _, measurement := range measurements {
+				name := measurement.name
+				tags := measurement.tags
+				fields := measurement.fields
+
+				if tags == nil || len(tags) == 0 {
+					continue
+				}
+
+				// add the qfs version tag
+				tags = append(tags, versionTag)
+
+				agg.db.Store(name, tags, fields, nowTime)
 			}
 		}
 	}
@@ -214,7 +333,8 @@ func (agg *Aggregator) runGC() {
 		time.Sleep(agg.gcInternval)
 
 		for _, extractor := range agg.extractors {
-			extractor.GC()
+			targetChan := extractor.Chan()
+			targetChan <- &GcCommand{}
 		}
 	}
 }

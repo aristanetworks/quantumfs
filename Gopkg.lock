@@ -24,7 +24,7 @@
   branch = "master"
   name = "github.com/aristanetworks/influxlib"
   packages = ["go"]
-  revision = "480041597a36899642c9c410f46ee1e25ded66eb"
+  revision = "700972fce9b30aaf46769034e66cfb94b65890c6"
   source = "gut.aristanetworks.com/repos/influxlib"
 
 [[projects]]

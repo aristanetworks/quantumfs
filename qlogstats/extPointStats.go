@@ -8,23 +8,14 @@ package qlogstats
 import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/utils"
 )
 
 type extPointStats struct {
 	format        string
 	name          string
-	messages      chan *qlog.LogOutput
+	messages      chan StatCommand
 	partialFormat bool
 
-	// These channels are used instead of a mutex to pause the processing thread
-	// so publishing or GC can occur. This eliminates the mutex overhead from the
-	// common mutex processing path.
-	pause   chan struct{}
-	paused  chan struct{}
-	unpause chan struct{}
-
-	lock  utils.DeferableMutex
 	stats basicStats
 }
 
@@ -46,11 +37,8 @@ func newExtPointStats(format string, nametag string,
 	ext := &extPointStats{
 		format:        format,
 		name:          nametag,
-		messages:      make(chan *qlog.LogOutput, 10000),
+		messages:      make(chan StatCommand, 10000),
 		partialFormat: partialFormat,
-		pause:         make(chan struct{}),
-		paused:        make(chan struct{}),
-		unpause:       make(chan struct{}),
 	}
 
 	go ext.process()
@@ -65,7 +53,7 @@ func (ext *extPointStats) TriggerStrings() []string {
 	return rtn
 }
 
-func (ext *extPointStats) Chan() chan *qlog.LogOutput {
+func (ext *extPointStats) Chan() chan StatCommand {
 	return ext.messages
 }
 
@@ -79,42 +67,32 @@ func (ext *extPointStats) Type() TriggerType {
 
 func (ext *extPointStats) process() {
 	for {
-		select {
-		case log := <-ext.messages:
-			func() {
-				defer ext.lock.Lock().Unlock()
-				ext.stats.NewPoint(int64(log.T))
-			}()
-		case <-ext.pause:
-			// Notify the other goroutine that we are paused
-			ext.paused <- struct{}{}
-			// Wait until they are complete
-			<-ext.unpause
+		cmd := <-ext.messages
+		switch cmd.Type() {
+		case MessageCommandType:
+			log := cmd.Data().(*qlog.LogOutput)
+			ext.stats.NewPoint(int64(log.T))
+		case PublishCommandType:
+			resultChannel := cmd.Data().(chan []Measurement)
+			resultChannel <- ext.publish()
+		case GcCommandType:
+			// do nothing since we store no state
 		}
 	}
 }
 
-func (ext *extPointStats) Publish() (measurement string, tags []quantumfs.Tag,
-	fields []quantumfs.Field) {
+func (ext *extPointStats) publish() []Measurement {
+	tags := make([]quantumfs.Tag, 0)
+	tags = appendNewTag(tags, "statName", ext.name)
 
-	defer ext.lock.Lock().Unlock()
-	ext.pause <- struct{}{}
-	<-ext.paused
-	defer func() {
-		ext.unpause <- struct{}{}
-	}()
+	fields := make([]quantumfs.Field, 0)
 
-	tags = make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("statName", ext.name))
-
-	fields = make([]quantumfs.Field, 0)
-
-	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
+	fields = appendNewFieldInt(fields, "samples", ext.stats.Count())
 
 	ext.stats = basicStats{}
-	return "quantumFsPointCount", tags, fields
-}
-
-func (ext *extPointStats) GC() {
-	// We keep no state, so there is nothing to do
+	return []Measurement{{
+		name:   "quantumFsPointCount",
+		tags:   tags,
+		fields: fields,
+	}}
 }

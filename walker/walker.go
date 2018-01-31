@@ -35,7 +35,7 @@ type Ctx struct {
 	Qctx   *quantumfs.Ctx
 	rootID quantumfs.ObjectKey
 
-	hlkeys map[quantumfs.FileId]*quantumfs.DirectRecord
+	hlkeys map[quantumfs.FileId]*quantumfs.EncodedDirectoryRecord
 }
 
 type workerData struct {
@@ -69,12 +69,13 @@ func panicHandler(c *Ctx, err *error) {
 
 // Walk the workspace hierarchy
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
-	wf WalkFunc) (err error) {
+	wf WalkFunc) error {
 
 	// encompass the provided datastore in an
 	// AggregateDataStore
 	ads := aggregatedatastore.New(ds)
 
+	var err error
 	buf := simplebuffer.New(nil, rootID)
 	if err = ads.Get(cq, rootID, buf); err != nil {
 		return err
@@ -97,7 +98,8 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		Context: groupCtx,
 		Qctx:    cq,
 		rootID:  rootID,
-		hlkeys:  make(map[quantumfs.FileId]*quantumfs.DirectRecord),
+		hlkeys: make(
+			map[quantumfs.FileId]*quantumfs.EncodedDirectoryRecord),
 	}
 
 	// Start Workers
@@ -301,13 +303,14 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 }
 
 func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
-	dr *quantumfs.DirectRecord, wf WalkFunc,
+	dr *quantumfs.EncodedDirectoryRecord, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	// NOTE: some of the DirectRecord accesses eg: Filename, Size etc
-	//       may not be meaningful for some DirectRecords. For example -
-	//       Filename for DirectRecord in hardlinkRecord is  meaningless
-	//       Size for DirectRecord in special file is meaningless
+	// NOTE: some of the EncodedDirectoryRecord accesses eg: Filename, Size etc
+	//       may not be meaningful for some EncodedDirectoryRecords. For example,
+	//       Filename for EncodedDirectoryRecord in hardlinkRecord is
+	//       meaningless
+	//       Size for EncodedDirectoryRecord in special file is meaningless
 	//
 	//       This information is eventually sent to the walk handler
 	//       function. Current use-cases don't need to filter such
@@ -343,17 +346,24 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 
 		// hence use key from hardlinkRecord
 		hldr, exists := c.hlkeys[dr.FileId()]
-		utils.Assert(exists, "Key for hardlink Path: %s "+
-			"FileId: %d missing in WSR hardlink info",
-			fpath, dr.FileId())
-		utils.Assert(hldr.Type() != quantumfs.ObjectTypeHardlink,
-			"Hardlink object type found in WSR hardlink info "+
-				"for path: %s fileID: %d",
-			fpath, dr.FileId())
-		// hldr could be of any of the supported ObjectTypes so
-		// handle the directoryRecord accordingly
-		return handleDirectoryRecord(c, fpath, ds, hldr, wf, keyChan)
 
+		if !exists {
+			errStr := fmt.Sprintf("Key for hardlink Path: %s "+
+				"FileId: %d missing in WSR hardlink info",
+				fpath, dr.FileId())
+			c.Qctx.Elog(qlog.LogTool, errStr)
+			return SkipEntry
+		} else if hldr.Type() == quantumfs.ObjectTypeHardlink {
+			errStr := fmt.Sprintf("Hardlink object type found in"+
+				"WSR hardlink info for path: %s fileID: %d", fpath,
+				dr.FileId())
+			c.Qctx.Elog(qlog.LogTool, errStr)
+			return SkipEntry
+		} else {
+			// hldr could be of any of the supported ObjectTypes so
+			// handle the directoryRecord accordingly
+			return handleDirectoryRecord(c, fpath, ds, hldr, wf, keyChan)
+		}
 	default:
 		return writeToChan(c, keyChan, fpath, key, dr.Size())
 	}

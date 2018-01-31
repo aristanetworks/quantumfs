@@ -61,7 +61,8 @@ update: check-dep-installed
 	@echo "Please review and commit any changes to Gopkg.toml and Gopkg.lock"
 
 vet: $(PKGS_TO_TEST) $(COMMANDS)
-	go vet -n ./... | while read -r line; do if  [[ ! "$$line" =~ .*encoding.* ]]; then eval $$line || exit 1; fi; done
+	go vet -n ./... | while read -r line; do if  [[ ! "$$line" =~ .*encoding.* ]] && \
+	[[ ! "$$line" =~ .*unsafe.* ]] ; then eval $$line || exit 1; fi; done
 
 lockcheck:
 	./lockcheck.sh

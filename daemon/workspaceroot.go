@@ -34,11 +34,11 @@ type WorkspaceRoot struct {
 
 	// Hardlink support structures
 	linkLock    utils.DeferableRwMutex
-	hardlinks   map[quantumfs.FileId]linkEntry
+	hardlinks   map[quantumfs.FileId]HardlinkTableEntry
 	inodeToLink map[InodeId]quantumfs.FileId
 }
 
-type linkEntry struct {
+type HardlinkTableEntry struct {
 	record  quantumfs.DirectoryRecord
 	nlink   uint32
 	inodeId InodeId
@@ -58,7 +58,7 @@ type HardlinkTable interface {
 	hardlinkDec(fileId quantumfs.FileId) bool
 	hardlinkInc(fileId quantumfs.FileId)
 	newHardlink(c *ctx, inodeId InodeId,
-		record quantumfs.DirectoryRecord) *Hardlink
+		record quantumfs.DirectoryRecord) *HardlinkLeg
 	getHardlink(fileId quantumfs.FileId) (valid bool,
 		record quantumfs.ImmutableDirectoryRecord)
 	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
@@ -69,8 +69,8 @@ type HardlinkTable interface {
 	getWorkspaceRoot() *WorkspaceRoot
 }
 
-func newLinkEntry(record_ quantumfs.DirectoryRecord) linkEntry {
-	return linkEntry{
+func newLinkEntry(record_ quantumfs.DirectoryRecord) HardlinkTableEntry {
+	return HardlinkTableEntry{
 		record:  record_,
 		nlink:   2,
 		inodeId: quantumfs.InodeIdInvalid,
@@ -234,11 +234,11 @@ func (wsr *WorkspaceRoot) removeHardlink_(fileId quantumfs.FileId, inodeId Inode
 }
 
 func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
-	record quantumfs.DirectoryRecord) *Hardlink {
+	record quantumfs.DirectoryRecord) *HardlinkLeg {
 
 	defer c.FuncIn("WorkspaceRoot::newHardlink", "inode %d", inodeId).Out()
 
-	if _, isLink := record.(*Hardlink); isLink {
+	if _, isLink := record.(*HardlinkLeg); isLink {
 		panic("newHardlink called on existing hardlink")
 	}
 
@@ -259,8 +259,8 @@ func (wsr *WorkspaceRoot) newHardlink(c *ctx, inodeId InodeId,
 	// parent lock
 	wsr.dirty(c)
 
-	return newHardlink(record.Filename(), fileId, quantumfs.NewTime(time.Now()),
-		wsr)
+	return newHardlinkLeg(record.Filename(), fileId,
+		quantumfs.NewTime(time.Now()), wsr)
 }
 
 func (wsr *WorkspaceRoot) instantiateHardlink(c *ctx, inodeId InodeId) Inode {
@@ -351,8 +351,8 @@ func (wsr *WorkspaceRoot) getHardlinkByInode(inodeId InodeId) (valid bool,
 		return false, nil
 	}
 
-	return true, newHardlink(link.record.Filename(), fileId, quantumfs.Time(0),
-		wsr)
+	return true, newHardlinkLeg(link.record.Filename(), fileId,
+		quantumfs.Time(0), wsr)
 }
 
 func (wsr *WorkspaceRoot) getHardlink(fileId quantumfs.FileId) (valid bool,
@@ -461,11 +461,11 @@ func (wsr *WorkspaceRoot) setHardlink(fileId quantumfs.FileId,
 }
 
 func loadHardlinks(c *ctx,
-	entry quantumfs.HardlinkEntry) map[quantumfs.FileId]linkEntry {
+	entry quantumfs.HardlinkEntry) map[quantumfs.FileId]HardlinkTableEntry {
 
 	defer c.funcIn("loadHardlinks").Out()
 
-	hardlinks := make(map[quantumfs.FileId]linkEntry)
+	hardlinks := make(map[quantumfs.FileId]HardlinkTableEntry)
 
 	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
 		newLink := newLinkEntry(hardlink.Record())
@@ -478,7 +478,7 @@ func loadHardlinks(c *ctx,
 }
 
 func publishHardlinkMap(c *ctx,
-	records map[quantumfs.FileId]linkEntry) *quantumfs.HardlinkEntry {
+	records map[quantumfs.FileId]HardlinkTableEntry) *quantumfs.HardlinkEntry {
 
 	defer c.funcIn("publishHardlinkMap").Out()
 
@@ -511,9 +511,8 @@ func publishHardlinkMap(c *ctx,
 				quantumfs.KeyTypeMetadata)
 
 			nextBaseLayerId, err = buf.Key(&c.Ctx)
-			if err != nil {
-				panic("Failed to upload new baseLayer object")
-			}
+			utils.Assert(err == nil,
+				"Failed to upload new baseLayer object: %v", err)
 
 			entryNum, baseLayer = quantumfs.NewHardlinkEntry(entryNum)
 			entryIdx = 0
@@ -595,7 +594,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 }
 
 func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
-	hardlinks map[quantumfs.FileId]linkEntry) quantumfs.ObjectKey {
+	hardlinks map[quantumfs.FileId]HardlinkTableEntry) quantumfs.ObjectKey {
 
 	defer c.funcIn("publishWorkspaceRoot").Out()
 
@@ -607,9 +606,7 @@ func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 	newRootId, err := buf.Key(&c.Ctx)
-	if err != nil {
-		panic("Failed to upload new workspace root")
-	}
+	utils.Assert(err == nil, "Failed to upload new workspace root: %v", err)
 
 	c.vlog("Publish: %s", newRootId.String())
 	return newRootId
@@ -690,6 +687,15 @@ func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
 	fillApiAttr(c, &api.attr)
 	children = append(children, api)
 
+	if c.qfs.inLowMemoryMode {
+		lowmem := directoryContents{
+			filename: quantumfs.LowMemFileName,
+			fuseType: fuse.S_IFREG,
+		}
+		fillLowMemAttr(c, &lowmem.attr)
+		children = append(children, lowmem)
+	}
+
 	return children
 }
 
@@ -702,6 +708,13 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 		out.NodeId = quantumfs.InodeIdApi
 		fillEntryOutCacheData(c, out)
 		fillApiAttr(c, &out.Attr)
+		return fuse.OK
+	}
+
+	if c.qfs.inLowMemoryMode && name == quantumfs.LowMemFileName {
+		out.NodeId = quantumfs.InodeIdLowMemMarker
+		fillEntryOutCacheData(c, out)
+		fillLowMemAttr(c, &out.Attr)
 		return fuse.OK
 	}
 

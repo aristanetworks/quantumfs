@@ -64,6 +64,21 @@ func isKeyValid(key string) bool {
 	return true
 }
 
+func isWorkspaceNameValid(name string) bool {
+	parts := strings.Split(name, "/")
+	if len(parts) != 3 {
+		return false
+	}
+
+	for _, part := range parts {
+		if len(part) == 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (api *ApiInode) dirty(c *ctx) {
 	c.vlog("ApiInode::dirty doing nothing")
 	// Override the InodeCommon dirty because the Api can never be changed on the
@@ -503,6 +518,18 @@ func (api *ApiHandle) branchWorkspace(c *ctx, buf []byte) int {
 			err.Error())
 	}
 
+	if !isWorkspaceNameValid(cmd.Src) {
+		c.vlog("workspace name '%s' is malformed", cmd.Src)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.Src)
+	}
+
+	if !isWorkspaceNameValid(cmd.Dst) {
+		c.vlog("workspace name '%s' is malformed", cmd.Dst)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.Dst)
+	}
+
 	src := strings.Split(cmd.Src, "/")
 	dst := strings.Split(cmd.Dst, "/")
 
@@ -535,6 +562,22 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
+	}
+
+	if !isWorkspaceNameValid(cmd.BaseWorkspace) {
+		c.vlog("workspace name '%s' is malformed", cmd.BaseWorkspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.BaseWorkspace)
+	}
+	if !isWorkspaceNameValid(cmd.RemoteWorkspace) {
+		c.vlog("workspace name '%s' is malformed", cmd.RemoteWorkspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.RemoteWorkspace)
+	}
+	if !isWorkspaceNameValid(cmd.LocalWorkspace) {
+		c.vlog("workspace name '%s' is malformed", cmd.LocalWorkspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.LocalWorkspace)
 	}
 
 	// Fetch base
@@ -630,6 +673,12 @@ func (api *ApiHandle) refreshWorkspace(c *ctx, buf []byte) int {
 	}
 	c.vlog("Refreshing workspace %s", cmd.Workspace)
 
+	if !isWorkspaceNameValid(cmd.Workspace) {
+		c.vlog("workspace name '%s' is malformed", cmd.Workspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.Workspace)
+	}
+
 	c.qfs.refreshWorkspace(c, cmd.Workspace)
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Refresh Succeeded")
@@ -646,6 +695,12 @@ func (api *ApiHandle) advanceWSDB(c *ctx, buf []byte) int {
 	}
 	c.vlog("Advancing wsdb of %s to that of %s", cmd.Workspace,
 		cmd.ReferenceWorkspace)
+
+	if !isWorkspaceNameValid(cmd.Workspace) {
+		c.vlog("workspace name '%s' is malformed", cmd.Workspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.Workspace)
+	}
 
 	workspace := strings.Split(cmd.Workspace, "/")
 	wsr, cleanup, ok := c.qfs.getWorkspaceRoot(c, workspace[0],
@@ -691,6 +746,12 @@ func (api *ApiHandle) getAccessed(c *ctx, buf []byte) int {
 			err.Error())
 	}
 
+	if !isWorkspaceNameValid(cmd.WorkspaceRoot) {
+		c.vlog("workspace name '%s' is malformed", cmd.WorkspaceRoot)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.WorkspaceRoot)
+	}
+
 	wsr := cmd.WorkspaceRoot
 	dst := strings.Split(wsr, "/")
 	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
@@ -713,6 +774,12 @@ func (api *ApiHandle) clearAccessed(c *ctx, buf []byte) int {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
+	}
+
+	if !isWorkspaceNameValid(cmd.WorkspaceRoot) {
+		c.vlog("workspace name '%s' is malformed", cmd.WorkspaceRoot)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.WorkspaceRoot)
 	}
 
 	wsr := cmd.WorkspaceRoot
@@ -753,6 +820,12 @@ func (api *ApiHandle) syncWorkspace(c *ctx, buf []byte) int {
 	}
 	c.vlog("Syncing workspace %s", cmd.Workspace)
 
+	if !isWorkspaceNameValid(cmd.Workspace) {
+		c.vlog("workspace name '%s' is malformed", cmd.Workspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.Workspace)
+	}
+
 	if err := c.qfs.syncWorkspace(c, cmd.Workspace); err != nil {
 		c.vlog("Error sync %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed, "%s",
@@ -787,10 +860,17 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	if type_ == quantumfs.ObjectTypeDirectory {
 		c.vlog("Attempted to insert a directory")
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
-			"InsertInode with directories is not supporte")
+			"InsertInode with directories is not supported")
 	}
 
 	wsr := dst[0] + "/" + dst[1] + "/" + dst[2]
+
+	if !isWorkspaceNameValid(wsr) {
+		c.vlog("workspace name '%s' is malformed", wsr)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", wsr)
+	}
+
 	workspace, cleanup, ok := c.qfs.getWorkspaceRoot(c, dst[0], dst[1], dst[2])
 	defer cleanup()
 	if !ok {
@@ -821,8 +901,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		// have the tree lock on the WorkspaceRoot. Hence, it is safe and
 		// necessary to get the tree lock of the WorkspaceRoot exclusively
 		// here.
-		defer (&workspace.Directory).LockTree().Unlock()
-		return (&workspace.Directory).followPath_DOWN(c, dst)
+		defer workspace.LockTree().Unlock()
+		return workspace.followPath_DOWN(c, dst)
 	}()
 	defer cleanup()
 	if err != nil {
@@ -831,16 +911,34 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 			"Path %s does not exist", cmd.DstPath)
 	}
 
-	parent := p.(*Directory)
+	p, treeUnlock := c.qfs.RLockTreeGetInode(c, p.inodeNum())
+	defer treeUnlock.RUnlock()
+
+	// The parent may have been deleted between the search and locking its tree.
+	if p == nil {
+		c.vlog("Path does not exist: %s", cmd.DstPath)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Path %s does not exist", cmd.DstPath)
+	}
+
+	parent := asDirectory(p)
 	target := dst[len(dst)-1]
 
-	if parent.childExists(c, target) == fuse.Status(syscall.EEXIST) {
+	status := parent.Unlink(c, target)
+	if status != fuse.OK && status != fuse.ENOENT {
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
-			"Inode %s should not exist", target)
+			"Inode %s should not exist, error unlinking %d", target,
+			status)
 	}
 
 	c.vlog("Api::insertInode put key %v into node %d - %s",
 		key.Value(), parent.inodeNum(), parent.InodeCommon.name_)
+
+	err = freshenKeys(c, key, type_)
+	if err != nil {
+		return api.queueErrorResponse(quantumfs.ErrorKeyNotFound,
+			"Unable to freshen all blocks for key: %s", err)
+	}
 
 	func() {
 		defer parent.Lock().Unlock()
@@ -860,6 +958,12 @@ func (api *ApiHandle) deleteWorkspace(c *ctx, buf []byte) int {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
+	}
+
+	if !isWorkspaceNameValid(cmd.WorkspacePath) {
+		c.vlog("workspace name '%s' is malformed", cmd.WorkspacePath)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.WorkspacePath)
 	}
 
 	workspacePath := cmd.WorkspacePath
@@ -915,6 +1019,12 @@ func (api *ApiHandle) enableRootWrite(c *ctx, buf []byte) int {
 		c.vlog("Error unmarshaling JSON: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
+	}
+
+	if !isWorkspaceNameValid(cmd.Workspace) {
+		c.vlog("workspace name '%s' is malformed", cmd.Workspace)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.Workspace)
 	}
 
 	workspacePath := cmd.Workspace
@@ -1034,6 +1144,12 @@ func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) int {
 	if err := json.Unmarshal(buf, &cmd); err != nil {
 		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
 			err.Error())
+	}
+
+	if !isWorkspaceNameValid(cmd.WorkspacePath) {
+		c.vlog("workspace name '%s' is malformed", cmd.WorkspacePath)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.WorkspacePath)
 	}
 
 	workspacePath := cmd.WorkspacePath

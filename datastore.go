@@ -89,15 +89,21 @@ const (
 	// ie. _/_/_.
 	NullSpaceName     = "_"
 	NullWorkspaceName = "_/_/_"
+
+	// This file indicates that QuantumFS is in a low memory mode and poor
+	// performance is to be expected. This normally happens because QuantumFS is
+	// being gracefully terminated, perhaps for an upgrade.
+	LowMemFileName = "QUANTUMFS_IS_IN_LOW_MEMORY_MODE"
 )
 
 // Special reserved inode numbers
 const (
-	InodeIdInvalid = 0 // Invalid
-	InodeIdRoot    = 1 // Same as fuse.FUSE_ROOT_ID
-	InodeIdApi     = 2 // /api file
+	InodeIdInvalid      = 0 // Invalid
+	InodeIdRoot         = 1 // Same as fuse.FUSE_ROOT_ID
+	InodeIdApi          = 2 // /api file
+	InodeIdLowMemMarker = 3 // /QUANTUMFS_IS_IN_LOW_MEMORY_MODE file
 
-	InodeIdReservedEnd = 2 // End of the reserved range
+	InodeIdReservedEnd = 3 // End of the reserved range
 )
 
 // Object key types, possibly used for datastore routing
@@ -116,7 +122,12 @@ const (
 	KeyTypeEmbedded = 7
 
 	KeyTypeApi = 8 // A key-value pair provided entirely by the api
+
+	KeyTypeInvalidLast = 9
 )
+
+const KeyTypeStrMaxSize = 10
+const KeyValueStrSize = 42
 
 // String names for KeyTypes
 func KeyTypeToString(keyType KeyType) string {
@@ -199,9 +210,20 @@ func (key ObjectKey) Type() KeyType {
 	return KeyType(key.key.KeyType())
 }
 
+// There are 4 characters in the output String in addition to
+// the type and the value strings
+const keyStrMaxSize = KeyTypeStrMaxSize + KeyValueStrSize + 4
+
 func (key ObjectKey) String() string {
-	return fmt.Sprintf("(%s: %s)", KeyTypeToString(key.Type()),
-		hex.EncodeToString(key.Value()))
+	byteArr := [keyStrMaxSize]byte{}
+	index := 0
+	index += copy(byteArr[index:], "(")
+	index += copy(byteArr[index:], KeyTypeToString(key.Type()))
+	index += copy(byteArr[index:], ": ")
+	index += hex.Encode(byteArr[index:], key.Value())
+	index += copy(byteArr[index:], ")")
+
+	return string(byteArr[:index])
 }
 
 func FromString(text string) (ObjectKey, error) {
@@ -335,7 +357,7 @@ func (dir *DirectoryEntry) SetNumEntries(n int) {
 	dir.dir.SetNumEntries(uint32(n))
 }
 
-func (dir *DirectoryEntry) Entry(i int) *DirectRecord {
+func (dir *DirectoryEntry) Entry(i int) *EncodedDirectoryRecord {
 	return overlayDirectoryRecord(dir.dir.Entries().At(i))
 }
 
@@ -646,12 +668,12 @@ func (r *HardlinkRecord) SetFileId(v uint64) {
 	r.record.Record().SetFileId(v)
 }
 
-func (r *HardlinkRecord) Record() *DirectRecord {
+func (r *HardlinkRecord) Record() *EncodedDirectoryRecord {
 	return overlayDirectoryRecord(r.record.Record())
 }
 
 func (r *HardlinkRecord) SetRecord(record DirectoryRecord) {
-	r.record.SetRecord(record.(*DirectRecord).record)
+	r.record.SetRecord(record.(*EncodedDirectoryRecord).record)
 }
 
 func (r *HardlinkRecord) Nlinks() uint32 {
@@ -860,9 +882,9 @@ type DirectoryRecord interface {
 	EncodeExtendedKey() []byte
 
 	// Return an immutable copy. Changes made to this object after calling
-	// AsImmutableDirectoryRecord() will not result in those changes being
+	// AsImmutable() will not result in those changes being
 	// reflected in the ImmutableDirectoryRecord.
-	AsImmutableDirectoryRecord() ImmutableDirectoryRecord
+	AsImmutable() ImmutableDirectoryRecord
 
 	// returns a real copy, which can result in future changes changing the
 	// original depending on the underlying class.
@@ -872,12 +894,12 @@ type DirectoryRecord interface {
 }
 
 type PublishableRecord struct {
-	*DirectRecord
+	*EncodedDirectoryRecord
 }
 
 func AsPublishableRecord(record DirectoryRecord) PublishableRecord {
 	return PublishableRecord{
-		record.(*DirectRecord),
+		record.(*EncodedDirectoryRecord),
 	}
 }
 
@@ -904,131 +926,131 @@ type ImmutableDirectoryRecord interface {
 	FileId() FileId
 	Nlinks() uint32
 	EncodeExtendedKey() []byte
-	AsImmutableDirectoryRecord() ImmutableDirectoryRecord
+	AsImmutable() ImmutableDirectoryRecord
 }
 
-func NewDirectoryRecord() *DirectRecord {
+func NewDirectoryRecord() *EncodedDirectoryRecord {
 	segment := capn.NewBuffer(nil)
 
-	record := DirectRecord{
+	record := EncodedDirectoryRecord{
 		record: encoding.NewRootDirectoryRecord(segment),
 	}
 
 	return &record
 }
 
-type DirectRecord struct {
+type EncodedDirectoryRecord struct {
 	record encoding.DirectoryRecord
 }
 
-func overlayDirectoryRecord(r encoding.DirectoryRecord) *DirectRecord {
-	record := DirectRecord{
+func overlayDirectoryRecord(r encoding.DirectoryRecord) *EncodedDirectoryRecord {
+	record := EncodedDirectoryRecord{
 		record: r,
 	}
 	return &record
 }
 
-func (record *DirectRecord) Publishable() PublishableRecord {
+func (record *EncodedDirectoryRecord) Publishable() PublishableRecord {
 	return AsPublishableRecord(record)
 }
 
-func (record *DirectRecord) Nlinks() uint32 {
+func (record *EncodedDirectoryRecord) Nlinks() uint32 {
 	return 1
 }
 
-func (record *DirectRecord) Filename() string {
+func (record *EncodedDirectoryRecord) Filename() string {
 	return record.record.Filename()
 }
 
-func (record *DirectRecord) SetFilename(name string) {
+func (record *EncodedDirectoryRecord) SetFilename(name string) {
 	record.record.SetFilename(name)
 }
 
-func (record *DirectRecord) Type() ObjectType {
+func (record *EncodedDirectoryRecord) Type() ObjectType {
 	return ObjectType(record.record.Type())
 }
 
-func (record *DirectRecord) SetType(t ObjectType) {
+func (record *EncodedDirectoryRecord) SetType(t ObjectType) {
 	record.record.SetType(uint8(t))
 }
 
-func (record *DirectRecord) ID() ObjectKey {
+func (record *EncodedDirectoryRecord) ID() ObjectKey {
 	return overlayObjectKey(record.record.Id())
 }
 
-func (record *DirectRecord) SetID(key ObjectKey) {
+func (record *EncodedDirectoryRecord) SetID(key ObjectKey) {
 	record.record.SetId(key.key)
 }
 
-func (record *DirectRecord) Size() uint64 {
+func (record *EncodedDirectoryRecord) Size() uint64 {
 	return record.record.Size()
 }
 
-func (record *DirectRecord) SetSize(s uint64) {
+func (record *EncodedDirectoryRecord) SetSize(s uint64) {
 	record.record.SetSize(s)
 }
 
-func (record *DirectRecord) ModificationTime() Time {
+func (record *EncodedDirectoryRecord) ModificationTime() Time {
 	return Time(record.record.ModificationTime())
 }
 
-func (record *DirectRecord) FileId() FileId {
+func (record *EncodedDirectoryRecord) FileId() FileId {
 	return FileId(record.record.FileId())
 }
 
-func (record *DirectRecord) SetModificationTime(t Time) {
+func (record *EncodedDirectoryRecord) SetModificationTime(t Time) {
 	record.record.SetModificationTime(uint64(t))
 }
 
-func (record *DirectRecord) SetFileId(fileId FileId) {
+func (record *EncodedDirectoryRecord) SetFileId(fileId FileId) {
 	record.record.SetFileId(uint64(fileId))
 }
 
-func (record *DirectRecord) ContentTime() Time {
+func (record *EncodedDirectoryRecord) ContentTime() Time {
 	return Time(record.record.ContentTime())
 }
 
-func (record *DirectRecord) SetContentTime(t Time) {
+func (record *EncodedDirectoryRecord) SetContentTime(t Time) {
 	record.record.SetContentTime(uint64(t))
 }
 
-func (record *DirectRecord) Permissions() uint32 {
+func (record *EncodedDirectoryRecord) Permissions() uint32 {
 	return record.record.Permissions()
 }
 
-func (record *DirectRecord) SetPermissions(p uint32) {
+func (record *EncodedDirectoryRecord) SetPermissions(p uint32) {
 	record.record.SetPermissions(p)
 }
 
-func (record *DirectRecord) Owner() UID {
+func (record *EncodedDirectoryRecord) Owner() UID {
 	return UID(record.record.Owner())
 }
 
-func (record *DirectRecord) SetOwner(u UID) {
+func (record *EncodedDirectoryRecord) SetOwner(u UID) {
 	record.record.SetOwner(uint16(u))
 }
 
-func (record *DirectRecord) Group() GID {
+func (record *EncodedDirectoryRecord) Group() GID {
 	return GID(record.record.Group())
 }
 
-func (record *DirectRecord) SetGroup(g GID) {
+func (record *EncodedDirectoryRecord) SetGroup(g GID) {
 	record.record.SetGroup(uint16(g))
 }
 
-func (record *DirectRecord) ExtendedAttributes() ObjectKey {
+func (record *EncodedDirectoryRecord) ExtendedAttributes() ObjectKey {
 	return overlayObjectKey(record.record.ExtendedAttributes())
 }
 
-func (record *DirectRecord) SetExtendedAttributes(key ObjectKey) {
+func (record *EncodedDirectoryRecord) SetExtendedAttributes(key ObjectKey) {
 	record.record.SetExtendedAttributes(key.key)
 }
 
-func (record *DirectRecord) EncodeExtendedKey() []byte {
+func (record *EncodedDirectoryRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(record.ID(), record.Type(), record.Size())
 }
 
-func (record *DirectRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
+func (record *EncodedDirectoryRecord) AsImmutable() ImmutableDirectoryRecord {
 	return &ImmutableRecord{
 		filename:    record.Filename(),
 		id:          record.ID(),
@@ -1045,7 +1067,7 @@ func (record *DirectRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecor
 	}
 }
 
-func (record *DirectRecord) Clone() DirectoryRecord {
+func (record *EncodedDirectoryRecord) Clone() DirectoryRecord {
 	newEntry := NewDirectoryRecord()
 	newEntry.SetFilename(record.Filename())
 	newEntry.SetID(record.ID())
@@ -1062,7 +1084,7 @@ func (record *DirectRecord) Clone() DirectoryRecord {
 	return newEntry
 }
 
-func (record *DirectRecord) MarshalJSON() ([]byte, error) {
+func (record *EncodedDirectoryRecord) MarshalJSON() ([]byte, error) {
 	return record.record.MarshalJSON()
 }
 
@@ -1337,6 +1359,22 @@ func (store *constDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 
 var ZeroKey ObjectKey
 
+func binarySearchSpace(min int, max int, testFn func(int) (checkLower bool)) int {
+	for {
+		if min >= max {
+			return min
+		}
+
+		half := (min + max) / 2
+		goLower := testFn(half)
+		if goLower {
+			max = half
+		} else {
+			min = half + 1
+		}
+	}
+}
+
 func calcMaxNumExtendedAttributes(maxSize int) int {
 	attrs0 := newExtendedAttributesAttrs(0)
 	size0attrs := len(attrs0.Bytes())
@@ -1350,20 +1388,34 @@ func calcMaxNumExtendedAttributes(maxSize int) int {
 	return (maxSize - size0attrs) / (size1attrs - size0attrs)
 }
 
+// We can't assume that directory entries grow by a constant amount for every
+// record that we put into it. So, fully create the directory using hopefully
+// "max" sized records, and search for our answer
 func calcMaxDirectoryRecords(maxSize int) int {
-	dir0 := newDirectoryEntryRecords(0)
-	size0recs := len(dir0.Bytes())
+	closestNum := binarySearchSpace(1, 100000, func(records int) bool {
+		dir := newDirectoryEntryRecords(records)
 
-	// setup the pointers in DirectRecord to practical max values
-	record := NewDirectoryRecord()
-	record.SetFilename(string(make([]byte, MaxFilenameLength)))
-	record.SetExtendedAttributes(createEmptyBlock())
+		record := NewDirectoryRecord()
+		record.SetFilename(string(make([]byte, MaxFilenameLength)))
+		record.SetID(createEmptyBlock())
+		record.SetExtendedAttributes(createEmptyBlock())
+		published := record.Publishable()
+		for i := 0; i < records; i++ {
+			dir.SetEntry(i, published)
+		}
+		dir.SetNumEntries(records)
 
-	dir1 := newDirectoryEntryRecords(1)
-	dir1.dir.Entries().Set(0, record.record)
-	size1recs := len(dir1.Bytes())
+		return len(dir.Bytes()) >= maxSize
+	})
 
-	return (maxSize - size0recs) / (size1recs - size0recs)
+	// closestNum may be slightly over our maxBlockSize, so subtract 1 to be safe
+	closestNum -= 1
+
+	// BUG233542: We still haven't identified how up to 1.5MB is acheived, so
+	// add a margin for now
+	closestNum = int(float32(closestNum) * 0.66)
+
+	return closestNum
 }
 
 func calcMaxBlocksLargeFile(maxSize int) int {
@@ -1419,6 +1471,20 @@ func init() {
 	EmptyDirKey = emptyDirKey
 	EmptyBlockKey = emptyBlockKey
 	EmptyWorkspaceKey = emptyWorkspaceKey
+
+	// Assert that all types have a string representation shorter than
+	// KeyTypeStrMaxSize bytes.
+	for keyType := KeyTypeInvalid; keyType < KeyTypeInvalidLast; keyType++ {
+		str := KeyTypeToString(KeyType(keyType))
+		utils.Assert(len(str) <= KeyTypeStrMaxSize,
+			"KeyType %s is too large, please adjust KeyTypeStrMaxSize",
+			str)
+	}
+
+	emptyDirValueStrSize := len(hex.EncodeToString(emptyDirKey.Value()))
+	utils.Assert(emptyDirValueStrSize == KeyValueStrSize,
+		"Values are encoded to %d bytes. Expected %d bytes.",
+		emptyDirValueStrSize, KeyValueStrSize)
 }
 
 func NewImmutableRecord(filename string, id ObjectKey, filetype ObjectType,
@@ -1509,6 +1575,6 @@ func (ir *ImmutableRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(ir.ID(), ir.Type(), ir.Size())
 }
 
-func (ir *ImmutableRecord) AsImmutableDirectoryRecord() ImmutableDirectoryRecord {
+func (ir *ImmutableRecord) AsImmutable() ImmutableDirectoryRecord {
 	return ir
 }

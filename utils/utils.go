@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"syscall"
 )
 
@@ -125,4 +126,29 @@ func callername(depth int) string {
 	lastSlash := strings.LastIndex(name, "/")
 	name = name[lastSlash+1:]
 	return name
+}
+
+// The memFence is laid out in memory in such a way to minimize false sharing in
+// L1 cache while still being cached in non-exclusive L2/L3.
+
+// Using the memory fence requires an identifier for the calling goroutine. Given
+// the lack of thread-local storage in golang, the best fall back is timestamp which
+// prevents L1 cache line false sharing while still maintaining spatial locality to
+// avoid excessive pressure on L2/L3.
+const memFenceArrSize = 8 * 1024
+
+var memFenceArr [memFenceArrSize]uint64
+
+func MemFence(identifier int64) {
+	// Assuming a cache line is 64 bytes, this avoids false sharing of the
+	// cache-line for consecutive identifiers
+	index := (identifier % (memFenceArrSize / 8)) * 8
+	atomic.AddUint64(&memFenceArr[index], 1)
+}
+
+func TestTmpDir() string {
+	testPc, _, _, _ := runtime.Caller(1)
+	testName := runtime.FuncForPC(testPc).Name()
+	lastSlash := strings.LastIndex(testName, "/")
+	return "/tmp/" + testName[lastSlash+1:]
 }

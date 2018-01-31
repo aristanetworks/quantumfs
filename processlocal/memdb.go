@@ -6,13 +6,15 @@
 package processlocal
 
 import (
+	"time"
+
 	"github.com/aristanetworks/quantumfs"
 )
 
 type dataSeries struct {
 	Measurement string
 	Tags        map[string]string
-	Fields      []quantumfs.Field
+	Fields      map[string]interface{}
 }
 
 type Memdb struct {
@@ -26,7 +28,7 @@ func NewMemdb(conf string) quantumfs.TimeSeriesDB {
 }
 
 func (db *Memdb) Store(measurement string, tags_ []quantumfs.Tag,
-	fields_ []quantumfs.Field) {
+	fields_ []quantumfs.Field, t time.Time) {
 
 	tagMap := make(map[string]string)
 	// Use a set to make Fetch faster, but use maps because Golang has no sets
@@ -34,15 +36,22 @@ func (db *Memdb) Store(measurement string, tags_ []quantumfs.Tag,
 		tagMap[tag.Name] = tag.Data
 	}
 
+	fieldMap := make(map[string]interface{})
+	for _, field := range fields_ {
+		fieldMap[field.Name] = field.Data
+	}
+
 	db.Data = append(db.Data, dataSeries{
 		Measurement: measurement,
 		Tags:        tagMap,
-		Fields:      fields_,
+		Fields:      fieldMap,
 	})
 }
 
-func (db *Memdb) Fetch(withTags []quantumfs.Tag, field string, lastN int) []int64 {
-	rtn := make([]int64, 0)
+func (db *Memdb) Fetch(withTags []quantumfs.Tag, field string,
+	lastN int) []interface{} {
+
+	rtn := make([]interface{}, 0)
 
 	for _, entry := range db.Data {
 		// check if the data has all the tags we need
@@ -57,14 +66,9 @@ func (db *Memdb) Fetch(withTags []quantumfs.Tag, field string, lastN int) []int6
 			}
 		}
 
-		if outputData {
-			// add the field, if it exists
-			for _, hasField := range entry.Fields {
-				if hasField.Name == field {
-					rtn = append(rtn, hasField.Data)
-					break
-				}
-			}
+		datum, exists := entry.Fields[field]
+		if outputData && exists {
+			rtn = append(rtn, datum)
 		}
 	}
 

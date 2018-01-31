@@ -110,11 +110,17 @@ func (container *ChildContainer) loadChild(c *ctx, record quantumfs.DirectoryRec
 	if record.Type() == quantumfs.ObjectTypeHardlink {
 		return container.loadPublishableChild(c, record, inodeId)
 	}
-	if inodeId == quantumfs.InodeIdInvalid {
+	if inodeId != quantumfs.InodeIdInvalid {
+		container.effective.set(inodeId, record)
+	} else {
+		// As there is no inodeNum, there doesn't exist an instantiated inode
+		// for this child so its entry must be made publishable immediately.
 		inodeId = c.qfs.newInodeId()
+		container.publishable.loadChild(c, record, inodeId)
 	}
-	container.effective.set(inodeId, record)
+
 	container.children[record.Filename()] = inodeId
+
 	return inodeId
 }
 
@@ -183,8 +189,8 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 
 	// if this is a hardlink, we must update its creationTime and the accesslist
 	// path
-	if hardlink, isHardlink := record.(*Hardlink); isHardlink {
-		hardlink.creationTime = quantumfs.NewTime(time.Now())
+	if hardlink, isHardlink := record.(*HardlinkLeg); isHardlink {
+		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
 		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
 	container.loadPublishableChild(c, record, inodeId)

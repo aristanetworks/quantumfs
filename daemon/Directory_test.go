@@ -8,7 +8,9 @@ package daemon
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"syscall"
 	"testing"
@@ -1817,6 +1819,185 @@ func TestDirectoryReadStaleDir(t *testing.T) {
 			test.AssertNoErr(err)
 			test.AssertNoErr(syscall.Unlink(
 				fmt.Sprintf("%s/f%d", dir, i)))
+		}
+	})
+}
+
+// Test our inherent assumption that underlying container size is independent of
+// the data contents in the buffer
+func TestProtoSizeConsistency(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		_, entry := quantumfs.NewDirectoryEntry(1)
+		record := quantumfs.NewDirectoryRecord()
+
+		entry.SetEntry(0, record.Publishable())
+		sizeA := len(entry.Bytes())
+
+		_, entry = quantumfs.NewDirectoryEntry(1)
+		record = quantumfs.NewDirectoryRecord()
+		record.SetType(255)
+		record.SetPermissions(1048577)
+		entry.SetEntry(0, record.Publishable())
+		sizeB := len(entry.Bytes())
+
+		_, entry = quantumfs.NewDirectoryEntry(1)
+		record = quantumfs.NewDirectoryRecord()
+		record.SetType(0)
+		record.SetPermissions(0)
+		entry.SetEntry(0, record.Publishable())
+		sizeC := len(entry.Bytes())
+
+		_, entry = quantumfs.NewDirectoryEntry(1)
+		record = quantumfs.NewDirectoryRecord()
+		record.SetType(16)
+		record.SetPermissions(32)
+		entry.SetEntry(0, record.Publishable())
+		sizeD := len(entry.Bytes())
+
+		_, entry = quantumfs.NewDirectoryEntry(1)
+		record = quantumfs.NewDirectoryRecord()
+		record.SetType(0)
+		record.SetPermissions(0)
+		entry.SetEntry(0, record.Publishable())
+		sizeE := len(entry.Bytes())
+
+		test.Assert(sizeA == sizeB && sizeB == sizeC && sizeC == sizeD &&
+			sizeD == sizeE,
+			"Underlying container size changes %d %d %d %d %d", sizeA,
+			sizeB, sizeC, sizeD, sizeE)
+	})
+}
+
+func TestMaxDirectoryRecordsSize(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		record := quantumfs.NewDirectoryRecord()
+
+		_, entry := quantumfs.NewDirectoryEntry(0 +
+			quantumfs.MaxDirectoryRecords())
+
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		offset := int(r.Uint32() % 1000000)
+		names := GenData(offset + (quantumfs.MaxDirectoryRecords() *
+			quantumfs.MaxFilenameLength))
+		names = names[offset:]
+
+		// Capnproto compresses data, so make it random to minimize that
+		for i := 0; i < quantumfs.MaxDirectoryRecords(); i++ {
+			name := names[i*quantumfs.MaxFilenameLength:]
+			name = name[:quantumfs.MaxFilenameLength]
+			record.SetFilename(string(name))
+
+			idData := name[:quantumfs.ObjectKeyLength]
+			record.SetID(quantumfs.NewObjectKeyFromBytes(idData))
+			record.SetType(quantumfs.ObjectType(r.Int()))
+			record.SetPermissions(r.Uint32())
+			record.SetOwner(quantumfs.UID(r.Uint32()))
+			record.SetGroup(quantumfs.GID(r.Uint32()))
+			record.SetSize(r.Uint64())
+			extData := name[quantumfs.ObjectKeyLength:]
+			extData = extData[:quantumfs.ObjectKeyLength]
+			extKey := quantumfs.NewObjectKeyFromBytes(extData)
+			record.SetExtendedAttributes(extKey)
+			record.SetContentTime(quantumfs.Time(r.Uint64()))
+			record.SetModificationTime(quantumfs.Time(r.Uint64()))
+			record.SetFileId(quantumfs.FileId(r.Uint64()))
+
+			entry.SetEntry(i, record.Publishable())
+		}
+
+		test.Assert(len(entry.Bytes()) < quantumfs.MaxBlockSize,
+			"MaxDirectoryRecords is incorrect: %d block vs %d (%d)",
+			len(entry.Bytes()), quantumfs.MaxBlockSize,
+			quantumfs.MaxDirectoryRecords())
+	})
+}
+
+func TestDirectorySetAttrUidPermsRoot(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+
+		test.AssertNoErr(os.Mkdir(filename, 0777))
+
+		// Root is always allowed to change UID
+		test.AssertNoErr(os.Chown(filename, 99, 99))
+
+		// Nobody else is allowed to change UID
+		defer test.SetUidGid(99, 99, []int{}).Revert()
+
+		err := os.Chown(filename, 0, 99)
+		test.Assert(err != nil && os.IsPermission(err),
+			"unexpected chown error %s", err.Error())
+
+		// However, a call to chown which doesn't change the UID is fine
+		test.AssertNoErr(os.Chown(filename, 99, 99))
+	})
+}
+
+func TestDirectoryUnlinkChildNoWrite(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		defer test.SetUidGid(99, 99, nil).Revert()
+
+		test.AssertNoErr(utils.MkdirAll(workspace+"/a/b/c", 0777))
+		test.AssertNoErr(os.Chmod(workspace+"/a/b", 0555))
+
+		err := syscall.Rmdir(workspace + "/a/b/c")
+		test.AssertErr(err)
+		test.Assert(err == syscall.EACCES, "Unexpected error: %s",
+			err.Error())
+	})
+}
+
+// Read the directory one entry at a time.
+func (test *testHelper) smallReaddirnames(file *os.File, length int) []string {
+	names := make([]string, length)
+	count := 0
+	for {
+		d, err := file.Readdirnames(1)
+		if err == io.EOF {
+			break
+		}
+		test.AssertNoErr(err)
+		test.Assert(len(d) > 0,
+			"readdirnames %q returned empty slice", file.Name())
+		names[count] = d[0]
+		count++
+	}
+	return names[0:count]
+}
+
+// This test is a modified version of a test from golang's os_test with
+// the same name
+func TestReaddirnamesOneAtATime(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/subdir"
+		test.AssertNoErr(utils.MkdirAll(dir, 0777))
+
+		for i := 0; i < 100; i++ {
+			test.createFile(dir, fmt.Sprintf("file_%d", i), 0)
+		}
+
+		file, err := os.Open(dir)
+		test.AssertNoErr(err)
+		defer file.Close()
+
+		all, err := file.Readdirnames(-1)
+		test.AssertNoErr(err)
+
+		file1, err := os.Open(dir)
+		test.AssertNoErr(err)
+		defer file1.Close()
+
+		small := test.smallReaddirnames(file1, len(all)+100)
+		test.Assert(len(small) >= len(all),
+			"len(small) is %d, less than %d", len(small), len(all))
+
+		for i, n := range all {
+			test.Assert(small[i] == n,
+				"small read %q mismatch: %v", small[i], n)
 		}
 	})
 }

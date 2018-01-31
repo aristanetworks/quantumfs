@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -386,6 +387,16 @@ func ApiInsertInodeTest(test *testHelper, uid uint32, gid uint32) {
 		return err == nil
 	})
 
+	// Ensure we can overwrite a file
+	overwriteFilename := workspaceDst + "/overwrite"
+	fd2, err := syscall.Creat(overwriteFilename, PermissionB)
+	test.Assert(err == nil, "Error creating a file to overwrite: %v", err)
+	syscall.Close(fd2)
+
+	err = api.InsertInode(dst+"/overwrite", keyF, PermissionA, uid, gid)
+	test.Assert(err == nil,
+		"Error overwriting a file: %v", err)
+
 	// InsertInode with an empty key should fail
 	err = api.InsertInode(dst+"/test/a/file1", "", PermissionA, uid, gid)
 	test.Assert(err != nil, "Unexpected success inserting empty key")
@@ -458,6 +469,27 @@ func TestApiInsertInode(t *testing.T) {
 func TestApiInsertInodeAsUser(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		ApiInsertInodeTest(test, 10100, 10999)
+	})
+}
+
+func TestInsertInodeDirties(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/dir/file"
+		api := test.getApi()
+
+		test.MakeFile(filename)
+
+		key := getExtendedKeyHelper(test, filename, "file")
+
+		test.SyncWorkspace(test.RelPath(workspace))
+
+		test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+
+			"/dir/copy", key, 0777, 0, 0))
+
+		branch := test.AbsPath(test.branchWorkspace(workspace))
+
+		test.assertFileExists(branch + "/dir/copy")
 	})
 }
 
@@ -572,5 +604,154 @@ func TestApiGetAndSetBlock(t *testing.T) {
 
 		_, err = api.GetBlock(key[:1])
 		test.Assert(err != nil, "Invalid key length allowed in GetBlock")
+	})
+}
+
+func TestInvalidWorkspaceName(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+
+		assertInvalid := func(err error) {
+			test.AssertErr(err)
+			test.Assert(strings.Contains(err.Error(), "workspace name"),
+				"Expected 'workspace name' in error: %s",
+				err.Error())
+			test.Assert(strings.Contains(err.Error(), "is malformed"),
+				"Expected 'is malformed' in error: %s",
+				err.Error())
+		}
+
+		assertInvalid(api.DeleteWorkspace("//qfs"))
+		assertInvalid(api.DeleteWorkspace("too/many/slashes/"))
+	})
+}
+
+func insertInodeTraversal(test *testHelper, createFn func(string)) {
+
+	config := test.defaultConfig()
+	test.startQuantumFs(config, nil, false)
+	dataStore := newTestDataStore(test)
+	test.SetDataStore(dataStore)
+
+	workspace := test.NewWorkspace()
+
+	test.AssertNoErr(os.MkdirAll(workspace+"/dirA", 0777))
+
+	test.SyncAllWorkspaces()
+
+	baseNumBlocks := func() int {
+		defer dataStore.countLock.Lock().Unlock()
+		return len(dataStore.setCount)
+	}()
+
+	// When we insert the inode here we'll create new metadata blocks for the
+	// workspace root and its internal directory. Take these unaccessed blocks
+	// into account.
+	baseNumBlocks += 2
+
+	createFn(workspace)
+
+	test.SyncAllWorkspaces()
+
+	// Record the set counts in the datastore
+	beforeCounts := make(map[string]int, 0)
+	func() {
+		defer dataStore.countLock.Lock().Unlock()
+
+		for k, v := range dataStore.setCount {
+			beforeCounts[k] = v
+		}
+	}()
+
+	api := test.getApi()
+	permission := uint32(syscall.S_IXUSR | syscall.S_IWGRP | syscall.S_IROTH)
+
+	_, err, key := utils.LGetXattr(workspace+"/dirA/testfile",
+		quantumfs.XAttrTypeKey, quantumfs.ExtendedKeyLength)
+	test.AssertNoErr(err)
+
+	test.AssertNoErr(api.InsertInode(test.RelPath(workspace)+
+		"/insertedFile", string(key), permission, 0, 0))
+
+	test.SyncAllWorkspaces()
+
+	// Almost all of the blocks in the workspace should have been
+	// re-set to refresh their timeouts
+
+	notRefreshed := 0
+	refreshed := 0
+	func() {
+		defer dataStore.countLock.Lock().Unlock()
+
+		for key, before := range beforeCounts {
+			if dataStore.setCount[key] <= before {
+				notRefreshed++
+			} else {
+				refreshed++
+			}
+		}
+	}()
+
+	netBlocksNotRefreshed := notRefreshed - baseNumBlocks
+	test.Assert(netBlocksNotRefreshed <= 0, "Blocks not refreshed "+
+		"during InsertInode: %d %d", netBlocksNotRefreshed,
+		refreshed)
+}
+
+func TestInsertInodeSmallFile(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		insertInodeTraversal(test, func(workspace string) {
+			test.AssertNoErr(testutils.PrintToFile(workspace+
+				"/dirA/testfile", "Some data"))
+		})
+	})
+}
+
+func TestInsertInodeMediumFile(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		insertInodeTraversal(test, func(workspace string) {
+			test.AssertNoErr(testutils.PrintToFile(workspace+
+				"/dirA/testfile", string(GenData(1000+
+				quantumfs.MaxBlockSize))))
+		})
+	})
+}
+
+func TestInsertInodeLargeFile(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		insertInodeTraversal(test, func(workspace string) {
+			test.AssertNoErr(testutils.PrintToFile(workspace+
+				"/dirA/testfile",
+				string(GenData(1+(quantumfs.MaxBlockSize*
+					quantumfs.MaxBlocksMediumFile())))))
+		})
+	})
+}
+
+func TestInsertInodeVeryLargeFile(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		insertInodeTraversal(test, func(workspace string) {
+			file, err := os.Create(workspace + "/dirA/testfile")
+			defer file.Close()
+			test.Assert(err == nil, "Error creating test file: %v", err)
+
+			testDataSize := 100 * 1024
+			data := GenData(testDataSize)
+			_, err = file.Write(data)
+			test.Assert(err == nil, "Error writing data to file: %v",
+				err)
+
+			os.Truncate(workspace+"/dirA/fileD",
+				int64(quantumfs.MaxLargeFileSize())+
+					int64(quantumfs.MaxBlockSize))
+		})
+	})
+}
+
+func TestInsertInodeSymlink(t *testing.T) {
+	runTestNoQfs(t, func(test *testHelper) {
+		insertInodeTraversal(test, func(workspace string) {
+			syscall.Symlink(workspace, workspace+"/dirA/testfile")
+		})
 	})
 }

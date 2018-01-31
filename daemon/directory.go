@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -187,7 +188,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	// Ensure we have a flattened DirectoryRecord to ensure the type is the
 	// underlying type for Hardlinks. This is required in order for
 	// objectTypeToFileType() to have access to the correct type to report.
-	entry := entry_.AsImmutableDirectoryRecord()
+	entry := entry_.AsImmutable()
 
 	attr.Ino = uint64(inodeNum)
 
@@ -331,9 +332,7 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 	newKey, err := buf.Key(&c.Ctx)
-	if err != nil {
-		panic("Failed to upload new baseLayer object")
-	}
+	utils.Assert(err == nil, "Failed to upload new baseLayer object: %v", err)
 
 	return newKey
 }
@@ -390,6 +389,14 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrI
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	defer c.funcIn("Directory::setChildAttr").Out()
+
+	if c.fuseCtx != nil && utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_UID) {
+		userUid := c.fuseCtx.Owner.Uid
+		if userUid != 0 && userUid != attr.Owner.Uid {
+			c.vlog("Non-root cannot change UID")
+			return fuse.EPERM
+		}
+	}
 
 	if dir.isOrphaned() && dir.id == inodeNum {
 		return dir.setOrphanChildAttr(c, inodeNum, attr, out, updateMtime)
@@ -455,7 +462,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 		checkLink, inodeNum := func() (bool, InodeId) {
 			defer dir.childRecordLock.Lock().Unlock()
 			record := dir.children.recordByName(c, name)
-			_, isHardlink := record.(*Hardlink)
+			_, isHardlink := record.(*HardlinkLeg)
 			return isHardlink, dir.children.inodeNum(name)
 		}()
 		if inodeNum == quantumfs.InodeIdInvalid {
@@ -599,6 +606,13 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 		children = append(children, entryInfo)
 	}
+
+	// Sort the dentries so that their order is deterministic
+	// on every invocation
+	sort.Slice(children,
+		func(i, j int) bool {
+			return children[i].filename < children[j].filename
+		})
 
 	return children
 }
@@ -756,7 +770,7 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 
 	record := dir.getRecordChildCall_(c, inodeNum)
 	if record != nil {
-		return record.AsImmutableDirectoryRecord(), nil
+		return record.AsImmutable(), nil
 	}
 
 	return nil, errors.New("Inode given is not a child of this directory")
@@ -821,7 +835,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 				return fuse.ENOENT
 			}
 
-			recordCopy = record.AsImmutableDirectoryRecord()
+			recordCopy = record.AsImmutable()
 			return fuse.OK
 		}()
 		if err != fuse.OK {
@@ -872,7 +886,12 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 
 			// Use a shallow copy of record to ensure the right type for
 			// objectTypeToFileType
-			record := record_.AsImmutableDirectoryRecord()
+			record := record_.AsImmutable()
+
+			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
+			if err != fuse.OK {
+				return err
+			}
 
 			type_ := objectTypeToFileType(c, record.Type())
 			if type_ != fuse.S_IFDIR {
@@ -933,6 +952,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 		// Update the outgoing entry size
 		out.Attr.Size = uint64(len(pointedTo))
+		out.Attr.Blocks = utils.BlocksRoundUp(out.Attr.Size, statBlockSize)
 
 		return fuse.OK
 	}()
@@ -1196,7 +1216,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	// fix the name on the copy
 	newEntry.SetFilename(newName)
 
-	hardlink, isHardlink := newEntry.(*Hardlink)
+	hardlink, isHardlink := newEntry.(*HardlinkLeg)
 	if !isHardlink {
 		// Update the inode to point to the new name and
 		// mark as accessed in both parents.
@@ -1206,8 +1226,8 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			childInode.clearAccessedCache()
 		}
 	} else {
-		hardlink.creationTime = quantumfs.NewTime(time.Now())
-		newEntry.SetContentTime(hardlink.creationTime)
+		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
+		newEntry.SetContentTime(hardlink.creationTime())
 	}
 
 	func() {
@@ -1611,9 +1631,9 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 	}
 
 	// add a check incase there's an inconsistency
-	if hardlink, isHardlink := entry.(*Hardlink); isHardlink {
+	if hardlink, isHardlink := entry.(*HardlinkLeg); isHardlink {
 		panic(fmt.Sprintf("Hardlink not recognized by workspaceroot: %d, %d",
-			inodeNum, hardlink.fileId))
+			inodeNum, hardlink.FileId()))
 	}
 
 	return dir.recordToChild(c, inodeNum, entry)
@@ -1741,7 +1761,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
 
-	go c.qfs.noteChildCreated(dir.inodeNum(), name)
+	c.qfs.noteChildCreated(c, dir.inodeNum(), name)
 
 	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
 }
