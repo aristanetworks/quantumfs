@@ -155,7 +155,7 @@ func (container *ChildContainer) delRecord(c *ctx, inodeId InodeId,
 	defer c.FuncIn("ChildContainer::delRecord", "inode %d name '%s'", inodeId,
 		name).Out()
 
-	record := container.recordByName(c, name)
+	record := container._recordByName(c, name)
 	if record == nil {
 		c.vlog("Does not exist")
 		return nil // Doesn't exist
@@ -169,9 +169,16 @@ func (container *ChildContainer) delRecord(c *ctx, inodeId InodeId,
 }
 
 func (container *ChildContainer) recordByName(c *ctx,
+	name string) quantumfs.ImmutableDirectoryRecord {
+
+	return container._recordByName(c, name)
+}
+
+// Internal use only method
+func (container *ChildContainer) _recordByName(c *ctx,
 	name string) quantumfs.DirectoryRecord {
 
-	defer c.FuncIn("ChildContainer::getRecordByName", "%s", name).Out()
+	defer c.FuncIn("ChildContainer::_recordByName", "%s", name).Out()
 
 	inodeId := container.inodeNum(name)
 	records := container.effective[inodeId]
@@ -189,9 +196,16 @@ func (container *ChildContainer) recordByName(c *ctx,
 // Note that this will return one arbitrary record in cases where that inode has
 // multiple names in this container/directory.
 func (container *ChildContainer) recordById(c *ctx,
+	inodeId InodeId) quantumfs.ImmutableDirectoryRecord {
+
+	return container._recordById(c, inodeId)
+}
+
+// Internal use only method
+func (container *ChildContainer) _recordById(c *ctx,
 	inodeId InodeId) quantumfs.DirectoryRecord {
 
-	defer c.FuncIn("ChildContainer::recordById", "inodeId %d", inodeId).Out()
+	defer c.FuncIn("ChildContainer::_recordById", "inodeId %d", inodeId).Out()
 
 	records := container.effective[inodeId]
 	if records == nil {
@@ -289,7 +303,7 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 
 	inodeId := container.inodeNum(oldName)
 	c.vlog("child %s has inode %d", oldName, inodeId)
-	record := container.recordByName(c, oldName)
+	record := container._recordByName(c, oldName)
 	if record == nil {
 		c.vlog("oldName doesn't exist")
 		return
@@ -306,6 +320,50 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 	}
 	container.setRecord(c, inodeId, record)
 	container.makePublishable(c, newName)
+}
+
+// Modify the effective view of a child according to a fuse.SetAttrIn. The child Inode
+// must be instantiated and must be on the dirty queue in order for this changes to
+// eventually be publishable.
+func (container *ChildContainer) modifyChildWithAttr(c *ctx, inodeId InodeId,
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	updateMtime bool) fuse.Status {
+
+	defer c.funcIn("ChildContainer::modifyChildWithAttr").Out()
+
+	return container.modifyChildWithFunc(c, inodeId,
+		func(record quantumfs.DirectoryRecord) {
+
+			modifyEntryWithAttr(c, newType, attr, record, updateMtime)
+		})
+}
+
+// Modify the effective view of a child according to a fuse.SetAttrIn. The child
+// Inode must be instantiated and must be on the dirty queue in order for this
+// changes to eventually be publishable.
+func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
+	modify func(record quantumfs.DirectoryRecord)) fuse.Status {
+
+	defer c.funcIn("ChildContainer::modifyChildWithFunc").Out()
+
+	record := container._recordById(c, inodeId)
+	if record == nil {
+		return fuse.ENOENT
+	}
+
+	_, hasEffective := container.effective[inodeId]
+
+	if !hasEffective && record.Type() != quantumfs.ObjectTypeHardlink {
+		// We do not modify publishable records in this method. If we don't
+		// have an effective entry we must create one. Hardlinks are always
+		// publishable, so do not create an effective entry for those types.
+		record = record.Clone()
+		container.setRecord(c, inodeId, record)
+	}
+
+	modify(record)
+
+	return fuse.OK
 }
 
 func (container *ChildContainer) directInodes() []InodeId {
@@ -337,8 +395,8 @@ func (container *ChildContainer) publishableRecords(
 	return records
 }
 
-func (container *ChildContainer) records() []quantumfs.DirectoryRecord {
-	records := make([]quantumfs.DirectoryRecord, 0, container.count())
+func (container *ChildContainer) records() []quantumfs.ImmutableDirectoryRecord {
+	records := make([]quantumfs.ImmutableDirectoryRecord, 0, container.count())
 	seen := make(map[string]bool, container.count())
 
 	for _, byInode := range container.effective {
@@ -393,10 +451,10 @@ func (container *ChildContainer) makeHardlink(c *ctx, childId InodeId) (
 
 	childname := child.Filename()
 	// remove the record from the childmap before donating it to be a hardlink
-	container.delRecord(c, childId, childname)
+	childRecord := container.delRecord(c, childId, childname)
 
 	c.vlog("Converting %s into a hardlink", childname)
-	newLink := container.dir.hardlinkTable.newHardlink(c, childId, child)
+	newLink := container.dir.hardlinkTable.newHardlink(c, childId, childRecord)
 
 	linkSrcCopy := newLink.Clone()
 	linkSrcCopy.SetFilename(childname)
@@ -428,4 +486,17 @@ func (container *ChildContainer) makePublishable(c *ctx, name string) {
 	c.vlog("Inode has %d names in this directory", len(records))
 
 	removeFromMap(container.effective, inodeId, name)
+}
+
+func (container *ChildContainer) setID(c *ctx, name string,
+	key quantumfs.ObjectKey) {
+
+	defer c.FuncIn("ChildContainer::setID", "name %s key %s", name,
+		key.String()).Out()
+
+	record := container._recordByName(c, name)
+	utils.Assert(record != nil, "Child '%s' not found in setID", name)
+
+	record.SetID(key)
+	container.makePublishable(c, name)
 }

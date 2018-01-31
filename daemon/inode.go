@@ -309,6 +309,10 @@ func (inode *InodeCommon) parentUpdateSize(c *ctx,
 	defer inode.parentLock.RLock().RUnlock()
 	defer inode.lock.Lock().Unlock()
 
+	if !inode.isOrphaned_() {
+		inode.dirty(c)
+	}
+
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = getSize_()
@@ -323,6 +327,11 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 	defer c.funcIn("InodeCommon::parentSetChildAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
+
+	if !inode.isOrphaned_() {
+		inode.dirty(c)
+	}
+
 	return inode.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
 		updateMtime)
 }
@@ -360,6 +369,11 @@ func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr str
 	defer c.funcIn("InodeCommon::parentSetChildXAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
+
+	if !inode.isOrphaned_() {
+		inode.dirty(c)
+	}
+
 	return inode.parent_(c).setChildXAttr(c, inodeNum, attr, data)
 }
 
@@ -369,6 +383,11 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 	defer c.funcIn("InodeCommon::parentRemoveChildXAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
+
+	if !inode.isOrphaned_() {
+		inode.dirty(c)
+	}
+
 	return inode.parent_(c).removeChildXAttr(c, inodeNum, attr)
 }
 
