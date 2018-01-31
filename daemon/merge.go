@@ -357,6 +357,7 @@ func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 				entryCapacity)
 			entryIdx = 0
 		}
+		c.vlog("Setting merged child %s", record.Filename())
 		baseLayer.SetEntry(entryIdx, record.Publishable())
 
 		entryIdx++
@@ -488,6 +489,8 @@ func (mp mergePreference) pick(newer quantumfs.DirectoryRecord,
 func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
 	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
+
+	defer c.funcIn("mergeAttributes").Out()
 
 	newer := local
 	older := remote
@@ -717,6 +720,8 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
 	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
+
+	defer c.funcIn("mergeFile").Out()
 
 	var baseAccessor blockAccessor
 	baseAvailable := false
