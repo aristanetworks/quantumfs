@@ -63,9 +63,11 @@ func NewRealCluster(clusterCfg ClusterConfig) Cluster {
 
 	c.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: clusterCfg.QueryNumRetries}
 
-	if clusterCfg.ConnTimeoutSec != 0 {
-		c.Timeout = time.Duration(clusterCfg.ConnTimeoutSec) * time.Second
+	if clusterCfg.ConnTimeoutSec == 0 {
+		clusterCfg.ConnTimeoutSec = 3
 	}
+
+	c.Timeout = time.Duration(clusterCfg.ConnTimeoutSec) * time.Second
 
 	cc := &RealCluster{
 		cluster: c,
