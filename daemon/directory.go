@@ -1262,7 +1262,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		if childInode != nil {
 			childInode.dirty(c)
 		} else {
-			dir.children.makePublishable(c, newName)
+			dst.children.makePublishable(c, newName)
 		}
 		dst.self.dirty(c)
 	}()
