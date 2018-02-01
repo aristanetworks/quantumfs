@@ -1104,6 +1104,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 func (dir *Directory) orphanChild_(c *ctx, name string, inode Inode) {
 	defer c.FuncIn("Directory::orphanChild_", "%s", name).Out()
 
+	removedId := dir.children.inodeNum(name)
 	removedRecord := dir.children.deleteChild(c, name, true)
 	if removedRecord == nil {
 		return
@@ -1112,10 +1113,7 @@ func (dir *Directory) orphanChild_(c *ctx, name string, inode Inode) {
 	dir.self.markAccessed(c, name,
 		markType(removedRecord.Type(),
 			quantumfs.PathDeleted))
-	removedId := dir.children.inodeNum(name)
-	if removedId == quantumfs.InodeIdInvalid {
-		return
-	}
+
 	if removedRecord.Type() == quantumfs.ObjectTypeHardlink {
 		c.vlog("nothing to do for the detached leg of hardlink")
 		// XXX handle the case where the Record is the last leg of
