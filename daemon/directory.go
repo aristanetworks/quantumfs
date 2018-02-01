@@ -1225,7 +1225,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	c.vlog("Removing source")
 	newEntry := func() quantumfs.DirectoryRecord {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.deleteChild(c, oldName, false)
+		return dir.children.delRecord(c, childInodeId, oldName)
 	}()
 	if newEntry == nil {
 		c.vlog("No source!")
