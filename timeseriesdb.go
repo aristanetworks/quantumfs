@@ -10,10 +10,17 @@ import (
 
 type Field struct {
 	Name string
-	Data int64
+	Data interface{}
 }
 
-func NewField(name_ string, data_ int64) Field {
+func NewFieldInt(name_ string, data_ int64) Field {
+	return Field{
+		Name: name_,
+		Data: data_,
+	}
+}
+
+func NewFieldString(name_ string, data_ string) Field {
 	return Field{
 		Name: name_,
 		Data: data_,

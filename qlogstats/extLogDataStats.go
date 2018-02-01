@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
+// Copyright (c) 2018 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // extLogDataStats is a stat extractor that produces a histogram from log data
@@ -17,10 +17,17 @@ type extLogDataStats struct {
 	dataFetch func(*qlog.LogOutput) (int64, bool)
 	errors    int64
 
-	stats histoStats
+	stats histogram
 }
 
-func NewExtLogDataStats(format string, nametag string, histo histoStats,
+func NewHistogramExtractor(format string, nametag string, min int64, max int64,
+	buckets int64, normalize bool, paramIdx int) StatExtractor {
+
+	return NewExtLogDataStats(format, nametag, NewHistogram(min, max, buckets,
+		normalize), GetParamIntFn(paramIdx))
+}
+
+func NewExtLogDataStats(format string, nametag string, histo histogram,
 	fetchFn func(*qlog.LogOutput) (int64, bool)) StatExtractor {
 
 	ext := &extLogDataStats{
@@ -64,7 +71,7 @@ func (ext *extLogDataStats) process() {
 				ext.stats.NewPoint(data)
 			}
 		case PublishCommandType:
-			resultChannel := cmd.Data().(chan PublishResult)
+			resultChannel := cmd.Data().(chan []Measurement)
 			resultChannel <- ext.publish()
 		case GcCommandType:
 			// do nothing since we clear every publish
@@ -72,26 +79,37 @@ func (ext *extLogDataStats) process() {
 	}
 }
 
-func (ext *extLogDataStats) publish() PublishResult {
+func (ext *extLogDataStats) publish() []Measurement {
 	tags := make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("statName", ext.name))
+	tags = appendNewTag(tags, "statName", ext.name)
 
 	fields := make([]quantumfs.Field, 0)
 
-	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
+	fields = appendNewFieldInt(fields, "samples", ext.stats.Count())
 
 	for name, data := range ext.stats.Histogram() {
-		fields = append(fields, quantumfs.NewField(name, data))
+		fields = appendNewFieldInt(fields, name, data)
 	}
 
 	// Take note of any parsing errors
-	fields = append(fields, quantumfs.NewField("errors", ext.errors))
+	fields = appendNewFieldInt(fields, "errors", ext.errors)
 
 	ext.stats.Clear()
 	ext.errors = 0
-	return PublishResult{
-		measurement: "quantumFsLogDataStats",
-		tags:        tags,
-		fields:      fields,
+	return []Measurement{{
+		name:   "quantumFsLogDataStats",
+		tags:   tags,
+		fields: fields,
+	}}
+}
+
+func GetParamIntFn(paramIdx int) func(*qlog.LogOutput) (int64, bool) {
+	return func(log *qlog.LogOutput) (int64, bool) {
+		if len(log.Args) <= paramIdx {
+			return 0, false
+		}
+
+		num := log.Args[paramIdx].(int64)
+		return num, true
 	}
 }

@@ -35,7 +35,7 @@ type Ctx struct {
 	Qctx   *quantumfs.Ctx
 	rootID quantumfs.ObjectKey
 
-	hlkeys map[quantumfs.FileId]*quantumfs.DirectRecord
+	hlkeys map[quantumfs.FileId]*quantumfs.EncodedDirectoryRecord
 }
 
 type workerData struct {
@@ -98,7 +98,8 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		Context: groupCtx,
 		Qctx:    cq,
 		rootID:  rootID,
-		hlkeys:  make(map[quantumfs.FileId]*quantumfs.DirectRecord),
+		hlkeys: make(
+			map[quantumfs.FileId]*quantumfs.EncodedDirectoryRecord),
 	}
 
 	// Start Workers
@@ -302,13 +303,14 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 }
 
 func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
-	dr *quantumfs.DirectRecord, wf WalkFunc,
+	dr *quantumfs.EncodedDirectoryRecord, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
-	// NOTE: some of the DirectRecord accesses eg: Filename, Size etc
-	//       may not be meaningful for some DirectRecords. For example -
-	//       Filename for DirectRecord in hardlinkRecord is  meaningless
-	//       Size for DirectRecord in special file is meaningless
+	// NOTE: some of the EncodedDirectoryRecord accesses eg: Filename, Size etc
+	//       may not be meaningful for some EncodedDirectoryRecords. For example,
+	//       Filename for EncodedDirectoryRecord in hardlinkRecord is
+	//       meaningless
+	//       Size for EncodedDirectoryRecord in special file is meaningless
 	//
 	//       This information is eventually sent to the walk handler
 	//       function. Current use-cases don't need to filter such

@@ -72,7 +72,7 @@ func (ext *extPairStats) process() {
 				ext.stopRequest(log)
 			}
 		case PublishCommandType:
-			resultChannel := cmd.Data().(chan PublishResult)
+			resultChannel := cmd.Data().(chan []Measurement)
 			resultChannel <- ext.publish()
 		case GcCommandType:
 			ext.gc()
@@ -110,27 +110,26 @@ func (ext *extPairStats) stopRequest(log *qlog.LogOutput) {
 	delete(ext.requests, log.ReqId)
 }
 
-func (ext *extPairStats) publish() PublishResult {
+func (ext *extPairStats) publish() []Measurement {
 	tags := make([]quantumfs.Tag, 0)
-	tags = append(tags, quantumfs.NewTag("statName", ext.name))
+	tags = appendNewTag(tags, "statName", ext.name)
 
 	fields := make([]quantumfs.Field, 0)
 
-	fields = append(fields, quantumfs.NewField("average_ns",
-		ext.stats.Average()))
-	fields = append(fields, quantumfs.NewField("maximum_ns", ext.stats.Max()))
-	fields = append(fields, quantumfs.NewField("samples", ext.stats.Count()))
+	fields = appendNewFieldInt(fields, "average_ns", ext.stats.Average())
+	fields = appendNewFieldInt(fields, "maximum_ns", ext.stats.Max())
+	fields = appendNewFieldInt(fields, "samples", ext.stats.Count())
 
 	for name, data := range ext.stats.Percentiles() {
-		fields = append(fields, quantumfs.NewField(name, data))
+		fields = appendNewFieldInt(fields, name, data)
 	}
 
 	ext.stats = basicStats{}
-	return PublishResult{
-		measurement: "quantumFsLatency",
-		tags:        tags,
-		fields:      fields,
-	}
+	return []Measurement{{
+		name:   "quantumFsLatency",
+		tags:   tags,
+		fields: fields,
+	}}
 }
 
 func (ext *extPairStats) gc() {

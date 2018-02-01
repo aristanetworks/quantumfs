@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -23,6 +24,28 @@ const (
 	OnPartialFormat                     // Match log format substring
 	OnAll                               // Match every message
 )
+
+type Measurement struct {
+	name   string
+	tags   []quantumfs.Tag
+	fields []quantumfs.Field
+}
+
+func appendNewTag(tags []quantumfs.Tag, name string, data string) []quantumfs.Tag {
+	return append(tags, quantumfs.NewTag(name, data))
+}
+
+func appendNewFieldInt(fields []quantumfs.Field, name string,
+	data int64) []quantumfs.Field {
+
+	return append(fields, quantumfs.NewFieldInt(name, data))
+}
+
+func appendNewFieldString(fields []quantumfs.Field, name string,
+	data string) []quantumfs.Field {
+
+	return append(fields, quantumfs.NewFieldString(name, data))
+}
 
 type CommandType int
 
@@ -51,14 +74,8 @@ func (cmd *MessageCommand) Data() interface{} {
 	return cmd.log
 }
 
-type PublishResult struct {
-	measurement string
-	tags        []quantumfs.Tag
-	fields      []quantumfs.Field
-}
-
 type PublishCommand struct {
-	result chan PublishResult
+	result chan []Measurement
 }
 
 func (cmd *PublishCommand) Type() CommandType {
@@ -121,10 +138,8 @@ type Aggregator struct {
 
 	queueMutex   utils.DeferableMutex
 	queueLogs    []*qlog.LogOutput
+	queueSize    int64
 	notification chan struct{}
-
-	processDeadline time.Time
-	lastProcess     time.Time
 }
 
 func NewAggregator(db_ quantumfs.TimeSeriesDB,
@@ -184,24 +199,31 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	return &agg
 }
 
-const processTimeout = time.Second
+const maxQueueSize_bytes = 10 * 1024 * 1024 * 1024
+
+func logSize(log *qlog.LogOutput) int64 {
+	rtn := int(unsafe.Sizeof(log))
+	rtn += len(log.Format)
+	for _, arg := range log.Args {
+		rtn += int(unsafe.Sizeof(arg))
+	}
+
+	return int64(rtn)
+}
 
 func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 	defer agg.queueMutex.Lock().Unlock()
 
 	agg.queueLogs = append(agg.queueLogs, log)
 
+	agg.queueSize += logSize(log)
+	if agg.queueSize > maxQueueSize_bytes {
+		panic("Qlogger processThread probably locked due to timeout")
+	}
+
 	select {
 	case agg.notification <- struct{}{}:
 	default:
-	}
-
-	// Check if the process thread has deadlocked
-	if time.Since(agg.processDeadline) > time.Duration(0) {
-		if agg.processDeadline.Sub(agg.lastProcess) > processTimeout {
-			panic("Qlogger processThread probably locked due to timeout")
-		}
-		agg.processDeadline = time.Now().Add(processTimeout)
 	}
 }
 
@@ -227,8 +249,7 @@ func (agg *Aggregator) processThread() {
 			// but gain a much quicker mutex unlock
 			rtn := agg.queueLogs
 			agg.queueLogs = make([]*qlog.LogOutput, 0, 1000)
-
-			agg.lastProcess = time.Now()
+			agg.queueSize = 0
 
 			return rtn
 		}()
@@ -268,15 +289,17 @@ func (agg *Aggregator) filterAndDistribute(log *qlog.LogOutput) {
 }
 
 func (agg *Aggregator) publish() {
+	versionTag := quantumfs.NewTag("version", agg.daemonVersion)
+
 	for {
 		time.Sleep(agg.publishInterval)
 		nowTime := time.Now()
 
-		results := make([]chan PublishResult, 0, len(agg.extractors))
+		results := make([]chan []Measurement, 0, len(agg.extractors))
 		// Trigger extractors to publish in parallel
 		for _, extractor := range agg.extractors {
 			targetChan := extractor.Chan()
-			resultChannel := make(chan PublishResult)
+			resultChannel := make(chan []Measurement, 1)
 			targetChan <- &PublishCommand{
 				result: resultChannel,
 			}
@@ -286,15 +309,21 @@ func (agg *Aggregator) publish() {
 
 		// Wait for all their results to come in
 		for _, resultChannel := range results {
-			result := <-resultChannel
-			if result.tags != nil && len(result.tags) > 0 {
-				// add the qfs version tag
-				result.tags = append(result.tags,
-					quantumfs.NewTag("version",
-						agg.daemonVersion))
+			measurements := <-resultChannel
 
-				agg.db.Store(result.measurement, result.tags,
-					result.fields, nowTime)
+			for _, measurement := range measurements {
+				name := measurement.name
+				tags := measurement.tags
+				fields := measurement.fields
+
+				if tags == nil || len(tags) == 0 {
+					continue
+				}
+
+				// add the qfs version tag
+				tags = append(tags, versionTag)
+
+				agg.db.Store(name, tags, fields, nowTime)
 			}
 		}
 	}
@@ -318,7 +347,7 @@ func (a byIncreasing) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
 
 // A data aggregator that outputs histogram based statistics
-type histoStats struct {
+type histogram struct {
 	minVal      int64
 	maxVal      int64
 	bucketWidth int64
@@ -328,10 +357,11 @@ type histoStats struct {
 	beforeCount int64
 	pastCount   int64
 
-	count int64
+	count     int64
+	normalize bool
 }
 
-func NewHistoStats(min int64, max int64, buckets_ int64) histoStats {
+func NewHistogram(min int64, max int64, buckets_ int64, normalize bool) histogram {
 	numRange := (1 + max) - min
 	width := numRange / buckets_
 	// when the range doesn't divide evenly, choose to have a smaller upper
@@ -340,15 +370,16 @@ func NewHistoStats(min int64, max int64, buckets_ int64) histoStats {
 		width++
 	}
 
-	return histoStats{
+	return histogram{
 		minVal:      min,
 		maxVal:      max,
 		bucketWidth: width,
 		buckets:     make([]int64, buckets_),
+		normalize:   normalize,
 	}
 }
 
-func (hs *histoStats) NewPoint(data int64) {
+func (hs *histogram) NewPoint(data int64) {
 	if data < hs.minVal {
 		hs.beforeCount++
 	} else if data > hs.maxVal {
@@ -361,18 +392,18 @@ func (hs *histoStats) NewPoint(data int64) {
 	hs.count++
 }
 
-func (hs *histoStats) Count() int64 {
+func (hs *histogram) Count() int64 {
 	return hs.count
 }
 
-func (hs *histoStats) Clear() {
+func (hs *histogram) Clear() {
 	hs.buckets = make([]int64, len(hs.buckets))
 	hs.beforeCount = 0
 	hs.pastCount = 0
 	hs.count = 0
 }
 
-func (hs *histoStats) Histogram() map[string]int64 {
+func (hs *histogram) Histogram() map[string]int64 {
 	rtn := make(map[string]int64)
 
 	min := hs.minVal
@@ -382,10 +413,12 @@ func (hs *histoStats) Histogram() map[string]int64 {
 		tag := strconv.Itoa(int(min)) + "-" + strconv.Itoa(int(nextMin))
 		if hs.count == 0 {
 			rtn[tag] = 0
-		} else {
+		} else if hs.normalize {
 			// Normalize the histogram to a percentage for
 			// easier interpretation
 			rtn[tag] = (100 * count) / hs.count
+		} else {
+			rtn[tag] = count
 		}
 		min = nextMin
 	}
