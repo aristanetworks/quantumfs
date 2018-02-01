@@ -114,7 +114,8 @@ func (container *ChildContainer) loadChild(c *ctx,
 func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	record quantumfs.DirectoryRecord) {
 
-	defer c.FuncIn("ChildContainer::setRecord", "inode %d", inodeId).Out()
+	defer c.FuncIn("ChildContainer::setRecord", "inode %d name %s", inodeId,
+		record.Filename()).Out()
 
 	// Since we have an inodeId this child is or will be instantiated and so is
 	// placed in the effective set.
