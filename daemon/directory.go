@@ -1252,7 +1252,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	}
 
 	// Add to destination, possibly removing the overwritten inode
-	c.vlog("Adding to destionation directory")
+	c.vlog("Adding to destination directory")
 	func() {
 		defer dst.childRecordLock.Lock().Unlock()
 		dst.orphanChild_(c, newName, overwrittenInode)
