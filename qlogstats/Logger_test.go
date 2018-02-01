@@ -315,7 +315,7 @@ func TestExtLogDataExtractor(t *testing.T) {
 
 		testFmt := "DATA POINT %d"
 
-		extractor := NewHistogram(testFmt, "test_ext", 0, 99,
+		extractor := NewHistogramExtractor(testFmt, "test_ext", 0, 99,
 			10, false, 0)
 
 		// Setup a histogram where each bucket i has 2*i items in it

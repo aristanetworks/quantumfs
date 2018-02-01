@@ -20,8 +20,8 @@ type extLogDataStats struct {
 	stats histogram
 }
 
-func NewHistogram(format string, nametag string, min int64, max int64, buckets int64,
-	normalize bool, paramIdx int) StatExtractor {
+func NewHistogramExtractor(format string, nametag string, min int64, max int64,
+	buckets int64, normalize bool, paramIdx int) StatExtractor {
 
 	return NewExtLogDataStats(format, nametag, NewHistogram(min, max, buckets,
 		normalize), GetParamIntFn(paramIdx))
