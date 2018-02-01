@@ -407,14 +407,29 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 
-		result := dir.children.modifyChildWithAttr(c, inodeNum, newType,
+		dir.children.modifyChildWithAttr(c, inodeNum, newType,
 			attr, updateMtime)
-		if result != fuse.OK {
-			return result
+		entry := dir.children.recordById(c, inodeNum)
+
+		if entry == nil && dir.self.isWorkspaceRoot() {
+			// if we don't have the child, maybe we're wsr and it's a
+			// hardlink
+			c.vlog("Checking hardlink table")
+			valid, linkRecord :=
+				dir.hardlinkTable.getHardlinkByInode(inodeNum)
+			if valid {
+				c.vlog("Hardlink found")
+				modifyEntryWithAttr(c, newType, attr, linkRecord,
+					updateMtime)
+				entry = linkRecord
+			}
+		}
+
+		if entry == nil {
+			return fuse.ENOENT
 		}
 
 		if out != nil {
-			entry := dir.children.recordById(c, inodeNum)
 			fillAttrOutCacheData(c, out)
 			fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum,
 				c.fuseCtx.Owner, entry)

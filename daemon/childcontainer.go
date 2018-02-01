@@ -327,11 +327,11 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 // eventually be publishable.
 func (container *ChildContainer) modifyChildWithAttr(c *ctx, inodeId InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	updateMtime bool) fuse.Status {
+	updateMtime bool) {
 
 	defer c.funcIn("ChildContainer::modifyChildWithAttr").Out()
 
-	return container.modifyChildWithFunc(c, inodeId,
+	container.modifyChildWithFunc(c, inodeId,
 		func(record quantumfs.DirectoryRecord) {
 
 			modifyEntryWithAttr(c, newType, attr, record, updateMtime)
@@ -342,13 +342,13 @@ func (container *ChildContainer) modifyChildWithAttr(c *ctx, inodeId InodeId,
 // Inode must be instantiated and must be on the dirty queue in order for this
 // changes to eventually be publishable.
 func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
-	modify func(record quantumfs.DirectoryRecord)) fuse.Status {
+	modify func(record quantumfs.DirectoryRecord)) {
 
 	defer c.funcIn("ChildContainer::modifyChildWithFunc").Out()
 
 	record := container._recordById(c, inodeId)
 	if record == nil {
-		return fuse.ENOENT
+		return
 	}
 
 	_, hasEffective := container.effective[inodeId]
@@ -362,8 +362,6 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 	}
 
 	modify(record)
-
-	return fuse.OK
 }
 
 func (container *ChildContainer) directInodes() []InodeId {

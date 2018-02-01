@@ -25,7 +25,7 @@ const F_OK = 0
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	entry quantumfs.DirectoryRecord, updateMtime bool) {
 
-	defer c.funcIn("modifyEntryWithAttr").Out()
+	defer c.FuncIn("modifyEntryWithAttr", "valid %x", attr.Valid).Out()
 
 	// Update the type if needed
 	if newType != nil {
