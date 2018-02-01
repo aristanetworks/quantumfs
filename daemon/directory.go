@@ -1237,10 +1237,10 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	hardlink, isHardlink := newEntry.(*HardlinkLeg)
 	if !isHardlink {
-		c.vlog("Updating name")
 		// Update the inode to point to the new name and
 		// mark as accessed in both parents.
 		if childInode != nil {
+			c.vlog("Updating name and parent")
 			childInode.setParent_(dst.inodeNum())
 			childInode.setName(newName)
 			childInode.clearAccessedCache()
