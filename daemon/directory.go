@@ -1546,12 +1546,28 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.modifyChildWithFunc(c, inodeNum,
-			func(record quantumfs.DirectoryRecord) {
+		record := dir.children.recordById(c, inodeNum)
 
-				record.SetExtendedAttributes(key)
-				record.SetContentTime(quantumfs.NewTime(time.Now()))
-			})
+		now := quantumfs.NewTime(time.Now())
+		if record != nil {
+			dir.children.modifyChildWithFunc(c, inodeNum,
+				func(record quantumfs.DirectoryRecord) {
+
+					record.SetExtendedAttributes(key)
+					record.SetContentTime(now)
+				})
+		} else if dir.self.isWorkspaceRoot() {
+			// if we don't have the child, maybe we're wsr and it's a
+			// hardlink
+			c.vlog("Checking hardlink table")
+			valid, linkRecord :=
+				dir.hardlinkTable.getHardlinkByInode(inodeNum)
+			if valid {
+				c.vlog("Hardlink found")
+				linkRecord.SetExtendedAttributes(key)
+				linkRecord.SetContentTime(now)
+			}
+		}
 	}()
 	dir.self.dirty(c)
 
@@ -1616,12 +1632,28 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.modifyChildWithFunc(c, inodeNum,
-			func(record quantumfs.DirectoryRecord) {
+		record := dir.children.recordById(c, inodeNum)
 
-				record.SetExtendedAttributes(key)
-				record.SetContentTime(quantumfs.NewTime(time.Now()))
-			})
+		now := quantumfs.NewTime(time.Now())
+		if record != nil {
+			dir.children.modifyChildWithFunc(c, inodeNum,
+				func(record quantumfs.DirectoryRecord) {
+
+					record.SetExtendedAttributes(key)
+					record.SetContentTime(now)
+				})
+		} else if dir.self.isWorkspaceRoot() {
+			// if we don't have the child, maybe we're wsr and it's a
+			// hardlink
+			c.vlog("Checking hardlink table")
+			valid, linkRecord :=
+				dir.hardlinkTable.getHardlinkByInode(inodeNum)
+			if valid {
+				c.vlog("Hardlink found")
+				linkRecord.SetExtendedAttributes(key)
+				linkRecord.SetContentTime(now)
+			}
+		}
 	}()
 	dir.self.dirty(c)
 
