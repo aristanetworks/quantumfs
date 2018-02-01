@@ -1169,12 +1169,15 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	overwrittenInode := c.qfs.inodeNoInstantiate(c, overwrittenInodeId)
 
 	if childInode != nil {
+		c.vlog("checking source for hardlink normalization")
 		childInode.parentCheckLinkReparent(c, dir)
 	}
 	if overwrittenInode != nil {
+		c.vlog("checking destination for hardlink normalization")
 		overwrittenInode.parentCheckLinkReparent(c, dst)
 	}
 
+	c.vlog("Aquiring locks")
 	if childInode != nil && overwrittenInode != nil {
 		firstChild, lastChild := getLockOrder(childInode, overwrittenInode)
 		defer firstChild.getParentLock().Lock().Unlock()
@@ -1200,6 +1203,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	defer lastLock.Lock().Unlock()
 
 	result = func() fuse.Status {
+		c.vlog("Checking if destination is an empty directory")
 		defer dst.childRecordLock.Lock().Unlock()
 
 		dstRecord := dst.children.recordByName(c, newName)
@@ -1218,6 +1222,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	// Remove from source. This is atomic because both the source and destination
 	// directories are locked.
+	c.vlog("Removing source")
 	newEntry := func() quantumfs.DirectoryRecord {
 		defer dir.childRecordLock.Lock().Unlock()
 		return dir.children.deleteChild(c, oldName, false)
@@ -1232,6 +1237,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	hardlink, isHardlink := newEntry.(*HardlinkLeg)
 	if !isHardlink {
+		c.vlog("Updating name")
 		// Update the inode to point to the new name and
 		// mark as accessed in both parents.
 		if childInode != nil {
@@ -1240,11 +1246,13 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			childInode.clearAccessedCache()
 		}
 	} else {
+		c.vlog("Updating hardlink creation time")
 		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
 		newEntry.SetContentTime(hardlink.creationTime())
 	}
 
 	// Add to destination, possibly removing the overwritten inode
+	c.vlog("Adding to destionation directory")
 	func() {
 		defer dst.childRecordLock.Lock().Unlock()
 		dst.orphanChild_(c, newName, overwrittenInode)

@@ -187,10 +187,15 @@ func (container *ChildContainer) _recordByName(c *ctx,
 	}
 
 	if records == nil {
-		c.vlog("Does not exist")
+		c.vlog("Inode does not exist")
 		return nil // Does not exist
 	}
-	return records[name]
+
+	record := records[name]
+	if record == nil {
+		c.vlog("Name does not exist")
+	}
+	return record
 }
 
 // Note that this will return one arbitrary record in cases where that inode has
