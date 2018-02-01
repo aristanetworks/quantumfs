@@ -292,6 +292,8 @@ func updateMapDescend_DOWN(c *ctx, rc *RefreshContext,
 func (dir *Directory) hideEntry_DOWN_(c *ctx, childId InodeId,
 	localRecord quantumfs.DirectoryRecord) {
 
+	defer c.funcIn("Directory::hideEntry_DOWN_").Out()
+
 	oldName := localRecord.Filename()
 	hiddenName := fmt.Sprintf(".hidden.%d", localRecord.FileId())
 	for {
@@ -325,6 +327,9 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 	dir.children.foreachChild(c, func(childname string, childId InodeId) {
 		localRecord := dir.children.recordByName(c, childname)
 		remoteRecord := remoteEntries[childname]
+
+		c.vlog("Processing %s local %t remote %t", childname,
+			localRecord != nil, remoteRecord != nil)
 
 		if rc.isInodeUsedAfterRefresh(c, localRecord, remoteRecord) {
 			if shouldHideLocalRecord(localRecord, remoteRecord) {
