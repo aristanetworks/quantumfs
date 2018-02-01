@@ -23,7 +23,7 @@ type extLogDataStats struct {
 func NewHistogram(format string, nametag string, min int64, max int64, buckets int64,
 	normalize bool, paramIdx int) StatExtractor {
 
-	return NewExtLogDataStats(format, nametag, NewHistoStats(min, max, buckets,
+	return NewExtLogDataStats(format, nametag, NewHistogram(min, max, buckets,
 		normalize), GetParamIntFn(paramIdx))
 }
 

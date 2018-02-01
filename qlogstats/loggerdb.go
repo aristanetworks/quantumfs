@@ -361,7 +361,7 @@ type histogram struct {
 	normalize bool
 }
 
-func NewHistoStats(min int64, max int64, buckets_ int64, normalize bool) histogram {
+func NewHistogram(min int64, max int64, buckets_ int64, normalize bool) histogram {
 	numRange := (1 + max) - min
 	width := numRange / buckets_
 	// when the range doesn't divide evenly, choose to have a smaller upper
