@@ -541,7 +541,7 @@ func (wsdb *WorkspaceDB) sendNotifications(c *quantumfs.Ctx) {
 	}
 }
 
-func (wsdb *WorkspaceDB) GetSecondHead() *WorkspaceDB {
+func (wsdb *WorkspaceDB) GetAdditionalHead() *WorkspaceDB {
 	wsdb2 := NewWorkspaceDB("").(*WorkspaceDB)
 	wsdb2.cache = wsdb.cache
 	wsdb2.CacheMutex = wsdb.CacheMutex

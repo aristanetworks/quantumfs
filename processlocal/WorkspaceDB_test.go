@@ -333,7 +333,7 @@ func TestPubSubPanic(t *testing.T) {
 func TestPubSubMultiHead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		wsdb1 := test.wsdb.(*WorkspaceDB)
-		wsdb2 := wsdb1.GetSecondHead()
+		wsdb2 := wsdb1.GetAdditionalHead()
 
 		called := false
 		callback := func(updates map[string]quantumfs.WorkspaceState) {
