@@ -14,8 +14,8 @@ import (
 	qubit "github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
-	"github.com/aristanetworks/qubit/tools/qwalker/cmd/cmdproc"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
+	"github.com/aristanetworks/qubit/tools/utils/cmdproc"
 )
 
 var walkFlags *flag.FlagSet

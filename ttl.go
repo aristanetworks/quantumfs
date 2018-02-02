@@ -12,9 +12,9 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
-	"github.com/aristanetworks/qubit/tools/qwalker/cmd/cmdproc"
 	walkutils "github.com/aristanetworks/qubit/tools/qwalker/utils"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
+	"github.com/aristanetworks/qubit/tools/utils/cmdproc"
 )
 
 func init() {

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aristanetworks/qubit/tools/qwalker/cmd/cmdproc"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
+	"github.com/aristanetworks/qubit/tools/utils/cmdproc"
 )
 
 func init() {

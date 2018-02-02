@@ -12,7 +12,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
-	"github.com/aristanetworks/qubit/tools/qwalker/cmd/cmdproc"
+	"github.com/aristanetworks/qubit/tools/utils/cmdproc"
 )
 
 func init() {
