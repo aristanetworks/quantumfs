@@ -9,7 +9,6 @@ package daemon
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -20,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -264,16 +264,13 @@ func TestPublishRecordsToBeConsistent(t *testing.T) {
 		mnt1 := test.qfsInstances[1].config.MountPath + "/"
 		workspaceName := test.RelPath(workspace0)
 		workspace1 := mnt1 + workspaceName
-		dir := "dir"
-		file1 := "testFile1"
-		file2 := "testFile2"
 		content0 := "stale"
 		content1 := "content"
 
-		file2fullname0 := fmt.Sprintf("%s/%s/%s", workspace0, dir, file2)
+		file2mnt0 := workspace0 + "/dir/testFile2"
 
-		file1fullname1 := fmt.Sprintf("%s/%s/%s", workspace1, dir, file1)
-		file2fullname1 := fmt.Sprintf("%s/%s/%s", workspace1, dir, file2)
+		file1mnt1 := workspace1 + "/dir/testFile1"
+		file2mnt1 := workspace1 + "/dir/testFile2"
 
 		test.markImmutable(c, workspaceName)
 		api1, err := quantumfs.NewApiWithPath(mnt1 + "api")
@@ -281,43 +278,48 @@ func TestPublishRecordsToBeConsistent(t *testing.T) {
 		defer api1.Close()
 		test.AssertNoErr(api1.EnableRootWrite(workspaceName))
 
-		test.AssertNoErr(utils.MkdirAll(workspace1+"/"+dir, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file2fullname1, content0))
+		test.AssertNoErr(utils.MkdirAll(workspace1+"/dir", 0777))
+		test.AssertNoErr(testutils.PrintToFile(file2mnt1, content0))
 		test.AssertNoErr(api1.SyncAll())
 
+		// Register for all workspace updates so we know when the first
+		// update happens after the sync above and therefore when we need to
+		// check the newly added file.
+		wait := make(chan struct{})
+		wsdb := test.qfsInstances[0].config.WorkspaceDB
+		wsdbPl := wsdb.(*processlocal.WorkspaceDB)
+		wsdb = wsdbPl.GetAdditionalHead()
+		callback := func(updates map[string]quantumfs.WorkspaceState) {
+			close(wait)
+		}
+		wsdb.SetCallback(callback)
+		wsdb.SubscribeTo(workspaceName)
+
 		// This will create file1 which dirties the parent directory
-		test.AssertNoErr(testutils.PrintToFile(file1fullname1, content1))
+		test.AssertNoErr(testutils.PrintToFile(file1mnt1, content1))
 
 		// Now this will modify file2, which moves to effective view
-		test.AssertNoErr(testutils.OverWriteFile(file2fullname1, content1))
+		test.AssertNoErr(testutils.OverWriteFile(file2mnt1, content1))
 
 		var stat syscall.Stat_t
-		test.AssertNoErr(syscall.Stat(file2fullname1, &stat))
+		test.AssertNoErr(syscall.Stat(file2mnt1, &stat))
 		expectedSize := stat.Size
 
-		// refresh may conceals the fact that the rootId is inconsistent by
-		// making the assumption that if the ID of two records match, there
-		// has been no changes to it.
+		test.Log("Waiting for update to sync")
+		select {
+		case <-wait:
+			test.Assert(false, "Workspace update prior to test ready")
+		default:
+		}
+		<-wait
 
-		// However, loading the workspace for the first time does not have
-		// that luxury.
+		// Since we've never accessed the workspace via instance0 it
+		// shouldn't have been loaded.
+		test.AssertNoErr(syscall.Stat(file2mnt0, &stat))
+		test.Assert(stat.Size == expectedSize, "File had unexpected size %d",
+			stat.Size)
 
-		// In this test we prevent the workspaceroot inode from remaining
-		// instantiated by remounting the mountpoint and thus preventing
-		// refresh from kicking in.
-
-		test.remountFilesystem()
-
-		test.WaitFor(file2fullname0+" to have correct size", func() bool {
-			defer test.remountFilesystem()
-			test.AssertNoErr(syscall.Stat(file2fullname0, &stat))
-
-			test.Log("Comparing sizes %d vs. %d", stat.Size,
-				expectedSize)
-			return stat.Size == expectedSize
-		})
-
-		file, err := os.OpenFile(file2fullname0, os.O_RDONLY, 0777)
+		file, err := os.OpenFile(file2mnt0, os.O_RDONLY, 0777)
 		test.AssertNoErr(err)
 		defer file.Close()
 		test.verifyContentStartsWith(file, content1)
