@@ -27,7 +27,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 		callback:      nil,
 		updates:       nil,
 		subscriptions: map[string]bool{},
-		peers:         make([]*WorkspaceDB, 0, 100),
+		peers:         make([]*WorkspaceDB, 100),
 	}
 
 	wsdb.peers = append(wsdb.peers, wsdb)
@@ -440,7 +440,7 @@ func (wsdb *WorkspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 
 	if recurse {
 		for i, peer := range wsdb.peers {
-			if peer == wsdb {
+			if peer == wsdb || peer == nil {
 				continue
 			}
 
@@ -557,7 +557,15 @@ func (wsdb *WorkspaceDB) GetAdditionalHead() *WorkspaceDB {
 	wsdb2.CacheMutex = wsdb.CacheMutex
 
 	wsdb2.peers = wsdb.peers
-	wsdb.peers = append(wsdb.peers, wsdb2)
 
-	return wsdb2
+	for i, peer := range wsdb2.peers {
+		if peer != nil {
+			continue
+		}
+		wsdb2.peers[i] = wsdb2
+		return wsdb2
+	}
+
+	utils.Assert(false, "No WSDB head slots available")
+	return nil
 }
