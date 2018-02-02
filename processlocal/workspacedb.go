@@ -27,7 +27,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 		callback:      nil,
 		updates:       nil,
 		subscriptions: map[string]bool{},
-		peers:         make([]*WorkspaceDB, 0),
+		peers:         make([]*WorkspaceDB, 0, 100),
 	}
 
 	wsdb.peers = append(wsdb.peers, wsdb)
@@ -439,11 +439,12 @@ func (wsdb *WorkspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 	workspaceName := typespace + "/" + namespace + "/" + workspace
 
 	if recurse {
-		for _, peer := range wsdb.peers {
+		for i, peer := range wsdb.peers {
 			if peer == wsdb {
 				continue
 			}
 
+			c.Vlog(qlog.LogWorkspaceDb, "Notifying peer WSDB %d", i)
 			peer.notifySubscribers_(c, typespace, namespace, workspace,
 				false)
 		}
