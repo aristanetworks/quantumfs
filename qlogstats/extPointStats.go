@@ -13,7 +13,6 @@ import (
 type extPointStats struct {
 	StatExtractorBase
 
-	format        string
 	partialFormat bool
 
 	stats basicStats
@@ -35,7 +34,6 @@ func newExtPointStats(format string, nametag string,
 	}
 
 	ext := &extPointStats{
-		format:        format,
 		partialFormat: partialFormat,
 	}
 
