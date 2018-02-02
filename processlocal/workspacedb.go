@@ -27,7 +27,10 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 		callback:      nil,
 		updates:       nil,
 		subscriptions: map[string]bool{},
+		peers:         make([]*WorkspaceDB, 0),
 	}
+
+	wsdb.peers = append(wsdb.peers, wsdb)
 
 	type_ := quantumfs.NullSpaceName
 	name_ := quantumfs.NullSpaceName
@@ -74,7 +77,7 @@ type WorkspaceDB struct {
 	updates       map[string]quantumfs.WorkspaceState
 	subscriptions map[string]bool
 
-	peer *WorkspaceDB
+	peers []*WorkspaceDB
 }
 
 func (wsdb *WorkspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
@@ -435,9 +438,15 @@ func (wsdb *WorkspaceDB) notifySubscribers_(c *quantumfs.Ctx, typespace string,
 
 	workspaceName := typespace + "/" + namespace + "/" + workspace
 
-	if wsdb.peer != nil && recurse {
-		wsdb.peer.notifySubscribers_(c, typespace, namespace, workspace,
-			false)
+	if recurse {
+		for _, peer := range wsdb.peers {
+			if peer == wsdb {
+				continue
+			}
+
+			peer.notifySubscribers_(c, typespace, namespace, workspace,
+				false)
+		}
 	}
 
 	if _, subscribed := wsdb.subscriptions[workspaceName]; !subscribed {
@@ -541,12 +550,13 @@ func (wsdb *WorkspaceDB) sendNotifications(c *quantumfs.Ctx) {
 	}
 }
 
-func (wsdb *WorkspaceDB) GetSecondHead() *WorkspaceDB {
+func (wsdb *WorkspaceDB) GetAdditionalHead() *WorkspaceDB {
 	wsdb2 := NewWorkspaceDB("").(*WorkspaceDB)
 	wsdb2.cache = wsdb.cache
 	wsdb2.CacheMutex = wsdb.CacheMutex
-	wsdb2.peer = wsdb
-	wsdb.peer = wsdb2
+
+	wsdb2.peers = wsdb.peers
+	wsdb.peers = append(wsdb.peers, wsdb2)
 
 	return wsdb2
 }
