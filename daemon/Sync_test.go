@@ -317,7 +317,6 @@ func TestPublishRecordsToBeConsistent(t *testing.T) {
 			return stat.Size == expectedSize
 		})
 
-		defer test.remountFilesystem()
 		file, err := os.OpenFile(file2fullname0, os.O_RDONLY, 0777)
 		test.AssertNoErr(err)
 		defer file.Close()
