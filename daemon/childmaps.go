@@ -136,9 +136,9 @@ func (cmap *ChildMap) loadChild(c *ctx, entry quantumfs.DirectoryRecord,
 
 	if entry.Type() == quantumfs.ObjectTypeHardlink {
 		fileId := entry.FileId()
-		if _, isHardlink := entry.(*Hardlink); !isHardlink {
+		if _, isHardlink := entry.(*HardlinkLeg); !isHardlink {
 			// hardlink leg creation time is stored in its ContentTime
-			entry = newHardlink(entry.Filename(), fileId,
+			entry = newHardlinkLeg(entry.Filename(), fileId,
 				entry.ContentTime(), cmap.dir.hardlinkTable)
 		}
 
@@ -174,9 +174,9 @@ func (cmap *ChildMap) deleteChild(c *ctx, inodeId InodeId,
 	}
 
 	// This may be a hardlink that is due to be converted.
-	if hardlink, isHardlink := record.(*Hardlink); isHardlink && fixHardlinks {
+	if hardlink, ok := record.(*HardlinkLeg); ok && fixHardlinks {
 		newRecord, inodeId := cmap.dir.hardlinkTable.removeHardlink(c,
-			hardlink.fileId)
+			hardlink.FileId())
 
 		// Wsr says we're about to orphan the last hardlink copy
 		if newRecord != nil || inodeId != quantumfs.InodeIdInvalid {
@@ -188,15 +188,15 @@ func (cmap *ChildMap) deleteChild(c *ctx, inodeId InodeId,
 	}
 	result := cmap.delRecord(inodeId, name)
 
-	if link, isHardlink := record.(*Hardlink); isHardlink {
+	if link, ok := record.(*HardlinkLeg); ok {
 		if !fixHardlinks {
 			return nil
 		}
-		if !cmap.dir.hardlinkTable.hardlinkExists(c, link.fileId) {
+		if !cmap.dir.hardlinkTable.hardlinkExists(c, link.FileId()) {
 			c.vlog("hardlink does not exist")
 			return nil
 		}
-		if cmap.dir.hardlinkTable.hardlinkDec(link.fileId) {
+		if cmap.dir.hardlinkTable.hardlinkDec(link.FileId()) {
 			// If the refcount was greater than one we shouldn't
 			// reparent.
 			c.vlog("Hardlink referenced elsewhere")
@@ -231,13 +231,13 @@ func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
 	}
 
 	// If it's already a hardlink, great no more work is needed
-	if link, isLink := child.(*Hardlink); isLink {
+	if link, isLink := child.(*HardlinkLeg); isLink {
 		c.vlog("Already a hardlink")
 
 		recordCopy := *link
 
 		// Ensure we update the ref count for this hardlink
-		cmap.dir.hardlinkTable.hardlinkInc(link.fileId)
+		cmap.dir.hardlinkTable.hardlinkInc(link.FileId())
 
 		return &recordCopy, fuse.OK
 	}
@@ -262,7 +262,7 @@ func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
 	linkSrcCopy.SetFilename(childname)
 	cmap.setRecord(c, childId, linkSrcCopy)
 
-	newLink.creationTime = quantumfs.NewTime(time.Now())
-	newLink.SetContentTime(newLink.creationTime)
+	newLink.setCreationTime(quantumfs.NewTime(time.Now()))
+	newLink.SetContentTime(newLink.creationTime())
 	return newLink, fuse.OK
 }

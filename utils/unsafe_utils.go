@@ -29,3 +29,12 @@ func noescape(p unsafe.Pointer) unsafe.Pointer {
 func MoveByteSliceToString(b []byte) string {
 	return *(*string)(noescape(unsafe.Pointer(&b)))
 }
+
+func MoveStringToByteSlice(str string) []byte {
+	return *(*[]byte)(noescape(unsafe.Pointer(&str)))
+}
+
+func NoescapeInterface(arg interface{}) interface{} {
+	argp := noescape(unsafe.Pointer(&arg))
+	return *((*interface{})(argp))
+}
