@@ -563,8 +563,9 @@ func (wsdb *WorkspaceDB) GetAdditionalHead() *WorkspaceDB {
 			continue
 		}
 		wsdb2.peers[i] = wsdb2
-		break
+		return wsdb2
 	}
 
-	return wsdb2
+	utils.Assert(false, "No WSDB head slots available")
+	return nil
 }
