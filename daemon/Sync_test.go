@@ -254,3 +254,71 @@ func TestNoImplicitSync(t *testing.T) {
 			"Datastore sets didn't happen! %d", setCount)
 	})
 }
+
+func TestPublishRecordsToBeConsistent(t *testing.T) {
+	runDualQuantumFsTest(t, func(test *testHelper) {
+		workspace0 := test.NewWorkspace()
+		c := test.TestCtx()
+		mnt1 := test.qfsInstances[1].config.MountPath + "/"
+		workspaceName := test.RelPath(workspace0)
+		workspace1 := mnt1 + workspaceName
+		dir := "dir"
+		file1 := "testFile1"
+		file2 := "testFile2"
+		content0 := "stale"
+		content1 := "content"
+
+		file2fullname0 := fmt.Sprintf("%s/%s/%s", workspace0, dir, file2)
+
+		file1fullname1 := fmt.Sprintf("%s/%s/%s", workspace1, dir, file1)
+		file2fullname1 := fmt.Sprintf("%s/%s/%s", workspace1, dir, file2)
+
+		test.markImmutable(c, workspaceName)
+		api1, err := quantumfs.NewApiWithPath(mnt1 + "api")
+		test.AssertNoErr(err)
+		defer api1.Close()
+		test.AssertNoErr(api1.EnableRootWrite(workspaceName))
+
+		test.AssertNoErr(utils.MkdirAll(workspace1+"/"+dir, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file2fullname1, content0))
+		test.AssertNoErr(api1.SyncAll())
+
+		// This will create file1 which dirties the parent directory
+		test.AssertNoErr(testutils.PrintToFile(file1fullname1, content1))
+
+		// Now this will modify file2, which moves to effective view
+		test.AssertNoErr(testutils.OverWriteFile(file2fullname1, content1))
+
+		var stat syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(file2fullname1, &stat))
+		expectedSize := stat.Size
+
+		// refresh may conceals the fact that the rootId is inconsistent by
+		// making the assumption that if the ID of two records match, there
+		// has been no changes to it.
+
+		// However, loading the workspace for the first time does not have
+		// that luxury.
+
+		// In this test we prevent the workspaceroot inode from remaining
+		// instantiated by remounting the mountpoint and thus preventing
+		// refresh from kicking in.
+
+		test.remountFilesystem()
+
+		test.WaitFor(file2fullname0+" to have correct size", func() bool {
+			defer test.remountFilesystem()
+			test.AssertNoErr(syscall.Stat(file2fullname0, &stat))
+
+			test.Log("Comparing sizes %d vs. %d", stat.Size,
+				expectedSize)
+			return stat.Size == expectedSize
+		})
+
+		defer test.remountFilesystem()
+		file, err := os.OpenFile(file2fullname0, os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+		defer file.Close()
+		test.verifyContentStartsWith(file, content1)
+	})
+}
