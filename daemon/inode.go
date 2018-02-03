@@ -442,6 +442,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	// Ensure that we update this version of the record with this instance
 	// of the hardlink's information
 	newRecord.SetFilename(link.Filename())
+	inode.setName(link.Filename())
 
 	// Here we do the opposite of makeHardlink DOWN - we re-insert it
 	parent.children.loadChild(c, newRecord, inodeId)
