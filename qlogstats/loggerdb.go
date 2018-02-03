@@ -7,6 +7,7 @@ import (
 	"container/list"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unsafe"
@@ -344,6 +345,89 @@ type byIncreasing []int64
 func (a byIncreasing) Len() int           { return len(a) }
 func (a byIncreasing) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
+
+// A data aggregator that outputs histogram based statistics
+type histogram struct {
+	minVal      int64
+	maxVal      int64
+	bucketWidth int64
+	buckets     []int64
+
+	// Keep a bucket for data outside the range
+	beforeCount int64
+	pastCount   int64
+
+	count     int64
+	normalize bool
+}
+
+func NewHistogram(min int64, max int64, buckets_ int64, normalize bool) histogram {
+	numRange := (1 + max) - min
+	width := numRange / buckets_
+	// when the range doesn't divide evenly, choose to have a smaller upper
+	// bucket than a really big one.
+	if numRange%buckets_ != 0 {
+		width++
+	}
+
+	return histogram{
+		minVal:      min,
+		maxVal:      max,
+		bucketWidth: width,
+		buckets:     make([]int64, buckets_),
+		normalize:   normalize,
+	}
+}
+
+func (hs *histogram) NewPoint(data int64) {
+	if data < hs.minVal {
+		hs.beforeCount++
+	} else if data > hs.maxVal {
+		hs.pastCount++
+	} else {
+		idx := (data - hs.minVal) / hs.bucketWidth
+		hs.buckets[idx]++
+	}
+
+	hs.count++
+}
+
+func (hs *histogram) Count() int64 {
+	return hs.count
+}
+
+func (hs *histogram) Clear() {
+	hs.buckets = make([]int64, len(hs.buckets))
+	hs.beforeCount = 0
+	hs.pastCount = 0
+	hs.count = 0
+}
+
+func (hs *histogram) Histogram() map[string]int64 {
+	rtn := make(map[string]int64)
+
+	min := hs.minVal
+	for _, count := range hs.buckets {
+		nextMin := min + hs.bucketWidth
+
+		tag := strconv.Itoa(int(min)) + "-" + strconv.Itoa(int(nextMin))
+		if hs.count == 0 {
+			rtn[tag] = 0
+		} else if hs.normalize {
+			// Normalize the histogram to a percentage for
+			// easier interpretation
+			rtn[tag] = (100 * count) / hs.count
+		} else {
+			rtn[tag] = count
+		}
+		min = nextMin
+	}
+
+	rtn["BeforeHistogram"] = hs.beforeCount
+	rtn["PastHistogram"] = hs.pastCount
+
+	return rtn
+}
 
 // A data aggregator that outputs basic statistics such as the average
 // Intended to be used by data extractors.
