@@ -91,7 +91,7 @@ func (c *ctx) vlog(format string, args ...interface{}) {
 }
 
 func (c *ctx) funcIn(funcName string) quantumfs.ExitFuncLog {
-	return c.Ctx.FuncIn(qlog.LogDaemon, funcName, "")
+	return c.Ctx.FuncInName(qlog.LogDaemon, funcName)
 }
 
 func (c *ctx) FuncIn(funcName string, extraFmtStr string,
