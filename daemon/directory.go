@@ -1709,7 +1709,7 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	}
 
 	c.vlog("Directory::lookupInternal found inode %d Name %s", inodeNum, name)
-	_, instantiated = c.qfs.lookupCount(inodeNum)
+	_, instantiated = c.qfs.lookupCount(c, inodeNum)
 	child = c.qfs.inode(c, inodeNum)
 	// Activate the lookupCount entry of currently instantiated inodes
 	if !instantiated {

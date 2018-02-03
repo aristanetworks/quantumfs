@@ -314,7 +314,7 @@ func TestLookupCountHardlinks(t *testing.T) {
 			test.qfs.Lookup(&header, "test", &out)
 		}
 
-		count, exists := test.qfs.lookupCount(inodeNum)
+		count, exists := test.qfs.lookupCount(test.TestCtx(), inodeNum)
 		test.Assert(exists, "Lookup count missing for file")
 
 		// Since we can't guarantee the kernel hasn't looked it up extra by
