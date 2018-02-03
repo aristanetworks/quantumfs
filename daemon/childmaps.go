@@ -167,7 +167,7 @@ func (cmap *ChildMap) deleteChild(c *ctx, inodeId InodeId,
 
 	defer c.FuncIn("ChildMap::deleteChild", "name %s", name).Out()
 
-	record := cmap.getRecord(c, inodeId, name)
+	record := cmap.recordById(inodeId)
 	if record == nil {
 		c.vlog("record does not exist")
 		return nil
