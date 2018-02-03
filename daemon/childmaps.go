@@ -4,15 +4,12 @@
 package daemon
 
 import (
-	"time"
-
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/hanwen/go-fuse/fuse"
 )
 
-// Handles map coordination and partial map pairing (for hardlinks) since now the
-// mapping between maps isn't one-to-one.
+// A map of inodeIds to the list of children of the dirctory with that
+// inode Id
 type ChildMap struct {
 	dir             *Directory
 	childrenRecords map[InodeId][]quantumfs.DirectoryRecord
@@ -162,50 +159,6 @@ func (cmap *ChildMap) foreachChild(c *ctx, fxn func(name string, inodeId InodeId
 	}
 }
 
-func (cmap *ChildMap) deleteChild(c *ctx, inodeId InodeId,
-	name string, fixHardlinks bool) (needsReparent quantumfs.DirectoryRecord) {
-
-	defer c.FuncIn("ChildMap::deleteChild", "name %s", name).Out()
-
-	record := cmap.getRecord(c, inodeId, name)
-	if record == nil {
-		c.vlog("record does not exist")
-		return nil
-	}
-
-	// This may be a hardlink that is due to be converted.
-	if hardlink, ok := record.(*HardlinkLeg); ok && fixHardlinks {
-		newRecord, inodeId := cmap.dir.hardlinkTable.removeHardlink(c,
-			hardlink.FileId())
-
-		// Wsr says we're about to orphan the last hardlink copy
-		if newRecord != nil || inodeId != quantumfs.InodeIdInvalid {
-			newRecord.SetFilename(hardlink.Filename())
-			record = newRecord
-			cmap.loadChild(c, newRecord, inodeId)
-			// XXX This child must be moved to the effective view now.
-		}
-	}
-	result := cmap.delRecord(inodeId, name)
-
-	if link, ok := record.(*HardlinkLeg); ok {
-		if !fixHardlinks {
-			return nil
-		}
-		if !cmap.dir.hardlinkTable.hardlinkExists(c, link.FileId()) {
-			c.vlog("hardlink does not exist")
-			return nil
-		}
-		if cmap.dir.hardlinkTable.hardlinkDec(link.FileId()) {
-			// If the refcount was greater than one we shouldn't
-			// reparent.
-			c.vlog("Hardlink referenced elsewhere")
-			return nil
-		}
-	}
-	return result
-}
-
 func (cmap *ChildMap) records() []quantumfs.DirectoryRecord {
 	rtn := make([]quantumfs.DirectoryRecord, 0, len(cmap.childrenRecords))
 	for _, i := range cmap.childrenRecords {
@@ -213,56 +166,4 @@ func (cmap *ChildMap) records() []quantumfs.DirectoryRecord {
 	}
 
 	return rtn
-}
-
-func (cmap *ChildMap) record(inodeNum InodeId) quantumfs.DirectoryRecord {
-	return cmap.firstRecord(inodeNum)
-}
-
-func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
-	copy quantumfs.DirectoryRecord, err fuse.Status) {
-
-	defer c.FuncIn("ChildMap::makeHardlink", "inode %d", childId).Out()
-
-	child := cmap.firstRecord(childId)
-	if child == nil {
-		c.elog("No child record for inode id %d in childmap", childId)
-		return nil, fuse.ENOENT
-	}
-
-	// If it's already a hardlink, great no more work is needed
-	if link, isLink := child.(*HardlinkLeg); isLink {
-		c.vlog("Already a hardlink")
-
-		recordCopy := *link
-
-		// Ensure we update the ref count for this hardlink
-		cmap.dir.hardlinkTable.hardlinkInc(link.FileId())
-
-		return &recordCopy, fuse.OK
-	}
-
-	// record must be a file type to be hardlinked
-	if !child.Type().IsRegularFile() &&
-		child.Type() != quantumfs.ObjectTypeSymlink &&
-		child.Type() != quantumfs.ObjectTypeSpecial {
-
-		c.dlog("Cannot hardlink %s - not a file", child.Filename())
-		return nil, fuse.EINVAL
-	}
-
-	childname := child.Filename()
-	// remove the record from the childmap before donating it to be a hardlink
-	cmap.delRecord(childId, childname)
-
-	c.vlog("Converting %s into a hardlink", childname)
-	newLink := cmap.dir.hardlinkTable.newHardlink(c, childId, child)
-
-	linkSrcCopy := newLink.Clone()
-	linkSrcCopy.SetFilename(childname)
-	cmap.setRecord(c, childId, linkSrcCopy)
-
-	newLink.setCreationTime(quantumfs.NewTime(time.Now()))
-	newLink.SetContentTime(newLink.creationTime())
-	return newLink, fuse.OK
 }

@@ -930,8 +930,8 @@ func (qfs *QuantumFs) increaseLookupCountWithNum(c *ctx, inodeId InodeId,
 	}
 }
 
-func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
-	defer qfs.c.FuncIn("Mux::lookupCount", "inode %d", inodeId).Out()
+func (qfs *QuantumFs) lookupCount(c *ctx, inodeId InodeId) (uint64, bool) {
+	defer c.FuncIn("Mux::lookupCount", "inode %d", inodeId).Out()
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
@@ -1128,7 +1128,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		inodeChildren = inodeChildren[:0]
 		inodeNum := inode.inodeNum()
 		c.vlog("Evaluating inode %d for uninstantiation", inodeNum)
-		lookupCount, exists := qfs.lookupCount(inodeNum)
+		lookupCount, exists := qfs.lookupCount(c, inodeNum)
 		if lookupCount != 0 {
 			c.vlog("Inode %d still has %d pending lookups",
 				inodeNum, lookupCount)
@@ -1167,7 +1167,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 				// To be fully unloaded, the child must have lookup
 				// count of zero (no kernel refs) *and*
 				// be uninstantiated
-				lookupCount, _ = qfs.lookupCount(i)
+				lookupCount, _ = qfs.lookupCount(c, i)
 				if lookupCount != 0 ||
 					qfs.inodeNoInstantiate(c, i) != nil {
 
