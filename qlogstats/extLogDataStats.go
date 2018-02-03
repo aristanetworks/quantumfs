@@ -17,10 +17,17 @@ type extLogDataStats struct {
 	dataFetch func(*qlog.LogOutput) (int64, bool)
 	errors    int64
 
-	stats histoStats
+	stats histogram
 }
 
-func NewExtLogDataStats(format string, nametag string, histo histoStats,
+func NewHistogramExtractor(format string, nametag string, min int64, max int64,
+	buckets int64, normalize bool, paramIdx int) StatExtractor {
+
+	return NewExtLogDataStats(format, nametag, NewHistogram(min, max, buckets,
+		normalize), GetParamIntFn(paramIdx))
+}
+
+func NewExtLogDataStats(format string, nametag string, histo histogram,
 	fetchFn func(*qlog.LogOutput) (int64, bool)) StatExtractor {
 
 	ext := &extLogDataStats{
@@ -96,11 +103,13 @@ func (ext *extLogDataStats) publish() []Measurement {
 	}}
 }
 
-func GetFirstParamInt(log *qlog.LogOutput) (int64, bool) {
-	if len(log.Args) == 0 {
-		return 0, false
-	}
+func GetParamIntFn(paramIdx int) func(*qlog.LogOutput) (int64, bool) {
+	return func(log *qlog.LogOutput) (int64, bool) {
+		if len(log.Args) <= paramIdx {
+			return 0, false
+		}
 
-	num := log.Args[0].(int64)
-	return num, true
+		num := log.Args[paramIdx].(int64)
+		return num, true
+	}
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/hanwen/go-fuse/fuse"
 )
 
 // The combination of the effective and published views gives us a coherent
@@ -147,8 +146,8 @@ func (container *ChildContainer) foreachChild(c *ctx, fxn func(name string,
 	}
 }
 
-func (container *ChildContainer) deleteChild(c *ctx, name string,
-	fixHardlinks bool) (needsReparent quantumfs.DirectoryRecord) {
+func (container *ChildContainer) deleteChild(c *ctx,
+	name string) (needsReparent quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("ChildContainer::deleteChild", "name %s", name).Out()
 
@@ -160,7 +159,7 @@ func (container *ChildContainer) deleteChild(c *ctx, name string,
 	delete(container.children, name)
 	effectiveRecord := container.effective.get(inodeId)
 	container.effective.del(inodeId)
-	record := container.publishable.deleteChild(c, inodeId, name, fixHardlinks)
+	record := container.publishable.delRecord(inodeId, name)
 	if effectiveRecord != nil {
 		return effectiveRecord
 	}
@@ -172,19 +171,18 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 
 	defer c.FuncIn("ChildContainer::renameChild", "%s -> %s",
 		oldName, newName).Out()
-	if oldName == newName {
-		c.vlog("Names are identical")
-		return
-	}
+	utils.Assert(oldName != newName,
+		"Identical names must have been handled")
+	utils.Assert(container.inodeNum(newName) == quantumfs.InodeIdInvalid,
+		"The newName must have been already removed")
+
 	inodeId := container.inodeNum(oldName)
 	c.vlog("child %s has inode %d", oldName, inodeId)
-	record := container.getRecord(c, inodeId, oldName)
+	record := container.deleteChild(c, oldName)
 	if record == nil {
 		c.vlog("oldName doesn't exist")
 		return
 	}
-	container.deleteChild(c, newName, true)
-	container.deleteChild(c, oldName, false)
 	record.SetFilename(newName)
 
 	// if this is a hardlink, we must update its creationTime and the accesslist
@@ -254,7 +252,7 @@ func (container *ChildContainer) record(
 	if record := container.effective.get(inodeId); record != nil {
 		return record
 	}
-	return container.publishable.record(inodeId)
+	return container.publishable.firstRecord(inodeId)
 }
 
 func (container *ChildContainer) recordByName(c *ctx,
@@ -271,23 +269,6 @@ func (container *ChildContainer) recordByName(c *ctx,
 	return container.publishable.getRecord(c, inodeId, name)
 }
 
-func (container *ChildContainer) makeHardlink(c *ctx, childId InodeId) (
-	copy quantumfs.DirectoryRecord, err fuse.Status) {
-
-	defer c.FuncIn("ChildContainer::makeHardlink", "inode %d", childId).Out()
-	record := container.record(childId)
-	if record == nil {
-		c.elog("No child record for inode %d", childId)
-		return nil, fuse.ENOENT
-	}
-	// The child is becoming a hardlink which means it will be part of the
-	// hardlink map in wsr the next time wsr gets published, therefore,
-	// we can mark it as publishable
-	container.deleteChild(c, record.Filename(), false)
-	container.loadPublishableChild(c, record, childId)
-	return container.publishable.makeHardlink(c, childId)
-}
-
 func (container *ChildContainer) makePublishable(c *ctx, name string) {
 	defer c.FuncIn("ChildContainer::makePublishable", "%s", name).Out()
 
@@ -296,7 +277,6 @@ func (container *ChildContainer) makePublishable(c *ctx, name string) {
 		panic("No such child " + name)
 	}
 
-	record := container.record(inodeId)
-	container.deleteChild(c, name, false)
+	record := container.deleteChild(c, name)
 	container.loadPublishableChild(c, record, inodeId)
 }
