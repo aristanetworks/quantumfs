@@ -175,7 +175,7 @@ func (special *Special) MvChild(c *ctx, dstInode Inode, oldName string,
 func (special *Special) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrSize on Special")
+	c.vlog("Invalid GetXAttrSize on Special")
 	return 0, fuse.ENODATA
 }
 
