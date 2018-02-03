@@ -152,6 +152,7 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 func (dir *Directory) prepareForOrphaning(c *ctx, name string,
 	record quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
+	defer c.FuncIn("Directory::prepareForOrphaning", "%s", name).Out()
 	if record.Type() != quantumfs.ObjectTypeHardlink {
 		return record
 	}
