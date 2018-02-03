@@ -282,6 +282,10 @@ func TestPublishRecordsToBeConsistent(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(file2mnt1, content0))
 		test.AssertNoErr(api1.SyncAll())
 
+		var stat syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(file2mnt1, &stat))
+		size0 := stat.Size
+
 		// Register for all workspace updates so we know when the first
 		// update happens after the sync above and therefore when we need to
 		// check the newly added file.
@@ -290,38 +294,67 @@ func TestPublishRecordsToBeConsistent(t *testing.T) {
 		wsdbPl := wsdb.(*processlocal.WorkspaceDB)
 		wsdb = wsdbPl.GetAdditionalHead()
 		callback := func(updates map[string]quantumfs.WorkspaceState) {
-			close(wait)
+			wait <- struct{}{}
 		}
 		wsdb.SetCallback(callback)
 		wsdb.SubscribeTo(workspaceName)
 
-		// This will create file1 which dirties the parent directory
+		// This will create testFile1 which fills the dirty queue with:
+		// [testFile1] [dir] [WSR]
 		test.AssertNoErr(testutils.PrintToFile(file1mnt1, content1))
 
-		// Now this will modify file2, which moves to effective view
+		// Now this will modify testFile2, which creates an effective view
+		// and results in the following dirty queue:
+		// [testFile1] [dir] [WSR] [testFile2]
 		test.AssertNoErr(testutils.OverWriteFile(file2mnt1, content1))
 
-		var stat syscall.Stat_t
 		test.AssertNoErr(syscall.Stat(file2mnt1, &stat))
-		expectedSize := stat.Size
+		size1 := stat.Size
 
-		test.Log("Waiting for update to sync")
-		select {
-		case <-wait:
-			test.Assert(false, "Workspace update prior to test ready")
-		default:
+		waitForUpdate := func() {
+			test.Log("Waiting for update to sync")
+			select {
+			case <-wait:
+				test.Assert(false,
+					"Workspace update prior to test ready")
+			default:
+			}
+			<-wait
 		}
-		<-wait
 
-		// Since we've never accessed the workspace via instance0 it
-		// shouldn't have been loaded.
-		test.AssertNoErr(syscall.Stat(file2mnt0, &stat))
-		test.Assert(stat.Size == expectedSize, "File had unexpected size %d",
-			stat.Size)
+		verifyFile := func(expectedSize int64, expectedContent string) bool {
+			test.AssertNoErr(syscall.Stat(file2mnt0, &stat))
+			if stat.Size != expectedSize {
+				test.Log("File had unexpected size %d", stat.Size)
+				return false
+			}
 
-		file, err := os.OpenFile(file2mnt0, os.O_RDONLY, 0777)
-		test.AssertNoErr(err)
-		defer file.Close()
-		test.verifyContentStartsWith(file, content1)
+			file, err := os.OpenFile(file2mnt0, os.O_RDONLY, 0777)
+			test.AssertNoErr(err)
+			defer file.Close()
+			test.verifyContentStartsWith(file, expectedContent)
+			return true
+		}
+
+		// The first update happens when WSR publishes. testFile2 is the only
+		// thing left on the dirty queue and the published metadata must show
+		// the old size even though the effective view has the new size.
+		//
+		// The dirty queue is: [testFile2]
+		//
+		// We haven't accessed this workspace by this instance yet, so we can
+		// check immediately.
+		waitForUpdate()
+		test.Assert(verifyFile(size0, content0),
+			"File didn't verify, see above")
+
+		// The second update happens when the WSR publishes again after
+		// testFile2 has synced. The effective dirty queue was:
+		// [testFile2] [dir] [WSR]
+		waitForUpdate()
+		close(wait) // Fail on unexpected workspace publishing
+
+		test.WaitFor("Refresh to complete and see second state",
+			func() bool { return verifyFile(size1, content1) })
 	})
 }
