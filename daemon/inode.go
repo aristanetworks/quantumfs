@@ -270,7 +270,7 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 
 	parent := inode.parent_(c)
 	if wsr, isWorkspaceRoot := parent.(*WorkspaceRoot); isWorkspaceRoot {
-		isHardlink, fileId := wsr.checkHardlink(inode.id)
+		isHardlink, fileId := wsr.hardlinkTable.checkHardlink(inode.id)
 		if isHardlink {
 			wsr.markHardlinkAccessed(c, fileId, op)
 			return
