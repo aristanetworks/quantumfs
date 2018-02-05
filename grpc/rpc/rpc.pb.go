@@ -126,7 +126,8 @@ func (x ResponseCodes) String() string {
 func (ResponseCodes) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
 
 type WorkspaceNonce struct {
-	Nonce uint64 `protobuf:"fixed64,1,opt,name=nonce" json:"nonce,omitempty"`
+	Id        uint64 `protobuf:"fixed64,1,opt,name=id" json:"id,omitempty"`
+	Iteration uint64 `protobuf:"fixed64,1,opt,name=iteration" json:"iteration,omitempty"`
 }
 
 func (m *WorkspaceNonce) Reset()                    { *m = WorkspaceNonce{} }
@@ -134,9 +135,9 @@ func (m *WorkspaceNonce) String() string            { return proto.CompactTextSt
 func (*WorkspaceNonce) ProtoMessage()               {}
 func (*WorkspaceNonce) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
-func (m *WorkspaceNonce) GetNonce() uint64 {
+func (m *WorkspaceNonce) GetId() uint64 {
 	if m != nil {
-		return m.Nonce
+		return m.Id
 	}
 	return 0
 }

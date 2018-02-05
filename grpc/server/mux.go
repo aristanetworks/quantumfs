@@ -321,7 +321,8 @@ func (m *mux) WorkspaceTable(ctx context.Context, request *rpc.WorkspaceRequest)
 	if ok {
 		nonces := make(map[string]*rpc.WorkspaceNonce, len(workspaceNonces))
 		for name, nonce := range workspaceNonces {
-			nonces[name] = &rpc.WorkspaceNonce{Nonce: uint64(nonce)}
+			nonces[name] = &rpc.WorkspaceNonce{
+				Id: nonce.Id, Iteration: nonce.Iteration}
 		}
 
 		response.Workspaces = nonces
@@ -444,7 +445,8 @@ func (m *mux) ListenForUpdates(_ *rpc.Void,
 					Data: change.data.RootId.Value(),
 				},
 				Nonce: &rpc.WorkspaceNonce{
-					Nonce: uint64(change.data.Nonce),
+					Id:        change.data.Nonce.Id,
+					Iteration: change.data.Nonce.Iteration,
 				},
 				Immutable: change.data.Immutable,
 				Deleted:   change.data.Deleted,
@@ -512,14 +514,14 @@ func (m *mux) FetchWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	response := rpc.FetchWorkspaceResponse{
 		Header:    defaultResponseHeader(request.RequestId),
 		Key:       &rpc.ObjectKey{},
-		Nonce:     &rpc.WorkspaceNonce{Nonce: 0},
+		Nonce:     &rpc.WorkspaceNonce{},
 		Immutable: false,
 	}
 
 	ok, err := parseWorkspaceDbError(c, response.Header, err)
 	if ok {
 		response.Key.Data = key.Value()
-		response.Nonce.Nonce = uint64(nonce)
+		response.Nonce = &rpc.WorkspaceNonce{nonce.Id, nonce.Iteration}
 		response.Immutable = false
 	}
 
@@ -592,7 +594,7 @@ func (m *mux) AdvanceWorkspace(ctx context.Context,
 
 	currentKey := quantumfs.NewObjectKeyFromBytes(request.CurrentRootId.Data)
 	newKey := quantumfs.NewObjectKeyFromBytes(request.NewRootId.Data)
-	nonce := quantumfs.WorkspaceNonce(request.Nonce.Nonce)
+	nonce := quantumfs.WorkspaceNonce{request.Nonce.Id, request.Nonce.Iteration}
 
 	c := m.newCtx(request.RequestId.Id, ctx)
 	defer c.FuncIn("mux::AdvanceWorkspace", "workspace %s (%d): %s -> %s",

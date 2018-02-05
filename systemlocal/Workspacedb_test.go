@@ -119,7 +119,7 @@ func TestBranching(t *testing.T) {
 		key, nonce2, err := db.Workspace(ctx, "duplicate", "test", "b")
 		utils.Assert(err == nil, "Error fetching key: %v", err)
 
-		utils.Assert(nonce1 != nonce2, "Duplicate nonce for "+
+		utils.Assert(!nonce1.Equals(&nonce2), "Duplicate nonce for "+
 			"branched workspace")
 	})
 }

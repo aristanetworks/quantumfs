@@ -15,7 +15,18 @@ import (
 // path, but different lifetimes. For example, if a workspace path were deleted and
 // then recreated, the old workspace and new workspace would have different
 // WorkspaceNonces and therefore be distinguishable.
-type WorkspaceNonce uint64
+type WorkspaceNonce struct {
+	Id        uint64
+	Iteration uint64
+}
+
+func (lhs *WorkspaceNonce) Equals(rhs *WorkspaceNonce) bool {
+	return lhs.Id == rhs.Id
+}
+
+func (v *WorkspaceNonce) String() string {
+	return fmt.Sprintf("(%d : %d)", v.Id, v.Iteration)
+}
 
 type WorkspaceState struct {
 	RootId    ObjectKey

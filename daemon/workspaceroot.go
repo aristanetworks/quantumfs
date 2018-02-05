@@ -565,7 +565,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 		wsr.typespace, wsr.namespace, wsr.workspace)
 	utils.Assert(err == nil, "Failed to get rootId of the workspace.")
 	workspaceName := wsr.fullname()
-	if nonce != wsr.nonce {
+	if !nonce.Equals(&wsr.nonce) {
 		c.dlog("Not refreshing workspace %s due to mismatching "+
 			"nonces %d vs %d", workspaceName, wsr.nonce, nonce)
 		return
