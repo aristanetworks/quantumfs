@@ -162,50 +162,6 @@ func (cmap *ChildMap) foreachChild(c *ctx, fxn func(name string, inodeId InodeId
 	}
 }
 
-func (cmap *ChildMap) deleteChild(c *ctx, inodeId InodeId,
-	name string, fixHardlinks bool) (needsReparent quantumfs.DirectoryRecord) {
-
-	defer c.FuncIn("ChildMap::deleteChild", "name %s", name).Out()
-
-	record := cmap.recordById(inodeId)
-	if record == nil {
-		c.vlog("record does not exist")
-		return nil
-	}
-
-	// This may be a hardlink that is due to be converted.
-	if hardlink, ok := record.(*HardlinkLeg); ok && fixHardlinks {
-		newRecord, inodeId := cmap.dir.hardlinkTable.removeHardlink(c,
-			hardlink.FileId())
-
-		// Wsr says we're about to orphan the last hardlink copy
-		if newRecord != nil || inodeId != quantumfs.InodeIdInvalid {
-			newRecord.SetFilename(hardlink.Filename())
-			record = newRecord
-			cmap.loadChild(c, newRecord, inodeId)
-			// XXX This child must be moved to the effective view now.
-		}
-	}
-	result := cmap.delRecord(inodeId, name)
-
-	if link, ok := record.(*HardlinkLeg); ok {
-		if !fixHardlinks {
-			return nil
-		}
-		if !cmap.dir.hardlinkTable.hardlinkExists(c, link.FileId()) {
-			c.vlog("hardlink does not exist")
-			return nil
-		}
-		if cmap.dir.hardlinkTable.hardlinkDec(link.FileId()) {
-			// If the refcount was greater than one we shouldn't
-			// reparent.
-			c.vlog("Hardlink referenced elsewhere")
-			return nil
-		}
-	}
-	return result
-}
-
 func (cmap *ChildMap) records() []quantumfs.DirectoryRecord {
 	rtn := make([]quantumfs.DirectoryRecord, 0, len(cmap.childrenRecords))
 	for _, i := range cmap.childrenRecords {
