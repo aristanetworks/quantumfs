@@ -194,8 +194,13 @@ func (q *Qlog) setLogLevelBitmask(sys LogSubsystem, level uint8) {
 // Load desired log levels from the environment variable
 func (q *Qlog) SetLogLevels(levels string) {
 	// reset all levels
+	defaultSetting := uint8(1)
+	if levels == "*/*" {
+		defaultSetting = ^uint8(0)
+	}
+
 	for i := 0; i <= int(logSubsystemMax); i++ {
-		q.setLogLevelBitmask(LogSubsystem(i), 1)
+		q.setLogLevelBitmask(LogSubsystem(i), defaultSetting)
 	}
 
 	bases := strings.Split(levels, ",")
