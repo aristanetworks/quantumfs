@@ -217,7 +217,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	toLink Inode) (copy quantumfs.DirectoryRecord, err fuse.Status) {
 
-	defer c.funcIn("Directory::makeHardlink_DOWN").Out()
+	defer c.funcIn("Directory::makeHardlink_DOWN_").Out()
 
 	// If someone is trying to link a hardlink, we just need to return a copy
 	isHardlink, id := dir.hardlinkTable.checkHardlink(toLink.inodeNum())
