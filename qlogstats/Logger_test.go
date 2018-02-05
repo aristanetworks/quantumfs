@@ -4,6 +4,7 @@
 package qlogstats
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -306,4 +307,74 @@ func TestPairStatsGC(t *testing.T) {
 			return len(ext.requests) == 0
 		})
 	})
+}
+
+func TestExtLogDataExtractor(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		qlogHandle := test.Logger
+
+		testFmt := "DATA POINT %d"
+
+		extractor := NewHistogramExtractor(testFmt, "test_ext", 0, 99,
+			10, false, 0)
+
+		// Setup a histogram where each bucket i has 2*i items in it
+		dataPoints := int64(0)
+		for i := 0; i < 10; i++ {
+			for j := 0; j < 2*i; j++ {
+				qlogHandle.Log_(time.Unix(100, 100), qlog.LogTest,
+					uint64(i), 2, testFmt, (i*10)+1)
+				dataPoints++
+			}
+		}
+
+		// Add a couple points out of bounds
+		qlogHandle.Log_(time.Unix(100, 100), qlog.LogTest,
+			uint64(101), 2, testFmt, -1)
+		qlogHandle.Log_(time.Unix(100, 100), qlog.LogTest,
+			uint64(102), 2, testFmt, 1000000)
+		dataPoints += 2
+
+		bucketsChecked := 0
+		checker := func(memdb *processlocal.Memdb) {
+			test.Assert(len(memdb.Data[0].Fields) > 0,
+				"Empty database entry")
+
+			// check the fields
+			for key, data := range memdb.Data[0].Fields {
+				switch key {
+				case "samples":
+					test.Assert(data.(int64) == dataPoints,
+						"incorrect count %d", data)
+				case "BeforeHistogram":
+					test.Assert(data.(int64) == 1,
+						"incorrect BeforeHistogram %d", data)
+				case "PastHistogram":
+					test.Assert(data.(int64) == 1,
+						"incorrect PastHistogram %d", data)
+				case "errors":
+					test.Assert(data.(int64) == 0,
+						"parse errors found")
+				default:
+					min, _ := histoTagToInts(test, key)
+					expected := 2 * (min / 10)
+					test.Assert(data.(int64) == expected,
+						"incorrect histogram bucket %d %d",
+						data, expected)
+					bucketsChecked++
+				}
+			}
+		}
+
+		test.runExtractorTest(qlogHandle, extractor, checker)
+		test.Assert(bucketsChecked == 10, "Buckets not checked")
+	})
+}
+
+func histoTagToInts(test *testHelper, tag string) (int64, int64) {
+	var bucketMin, bucketMax int64
+	num, err := fmt.Sscanf(tag, "%d-%d", &bucketMin, &bucketMax)
+	test.Assert(err == nil, "Err %s, Str %s", err, tag)
+	test.Assert(num == 2, "Incorrect number of ints in bucket tag")
+	return bucketMin, bucketMax
 }
