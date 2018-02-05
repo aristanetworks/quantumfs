@@ -8,7 +8,6 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/hanwen/go-fuse/fuse"
 )
 
 // The combination of the effective and published views gives us a coherent
@@ -149,25 +148,6 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	}
 }
 
-func (container *ChildContainer) delRecord(c *ctx, inodeId InodeId,
-	name string) quantumfs.DirectoryRecord {
-
-	defer c.FuncIn("ChildContainer::delRecord", "inode %d name '%s'", inodeId,
-		name).Out()
-
-	record := container.recordByName(c, name)
-	if record == nil {
-		c.vlog("Does not exist")
-		return nil // Doesn't exist
-	}
-
-	removeFromMap(container.publishable, inodeId, name)
-	removeFromMap(container.effective, inodeId, name)
-	delete(container.children, name)
-
-	return record
-}
-
 func (container *ChildContainer) recordByName(c *ctx,
 	name string) quantumfs.DirectoryRecord {
 
@@ -231,8 +211,8 @@ func (container *ChildContainer) foreachChild(c *ctx, fxn func(name string,
 	}
 }
 
-func (container *ChildContainer) deleteChild(c *ctx, name string,
-	fixHardlinks bool) (needsReparent quantumfs.DirectoryRecord) {
+func (container *ChildContainer) deleteChild(c *ctx,
+	name string) (needsReparent quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("ChildContainer::deleteChild", "name %s", name).Out()
 
@@ -241,39 +221,14 @@ func (container *ChildContainer) deleteChild(c *ctx, name string,
 		c.vlog("name %s does not exist", name)
 		return nil
 	}
+
 	record := container.recordByName(c, name)
 
-	// This may be a hardlink that is due to be converted.
-	if hardlink, ok := record.(*HardlinkLeg); ok && fixHardlinks {
-		newRecord, inodeId := container.dir.hardlinkTable.removeHardlink(c,
-			hardlink.FileId())
+	removeFromMap(container.publishable, inodeId, name)
+	removeFromMap(container.effective, inodeId, name)
+	delete(container.children, name)
 
-		// Wsr says we're about to orphan the last hardlink copy
-		if newRecord != nil {
-			newRecord.SetFilename(hardlink.Filename())
-			record = newRecord
-			container.setRecord(c, inodeId, newRecord)
-		}
-	}
-
-	result := container.delRecord(c, inodeId, name)
-
-	if link, ok := record.(*HardlinkLeg); ok {
-		if !fixHardlinks {
-			return nil
-		}
-		if !container.dir.hardlinkTable.hardlinkExists(c, link.FileId()) {
-			c.vlog("hardlink does not exist")
-			return nil
-		}
-		if container.dir.hardlinkTable.hardlinkDec(link.FileId()) {
-			// If the refcount was greater than one we shouldn't
-			// reparent.
-			c.vlog("Hardlink referenced elsewhere")
-			return nil
-		}
-	}
-	return result
+	return record
 }
 
 func (container *ChildContainer) renameChild(c *ctx, oldName string,
@@ -281,21 +236,18 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 
 	defer c.FuncIn("ChildContainer::renameChild", "%s -> %s",
 		oldName, newName).Out()
-
-	if oldName == newName {
-		c.vlog("Names are identical")
-		return
-	}
+	utils.Assert(oldName != newName,
+		"Identical names must have been handled")
+	utils.Assert(container.inodeNum(newName) == quantumfs.InodeIdInvalid,
+		"The newName must have been already removed")
 
 	inodeId := container.inodeNum(oldName)
 	c.vlog("child %s has inode %d", oldName, inodeId)
-	record := container.recordByName(c, oldName)
+	record := container.deleteChild(c, oldName)
 	if record == nil {
 		c.vlog("oldName doesn't exist")
 		return
 	}
-	container.deleteChild(c, newName, true)
-	container.deleteChild(c, oldName, false)
 	record.SetFilename(newName)
 
 	// if this is a hardlink, we must update its creationTime and the accesslist
@@ -357,54 +309,6 @@ func (container *ChildContainer) records() []quantumfs.DirectoryRecord {
 	}
 
 	return records
-}
-
-func (container *ChildContainer) makeHardlink(c *ctx, childId InodeId) (
-	copy quantumfs.DirectoryRecord, err fuse.Status) {
-
-	defer c.FuncIn("ChildContainer::makeHardlink", "inode %d", childId).Out()
-
-	child := container.recordById(c, childId)
-	if child == nil {
-		c.elog("No child record for inode %d", childId)
-		return nil, fuse.ENOENT
-	}
-
-	// If it's already a hardlink, great no more work is needed
-	if link, isLink := child.(*HardlinkLeg); isLink {
-		c.vlog("Already a hardlink")
-
-		recordCopy := *link
-
-		// Ensure we update the ref count for this hardlink
-		container.dir.hardlinkTable.hardlinkInc(link.FileId())
-
-		return &recordCopy, fuse.OK
-	}
-
-	// record must be a file type to be hardlinked
-	if !child.Type().IsRegularFile() &&
-		child.Type() != quantumfs.ObjectTypeSymlink &&
-		child.Type() != quantumfs.ObjectTypeSpecial {
-
-		c.dlog("Cannot hardlink %s - not a file", child.Filename())
-		return nil, fuse.EINVAL
-	}
-
-	childname := child.Filename()
-	// remove the record from the childmap before donating it to be a hardlink
-	container.delRecord(c, childId, childname)
-
-	c.vlog("Converting %s into a hardlink", childname)
-	newLink := container.dir.hardlinkTable.newHardlink(c, childId, child)
-
-	linkSrcCopy := newLink.Clone()
-	linkSrcCopy.SetFilename(childname)
-	container.setRecord(c, childId, linkSrcCopy)
-
-	newLink.setCreationTime(quantumfs.NewTime(time.Now()))
-	newLink.SetContentTime(newLink.creationTime())
-	return newLink.Clone(), fuse.OK
 }
 
 func (container *ChildContainer) makePublishable(c *ctx, name string) {

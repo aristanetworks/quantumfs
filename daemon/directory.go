@@ -149,6 +149,29 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	})
 }
 
+func (dir *Directory) prepareForOrphaning(c *ctx, name string,
+	record quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
+
+	defer c.FuncIn("Directory::prepareForOrphaning", "%s", name).Out()
+	if record.Type() != quantumfs.ObjectTypeHardlink {
+		return record
+	}
+	newRecord, _ := dir.hardlinkTable.removeHardlink(c, record.FileId())
+
+	if newRecord != nil {
+		// This was the last leg of the hardlink
+		newRecord.SetFilename(name)
+		return newRecord
+	}
+	if dir.hardlinkTable.hardlinkDec(record.FileId()) {
+		// If the refcount was greater than one we shouldn't
+		// reparent.
+		c.vlog("Hardlink referenced elsewhere")
+		return nil
+	}
+	return record
+}
+
 // Needs inode lock for write
 func (dir *Directory) delChild_(c *ctx,
 	name string) (toOrphan quantumfs.DirectoryRecord) {
@@ -160,7 +183,8 @@ func (dir *Directory) delChild_(c *ctx,
 	// If this is a file we need to reparent it to itself
 	record := func() quantumfs.DirectoryRecord {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.deleteChild(c, name, true)
+		detachedChild := dir.children.deleteChild(c, name)
+		return dir.prepareForOrphaning(c, name, detachedChild)
 	}()
 
 	pathFlags := quantumfs.PathFlags(quantumfs.PathDeleted)
@@ -363,6 +387,7 @@ func publishDirectoryRecords(c *ctx,
 				quantumfs.NewDirectoryEntry(numEntries)
 			entryIdx = 0
 		}
+		c.vlog("Setting child %s", child.Filename())
 		baseLayer.SetEntry(entryIdx, child.Publishable())
 
 		entryIdx++
@@ -1087,22 +1112,20 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 // Must hold the child's parentLock if inode is not nil
 func (dir *Directory) orphanChild_(c *ctx, name string, inode Inode) {
 	defer c.FuncIn("Directory::orphanChild_", "%s", name).Out()
-	removedRecord := dir.children.recordByName(c, name)
+	removedId := dir.children.inodeNum(name)
+	removedRecord := dir.children.deleteChild(c, name)
 	if removedRecord == nil {
 		return
 	}
 	dir.self.markAccessed(c, name,
 		markType(removedRecord.Type(),
 			quantumfs.PathDeleted))
-	removedId := dir.children.inodeNum(name)
-	dir.children.deleteChild(c, name, true)
-	if removedId == quantumfs.InodeIdInvalid {
+	removedRecord = dir.prepareForOrphaning(c, name, removedRecord)
+	if removedId == quantumfs.InodeIdInvalid || removedRecord == nil {
 		return
 	}
 	if removedRecord.Type() == quantumfs.ObjectTypeHardlink {
 		c.vlog("nothing to do for the detached leg of hardlink")
-		// XXX handle the case where the Record is the last leg of
-		// a not-yet-normalized hardlink with nlink of 1
 		return
 	}
 	if inode == nil {
@@ -1245,7 +1268,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.deleteChild(c, oldName, false)
+		dir.children.deleteChild(c, oldName)
 	}()
 
 	// This is the same entry just moved, so we can use the same
