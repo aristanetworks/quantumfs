@@ -148,25 +148,6 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	}
 }
 
-func (container *ChildContainer) delRecord(c *ctx, inodeId InodeId,
-	name string) quantumfs.DirectoryRecord {
-
-	defer c.FuncIn("ChildContainer::delRecord", "inode %d name '%s'", inodeId,
-		name).Out()
-
-	record := container.recordByName(c, name)
-	if record == nil {
-		c.vlog("Does not exist")
-		return nil // Doesn't exist
-	}
-
-	removeFromMap(container.publishable, inodeId, name)
-	removeFromMap(container.effective, inodeId, name)
-	delete(container.children, name)
-
-	return record
-}
-
 func (container *ChildContainer) recordByName(c *ctx,
 	name string) quantumfs.DirectoryRecord {
 
@@ -240,7 +221,14 @@ func (container *ChildContainer) deleteChild(c *ctx,
 		c.vlog("name %s does not exist", name)
 		return nil
 	}
-	return container.delRecord(c, inodeId, name)
+
+	record := container.recordByName(c, name)
+
+	removeFromMap(container.publishable, inodeId, name)
+	removeFromMap(container.effective, inodeId, name)
+	delete(container.children, name)
+
+	return record
 }
 
 func (container *ChildContainer) renameChild(c *ctx, oldName string,
