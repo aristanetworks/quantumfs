@@ -51,8 +51,13 @@ func loadTimeSeriesDB() quantumfs.TimeSeriesDB {
 func newQfsExtPair(common string,
 	startPostfix string) qlogstats.StatExtractor {
 
+	start := qlog.FnEnterStr + common
+	if startPostfix != "" {
+		start += " " + startPostfix
+	}
+
 	return qlogstats.NewExtPairStats(
-		qlog.FnEnterStr+common+" "+startPostfix,
+		start,
 		qlog.FnExitStr+common, common)
 }
 
