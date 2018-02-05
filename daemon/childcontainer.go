@@ -66,7 +66,6 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
 		c.vlog("Loading child %s", record.Filename())
 		childInodeNum := container.loadChild(c, record)
-		container.children[record.Filename()] = childInodeNum
 		c.vlog("loaded child %d", childInodeNum)
 		uninstantiated = append(uninstantiated, childInodeNum)
 	})
