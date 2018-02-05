@@ -281,9 +281,9 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 	container.makePublishable(c, newName)
 }
 
-// Modify the effective view of a child according to a fuse.SetAttrIn. The child Inode
-// must be instantiated and must be on the dirty queue in order for this changes to
-// eventually be publishable.
+// Modify the effective view of a child according to a fuse.SetAttrIn. The child
+// Inode must be instantiated and must be on the dirty queue in order for this
+// changes to eventually be publishable.
 func (container *ChildContainer) modifyChildWithAttr(c *ctx, inodeId InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	updateMtime bool) {
