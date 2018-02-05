@@ -4,11 +4,8 @@
 package daemon
 
 import (
-	"time"
-
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/hanwen/go-fuse/fuse"
 )
 
 // Handles map coordination and partial map pairing (for hardlinks) since now the
@@ -173,52 +170,4 @@ func (cmap *ChildMap) records() []quantumfs.DirectoryRecord {
 
 func (cmap *ChildMap) recordById(inodeNum InodeId) quantumfs.DirectoryRecord {
 	return cmap.firstRecord(inodeNum)
-}
-
-func (cmap *ChildMap) makeHardlink(c *ctx, childId InodeId) (
-	copy quantumfs.DirectoryRecord, err fuse.Status) {
-
-	defer c.FuncIn("ChildMap::makeHardlink", "inode %d", childId).Out()
-
-	child := cmap.firstRecord(childId)
-	if child == nil {
-		c.elog("No child record for inode id %d in childmap", childId)
-		return nil, fuse.ENOENT
-	}
-
-	// If it's already a hardlink, great no more work is needed
-	if link, isLink := child.(*HardlinkLeg); isLink {
-		c.vlog("Already a hardlink")
-
-		recordCopy := *link
-
-		// Ensure we update the ref count for this hardlink
-		cmap.dir.hardlinkTable.hardlinkInc(link.FileId())
-
-		return &recordCopy, fuse.OK
-	}
-
-	// record must be a file type to be hardlinked
-	if !child.Type().IsRegularFile() &&
-		child.Type() != quantumfs.ObjectTypeSymlink &&
-		child.Type() != quantumfs.ObjectTypeSpecial {
-
-		c.dlog("Cannot hardlink %s - not a file", child.Filename())
-		return nil, fuse.EINVAL
-	}
-
-	childname := child.Filename()
-	// remove the record from the childmap before donating it to be a hardlink
-	cmap.delRecord(childId, childname)
-
-	c.vlog("Converting %s into a hardlink", childname)
-	newLink := cmap.dir.hardlinkTable.newHardlink(c, childId, child)
-
-	linkSrcCopy := newLink.Clone()
-	linkSrcCopy.SetFilename(childname)
-	cmap.setRecord(c, childId, linkSrcCopy)
-
-	newLink.setCreationTime(quantumfs.NewTime(time.Now()))
-	newLink.SetContentTime(newLink.creationTime())
-	return newLink, fuse.OK
 }
