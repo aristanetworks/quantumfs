@@ -8,8 +8,8 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-// Handles map coordination and partial map pairing (for hardlinks) since now the
-// mapping between maps isn't one-to-one.
+// A map of inodeIds to the list of children of the directory with that
+// inode Id
 type ChildMap struct {
 	dir             *Directory
 	childrenRecords map[InodeId][]quantumfs.DirectoryRecord
