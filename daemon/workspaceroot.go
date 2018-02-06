@@ -317,10 +317,10 @@ func (wsr *WorkspaceRoot) findHardlinkInodeId(c *ctx,
 	if hardlink.inodeId != quantumfs.InodeIdInvalid {
 		if inodeId != quantumfs.InodeIdInvalid {
 			utils.Assert(inodeId == hardlink.inodeId,
-				"requested hardlink inodeId %d exists as %d",
+				"requested hardlink inode %d exists as %d",
 				inodeId, hardlink.inodeId)
 		}
-		c.vlog("filedId a hardlink with inodeNum %d", hardlink.inodeId)
+		c.vlog("filedId a hardlink with inode %d", hardlink.inodeId)
 		return hardlink.inodeId
 	}
 
@@ -333,7 +333,7 @@ func (wsr *WorkspaceRoot) findHardlinkInodeId(c *ctx,
 	wsr.hardlinks[fileId] = hardlink
 	wsr.inodeToLink[inodeId] = fileId
 
-	c.vlog("Allocated new inodeId %d for hardlink", inodeId)
+	c.vlog("Allocated new inode %d for hardlink", inodeId)
 	return inodeId
 }
 
