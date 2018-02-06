@@ -80,7 +80,7 @@ func (container *ChildContainer) loadChild(c *ctx,
 		record.Filename(), record.Type()).Out()
 
 	// Since we do not have an inodeId this child is/will not be instantiated and
-	// so it placed in the publishable set.
+	// so it is placed in the publishable set.
 
 	var inodeId InodeId
 	if record.Type() == quantumfs.ObjectTypeHardlink {
