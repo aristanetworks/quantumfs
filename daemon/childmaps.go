@@ -168,6 +168,6 @@ func (cmap *ChildMap) records() []quantumfs.DirectoryRecord {
 	return rtn
 }
 
-func (cmap *ChildMap) recordById(inodeNum InodeId) quantumfs.DirectoryRecord {
+func (cmap *ChildMap) recordByInodeId(inodeNum InodeId) quantumfs.DirectoryRecord {
 	return cmap.firstRecord(inodeNum)
 }
