@@ -45,8 +45,9 @@ func TestHardlink(t *testing.T) {
 
 		wsrB, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
-		test.Assert(len(wsrB.hardlinks) == 1, "Wsr hardlink link len is %d",
-			len(wsrB.hardlinks))
+		test.Assert(len(wsrB.hardlinkTable.hardlinks) == 1,
+			"Wsr hardlink link len is %d",
+			len(wsrB.hardlinkTable.hardlinks))
 
 		// Ensure that hardlinks are now in place
 		file1InodeNum := test.getInodeNum(file1)
