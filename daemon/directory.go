@@ -433,8 +433,11 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 
-		dir.children.modifyChildWithAttr(c, inodeNum, newType,
-			attr, updateMtime)
+		dir.children.modifyChildWithFunc(c, inodeNum,
+			func(record quantumfs.DirectoryRecord) {
+				modifyEntryWithAttr(c, newType, attr, record,
+					updateMtime)
+			})
 		entry := dir.children.recordById(c, inodeNum)
 
 		if entry == nil && dir.self.isWorkspaceRoot() {

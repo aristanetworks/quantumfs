@@ -84,8 +84,8 @@ func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
 	if !found {
 		utils.Assert(localRecord.Type() == quantumfs.ObjectTypeDirectory,
 			"Did not find loadRecord for %d", localRecord.FileId())
-		// The dentry has been re-created, update its fileId to match the new
-		// incarnation
+		// The dentry has been re-created, update its fileId in our caller to
+		// match the new incarnation
 		fileId = remoteRecord.FileId()
 		loadRecord = rc.fileMap[remoteRecord.FileId()]
 		moved = false

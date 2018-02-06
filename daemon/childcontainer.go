@@ -8,7 +8,6 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/hanwen/go-fuse/fuse"
 )
 
 // The combination of the effective and published views gives us a coherent
@@ -281,25 +280,9 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 	container.makePublishable(c, newName)
 }
 
-// Modify the effective view of a child according to a fuse.SetAttrIn. The child
-// Inode must be instantiated and must be on the dirty queue in order for this
-// changes to eventually be publishable.
-func (container *ChildContainer) modifyChildWithAttr(c *ctx, inodeId InodeId,
-	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
-	updateMtime bool) {
-
-	defer c.funcIn("ChildContainer::modifyChildWithAttr").Out()
-
-	container.modifyChildWithFunc(c, inodeId,
-		func(record quantumfs.DirectoryRecord) {
-
-			modifyEntryWithAttr(c, newType, attr, record, updateMtime)
-		})
-}
-
-// Modify the effective view of a child according to a fuse.SetAttrIn. The child
-// Inode must be instantiated and must be on the dirty queue in order for this
-// changes to eventually be publishable.
+// Modify the effective view of a child with the given function. The child Inode must
+// be instantiated and must be on the dirty queue in order for this changes to
+// eventually be publishable.
 func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 	modify func(record quantumfs.DirectoryRecord)) {
 
