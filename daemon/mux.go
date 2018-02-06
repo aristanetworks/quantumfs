@@ -533,7 +533,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 	}
 
 	newRootId := publishWorkspaceRoot(c,
-		wsr.baseLayerId, wsr.hardlinks)
+		wsr.baseLayerId, wsr.hardlinkTable.hardlinks)
 
 	// We should eventually be able to Advance after merging
 	for {

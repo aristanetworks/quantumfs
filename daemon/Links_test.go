@@ -45,8 +45,9 @@ func TestHardlink(t *testing.T) {
 
 		wsrB, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
-		test.Assert(len(wsrB.hardlinks) == 1, "Wsr hardlink link len is %d",
-			len(wsrB.hardlinks))
+		test.Assert(len(wsrB.hardlinkTable.hardlinks) == 1,
+			"Wsr hardlink link len is %d",
+			len(wsrB.hardlinkTable.hardlinks))
 
 		// Ensure that hardlinks are now in place
 		file1InodeNum := test.getInodeNum(file1)
@@ -55,11 +56,11 @@ func TestHardlink(t *testing.T) {
 		parentInode := test.getInode(workspace)
 		parentDir := &parentInode.(*WorkspaceRoot).Directory
 		defer parentDir.childRecordLock.Lock().Unlock()
-		test.Assert(parentDir.children.record(file1InodeNum).Type() ==
-			quantumfs.ObjectTypeHardlink,
+		type_ := parentDir.children.recordByInodeId(file1InodeNum).Type()
+		test.Assert(type_ == quantumfs.ObjectTypeHardlink,
 			"file1 not replaced with hardlink %d", file1InodeNum)
-		test.Assert(parentDir.children.record(file2InodeNum).Type() ==
-			quantumfs.ObjectTypeHardlink,
+		type_ = parentDir.children.recordByInodeId(file2InodeNum).Type()
+		test.Assert(type_ == quantumfs.ObjectTypeHardlink,
 			"file2 not created as hardlink")
 	})
 }
