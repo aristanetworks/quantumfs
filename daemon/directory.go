@@ -809,7 +809,7 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	defer c.FuncIn("DirectoryRecord::getRecordChildCall_", "inode %d",
 		inodeNum).Out()
 
-	record := dir.children.record(inodeNum)
+	record := dir.children.recordByInodeId(inodeNum)
 	if record != nil {
 		c.vlog("Record found")
 		return record
@@ -970,7 +970,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			defer dir.childRecordLock.Lock().Unlock()
 
 			// Update the record's size
-			record := dir.children.record(inode.inodeNum())
+			record := dir.children.recordByInodeId(inode.inodeNum())
 			record.SetSize(uint64(len(pointedTo)))
 		}()
 
@@ -1640,7 +1640,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 		return inode, nil
 	}
 
-	entry := dir.children.record(inodeNum)
+	entry := dir.children.recordByInodeId(inodeNum)
 	if entry == nil {
 		c.elog("Cannot instantiate child with no record: %d", inodeNum)
 		return nil, nil

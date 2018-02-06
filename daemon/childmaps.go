@@ -8,7 +8,7 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-// A map of inodeIds to the list of children of the dirctory with that
+// A map of inodeIds to the list of children of the directory with that
 // inode Id
 type ChildMap struct {
 	dir             *Directory
@@ -166,4 +166,8 @@ func (cmap *ChildMap) records() []quantumfs.DirectoryRecord {
 	}
 
 	return rtn
+}
+
+func (cmap *ChildMap) recordByInodeId(inodeNum InodeId) quantumfs.DirectoryRecord {
+	return cmap.firstRecord(inodeNum)
 }
