@@ -270,7 +270,7 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 
 	parent := inode.parent_(c)
 	if wsr, isWorkspaceRoot := parent.(*WorkspaceRoot); isWorkspaceRoot {
-		isHardlink, fileId := wsr.checkHardlink(inode.id)
+		isHardlink, fileId := wsr.hardlinkTable.checkHardlink(inode.id)
 		if isHardlink {
 			wsr.markHardlinkAccessed(c, fileId, op)
 			return
@@ -420,7 +420,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	defer parent.childRecordLock.Lock().Unlock()
 
 	// Check if this is still a child
-	record := parent.children.record(inode.id)
+	record := parent.children.recordByInodeId(inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
 		return
@@ -442,6 +442,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	// Ensure that we update this version of the record with this instance
 	// of the hardlink's information
 	newRecord.SetFilename(link.Filename())
+	inode.setName(link.Filename())
 
 	// Here we do the opposite of makeHardlink DOWN - we re-insert it
 	parent.children.loadChild(c, newRecord, inodeId)
