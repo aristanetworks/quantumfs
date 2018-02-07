@@ -158,6 +158,33 @@ func createExtractors() []qlogstats.StatExtractor {
 		newQfsExtPair(cql.GoCqlGetLog, cql.KeyLog),
 		newQfsExtPair(cql.GoCqlInsertLog, cql.KeyTTLLog),
 		newQfsExtPair(cql.GoCqlMetadataLog, cql.KeyLog),
+
+		// Per QuBIT-task statistics
+		qlogstats.NewExtWorkspaceStats("per-Task", []string{
+			daemon.LookupLog,
+			daemon.GetAttrLog,
+			daemon.SetAttrLog,
+			daemon.MknodLog,
+			daemon.MkdirLog,
+			daemon.UnlinkLog,
+			daemon.RmdirLog,
+			daemon.RenameLog,
+			daemon.LinkLog,
+			daemon.SymlinkLog,
+			daemon.ReadlinkLog,
+			daemon.AccessLog,
+			daemon.GetXAttrSizeLog,
+			daemon.GetXAttrDataLog,
+			daemon.ListXAttrLog,
+			daemon.SetXAttrLog,
+			daemon.RemoveXAttrLog,
+			daemon.CreateLog,
+			daemon.OpenLog,
+			daemon.ReadLog,
+			daemon.WriteLog,
+			daemon.OpenDirLog,
+			daemon.ReadDirPlusLog,
+		}),
 	}
 }
 

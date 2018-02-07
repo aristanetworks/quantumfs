@@ -98,7 +98,8 @@ func TestWorkspaceStats(t *testing.T) {
 		}
 
 		test.runExtractorTest(qlogHandle,
-			NewExtWorkspaceStats("FUSE Requests"), checker)
+			NewExtWorkspaceStats("FUSE Requests", []string{"Mux::"}),
+			checker)
 
 		test.Assert(checked, "test not checking anything")
 	})
