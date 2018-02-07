@@ -110,7 +110,7 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	case *Directory:
 		hardlinkTable = v.hardlinkTable
 	case *WorkspaceRoot:
-		hardlinkTable = v
+		hardlinkTable = v.hardlinkTable
 	default:
 		panic(fmt.Sprintf("Parent of inode %d is neither "+
 			"Directory nor WorkspaceRoot", inodeNum))
@@ -812,7 +812,7 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	defer c.FuncIn("DirectoryRecord::getRecordChildCall_", "inode %d",
 		inodeNum).Out()
 
-	record := dir.children.recordById(c, inodeNum)
+	record := dir.children.recordByInodeId(c, inodeNum)
 	if record != nil {
 		c.vlog("Record found")
 		return record
@@ -973,7 +973,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			defer dir.childRecordLock.Lock().Unlock()
 
 			// Update the record's size
-			record := dir.children.recordById(c, inode.inodeNum())
+			record := dir.children.recordByInodeId(c, inode.inodeNum())
 			record.SetSize(uint64(len(pointedTo)))
 		}()
 
@@ -1643,7 +1643,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 		return inode, nil
 	}
 
-	entry := dir.children.recordById(c, inodeNum)
+	entry := dir.children.recordByInodeId(c, inodeNum)
 	if entry == nil {
 		c.elog("Cannot instantiate child with no record: %d", inodeNum)
 		return nil, nil

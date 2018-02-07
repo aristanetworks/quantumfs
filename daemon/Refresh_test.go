@@ -1347,7 +1347,8 @@ func GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(
 		defer cleanup()
 
 		inode := test.getInode(fullName)
-		isHardlink, fileId1 := wsr.checkHardlink(inode.inodeNum())
+		isHardlink, fileId1 := wsr.hardlinkTable.checkHardlink(
+			inode.inodeNum())
 		test.Assert(isHardlink, "testfile is not a hardlin.")
 
 		test.AssertNoErr(syscall.Unlink(fullName))
@@ -1362,7 +1363,8 @@ func GenTestRefresh_Hardlink2Hardlink_unlinkAndRelink(
 		newRootId2 := test.getRootId(workspace)
 
 		inode = test.getInode(fullName)
-		isHardlink, fileId2 := wsr.checkHardlink(inode.inodeNum())
+		isHardlink, fileId2 := wsr.hardlinkTable.checkHardlink(
+			inode.inodeNum())
 		test.Assert(isHardlink, "testfile is not a hardlin.")
 
 		test.Assert(fileId1 == fileId2,
