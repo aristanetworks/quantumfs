@@ -713,8 +713,8 @@ func (th *TestHelper) getHardlinkLeg(parentPath string,
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()
-	record := parentDir.children.recordByName(&th.qfs.c, leg).Clone()
-	return record.(*HardlinkLeg)
+	record := parentDir.children.recordByName(&th.qfs.c, leg)
+	return record.(*HardlinkLeg).Clone().(*HardlinkLeg)
 }
 
 func TestHardlinkCreatedTime(t *testing.T) {

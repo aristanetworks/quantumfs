@@ -199,10 +199,10 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 	}
 
 	// remove the record from the childmap before donating it to be a hardlink
-	dir.children.deleteChild(c, childname)
+	donateChild := dir.children.deleteChild(c, childname)
 
 	c.vlog("Converting %s into a hardlink", childname)
-	newLink := dir.hardlinkTable.newHardlink(c, childId, child)
+	newLink := dir.hardlinkTable.newHardlink(c, childId, donateChild)
 
 	linkSrcCopy := newLink.Clone()
 	linkSrcCopy.SetFilename(childname)
@@ -238,7 +238,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 
 // The caller must hold the childRecordLock
 func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
-	rc *RefreshContext, localRecord quantumfs.DirectoryRecord,
+	rc *RefreshContext, localRecord quantumfs.ImmutableDirectoryRecord,
 	remoteRecord quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
 	defer c.funcIn("Directory::normalizeHardlinks_DOWN_").Out()
@@ -289,7 +289,7 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 
 // The caller must hold the childRecordLock
 func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
-	localRecord quantumfs.DirectoryRecord, childId InodeId,
+	localRecord quantumfs.ImmutableDirectoryRecord, childId InodeId,
 	remoteRecord quantumfs.DirectoryRecord) {
 
 	childname := remoteRecord.Filename()
@@ -326,7 +326,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 }
 
 func updateMapDescend_DOWN(c *ctx, rc *RefreshContext,
-	inodeId InodeId, remoteRecord quantumfs.DirectoryRecord) {
+	inodeId InodeId, remoteRecord quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.funcIn("updateMapDescend_DOWN").Out()
 	if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
@@ -346,7 +346,7 @@ func updateMapDescend_DOWN(c *ctx, rc *RefreshContext,
 
 // The caller must hold the childRecordLock
 func (dir *Directory) hideEntry_DOWN_(c *ctx, childId InodeId,
-	localRecord quantumfs.DirectoryRecord) {
+	localRecord quantumfs.ImmutableDirectoryRecord) string {
 
 	defer c.funcIn("Directory::hideEntry_DOWN_").Out()
 
@@ -362,6 +362,8 @@ func (dir *Directory) hideEntry_DOWN_(c *ctx, childId InodeId,
 	}
 	dir.children.renameChild(c, oldName, hiddenName)
 	c.qfs.noteDeletedInode(c, dir.inodeNum(), childId, oldName)
+
+	return hiddenName
 }
 
 func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
@@ -389,12 +391,23 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 		if rc.isInodeUsedAfterRefresh(c, localRecord, remoteRecord) {
 			if shouldHideLocalRecord(localRecord, remoteRecord) {
-				dir.hideEntry_DOWN_(c, childId, localRecord)
+				childname = dir.hideEntry_DOWN_(c, childId,
+					localRecord)
 			}
 			moved := remoteRecord == nil ||
 				remoteRecord.FileId() != localRecord.FileId()
-			rc.attachLocalRecord(c, dir.inodeNum(), childId, moved,
-				localRecord, remoteRecord)
+			fileId := rc.attachLocalRecord(c, dir.inodeNum(), childId,
+				moved, localRecord, remoteRecord)
+			if fileId != localRecord.FileId() {
+				// Don't be wasteful, only modify if a change
+				// occurred
+				dir.children.modifyChildWithFunc(c, childId,
+					func(record quantumfs.DirectoryRecord) {
+
+						record.SetFileId(fileId)
+					})
+				dir.children.makePublishable(c, childname)
+			}
 		} else {
 			rc.addStaleEntry(c, dir.inodeNum(), childId, localRecord)
 		}
@@ -407,7 +420,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 // The caller must hold the childRecordLock
 func (dir *Directory) findLocalMatch_DOWN_(c *ctx, rc *RefreshContext,
 	record quantumfs.DirectoryRecord, localEntries map[string]InodeId) (
-	localRecord quantumfs.DirectoryRecord, inodeId InodeId,
+	localRecord quantumfs.ImmutableDirectoryRecord, inodeId InodeId,
 	missingDentry bool) {
 
 	localRecord = dir.children.recordByName(c, record.Filename())

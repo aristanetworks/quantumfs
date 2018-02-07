@@ -64,7 +64,7 @@ func (th *TestHelper) getInode(path string) Inode {
 	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
 }
 
-func (th *TestHelper) GetRecord(path string) quantumfs.DirectoryRecord {
+func (th *TestHelper) GetRecord(path string) quantumfs.ImmutableDirectoryRecord {
 	inode := th.getInode(path)
 
 	parentId := func() InodeId {
@@ -77,7 +77,7 @@ func (th *TestHelper) GetRecord(path string) quantumfs.DirectoryRecord {
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()
-	return parentDir.getRecordChildCall_(&th.qfs.c, inode.inodeNum()).Clone()
+	return parentDir.getRecordChildCall_(&th.qfs.c, inode.inodeNum())
 }
 
 func logFuseWaiting(prefix string, th *TestHelper) {

@@ -25,7 +25,7 @@ const F_OK = 0
 func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	entry quantumfs.DirectoryRecord, updateMtime bool) {
 
-	defer c.funcIn("modifyEntryWithAttr").Out()
+	defer c.FuncIn("modifyEntryWithAttr", "valid %x", attr.Valid).Out()
 
 	// Update the type if needed
 	if newType != nil {
@@ -408,7 +408,7 @@ func markType(type_ quantumfs.ObjectType,
 }
 
 func underlyingTypeOf(hardlinkTable HardlinkTable,
-	record quantumfs.DirectoryRecord) quantumfs.ObjectType {
+	record quantumfs.ImmutableDirectoryRecord) quantumfs.ObjectType {
 
 	if record.Type() != quantumfs.ObjectTypeHardlink {
 		return record.Type()
@@ -421,8 +421,9 @@ func underlyingTypeOf(hardlinkTable HardlinkTable,
 	return hardlinkRecord.Type()
 }
 
-func underlyingTypesMatch(hardlinkTable HardlinkTable, r1 quantumfs.DirectoryRecord,
-	r2 quantumfs.DirectoryRecord) bool {
+func underlyingTypesMatch(hardlinkTable HardlinkTable,
+	r1 quantumfs.ImmutableDirectoryRecord,
+	r2 quantumfs.ImmutableDirectoryRecord) bool {
 
 	return underlyingTypeOf(hardlinkTable, r1).Matches(
 		underlyingTypeOf(hardlinkTable, r2))
