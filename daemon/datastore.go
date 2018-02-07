@@ -124,7 +124,7 @@ func newEmptyBuffer() buffer {
 
 // Does not obey the initBlockSize capacity, so only for use with buffers that
 // are very unlikely to be written to
-func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) *buffer {
+func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 	defer c.FuncIn("newBuffer", "keyType %d", keyType).Out()
 
 	return &buffer{
@@ -136,7 +136,7 @@ func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) *buffer {
 }
 
 // Like newBuffer(), but 'in' is copied and ownership is not assumed
-func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) *buffer {
+func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 	inSize := len(in)
 
 	defer c.FuncIn("newBufferCopy", "keyType %d inSize %d", keyType,
