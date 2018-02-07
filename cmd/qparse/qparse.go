@@ -41,6 +41,7 @@ var inFile string
 var outFile string
 var tabSpaces int
 var logOut bool
+var logAttach bool
 var patternsOut bool
 var stats bool
 var patternFile string
@@ -123,6 +124,8 @@ func init() {
 		"Indent function logs with n spaces, when using -log")
 	flag.BoolVar(&logOut, "log", false,
 		"Parse a log file (-in) and print to stdout or a file with -out")
+	flag.BoolVar(&logAttach, "tail", false, "For use with -log. Follows the "+
+		"qlog indefinitely, ignoring past logs.")
 	flag.BoolVar(&patternsOut, "pattern", false,
 		"Print patterns given in a stat file. Works with -id.")
 	flag.BoolVar(&stats, "stat", false, "Parse a log file (-in) and output to "+
@@ -245,22 +248,32 @@ func main() {
 			os.Exit(1)
 		}
 
-		if patternFile != "" {
-			filterLogOut(inFile, patternFile, true, tabSpaces)
-		} else if outFile == "" {
-			// Log parse mode only
-			qlog.ParseLogsExt(inFile, tabSpaces,
-				maxThreads, false, fmt.Printf)
+		var outFh *os.File
+		var err error
+		if outFile == "" {
+			outFh = os.Stdout
 		} else {
-			outFh, err := os.Create(outFile)
+			outFh, err = os.Create(outFile)
 			if err != nil {
 				fmt.Printf("Unable to create output file: %s\n", err)
 				os.Exit(1)
 			}
 			defer outFh.Close()
+		}
 
+		if logAttach {
+			reader := qlog.NewReader(inFile)
+
+			reader.ProcessLogs(qlog.TailOnly,
+				func(log *qlog.LogOutput) {
+					fmt.Fprintf(outFh, log.ToString())
+				})
+		} else if patternFile != "" {
+			filterLogOut(inFile, patternFile, true, tabSpaces)
+		} else {
 			qlog.ParseLogsExt(inFile, tabSpaces, maxThreads,
-				true, func(format string, args ...interface{}) (int,
+				(outFile != ""),
+				func(format string, args ...interface{}) (int,
 					error) {
 
 					return fmt.Fprintf(outFh, format, args...)

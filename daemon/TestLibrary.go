@@ -64,7 +64,7 @@ func (th *TestHelper) getInode(path string) Inode {
 	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
 }
 
-func (th *TestHelper) GetRecord(path string) quantumfs.DirectoryRecord {
+func (th *TestHelper) GetRecord(path string) quantumfs.ImmutableDirectoryRecord {
 	inode := th.getInode(path)
 
 	parentId := func() InodeId {
@@ -77,7 +77,7 @@ func (th *TestHelper) GetRecord(path string) quantumfs.DirectoryRecord {
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()
-	return parentDir.getRecordChildCall_(&th.qfs.c, inode.inodeNum()).Clone()
+	return parentDir.getRecordChildCall_(&th.qfs.c, inode.inodeNum())
 }
 
 func logFuseWaiting(prefix string, th *TestHelper) {
@@ -605,7 +605,8 @@ func (th *TestHelper) HardlinkKeyExists(workspace string,
 	wsr, cleanup := th.GetWorkspaceRoot(workspace)
 	defer cleanup()
 
-	for _, hardkey := range wsr.hardlinks {
+	defer wsr.hardlinkTable.linkLock.RLock().RUnlock()
+	for _, hardkey := range wsr.hardlinkTable.hardlinks {
 		if key.IsEqualTo(hardkey.record.ID()) {
 			return true
 		}

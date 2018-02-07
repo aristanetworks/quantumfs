@@ -69,15 +69,15 @@ type Inode interface {
 	RemoveXAttr(c *ctx, attr string) fuse.Status
 
 	// Methods called by children
-	setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-		out *fuse.AttrOut, updateMtime bool) fuse.Status
+	setChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
+		attr *fuse.SetAttrIn, out *fuse.AttrOut,
+		updateMtime bool) fuse.Status
 
 	getChildRecordCopy(c *ctx,
 		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 
 	// Update the key for only this child
-	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey,
-		newType quantumfs.ObjectType)
+	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
 
 	setChildRecord(c *ctx, record quantumfs.DirectoryRecord)
 
@@ -135,10 +135,10 @@ type Inode interface {
 			err fuse.Status)) fuse.Status
 
 	parentMarkAccessed(c *ctx, path string, op quantumfs.PathFlags)
-	parentSyncChild(c *ctx, publishFn func() (quantumfs.ObjectKey,
-		quantumfs.ObjectType))
-	parentSetChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
-		out *fuse.AttrOut, updateMtime bool) fuse.Status
+	parentSyncChild(c *ctx, publishFn func() quantumfs.ObjectKey)
+	parentSetChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
+		attr *fuse.SetAttrIn, out *fuse.AttrOut,
+		updateMtime bool) fuse.Status
 	parentUpdateSize(c *ctx, getSize_ func() uint64) fuse.Status
 	parentGetChildXAttrSize(c *ctx, inodeNum InodeId, attr string) (size int,
 		result fuse.Status)
@@ -270,7 +270,7 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 
 	parent := inode.parent_(c)
 	if wsr, isWorkspaceRoot := parent.(*WorkspaceRoot); isWorkspaceRoot {
-		isHardlink, fileId := wsr.checkHardlink(inode.id)
+		isHardlink, fileId := wsr.hardlinkTable.checkHardlink(inode.id)
 		if isHardlink {
 			wsr.markHardlinkAccessed(c, fileId, op)
 			return
@@ -281,7 +281,7 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 }
 
 func (inode *InodeCommon) parentSyncChild(c *ctx,
-	publishFn func() (quantumfs.ObjectKey, quantumfs.ObjectType)) {
+	publishFn func() quantumfs.ObjectKey) {
 
 	defer c.FuncIn("InodeCommon::parentSyncChild", "%d", inode.id).Out()
 
@@ -296,9 +296,9 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	}
 
 	// publish before we sync, once we know it's safe
-	baseLayerId, objectType := publishFn()
+	baseLayerId := publishFn()
 
-	inode.parent_(c).syncChild(c, inode.id, baseLayerId, objectType)
+	inode.parent_(c).syncChild(c, inode.id, baseLayerId)
 }
 
 func (inode *InodeCommon) parentUpdateSize(c *ctx,
@@ -309,19 +309,31 @@ func (inode *InodeCommon) parentUpdateSize(c *ctx,
 	defer inode.parentLock.RLock().RUnlock()
 	defer inode.lock.Lock().Unlock()
 
+	if !inode.isOrphaned_() {
+		inode.dirty(c)
+	}
+
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = getSize_()
-	return inode.parent_(c).setChildAttr(c, inode.inodeNum(), &attr, nil, true)
+	return inode.parent_(c).setChildAttr(c, inode.inodeNum(), nil, &attr, nil,
+		true)
 }
 
 func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	defer c.funcIn("InodeCommon::parentSetChildAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
-	return inode.parent_(c).setChildAttr(c, inodeNum, attr, out, updateMtime)
+
+	if !inode.isOrphaned_() {
+		inode.dirty(c)
+	}
+
+	return inode.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
+		updateMtime)
 }
 
 func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,
@@ -357,6 +369,11 @@ func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr str
 	defer c.funcIn("InodeCommon::parentSetChildXAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
+
+	if !inode.isOrphaned_() {
+		inode.dirty(c)
+	}
+
 	return inode.parent_(c).setChildXAttr(c, inodeNum, attr, data)
 }
 
@@ -366,6 +383,11 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 	defer c.funcIn("InodeCommon::parentRemoveChildXAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
+
+	if !inode.isOrphaned_() {
+		inode.dirty(c)
+	}
+
 	return inode.parent_(c).removeChildXAttr(c, inodeNum, attr)
 }
 
@@ -420,16 +442,16 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	defer parent.childRecordLock.Lock().Unlock()
 
 	// Check if this is still a child
-	record := parent.children.record(inode.id)
+	record := parent.children.recordByInodeId(c, inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
 		return
 	}
 
-	link := record.(*Hardlink)
+	link := record.(*HardlinkLeg)
 
 	// This may need to be turned back into a normal file
-	newRecord, inodeId := parent.hardlinkTable.removeHardlink(c, link.fileId)
+	newRecord, inodeId := parent.hardlinkTable.removeHardlink(c, link.FileId())
 
 	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
 		// wsr says hardlink isn't ready for removal yet
@@ -442,9 +464,14 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	// Ensure that we update this version of the record with this instance
 	// of the hardlink's information
 	newRecord.SetFilename(link.Filename())
+	inode.setName(link.Filename())
 
 	// Here we do the opposite of makeHardlink DOWN - we re-insert it
-	parent.children.loadChild(c, newRecord, inodeId)
+	parent.children.setRecord(c, inodeId, newRecord)
+
+	// Mark the inode as dirty to ensure it will flush to make itself publishable
+	inode.dirty(c)
+
 	parent.dirty(c)
 }
 

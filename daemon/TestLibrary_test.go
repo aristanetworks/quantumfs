@@ -84,11 +84,11 @@ func TestPanicFilesystemAbort(t *testing.T) {
 		api := test.getApi()
 
 		// Introduce a panicing error into quantumfs
-		test.qfs.mapMutex.Lock()
-		for k, v := range test.qfs.fileHandles {
-			test.qfs.fileHandles[k] = &crashOnWrite{FileHandle: v}
-		}
-		test.qfs.mapMutex.Unlock()
+		test.qfs.fileHandles.Range(func(k interface{}, v interface{}) bool {
+			fh := v.(FileHandle)
+			test.qfs.fileHandles.Store(k, &crashOnWrite{FileHandle: fh})
+			return true
+		})
 
 		// panic Quantumfs
 		api.Branch(quantumfs.NullSpaceName+"/"+quantumfs.NullSpaceName+"/"+
@@ -193,7 +193,7 @@ func startQuantumFsInstances(numDefaultQfs int, configModifier configModifierFun
 	if numDefaultQfs >= 2 {
 		config := th.defaultConfig()
 		wsdb := th.qfs.config.WorkspaceDB.(*processlocal.WorkspaceDB)
-		config.WorkspaceDB = wsdb.GetSecondHead()
+		config.WorkspaceDB = wsdb.GetAdditionalHead()
 
 		config.DurableStore = th.qfs.config.DurableStore
 		config.MountPath += "2"
@@ -243,16 +243,17 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 
 	defer th.qfs.mapMutex.Lock().Unlock()
 
-	for _, file := range th.qfs.fileHandles {
+	th.qfs.fileHandles.Range(func(k interface{}, file interface{}) bool {
 		fh, ok := file.(*FileDescriptor)
 		if !ok {
-			continue
+			return true
 		}
 
 		if fh.inodeNum == InodeId(inodeNum) {
 			handles = append(handles, fh)
 		}
-	}
+		return true
+	})
 
 	return handles
 }

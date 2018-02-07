@@ -7,8 +7,10 @@ import (
 	"container/list"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -99,29 +101,27 @@ type StatExtractor interface {
 	// Do the real processing
 	process(msg *qlog.LogOutput)
 	publish() []Measurement
-	gc()
+	gc() // Optional
 
 	// ExtractorBase below implements these
-
-	// Returns true if the given generation has reached death when compared with
-	// StatExtractorBase.CurrentGeneration.
-	AgedOut(generation uint64) bool
 
 	// This is the list of strings that the extractor will be triggered on and
 	// receive. Note that full formats include a trailing \n.
 	TriggerStrings() []string
 	Type() TriggerType
 	Chan() chan StatCommand
+
+	// Internal
+	_gc()
 }
 
 // A base class which handles the boiler plate for writing StatExtractors
 type StatExtractorBase struct {
-	Name              string
-	CurrentGeneration uint64
-	messages          chan StatCommand
-	self              StatExtractor // Our superclass
-	type_             TriggerType
-	triggers          []string
+	Name     string
+	messages chan StatCommand
+	self     StatExtractor // Our superclass
+	type_    TriggerType
+	triggers []string
 }
 
 func NewStatExtractorBase(name string, self StatExtractor, type_ TriggerType,
@@ -144,6 +144,8 @@ func (seb *StatExtractorBase) publish() []Measurement {
 
 func (seb *StatExtractorBase) gc() {}
 
+func (seb *StatExtractorBase) _gc() {}
+
 func (seb *StatExtractorBase) run() {
 	go seb.listen()
 }
@@ -158,17 +160,9 @@ func (seb *StatExtractorBase) listen() {
 			resultChannel := cmd.Data().(chan []Measurement)
 			resultChannel <- seb.self.publish()
 		case GcCommandType:
-			seb.CurrentGeneration++
-			seb.self.gc()
+			seb.self._gc()
 		}
 	}
-}
-
-func (seb *StatExtractorBase) AgedOut(generation uint64) bool {
-	if generation+2 < seb.CurrentGeneration {
-		return true
-	}
-	return false
 }
 
 func (seb *StatExtractorBase) Chan() chan StatCommand {
@@ -181,6 +175,36 @@ func (seb *StatExtractorBase) TriggerStrings() []string {
 
 func (seb *StatExtractorBase) Type() TriggerType {
 	return seb.type_
+}
+
+type StatExtractorBaseWithGC struct {
+	StatExtractorBase
+	CurrentGeneration uint64
+}
+
+func NewStatExtractorBaseWithGC(name string, self StatExtractor, type_ TriggerType,
+	triggerStrings []string) StatExtractorBaseWithGC {
+
+	sebgc := StatExtractorBaseWithGC{
+		StatExtractorBase: NewStatExtractorBase(name, self,
+			type_, triggerStrings),
+	}
+
+	return sebgc
+}
+
+// Returns true if the given generation has reached death when
+// compared with StatExtractorBaseWithGC.CurrentGeneration.
+func (sebgc *StatExtractorBaseWithGC) AgedOut(generation uint64) bool {
+	if generation+2 < sebgc.CurrentGeneration {
+		return true
+	}
+	return false
+}
+
+func (sebgc *StatExtractorBaseWithGC) _gc() {
+	sebgc.CurrentGeneration++
+	sebgc.self.gc()
 }
 
 func AggregateLogs(mode qlog.LogProcessMode, filename string,
@@ -219,6 +243,7 @@ type Aggregator struct {
 
 	queueMutex   utils.DeferableMutex
 	queueLogs    []*qlog.LogOutput
+	queueSize    int64
 	notification chan struct{}
 }
 
@@ -279,10 +304,27 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	return &agg
 }
 
+const maxQueueSize_bytes = 10 * 1024 * 1024 * 1024
+
+func logSize(log *qlog.LogOutput) int64 {
+	rtn := int(unsafe.Sizeof(log))
+	rtn += len(log.Format)
+	for _, arg := range log.Args {
+		rtn += int(unsafe.Sizeof(arg))
+	}
+
+	return int64(rtn)
+}
+
 func (agg *Aggregator) ProcessLog(log *qlog.LogOutput) {
 	defer agg.queueMutex.Lock().Unlock()
 
 	agg.queueLogs = append(agg.queueLogs, log)
+
+	agg.queueSize += logSize(log)
+	if agg.queueSize > maxQueueSize_bytes {
+		panic("Qlogger processThread probably locked due to timeout")
+	}
 
 	select {
 	case agg.notification <- struct{}{}:
@@ -312,6 +354,8 @@ func (agg *Aggregator) processThread() {
 			// but gain a much quicker mutex unlock
 			rtn := agg.queueLogs
 			agg.queueLogs = make([]*qlog.LogOutput, 0, 1000)
+			agg.queueSize = 0
+
 			return rtn
 		}()
 
@@ -354,6 +398,7 @@ func (agg *Aggregator) publish() {
 
 	for {
 		time.Sleep(agg.publishInterval)
+		nowTime := time.Now()
 
 		results := make([]chan []Measurement, 0, len(agg.extractors))
 		// Trigger extractors to publish in parallel
@@ -383,7 +428,7 @@ func (agg *Aggregator) publish() {
 				// add the qfs version tag
 				tags = append(tags, versionTag)
 
-				agg.db.Store(name, tags, fields)
+				agg.db.Store(name, tags, fields, nowTime)
 			}
 		}
 	}
@@ -405,6 +450,89 @@ type byIncreasing []int64
 func (a byIncreasing) Len() int           { return len(a) }
 func (a byIncreasing) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byIncreasing) Less(i, j int) bool { return a[i] < a[j] }
+
+// A data aggregator that outputs histogram based statistics
+type histogram struct {
+	minVal      int64
+	maxVal      int64
+	bucketWidth int64
+	buckets     []int64
+
+	// Keep a bucket for data outside the range
+	beforeCount int64
+	pastCount   int64
+
+	count     int64
+	normalize bool
+}
+
+func NewHistogram(min int64, max int64, buckets_ int64, normalize bool) histogram {
+	numRange := (1 + max) - min
+	width := numRange / buckets_
+	// when the range doesn't divide evenly, choose to have a smaller upper
+	// bucket than a really big one.
+	if numRange%buckets_ != 0 {
+		width++
+	}
+
+	return histogram{
+		minVal:      min,
+		maxVal:      max,
+		bucketWidth: width,
+		buckets:     make([]int64, buckets_),
+		normalize:   normalize,
+	}
+}
+
+func (hs *histogram) NewPoint(data int64) {
+	if data < hs.minVal {
+		hs.beforeCount++
+	} else if data > hs.maxVal {
+		hs.pastCount++
+	} else {
+		idx := (data - hs.minVal) / hs.bucketWidth
+		hs.buckets[idx]++
+	}
+
+	hs.count++
+}
+
+func (hs *histogram) Count() int64 {
+	return hs.count
+}
+
+func (hs *histogram) Clear() {
+	hs.buckets = make([]int64, len(hs.buckets))
+	hs.beforeCount = 0
+	hs.pastCount = 0
+	hs.count = 0
+}
+
+func (hs *histogram) Histogram() map[string]int64 {
+	rtn := make(map[string]int64)
+
+	min := hs.minVal
+	for _, count := range hs.buckets {
+		nextMin := min + hs.bucketWidth
+
+		tag := strconv.Itoa(int(min)) + "-" + strconv.Itoa(int(nextMin))
+		if hs.count == 0 {
+			rtn[tag] = 0
+		} else if hs.normalize {
+			// Normalize the histogram to a percentage for
+			// easier interpretation
+			rtn[tag] = (100 * count) / hs.count
+		} else {
+			rtn[tag] = count
+		}
+		min = nextMin
+	}
+
+	rtn["BeforeHistogram"] = hs.beforeCount
+	rtn["PastHistogram"] = hs.pastCount
+
+	return rtn
+}
 
 // A data aggregator that outputs basic statistics such as the average
 // Intended to be used by data extractors.
