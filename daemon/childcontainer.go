@@ -73,6 +73,8 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 	return uninstantiated
 }
 
+// Use this when you are loading a child's metadata from the datastore and do not
+// know the InodeId.
 func (container *ChildContainer) loadChild(c *ctx,
 	record quantumfs.DirectoryRecord) InodeId {
 
@@ -109,6 +111,9 @@ func (container *ChildContainer) loadChild(c *ctx,
 	return inodeId
 }
 
+// Use this when you know the child's InodeId. Either the child must be instantiated
+// and dirty, or markPublishable() must be called immediately afterwards for the
+// changes set here to eventually be published.
 func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	record quantumfs.DirectoryRecord) {
 
