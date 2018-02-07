@@ -422,11 +422,11 @@ func underlyingTypesMatch(hardlinkTable HardlinkTable, r1 quantumfs.DirectoryRec
 		underlyingTypeOf(hardlinkTable, r2))
 }
 
-type publishFn func (*ctx, *buffer) (quantumfs.ObjectKey, error)
+type publishFn func (*ctx, quantumfs.Buffer) (quantumfs.ObjectKey, error)
 
 var publishNow publishFn
 func init() {
-	publishNow = func (c *ctx, buf *buffer) (quantumfs.ObjectKey,
+	publishNow = func (c *ctx, buf quantumfs.Buffer) (quantumfs.ObjectKey,
 		error) {
 
 		return buf.Key(&c.Ctx)

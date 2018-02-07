@@ -220,7 +220,7 @@ func (fi *MultiBlockFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 	bytes := store.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	key, err := buf.Key(c, buf)
+	key, err := pub(c, buf)
 	utils.Assert(err == nil, "Failed to upload new file metadata: %v", err)
 
 	return key

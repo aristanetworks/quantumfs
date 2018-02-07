@@ -195,7 +195,7 @@ func (fi *VeryLargeFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 	store.SetNumberOfParts(len(fi.parts))
 
 	for i := 0; i < len(fi.parts); i++ {
-		newKey := fi.parts[i].sync(c)
+		newKey := fi.parts[i].sync(c, pub)
 
 		store.SetLargeFileKey(i, newKey)
 	}

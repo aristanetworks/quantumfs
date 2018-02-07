@@ -25,12 +25,11 @@ type hardlinkTracker struct {
 	merged map[quantumfs.FileId]HardlinkTableEntry
 }
 
-func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]HardlinkTableEntry,
+func newHardlinkTracker(merge *merger, base map[quantumfs.FileId]HardlinkTableEntry,
 	remote map[quantumfs.FileId]HardlinkTableEntry,
-	local map[quantumfs.FileId]HardlinkTableEntry,
-	prefer mergePreference) *hardlinkTracker {
+	local map[quantumfs.FileId]HardlinkTableEntry) *hardlinkTracker {
 
-	defer c.funcIn("newHardlinkTracker").Out()
+	defer merge.c.funcIn("newHardlinkTracker").Out()
 
 	rtn := hardlinkTracker{
 		allRecords: make(map[quantumfs.FileId]quantumfs.DirectoryRecord),
@@ -51,8 +50,8 @@ func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]HardlinkTableEntry,
 				baseRecord = baseEntry.record
 			}
 
-			mergedRecord, err := mergeFile(c, baseRecord,
-				remoteEntry.record, localEntry.record, prefer)
+			mergedRecord, err := mergeFile(merge, baseRecord,
+				remoteEntry.record, localEntry.record)
 			if err != nil {
 				panic(err)
 			}
@@ -175,7 +174,7 @@ type mergeSkipPaths struct {
 	paths map[string]struct{}
 }
 
-func mergeUploader(c *ctx, buffers chan *buffer, rtnErr *error,
+func mergeUploader(c *ctx, buffers chan quantumfs.Buffer, rtnErr *error,
 	wg *sync.WaitGroup) {
 
 	defer c.funcIn("mergeUploader").Out()
@@ -204,18 +203,18 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d", prefer,
 		len(skipPaths.paths)).Out()
 
-	toSet := make(chan *buffer, maxUploadBacklog)
+	toSet := make(chan quantumfs.Buffer, maxUploadBacklog)
 	merge := newMerger(c)
 	merge.preference = prefer
-	merge.pubFn = func (c *ctx, buf *buffer) (quantumfs.ObjectKey,
+	merge.pubFn = func (c *ctx, buf quantumfs.Buffer) (quantumfs.ObjectKey,
 		error) {
 
 			if len(toSet) == maxUploadBacklog-1 {
-				c.vlog("Merge uploading bandwidth maxed.")
+				c.elog("Merge uploading bandwidth maxed.")
 			}
 
 			toSet <- buf
-			return quantumfs.NewObjectKey(buf.keyType,
+			return quantumfs.NewObjectKey(buf.KeyType(),
 				buf.ContentHash()), nil
 		}
 
@@ -238,8 +237,8 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		return local, err
 	}
 
-	tracker := newHardlinkTracker(c, baseHardlinks, remoteHardlinks,
-		localHardlinks, merge.preference)
+	tracker := newHardlinkTracker(merge, baseHardlinks, remoteHardlinks,
+		localHardlinks)
 
 	localDirectory, err = mergeDirectory(merge, "/", baseDirectory,
 		remoteDirectory, localDirectory, true, tracker, skipPaths)
@@ -663,8 +662,7 @@ func mergeRecord(merge *merger, base quantumfs.DirectoryRecord,
 	case quantumfs.ObjectTypeVeryLargeFile:
 		if bothSameType {
 			// We can potentially do an intra-file merge
-			return mergeFile(merge.c, base, remote, local,
-				merge.preference)
+			return mergeFile(merge, base, remote, local)
 		}
 	}
 
@@ -864,12 +862,12 @@ func mergeFile(merge *merger, base quantumfs.DirectoryRecord,
 		rtnRecord.SetSize(other.fileLength(merge.c))
 		rtnRecord.SetID(other.sync(merge.c, merge.pubFn))
 
-		c.vlog("Merging file contents for %d %s", local.FileId(),
+		merge.c.vlog("Merging file contents for %d %s", local.FileId(),
 			local.Filename())
 		return rtnRecord, nil
 	}
 
-	c.vlog("File conflict for %s resulting in overwrite. %d %d",
+	merge.c.vlog("File conflict for %s resulting in overwrite. %d %d",
 		local.Filename(), local.FileId(), remote.FileId())
 
 	return rtnRecord, nil
