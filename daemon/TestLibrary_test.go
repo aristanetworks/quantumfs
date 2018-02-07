@@ -193,7 +193,7 @@ func startQuantumFsInstances(numDefaultQfs int, configModifier configModifierFun
 	if numDefaultQfs >= 2 {
 		config := th.defaultConfig()
 		wsdb := th.qfs.config.WorkspaceDB.(*processlocal.WorkspaceDB)
-		config.WorkspaceDB = wsdb.GetSecondHead()
+		config.WorkspaceDB = wsdb.GetAdditionalHead()
 
 		config.DurableStore = th.qfs.config.DurableStore
 		config.MountPath += "2"
