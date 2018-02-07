@@ -367,12 +367,6 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 }
 
-// DirectoryRecord.ExtendedAttributes() does not return EmptyBlockKey
-// when there are no EAs. Sometimes it returns fakeZeroKey and
-// sometime quantumfs.EmptyBlockKey. This is tracked with BUG/203685
-var fakeZeroKey = quantumfs.NewObjectKey(quantumfs.KeyTypeInvalid,
-	[quantumfs.ObjectKeyLength - 1]byte{})
-
 func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 	dr quantumfs.DirectoryRecord, keyChan chan<- *workerData) error {
 
