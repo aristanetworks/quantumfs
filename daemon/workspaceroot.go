@@ -472,7 +472,7 @@ func loadHardlinks(c *ctx,
 	return hardlinks
 }
 
-func publishHardlinkMap(c *ctx,
+func publishHardlinkMap(c *ctx, pub publishFn,
 	records map[quantumfs.FileId]HardlinkTableEntry) *quantumfs.HardlinkEntry {
 
 	defer c.funcIn("publishHardlinkMap").Out()
@@ -505,7 +505,7 @@ func publishHardlinkMap(c *ctx,
 			buf := newBuffer(c, baseLayer.Bytes(),
 				quantumfs.KeyTypeMetadata)
 
-			nextBaseLayerId, err = buf.Key(&c.Ctx)
+			nextBaseLayerId, err = pub(&c.Ctx)
 			utils.Assert(err == nil,
 				"Failed to upload new baseLayer object: %v", err)
 
@@ -589,18 +589,19 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 }
 
 func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
-	hardlinks map[quantumfs.FileId]HardlinkTableEntry) quantumfs.ObjectKey {
+	hardlinks map[quantumfs.FileId]HardlinkTableEntry,
+	pub publishFn) quantumfs.ObjectKey {
 
 	defer c.funcIn("publishWorkspaceRoot").Out()
 
 	workspaceRoot := quantumfs.NewWorkspaceRoot()
 	workspaceRoot.SetBaseLayer(baseLayer)
-	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, hardlinks))
+	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, pub, hardlinks))
 
 	bytes := workspaceRoot.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	newRootId, err := buf.Key(&c.Ctx)
+	newRootId, err := pub(c)
 	utils.Assert(err == nil, "Failed to upload new workspace root: %v", err)
 
 	c.vlog("Publish: %s", newRootId.String())
@@ -639,7 +640,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 
 	// Upload the workspaceroot object
 	newRootId := publishWorkspaceRoot(c, wsr.baseLayerId,
-		wsr.hardlinkTable.hardlinks)
+		wsr.hardlinkTable.hardlinks, publishNow)
 
 	// Update workspace rootId
 	if !newRootId.IsEqualTo(wsr.publishedRootId) {

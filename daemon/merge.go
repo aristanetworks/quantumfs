@@ -138,6 +138,22 @@ func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) HardlinkTableEntry {
 	return link
 }
 
+type merger struct {
+	preference	mergePreference
+	skipPaths	mergeSkipPaths
+	pubFn		publishFn
+}
+
+func newMerger() *merger {
+	paths := &mergeSkipPaths{paths: make(map[string]struct{}, 0)})
+
+	return &merger {
+		preference:	quantumfs.PreferNewer,
+		skipPaths:	paths,
+		pubFn:		publishNow,
+	}
+}
+
 func loadWorkspaceRoot(c *ctx,
 	key quantumfs.ObjectKey) (hardlinks map[quantumfs.FileId]HardlinkTableEntry,
 	directory quantumfs.ObjectKey, err error) {
@@ -160,12 +176,55 @@ type mergeSkipPaths struct {
 	paths map[string]struct{}
 }
 
+func mergeUploader(c *ctx, buffers chan *quantumfs.Buffer, rtnErr *error,
+	wg *sync.WaitGroup) {
+
+	defer c.funcIn("mergeUploader").Out()
+	defer wg.Done()
+
+	for {
+		buffer, more := <-buffers
+		if more {
+			_, err := buffer.Key(&c.Ctx)
+			if err != nil {
+				*rtnErr = err
+				return
+			}
+		} else {
+			return
+		}
+	}
+}
+
+const maxUploadBacklog = 1000
+
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
 	local quantumfs.ObjectKey, prefer mergePreference,
 	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d", prefer,
-		len(skipPaths.paths)).Out()
+		len(skipPaths)).Out()
+
+	toSet := make(chan *quantumfs.Buffer, maxUploadBacklog)
+	merge := NewMerger()
+	merge.prefer = prefer
+	merge.skipPaths = skipPaths
+	merge.pubFn = func (c *ctx, buf *quantumfs.Buffer) (quantumfs.ObjectKey,
+		error) {
+
+			if len(toSet) == maxUploadBacklog-1 {
+				c.vlog("Merge uploading bandwidth maxed.")
+			}
+
+			toSet <- buf
+			return quantumfs.NewObjectKey(buf.keyType, buf.ContantHash),
+				nil
+		}
+
+	var uploadErr error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go mergeUploader(c, toSet, &uploadErr, &wg)
 
 	baseHardlinks, baseDirectory, err := loadWorkspaceRoot(c, base)
 	if err != nil {
@@ -185,12 +244,19 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		localHardlinks, prefer)
 
 	localDirectory, err = mergeDirectory(c, "/", baseDirectory,
-		remoteDirectory, localDirectory, true, tracker, prefer, skipPaths)
+		remoteDirectory, localDirectory, true, tracker, mergeCfg.prefer,
+		mergeCfg.skipPaths)
+
 	if err != nil {
 		return local, err
 	}
 
-	return publishWorkspaceRoot(c, localDirectory, tracker.merged), nil
+	rtn := publishWorkspaceRoot(c, localDirectory, tracker.merged,
+		mergeCfg.pubFn)
+
+	// Ensure everything is uploaded before we continue
+	close(toSet)
+	uploading.Wait()
 }
 
 func loadRecords(c *ctx,
