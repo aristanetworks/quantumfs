@@ -339,12 +339,10 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 		// quantumfs.ObjectTypeSmallFile:
 		// quantumfs.ObjectTypeSymlink:
 	case quantumfs.ObjectTypeHardlink:
-		// this ObjectType will only be seen when
-		// looking at a directoryRecord reached from
-		// directoryEntry and not when walking from
-		// hardlinkEntry table
-
-		// hence use key from hardlinkRecord
+		// This ObjectType will only be seen when looking at a
+		// directoryRecord reached from directoryEntry and not
+		// when walking from hardlinkEntry table hence use the
+		// key from the hardlinkRecord.
 		hldr, exists := c.hlkeys[dr.FileId()]
 
 		if !exists {
