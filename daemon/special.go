@@ -118,8 +118,8 @@ func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	defer c.funcIn("Special::SetAttr").Out()
-	return special.parentSetChildAttr(c, special.InodeCommon.id, attr, out,
-		false)
+	return special.parentSetChildAttr(c, special.InodeCommon.id,
+		nil, attr, out, false)
 }
 
 func (special *Special) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
