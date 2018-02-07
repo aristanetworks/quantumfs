@@ -144,6 +144,8 @@ func (seb *StatExtractorBase) publish() []Measurement {
 
 func (seb *StatExtractorBase) gc() {}
 
+func (seb *StatExtractorBase) _gc() {}
+
 func (seb *StatExtractorBase) run() {
 	go seb.listen()
 }
@@ -162,8 +164,6 @@ func (seb *StatExtractorBase) listen() {
 		}
 	}
 }
-
-func (seb *StatExtractorBase) _gc() {}
 
 func (seb *StatExtractorBase) Chan() chan StatCommand {
 	return seb.messages
