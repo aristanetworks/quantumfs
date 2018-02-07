@@ -66,7 +66,6 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
 		c.vlog("Loading child %s", record.Filename())
 		childInodeNum := container.loadChild(c, record)
-		container.children[record.Filename()] = childInodeNum
 		c.vlog("loaded child %d", childInodeNum)
 		uninstantiated = append(uninstantiated, childInodeNum)
 	})
@@ -74,6 +73,8 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 	return uninstantiated
 }
 
+// Use this when you are loading a child's metadata from the datastore and do not
+// know the InodeId.
 func (container *ChildContainer) loadChild(c *ctx,
 	record quantumfs.DirectoryRecord) InodeId {
 
@@ -81,7 +82,7 @@ func (container *ChildContainer) loadChild(c *ctx,
 		record.Filename(), record.Type()).Out()
 
 	// Since we do not have an inodeId this child is/will not be instantiated and
-	// so it placed in the publishable set.
+	// so it is placed in the publishable set.
 
 	var inodeId InodeId
 	if record.Type() == quantumfs.ObjectTypeHardlink {
@@ -110,6 +111,9 @@ func (container *ChildContainer) loadChild(c *ctx,
 	return inodeId
 }
 
+// Use this when you know the child's InodeId. Either the child must be instantiated
+// and dirty, or markPublishable() must be called immediately afterwards for the
+// changes set here to eventually be published.
 func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	record quantumfs.DirectoryRecord) {
 
@@ -181,17 +185,18 @@ func (container *ChildContainer) _recordByName(c *ctx,
 
 // Note that this will return one arbitrary record in cases where that inode has
 // multiple names in this container/directory.
-func (container *ChildContainer) recordById(c *ctx,
+func (container *ChildContainer) recordByInodeId(c *ctx,
 	inodeId InodeId) quantumfs.ImmutableDirectoryRecord {
 
-	return container._recordById(c, inodeId)
+	return container._recordByInodeId(c, inodeId)
 }
 
 // Internal use only method
-func (container *ChildContainer) _recordById(c *ctx,
+func (container *ChildContainer) _recordByInodeId(c *ctx,
 	inodeId InodeId) quantumfs.DirectoryRecord {
 
-	defer c.FuncIn("ChildContainer::_recordById", "inodeId %d", inodeId).Out()
+	defer c.FuncIn("ChildContainer::_recordByInodeId", "inodeId %d",
+		inodeId).Out()
 
 	records := container.effective[inodeId]
 	if records == nil {
@@ -288,7 +293,7 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 
 	defer c.funcIn("ChildContainer::modifyChildWithFunc").Out()
 
-	record := container._recordById(c, inodeId)
+	record := container._recordByInodeId(c, inodeId)
 	if record == nil {
 		return
 	}

@@ -171,9 +171,9 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 	defer c.FuncIn("Directory::convertToHardlinkLeg_DOWN",
 		"inode %d name %s", childId, childname).Out()
 
-	child := dir.children.recordById(c, childId)
+	child := dir.children.recordByName(c, childname)
 	if child == nil {
-		c.elog("No child record for inode %d", childId)
+		c.elog("No child record for name %s", childname)
 		return nil, fuse.ENOENT
 	}
 

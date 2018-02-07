@@ -270,7 +270,7 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 
 	parent := inode.parent_(c)
 	if wsr, isWorkspaceRoot := parent.(*WorkspaceRoot); isWorkspaceRoot {
-		isHardlink, fileId := wsr.checkHardlink(inode.id)
+		isHardlink, fileId := wsr.hardlinkTable.checkHardlink(inode.id)
 		if isHardlink {
 			wsr.markHardlinkAccessed(c, fileId, op)
 			return
@@ -442,7 +442,7 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	defer parent.childRecordLock.Lock().Unlock()
 
 	// Check if this is still a child
-	record := parent.children.recordById(c, inode.id)
+	record := parent.children.recordByInodeId(c, inode.id)
 	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
 		// no hardlink record here, nothing to do
 		return
