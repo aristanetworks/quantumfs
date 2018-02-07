@@ -1310,6 +1310,7 @@ type Buffer interface {
 	Read(out []byte, offset uint32) int
 	Get() []byte
 	Set(data []byte, keyType KeyType)
+	KeyType() KeyType
 	ContentHash() [ObjectKeyLength - 1]byte
 	Key(c *Ctx) (ObjectKey, error)
 	SetSize(size int)
