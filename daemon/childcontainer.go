@@ -92,16 +92,6 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	container.publishable.setRecord(c, inodeId, record)
 }
 
-func (container *ChildContainer) getRecord(c *ctx, inodeId InodeId,
-	name string) quantumfs.DirectoryRecord {
-
-	defer c.FuncIn("ChildContainer::getRecord", "%d %s", inodeId, name).Out()
-	if record := container.effective.get(inodeId); record != nil {
-		return record
-	}
-	return container.publishable.getRecord(c, inodeId, name)
-}
-
 func (container *ChildContainer) loadChild(c *ctx, record quantumfs.DirectoryRecord,
 	inodeId InodeId) InodeId {
 
