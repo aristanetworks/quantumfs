@@ -234,9 +234,10 @@ type Aggregator struct {
 	requestSequence list.List
 
 	extractors             []StatExtractor
-	triggerByFormat        map[string][]chan StatCommand
-	triggerByPartialFormat map[string][]chan StatCommand
-	triggerAll             []chan StatCommand
+	extractorChans         []chan StatCommand
+	triggerByFormat        map[string][]int
+	triggerByPartialFormat map[string][]int
+	triggerAll             []int
 
 	gcInternval     time.Duration
 	publishInterval time.Duration
@@ -255,9 +256,10 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		db:                     db_,
 		daemonVersion:          daemonVersion_,
 		extractors:             extractors,
-		triggerByFormat:        make(map[string][]chan StatCommand),
-		triggerByPartialFormat: make(map[string][]chan StatCommand),
-		triggerAll:             make([]chan StatCommand, 0),
+		extractorChans:         make([]chan StatCommand, len(extractors)),
+		triggerByFormat:        make(map[string][]int),
+		triggerByPartialFormat: make(map[string][]int),
+		triggerAll:             make([]int, 0),
 		gcInternval:            time.Minute * 2,
 		publishInterval:        publishInterval,
 		queueLogs:              make([]*qlog.LogOutput, 0, 1000),
@@ -265,17 +267,18 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	}
 
 	// Record the desired filtering
-	for _, extractor := range agg.extractors {
+	for i, extractor := range agg.extractors {
 		c := extractor.Chan()
+		agg.extractorChans[i] = c
 
 		if extractor.Type() == OnAll {
-			agg.triggerAll = append(agg.triggerAll, c)
+			agg.triggerAll = append(agg.triggerAll, i)
 			continue
 		}
 
 		triggers := extractor.TriggerStrings()
 		for _, trigger := range triggers {
-			var triggerList map[string][]chan StatCommand
+			var triggerList map[string][]int
 			if extractor.Type() == OnFormat {
 				triggerList = agg.triggerByFormat
 			} else { // OnPartialFormat
@@ -284,10 +287,10 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 
 			newTriggers, exists := triggerList[trigger]
 			if !exists {
-				newTriggers = make([]chan StatCommand, 0)
+				newTriggers = make([]int, 0)
 			}
 
-			newTriggers = append(newTriggers, c)
+			newTriggers = append(newTriggers, i)
 
 			if extractor.Type() == OnFormat {
 				agg.triggerByFormat[trigger] = newTriggers
@@ -367,26 +370,31 @@ func (agg *Aggregator) processThread() {
 
 func (agg *Aggregator) filterAndDistribute(log *qlog.LogOutput) {
 	// These always match
-	for _, extractor := range agg.triggerAll {
-		extractor <- &MessageCommand{
+	for _, extractorIdx := range agg.triggerAll {
+		agg.extractorChans[extractorIdx] <- &MessageCommand{
 			log: log,
 		}
 	}
 
 	// These match the format string fully
 	matching := agg.triggerByFormat[log.Format]
-	for _, extractor := range matching {
-		extractor <- &MessageCommand{
+	for _, extractorIdx := range matching {
+		agg.extractorChans[extractorIdx] <- &MessageCommand{
 			log: log,
 		}
 	}
 
 	// These partially match the format string
+	notified := make(map[int]bool, 0)
 	for trigger, extractors := range agg.triggerByPartialFormat {
 		if strings.Contains(log.Format, trigger) {
-			for _, extractor := range extractors {
-				extractor <- &MessageCommand{
-					log: log,
+			for _, extractorIdx := range extractors {
+				if _, exists := notified[extractorIdx]; !exists {
+					c := agg.extractorChans[extractorIdx]
+					c <- &MessageCommand{
+						log: log,
+					}
+					notified[extractorIdx] = true
 				}
 			}
 		}
