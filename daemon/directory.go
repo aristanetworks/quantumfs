@@ -387,6 +387,7 @@ func publishDirectoryRecords(c *ctx,
 				quantumfs.NewDirectoryEntry(numEntries)
 			entryIdx = 0
 		}
+		c.vlog("Setting child %s", child.Filename())
 		baseLayer.SetEntry(entryIdx, child.Publishable())
 
 		entryIdx++

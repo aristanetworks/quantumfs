@@ -55,6 +55,7 @@ func TestHardlink(t *testing.T) {
 
 		parentInode := test.getInode(workspace)
 		parentDir := &parentInode.(*WorkspaceRoot).Directory
+
 		defer parentDir.childRecordLock.Lock().Unlock()
 		c := test.TestCtx()
 		type_ := parentDir.children.recordByInodeId(c, file1InodeNum).Type()

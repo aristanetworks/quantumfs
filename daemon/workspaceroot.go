@@ -327,14 +327,16 @@ func (ht *HardlinkTableImpl) findHardlinkInodeId(c *ctx,
 
 	hardlink, exists := ht.hardlinks[fileId]
 	if !exists {
+		c.vlog("fileId isn't a hardlink")
 		return inodeId
 	}
 	if hardlink.inodeId != quantumfs.InodeIdInvalid {
 		if inodeId != quantumfs.InodeIdInvalid {
 			utils.Assert(inodeId == hardlink.inodeId,
-				"requested hardlink inodeId %d exists as %d",
+				"requested hardlink inode %d exists as %d",
 				inodeId, hardlink.inodeId)
 		}
+		c.vlog("filedId a hardlink with inode %d", hardlink.inodeId)
 		return hardlink.inodeId
 	}
 
@@ -347,6 +349,7 @@ func (ht *HardlinkTableImpl) findHardlinkInodeId(c *ctx,
 	ht.hardlinks[fileId] = hardlink
 	ht.inodeToLink[inodeId] = fileId
 
+	c.vlog("Allocated new inode %d for hardlink", inodeId)
 	return inodeId
 }
 
