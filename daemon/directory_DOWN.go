@@ -398,12 +398,16 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 				remoteRecord.FileId() != localRecord.FileId()
 			fileId := rc.attachLocalRecord(c, dir.inodeNum(), childId,
 				moved, localRecord, remoteRecord)
-			dir.children.modifyChildWithFunc(c, childId,
-				func(record quantumfs.DirectoryRecord) {
+			if fileId != localRecord.FileId() {
+				// Don't be wasteful, only modify if a change
+				// occurred
+				dir.children.modifyChildWithFunc(c, childId,
+					func(record quantumfs.DirectoryRecord) {
 
-					record.SetFileId(fileId)
-				})
-			dir.children.makePublishable(c, childname)
+						record.SetFileId(fileId)
+					})
+				dir.children.makePublishable(c, childname)
+			}
 		} else {
 			rc.addStaleEntry(c, dir.inodeNum(), childId, localRecord)
 		}
