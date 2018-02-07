@@ -377,8 +377,7 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 	dr quantumfs.DirectoryRecord, keyChan chan<- *workerData) error {
 
 	extKey := dr.ExtendedAttributes()
-	if extKey.IsEqualTo(fakeZeroKey) ||
-		extKey.IsEqualTo(quantumfs.EmptyBlockKey) {
+	if extKey.IsEqualTo(quantumfs.EmptyBlockKey) {
 		return nil
 	}
 
