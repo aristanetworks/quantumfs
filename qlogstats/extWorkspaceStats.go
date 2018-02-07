@@ -30,11 +30,9 @@ type outstandingRequest struct {
 }
 
 type extWorkspaceStats struct {
-	name     string
-	messages chan StatCommand
+	StatExtractorBaseWithGC
 
 	lock                utils.DeferableMutex
-	currentGeneration   uint64
 	newRequests         map[uint64]newRequest
 	outstandingRequests map[uint64]outstandingRequest
 
@@ -43,51 +41,20 @@ type extWorkspaceStats struct {
 
 func NewExtWorkspaceStats(nametag string) StatExtractor {
 	ext := &extWorkspaceStats{
-		name:                nametag,
-		messages:            make(chan StatCommand, 10000),
 		newRequests:         make(map[uint64]newRequest),
 		outstandingRequests: make(map[uint64]outstandingRequest),
 		stats:               make(map[string]map[string]*basicStats),
 	}
 
-	go ext.process()
+	ext.StatExtractorBaseWithGC = NewStatExtractorBaseWithGC(nametag, ext,
+		OnPartialFormat, []string{"Mux::", daemon.FuseRequestWorkspace})
+
+	ext.run()
 
 	return ext
 }
 
-func (ext *extWorkspaceStats) TriggerStrings() []string {
-	strings := make([]string, 0)
-
-	strings = append(strings, "Mux::")
-	strings = append(strings, daemon.FuseRequestWorkspace)
-
-	return strings
-}
-
-func (ext *extWorkspaceStats) Chan() chan StatCommand {
-	return ext.messages
-}
-
-func (ext *extWorkspaceStats) Type() TriggerType {
-	return OnPartialFormat
-}
-
-func (ext *extWorkspaceStats) process() {
-	for {
-		cmd := <-ext.messages
-		switch cmd.Type() {
-		case MessageCommandType:
-			ext.processMsg(cmd.Data().(*qlog.LogOutput))
-		case PublishCommandType:
-			resultChannel := cmd.Data().(chan []Measurement)
-			resultChannel <- ext.publish()
-		case GcCommandType:
-			ext.gc()
-		}
-	}
-}
-
-func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
+func (ext *extWorkspaceStats) process(msg *qlog.LogOutput) {
 	if msg.ReqId >= qlog.MinSpecialReqId {
 		// The utility request ranges are never FUSE requests
 		return
@@ -112,7 +79,7 @@ func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
 		ext.newRequests[msg.ReqId] = newRequest{
 			time:                 msg.T,
 			requestType:          request,
-			lastUpdateGeneration: ext.currentGeneration,
+			lastUpdateGeneration: ext.CurrentGeneration,
 		}
 
 	case msg.Format == daemon.FuseRequestWorkspace+"\n":
@@ -128,7 +95,7 @@ func (ext *extWorkspaceStats) processMsg(msg *qlog.LogOutput) {
 			start:                startMsg.time,
 			workspace:            msg.Args[0].(string),
 			requestType:          startMsg.requestType,
-			lastUpdateGeneration: ext.currentGeneration,
+			lastUpdateGeneration: ext.CurrentGeneration,
 		}
 		delete(ext.newRequests, msg.ReqId)
 
@@ -166,7 +133,7 @@ func (ext *extWorkspaceStats) publish() []Measurement {
 	for workspace, stats := range ext.stats {
 		for requestType, stat := range stats {
 			tags := make([]quantumfs.Tag, 0, 10)
-			tags = appendNewTag(tags, "statName", ext.name)
+			tags = appendNewTag(tags, "statName", ext.Name)
 			tags = appendNewTag(tags, "operation", requestType)
 
 			fields := make([]quantumfs.Field, 0, 10)
@@ -194,22 +161,20 @@ func (ext *extWorkspaceStats) publish() []Measurement {
 }
 
 func (ext *extWorkspaceStats) gc() {
-	ext.currentGeneration++
-
 	for reqId, request := range ext.newRequests {
-		if request.lastUpdateGeneration+2 < ext.currentGeneration {
+		if ext.AgedOut(request.lastUpdateGeneration) {
 			fmt.Printf("%s: Deleting stale newRequest %d (%d/%d)\n",
-				ext.name, reqId, request.lastUpdateGeneration,
-				ext.currentGeneration)
+				ext.Name, reqId, request.lastUpdateGeneration,
+				ext.CurrentGeneration)
 			delete(ext.newRequests, reqId)
 		}
 	}
 
 	for reqId, request := range ext.outstandingRequests {
-		if request.lastUpdateGeneration+2 < ext.currentGeneration {
+		if ext.AgedOut(request.lastUpdateGeneration) {
 			fmt.Printf("%s: Deleting stale outstandingRequest %d "+
-				"(%d/%d)\n", ext.name, reqId,
-				request.lastUpdateGeneration, ext.currentGeneration)
+				"(%d/%d)\n", ext.Name, reqId,
+				request.lastUpdateGeneration, ext.CurrentGeneration)
 			delete(ext.outstandingRequests, reqId)
 		}
 	}
