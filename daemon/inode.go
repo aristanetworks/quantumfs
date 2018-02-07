@@ -445,7 +445,11 @@ func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
 	inode.setName(link.Filename())
 
 	// Here we do the opposite of makeHardlink DOWN - we re-insert it
-	parent.children.loadChild(c, newRecord, inodeId)
+	parent.children.setRecord(c, inodeId, newRecord)
+
+	// Mark the inode as dirty to ensure it will flush to make itself publishable
+	inode.dirty(c)
+
 	parent.dirty(c)
 }
 

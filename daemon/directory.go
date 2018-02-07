@@ -661,7 +661,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.loadChild(c, entry, inodeNum)
+		dir.children.setRecord(c, inodeNum, entry)
 	}()
 
 	c.qfs.setInode(c, inodeNum, newEntity)
@@ -1256,7 +1256,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	func() {
 		defer dst.childRecordLock.Lock().Unlock()
 		dst.orphanChild_(c, newName, overwrittenInode)
-		dst.children.loadChild(c, newEntry, childInodeId)
+		dst.children.setRecord(c, childInodeId, newEntry)
 
 		// being inserted means you're dirty and need to be synced
 		if childInode != nil {
@@ -1779,7 +1779,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	inodeNum := func() InodeId {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.loadChild(c, entry, quantumfs.InodeIdInvalid)
+		return dir.children.loadChild(c, entry)
 	}()
 
 	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())

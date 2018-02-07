@@ -60,10 +60,9 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	// We cannot lock earlier because the parent of srcInode may be us
 	defer dir.Lock().Unlock()
 
-	inodeNum := func() InodeId {
+	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.loadPublishableChild(c, newRecord,
-			quantumfs.InodeIdInvalid)
+		dir.children.setRecord(c, srcInode.inodeNum(), newRecord)
 	}()
 
 	dir.self.markAccessed(c, newName,
@@ -71,6 +70,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	c.dlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
+	inodeNum := srcInode.inodeNum()
 	out.NodeId = uint64(inodeNum)
 	c.qfs.increaseLookupCount(c, inodeNum)
 	fillEntryOutCacheData(c, out)
@@ -206,7 +206,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 
 	linkSrcCopy := newLink.Clone()
 	linkSrcCopy.SetFilename(childname)
-	dir.children.loadPublishableChild(c, linkSrcCopy, childId)
+	dir.children.setRecord(c, childId, linkSrcCopy)
 
 	newLink.setCreationTime(quantumfs.NewTime(time.Now()))
 	newLink.SetContentTime(newLink.creationTime())
@@ -273,9 +273,16 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 	defer c.FuncIn("Directory::loadNewChild_DOWN_", "%d : %s : %d",
 		dir.inodeNum(), remoteRecord.Filename(), inodeId).Out()
 
-	// Allocate a new inode for regular files or return an already
-	// existing inode for hardlinks to existing inodes
-	inodeId = dir.children.loadPublishableChild(c, remoteRecord, inodeId)
+	if inodeId == quantumfs.InodeIdInvalid {
+		// Allocate a new inode for regular files
+		inodeId = dir.children.loadChild(c, remoteRecord)
+	} else {
+		// An already existing inode for hardlinks to existing inodes
+		utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
+			"Child is of type %d not hardlink", remoteRecord.Type())
+		hll := newHardlinkLegFromRecord(remoteRecord, dir.hardlinkTable)
+		dir.children.setRecord(c, inodeId, hll)
+	}
 	c.qfs.noteChildCreated(c, dir.id, remoteRecord.Filename())
 	return inodeId
 }
@@ -292,6 +299,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 		c.wlog("No changes to record %s", remoteRecord.Filename())
 		if localRecord.Type() != quantumfs.ObjectTypeHardlink {
 			dir.children.setRecord(c, childId, remoteRecord)
+			dir.children.makePublishable(c, remoteRecord.Filename())
 		}
 		return
 	}
@@ -310,6 +318,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 			remoteRecord)
 	}
 	dir.children.setRecord(c, childId, remoteRecord)
+	dir.children.makePublishable(c, remoteRecord.Filename())
 	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
 		reload(c, dir.hardlinkTable, rc, inode, remoteRecord)
 	}
