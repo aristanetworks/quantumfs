@@ -19,7 +19,7 @@ type request struct {
 }
 
 type extPairStats struct {
-	StatExtractorBase
+	StatExtractorBaseWithGC
 
 	fmtStart string
 	fmtStop  string
@@ -35,8 +35,8 @@ func NewExtPairStats(start string, stop string, nametag string) StatExtractor {
 		requests: make(map[uint64]request),
 	}
 
-	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnFormat,
-		[]string{ext.fmtStart, ext.fmtStop})
+	ext.StatExtractorBaseWithGC = NewStatExtractorBaseWithGC(nametag, ext,
+		OnFormat, []string{ext.fmtStart, ext.fmtStop})
 
 	ext.run()
 

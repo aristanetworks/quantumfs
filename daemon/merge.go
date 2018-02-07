@@ -21,18 +21,19 @@ type hardlinkTracker struct {
 	// contains all local and remote records, with their contents merged
 	allRecords map[quantumfs.FileId]quantumfs.DirectoryRecord
 
-	merged map[quantumfs.FileId]linkEntry
+	merged map[quantumfs.FileId]HardlinkTableEntry
 }
 
-func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]linkEntry,
-	remote map[quantumfs.FileId]linkEntry, local map[quantumfs.FileId]linkEntry,
+func newHardlinkTracker(c *ctx, base map[quantumfs.FileId]HardlinkTableEntry,
+	remote map[quantumfs.FileId]HardlinkTableEntry,
+	local map[quantumfs.FileId]HardlinkTableEntry,
 	prefer mergePreference) *hardlinkTracker {
 
 	defer c.funcIn("newHardlinkTracker").Out()
 
 	rtn := hardlinkTracker{
 		allRecords: make(map[quantumfs.FileId]quantumfs.DirectoryRecord),
-		merged:     make(map[quantumfs.FileId]linkEntry),
+		merged:     make(map[quantumfs.FileId]HardlinkTableEntry),
 	}
 
 	// Merge all records together and do intra-file merges
@@ -122,8 +123,9 @@ func (ht *hardlinkTracker) decrement(id quantumfs.FileId) {
 	ht.merged[id] = link
 }
 
-// Returns the newest linkEntry version available, while preserving nlink from merged
-func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) linkEntry {
+// Returns the newest HardlinkTableEntry version available, while
+// preserving nlink from merged
+func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) HardlinkTableEntry {
 	link, _ := ht.merged[id]
 
 	// Use the latest record, but preserve the nlink count from merged
@@ -137,7 +139,7 @@ func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) linkEntry {
 }
 
 func loadWorkspaceRoot(c *ctx,
-	key quantumfs.ObjectKey) (hardlinks map[quantumfs.FileId]linkEntry,
+	key quantumfs.ObjectKey) (hardlinks map[quantumfs.FileId]HardlinkTableEntry,
 	directory quantumfs.ObjectKey, err error) {
 
 	defer c.funcIn("loadWorkspaceRoot").Out()
@@ -342,28 +344,7 @@ func mergeDirectory(c *ctx, dirName string, base quantumfs.ObjectKey,
 		localRecordsList = append(localRecordsList, mergeRecord)
 	}
 
-	// publish localRecordsList
-	newBaseLayerId := quantumfs.EmptyDirKey
-
-	entryCapacity := len(localRecordsList)
-	entryCapacity, baseLayer := quantumfs.NewDirectoryEntry(entryCapacity)
-	entryIdx := 0
-	for _, record := range localRecordsList {
-		if entryIdx == quantumfs.MaxDirectoryRecords() {
-			baseLayer.SetNumEntries(entryIdx)
-			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
-				newBaseLayerId)
-			entryCapacity, baseLayer = quantumfs.NewDirectoryEntry(
-				entryCapacity)
-			entryIdx = 0
-		}
-		baseLayer.SetEntry(entryIdx, record.Publishable())
-
-		entryIdx++
-	}
-
-	baseLayer.SetNumEntries(entryIdx)
-	return publishDirectoryEntry(c, baseLayer, newBaseLayerId), nil
+	return publishDirectoryRecords(c, localRecordsList), nil
 }
 
 var emptyAttrs *quantumfs.ExtendedAttributes
@@ -488,6 +469,8 @@ func (mp mergePreference) pick(newer quantumfs.DirectoryRecord,
 func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
 	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
+
+	defer c.funcIn("mergeAttributes").Out()
 
 	newer := local
 	older := remote
@@ -717,6 +700,8 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
 	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
+
+	defer c.funcIn("mergeFile").Out()
 
 	var baseAccessor blockAccessor
 	baseAvailable := false

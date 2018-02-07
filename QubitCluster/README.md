@@ -5,11 +5,11 @@ who would like to test things that depend on QFS outside of a production
 environment.
 
 ## Building The Image
-To build an image with the default QFS version run `docker build -t qfs .`.
-This will create an image tagged as `qfs:latest`.
+To build an image with the default QFS version run `./build.sh`.
+This will create an image called `qfs` tagged with the latest version number.
 
-If you would like to use a different version then change the `QFS_RPM_VERSION`
-build arg. E.g. `docker build -t qfs --build-arg QFS_RPM_VERSION=0.10.0-1 .`.
+If you would like to use a different version then run the build script with
+the version number you want to build, e.g. `./build 0.11.0`.
 The version you are trying to run must be available in
 http://dist/storage/QuantumFS/. Wget will print an error if the version
 requested is invalid.
