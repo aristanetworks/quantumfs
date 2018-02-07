@@ -171,9 +171,9 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 	defer c.FuncIn("Directory::convertToHardlinkLeg_DOWN",
 		"inode %d name %s", childId, childname).Out()
 
-	child := dir.children.recordById(c, childId)
+	child := dir.children.recordByName(c, childname)
 	if child == nil {
-		c.elog("No child record for inode %d", childId)
+		c.elog("No child record for name %s", childname)
 		return nil, fuse.ENOENT
 	}
 
@@ -398,12 +398,16 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 				remoteRecord.FileId() != localRecord.FileId()
 			fileId := rc.attachLocalRecord(c, dir.inodeNum(), childId,
 				moved, localRecord, remoteRecord)
-			dir.children.modifyChildWithFunc(c, childId,
-				func(record quantumfs.DirectoryRecord) {
+			if fileId != localRecord.FileId() {
+				// Don't be wasteful, only modify if a change
+				// occurred
+				dir.children.modifyChildWithFunc(c, childId,
+					func(record quantumfs.DirectoryRecord) {
 
-					record.SetFileId(fileId)
-				})
-			dir.children.makePublishable(c, childname)
+						record.SetFileId(fileId)
+					})
+				dir.children.makePublishable(c, childname)
+			}
 		} else {
 			rc.addStaleEntry(c, dir.inodeNum(), childId, localRecord)
 		}

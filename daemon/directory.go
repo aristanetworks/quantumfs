@@ -110,7 +110,7 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	case *Directory:
 		hardlinkTable = v.hardlinkTable
 	case *WorkspaceRoot:
-		hardlinkTable = v
+		hardlinkTable = v.hardlinkTable
 	default:
 		panic(fmt.Sprintf("Parent of inode %d is neither "+
 			"Directory nor WorkspaceRoot", inodeNum))
@@ -433,9 +433,12 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 
-		dir.children.modifyChildWithAttr(c, inodeNum, newType,
-			attr, updateMtime)
-		entry := dir.children.recordById(c, inodeNum)
+		dir.children.modifyChildWithFunc(c, inodeNum,
+			func(record quantumfs.DirectoryRecord) {
+				modifyEntryWithAttr(c, newType, attr, record,
+					updateMtime)
+			})
+		entry := dir.children.recordByInodeId(c, inodeNum)
 
 		if entry == nil && dir.self.isWorkspaceRoot() {
 			// if we don't have the child, maybe we're wsr and it's a
@@ -827,7 +830,7 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	defer c.FuncIn("DirectoryRecord::getRecordChildCall_", "inode %d",
 		inodeNum).Out()
 
-	record := dir.children.recordById(c, inodeNum)
+	record := dir.children.recordByInodeId(c, inodeNum)
 	if record != nil {
 		c.vlog("Record found")
 		return record
@@ -1579,7 +1582,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		record := dir.children.recordById(c, inodeNum)
+		record := dir.children.recordByInodeId(c, inodeNum)
 
 		now := quantumfs.NewTime(time.Now())
 		if record != nil {
@@ -1665,7 +1668,7 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		record := dir.children.recordById(c, inodeNum)
+		record := dir.children.recordByInodeId(c, inodeNum)
 
 		now := quantumfs.NewTime(time.Now())
 		if record != nil {
@@ -1704,7 +1707,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []Inode
 		return inode, nil
 	}
 
-	entry := dir.children.recordById(c, inodeNum)
+	entry := dir.children.recordByInodeId(c, inodeNum)
 	if entry == nil {
 		c.elog("Cannot instantiate child with no record: %d", inodeNum)
 		return nil, nil
