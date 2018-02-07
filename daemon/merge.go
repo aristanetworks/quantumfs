@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -140,12 +141,12 @@ func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) HardlinkTableEntry {
 
 type merger struct {
 	preference	mergePreference
-	skipPaths	mergeSkipPaths
+	skipPaths	*mergeSkipPaths
 	pubFn		publishFn
 }
 
 func newMerger() *merger {
-	paths := &mergeSkipPaths{paths: make(map[string]struct{}, 0)})
+	paths := &mergeSkipPaths{paths: make(map[string]struct{}, 0)}
 
 	return &merger {
 		preference:	quantumfs.PreferNewer,
@@ -176,7 +177,7 @@ type mergeSkipPaths struct {
 	paths map[string]struct{}
 }
 
-func mergeUploader(c *ctx, buffers chan *quantumfs.Buffer, rtnErr *error,
+func mergeUploader(c *ctx, buffers chan *buffer, rtnErr *error,
 	wg *sync.WaitGroup) {
 
 	defer c.funcIn("mergeUploader").Out()
@@ -203,13 +204,13 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
 
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d", prefer,
-		len(skipPaths)).Out()
+		len(skipPaths.paths)).Out()
 
-	toSet := make(chan *quantumfs.Buffer, maxUploadBacklog)
-	merge := NewMerger()
-	merge.prefer = prefer
+	toSet := make(chan *buffer, maxUploadBacklog)
+	merge := newMerger()
+	merge.preference = prefer
 	merge.skipPaths = skipPaths
-	merge.pubFn = func (c *ctx, buf *quantumfs.Buffer) (quantumfs.ObjectKey,
+	merge.pubFn = func (c *ctx, buf *buffer) (quantumfs.ObjectKey,
 		error) {
 
 			if len(toSet) == maxUploadBacklog-1 {
@@ -217,8 +218,8 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 			}
 
 			toSet <- buf
-			return quantumfs.NewObjectKey(buf.keyType, buf.ContantHash),
-				nil
+			return quantumfs.NewObjectKey(buf.keyType,
+				buf.ContentHash()), nil
 		}
 
 	var uploadErr error
@@ -241,22 +242,23 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	}
 
 	tracker := newHardlinkTracker(c, baseHardlinks, remoteHardlinks,
-		localHardlinks, prefer)
+		localHardlinks, merge.preference)
 
 	localDirectory, err = mergeDirectory(c, "/", baseDirectory,
-		remoteDirectory, localDirectory, true, tracker, mergeCfg.prefer,
-		mergeCfg.skipPaths)
+		remoteDirectory, localDirectory, true, tracker, merge.preference,
+		merge.skipPaths)
 
 	if err != nil {
 		return local, err
 	}
 
 	rtn := publishWorkspaceRoot(c, localDirectory, tracker.merged,
-		mergeCfg.pubFn)
+		merge.pubFn)
 
 	// Ensure everything is uploaded before we continue
 	close(toSet)
-	uploading.Wait()
+	wg.Wait()
+	return rtn, nil
 }
 
 func loadRecords(c *ctx,
