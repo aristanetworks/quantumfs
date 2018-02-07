@@ -101,29 +101,27 @@ type StatExtractor interface {
 	// Do the real processing
 	process(msg *qlog.LogOutput)
 	publish() []Measurement
-	gc()
+	gc() // Optional
 
 	// ExtractorBase below implements these
-
-	// Returns true if the given generation has reached death when compared with
-	// StatExtractorBase.CurrentGeneration.
-	AgedOut(generation uint64) bool
 
 	// This is the list of strings that the extractor will be triggered on and
 	// receive. Note that full formats include a trailing \n.
 	TriggerStrings() []string
 	Type() TriggerType
 	Chan() chan StatCommand
+
+	// Internal
+	_gc()
 }
 
 // A base class which handles the boiler plate for writing StatExtractors
 type StatExtractorBase struct {
-	Name              string
-	CurrentGeneration uint64
-	messages          chan StatCommand
-	self              StatExtractor // Our superclass
-	type_             TriggerType
-	triggers          []string
+	Name     string
+	messages chan StatCommand
+	self     StatExtractor // Our superclass
+	type_    TriggerType
+	triggers []string
 }
 
 func NewStatExtractorBase(name string, self StatExtractor, type_ TriggerType,
@@ -160,18 +158,12 @@ func (seb *StatExtractorBase) listen() {
 			resultChannel := cmd.Data().(chan []Measurement)
 			resultChannel <- seb.self.publish()
 		case GcCommandType:
-			seb.CurrentGeneration++
-			seb.self.gc()
+			seb.self._gc()
 		}
 	}
 }
 
-func (seb *StatExtractorBase) AgedOut(generation uint64) bool {
-	if generation+2 < seb.CurrentGeneration {
-		return true
-	}
-	return false
-}
+func (seb *StatExtractorBase) _gc() {}
 
 func (seb *StatExtractorBase) Chan() chan StatCommand {
 	return seb.messages
@@ -183,6 +175,36 @@ func (seb *StatExtractorBase) TriggerStrings() []string {
 
 func (seb *StatExtractorBase) Type() TriggerType {
 	return seb.type_
+}
+
+type StatExtractorBaseWithGC struct {
+	StatExtractorBase
+	CurrentGeneration uint64
+}
+
+func NewStatExtractorBaseWithGC(name string, self StatExtractor, type_ TriggerType,
+	triggerStrings []string) StatExtractorBaseWithGC {
+
+	sebgc := StatExtractorBaseWithGC{
+		StatExtractorBase: NewStatExtractorBase(name, self,
+			type_, triggerStrings),
+	}
+
+	return sebgc
+}
+
+// Returns true if the given generation has reached death when
+// compared with StatExtractorBaseWithGC.CurrentGeneration.
+func (sebgc *StatExtractorBaseWithGC) AgedOut(generation uint64) bool {
+	if generation+2 < sebgc.CurrentGeneration {
+		return true
+	}
+	return false
+}
+
+func (sebgc *StatExtractorBaseWithGC) _gc() {
+	sebgc.CurrentGeneration++
+	sebgc.self.gc()
 }
 
 func AggregateLogs(mode qlog.LogProcessMode, filename string,

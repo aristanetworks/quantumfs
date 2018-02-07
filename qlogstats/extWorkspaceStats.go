@@ -30,7 +30,7 @@ type outstandingRequest struct {
 }
 
 type extWorkspaceStats struct {
-	StatExtractorBase
+	StatExtractorBaseWithGC
 
 	lock                utils.DeferableMutex
 	newRequests         map[uint64]newRequest
@@ -46,8 +46,8 @@ func NewExtWorkspaceStats(nametag string) StatExtractor {
 		stats:               make(map[string]map[string]*basicStats),
 	}
 
-	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnPartialFormat,
-		[]string{"Mux::", daemon.FuseRequestWorkspace})
+	ext.StatExtractorBaseWithGC = NewStatExtractorBaseWithGC(nametag, ext,
+		OnPartialFormat, []string{"Mux::", daemon.FuseRequestWorkspace})
 
 	ext.run()
 
