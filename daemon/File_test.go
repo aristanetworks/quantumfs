@@ -686,35 +686,40 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 		workspace := test.NewWorkspace()
 
 		dirName := workspace + "/dir"
-		fileName := dirName + "/file"
+		fileName := "file"
+		filePath := dirName + "/file"
 		data := GenData(int(quantumfs.MaxSmallFileSize()) +
 			quantumfs.MaxBlockSize)
 
 		test.AssertNoErr(utils.MkdirAll(dirName, 0777))
 
-		file, err := os.Create(fileName)
+		file, err := os.Create(filePath)
 		test.AssertNoErr(err)
 		file.Close()
-		fileInode := test.getInodeNum(fileName)
+		fileInode := test.getInodeNum(filePath)
+
+		// Ensure the small file is publishable in the directory
+		test.SyncAllWorkspaces()
 
 		// Increase the file size to be a medium file. After this write we
 		// should have the state where, according to the directory, the file
 		// is still a small file with the EmptyBlockKey. Only after the file
 		// has flushed should its parent directory see it as a medium file
 		// with the appropiate ID.
-		test.AssertNoErr(testutils.PrintToFile(fileName, string(data)))
+		test.AssertNoErr(testutils.PrintToFile(filePath, string(data)))
 
 		// Confirm the directory is consistent with a small file
 		inode := test.getInode(dirName)
 		dir := inode.(*Directory)
-		record, err := dir.getChildRecordCopy(test.TestCtx(),
-			fileInode)
-		test.AssertNoErr(err)
+		func() {
+			defer dir.childRecordLock.Lock().Unlock()
+			record := dir.children.publishable[fileInode][fileName]
 
-		test.Assert(record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
-			"ID isn't empty block: %s", record.ID().String())
-		test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
-			"File isn't small file: %s", record.Type())
+			test.Assert(record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
+				"ID isn't empty block: %s", record.ID().String())
+			test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
+				"File isn't small file: %d", record.Type())
+		}()
 
 		// Cause the file to be flushed
 		test.SyncAllWorkspaces()
@@ -722,14 +727,14 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 		// Confirm the directory is consistent with a medium file
 		inode = test.getInode(dirName)
 		dir = inode.(*Directory)
-		record, err = dir.getChildRecordCopy(test.TestCtx(),
-			fileInode)
-		test.AssertNoErr(err)
-
-		test.Assert(!record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
-			"ID is empty block: %s", record.ID().String())
-		test.Assert(record.Type() == quantumfs.ObjectTypeMediumFile,
-			"File isn't medium file: %s", record.Type())
+		func() {
+			defer dir.childRecordLock.Lock().Unlock()
+			record := dir.children.publishable[fileInode][fileName]
+			test.Assert(!record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
+				"ID is empty block: %s", record.ID().String())
+			test.Assert(record.Type() == quantumfs.ObjectTypeMediumFile,
+				"File isn't medium file: %d", record.Type())
+		}()
 	})
 }
 
