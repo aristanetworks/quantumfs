@@ -105,7 +105,7 @@ func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	return store.datastore.Set(c, key, buf)
 }
 
-// checks that keys for the small files provided in hlpaths are
+// checks that keys for the small files provided in hardlink paths are
 // present in WSR's hardlink map
 func (th *testHelper) checkSmallFileHardlinkKey(workspace string,
 	hlpaths map[string]struct{}) {

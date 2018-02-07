@@ -19,6 +19,7 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -40,7 +41,6 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
-		fileHandles:            make(map[FileHandleId]FileHandle),
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
@@ -123,9 +123,10 @@ type QuantumFs struct {
 
 	// This is a leaf lock for protecting the instantiation maps
 	// Do not grab other locks while holding this
-	mapMutex    utils.DeferableRwMutex
-	inodes      map[InodeId]Inode
-	fileHandles map[FileHandleId]FileHandle
+	mapMutex utils.DeferableRwMutex
+	inodes   map[InodeId]Inode
+
+	fileHandles sync.Map // map[FileHandleId]FileHandle
 
 	metaInodeMutex           utils.DeferableMutex
 	metaInodeDeletionRecords []MetaInodeDeletionRecord
@@ -532,7 +533,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 	}
 
 	newRootId := publishWorkspaceRoot(c,
-		wsr.baseLayerId, wsr.hardlinks)
+		wsr.baseLayerId, wsr.hardlinkTable.hardlinks)
 
 	// We should eventually be able to Advance after merging
 	for {
@@ -975,16 +976,14 @@ func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 
 // Get a file handle in a thread safe way
 func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
-	defer qfs.mapMutex.RLock().RUnlock()
-	fileHandle := qfs.fileHandles[id]
-	return fileHandle
+	fileHandle, _ := qfs.fileHandles.Load(id)
+	return fileHandle.(FileHandle)
 }
 
 // Set a file handle in a thread safe way, set to nil to delete
 func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
 	defer c.funcIn("Mux::setFileHandle").Out()
 
-	defer qfs.mapMutex.Lock().Unlock()
 	qfs.setFileHandle_(c, id, fileHandle)
 }
 
@@ -993,15 +992,15 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 	fileHandle FileHandle) {
 
 	if fileHandle != nil {
-		qfs.fileHandles[id] = fileHandle
+		qfs.fileHandles.Store(id, fileHandle)
 	} else {
 		// clean up any remaining response queue size from the apiFileSize
-		fileHandle = qfs.fileHandles[id]
-		if api, ok := fileHandle.(*ApiHandle); ok {
+		fh, _ := qfs.fileHandles.Load(id)
+		if api, ok := fh.(*ApiHandle); ok {
 			api.drainResponseData(c)
 		}
 
-		delete(qfs.fileHandles, id)
+		qfs.fileHandles.Delete(id)
 	}
 }
 

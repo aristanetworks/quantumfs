@@ -172,10 +172,11 @@ func (container *ChildContainer) recordByName(c *ctx,
 
 // Note that this will return one arbitrary record in cases where that inode has
 // multiple names in this container/directory.
-func (container *ChildContainer) recordById(c *ctx,
+func (container *ChildContainer) recordByInodeId(c *ctx,
 	inodeId InodeId) quantumfs.DirectoryRecord {
 
-	defer c.FuncIn("ChildContainer::recordById", "inodeId %d", inodeId).Out()
+	defer c.FuncIn("ChildContainer::recordByInodeId", "inodeId %d",
+		inodeId).Out()
 
 	records := container.effective[inodeId]
 	if records == nil {
