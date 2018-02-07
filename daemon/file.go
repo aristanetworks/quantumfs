@@ -23,8 +23,7 @@ func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 	accessor := newSmallAccessor(c, size, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor,
-		quantumfs.ObjectTypeSmallFile), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor), nil
 }
 
 func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
@@ -35,8 +34,7 @@ func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 	accessor := newMediumAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor,
-		quantumfs.ObjectTypeMediumFile), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor), nil
 }
 
 func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
@@ -47,8 +45,7 @@ func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 	accessor := newLargeAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor,
-		quantumfs.ObjectTypeLargeFile), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor), nil
 }
 
 func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
@@ -59,13 +56,11 @@ func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 	accessor := newVeryLargeAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor,
-		quantumfs.ObjectTypeVeryLargeFile), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor), nil
 }
 
 func newFile_(c *ctx, name string, inodeNum InodeId,
-	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor,
-	accessorType quantumfs.ObjectType) *File {
+	key quantumfs.ObjectKey, parent Inode, accessor blockAccessor) *File {
 
 	defer c.funcIn("newFile_").Out()
 
@@ -76,8 +71,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 			accessed_: 0,
 			treeLock_: parent.treeLock(),
 		},
-		accessor:     accessor,
-		accessorType: accessorType,
+		accessor: accessor,
 	}
 	file.self = &file
 	file.setParent(parent.inodeNum())
@@ -89,8 +83,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 
 type File struct {
 	InodeCommon
-	accessor     blockAccessor
-	accessorType quantumfs.ObjectType
+	accessor blockAccessor
 }
 
 func (fi *File) handleAccessorTypeChange(c *ctx,
@@ -320,9 +313,7 @@ func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
 	return nil, nil
 }
 
-func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey,
-	newType quantumfs.ObjectType) {
-
+func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
 	c.elog("Invalid syncChild on File")
 }
 
@@ -366,7 +357,8 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 
 	if fi.accessor != newAccessor {
 		fi.accessor = newAccessor
-		fi.accessorType = neededType
+		var attr fuse.SetAttrIn
+		fi.parentSetChildAttr(c, fi.id, &neededType, &attr, nil, false)
 	}
 	return nil
 }
@@ -545,9 +537,9 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("File::flush", "%s", fi.name_).Out()
 
 	key := quantumfs.EmptyBlockKey
-	fi.parentSyncChild(c, func() (quantumfs.ObjectKey, quantumfs.ObjectType) {
+	fi.parentSyncChild(c, func() quantumfs.ObjectKey {
 		key = fi.accessor.sync(c)
-		return key, fi.accessorType
+		return key
 	})
 	return key
 }

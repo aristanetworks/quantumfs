@@ -750,7 +750,7 @@ func (wsr *WorkspaceRoot) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
+	newKey quantumfs.ObjectKey) {
 
 	defer c.funcIn("WorkspaceRoot::syncChild").Out()
 
@@ -768,13 +768,9 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 			}
 
 			entry.SetID(newKey)
-
-			if newType != quantumfs.ObjectTypeInvalid {
-				entry.SetType(newType)
-			}
 		}()
 	} else {
-		wsr.Directory.syncChild(c, inodeNum, newKey, newType)
+		wsr.Directory.syncChild(c, inodeNum, newKey)
 	}
 }
 
