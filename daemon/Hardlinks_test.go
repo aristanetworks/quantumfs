@@ -91,12 +91,13 @@ func TestHardlinkReload(t *testing.T) {
 		test.AssertNoErr(err)
 		test.Assert(stat.Size() == int64(len(data)), "file length mismatch")
 
-		test.Assert(len(wsr.hardlinks) == len(wsrB.hardlinks),
-			"Hardlink map length not preserved: %v %v", wsr.hardlinks,
-			wsrB.hardlinks)
+		test.Assert(len(wsr.hardlinkTable.hardlinks) ==
+			len(wsrB.hardlinkTable.hardlinks),
+			"Hardlink map length not preserved: %v %v",
+			wsr.hardlinkTable.hardlinks, wsrB.hardlinkTable.hardlinks)
 
-		for k, l := range wsr.hardlinks {
-			linkBPtr, exists := wsrB.hardlinks[k]
+		for k, l := range wsr.hardlinkTable.hardlinks {
+			linkBPtr, exists := wsrB.hardlinkTable.hardlinks[k]
 
 			test.Assert(l.nlink == linkBPtr.nlink,
 				"link reference count not preserved")
@@ -286,8 +287,8 @@ func TestHardlinkConversion(t *testing.T) {
 		wsr, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
 		fileId := func() quantumfs.FileId {
-			defer wsr.linkLock.Lock().Unlock()
-			return wsr.inodeToLink[linkInode]
+			defer wsr.hardlinkTable.linkLock.Lock().Unlock()
+			return wsr.hardlinkTable.inodeToLink[linkInode]
 		}()
 
 		err = os.Remove(testFile)
@@ -312,8 +313,8 @@ func TestHardlinkConversion(t *testing.T) {
 
 		wsrB, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
-		defer wsrB.linkLock.Lock().Unlock()
-		_, exists := wsrB.hardlinks[fileId]
+		defer wsrB.hardlinkTable.linkLock.Lock().Unlock()
+		_, exists := wsrB.hardlinkTable.hardlinks[fileId]
 		test.Assert(!exists, "hardlink not converted back to file")
 	})
 }
@@ -447,10 +448,10 @@ func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
 	// Extract the internal ObjectKey from QuantumFS
 	inode := test.getInode(path)
 	// parent should be the workspace root.
-	isHardlink, fileId := wsr.checkHardlink(inode.inodeNum())
+	isHardlink, fileId := wsr.hardlinkTable.checkHardlink(inode.inodeNum())
 	test.Assert(isHardlink, "Expected hardlink isn't one.")
 
-	valid, record := wsr.getHardlink(fileId)
+	valid, record := wsr.hardlinkTable.getHardlink(fileId)
 	test.Assert(valid, "Unable to get hardlink from wsr")
 
 	// Verify the type and key matching
@@ -712,8 +713,8 @@ func (th *TestHelper) getHardlinkLeg(parentPath string,
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()
-	record := parentDir.children.recordByName(&th.qfs.c, leg).Clone()
-	return record.(*HardlinkLeg)
+	record := parentDir.children.recordByName(&th.qfs.c, leg)
+	return record.(*HardlinkLeg).Clone().(*HardlinkLeg)
 }
 
 func TestHardlinkCreatedTime(t *testing.T) {
@@ -846,7 +847,7 @@ func TestRemoveHardlinkBeforeSync(t *testing.T) {
 		wsr, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
 
-		test.Assert(len(wsr.hardlinks) == 0,
+		test.Assert(len(wsr.hardlinkTable.hardlinks) == 0,
 			"Hardlink table not initially empty")
 
 		// Create and remove the hardlink. Though the file is gone the
@@ -859,12 +860,12 @@ func TestRemoveHardlinkBeforeSync(t *testing.T) {
 		test.removeFile(workspace, "leg2")
 		test.removeFile(workspace, "dir/leg1")
 
-		test.Assert(len(wsr.hardlinks) == 1,
+		test.Assert(len(wsr.hardlinkTable.hardlinks) == 1,
 			"Hardlink table doesn't contain entry after delete")
 
 		test.SyncWorkspace(test.RelPath(workspace))
 
-		test.Assert(len(wsr.hardlinks) == 0,
+		test.Assert(len(wsr.hardlinkTable.hardlinks) == 0,
 			"Hardlink table not empty after sync")
 	})
 }
