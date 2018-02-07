@@ -45,6 +45,13 @@ func TestWorkspaceStats(t *testing.T) {
 
 		logOut(2, daemon.ReadlinkLog)
 
+		logIn(4, daemon.ReadLog, daemon.FileHandleLog, 17)
+		log(4, daemon.FuseRequestWorkspace, "req4/n/w")
+		logOut(4, daemon.ReadLog)
+
+		log(15, daemon.WorkspaceFinishedFormat, "req1/n/w")
+		log(16, daemon.WorkspaceFinishedFormat, "req2/n/w")
+
 		checked := false
 		checker := func(memdb *processlocal.Memdb) {
 			foundReq1Lookup := false
@@ -65,6 +72,13 @@ func TestWorkspaceStats(t *testing.T) {
 				default:
 					test.Assert(false, "Unknown ws/op: %s %s",
 						ws, op)
+
+				case ws == "req4/n/w":
+					// We should never see any stats for req4
+					// because we never mark the workspace as
+					// finished.
+					test.Assert(false,
+						"Workspace req4 has stats!")
 
 				case ws == "req1/n/w" && op == "Mux::Lookup":
 					foundReq1Lookup = true
