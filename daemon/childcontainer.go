@@ -236,14 +236,14 @@ func (container *ChildContainer) records() []quantumfs.DirectoryRecord {
 	return records
 }
 
-func (container *ChildContainer) recordById(c *ctx,
+func (container *ChildContainer) recordByInodeId(c *ctx,
 	inodeId InodeId) quantumfs.DirectoryRecord {
 
 	defer c.FuncIn("ChildContainer::recordById", "inode %d", inodeId).Out()
 	if record := container.effective.get(inodeId); record != nil {
 		return record
 	}
-	return container.publishable.recordById(inodeId)
+	return container.publishable.recordByInodeId(inodeId)
 }
 
 func (container *ChildContainer) recordByName(c *ctx,
