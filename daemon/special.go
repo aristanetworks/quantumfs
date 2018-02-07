@@ -118,8 +118,8 @@ func (special *Special) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
 	defer c.funcIn("Special::SetAttr").Out()
-	return special.parentSetChildAttr(c, special.InodeCommon.id, attr, out,
-		false)
+	return special.parentSetChildAttr(c, special.InodeCommon.id,
+		nil, attr, out, false)
 }
 
 func (special *Special) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
@@ -175,7 +175,7 @@ func (special *Special) MvChild(c *ctx, dstInode Inode, oldName string,
 func (special *Special) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrSize on Special")
+	c.vlog("Invalid GetXAttrSize on Special")
 	return 0, fuse.ENODATA
 }
 
@@ -202,7 +202,7 @@ func (special *Special) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (special *Special) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
+	newKey quantumfs.ObjectKey) {
 
 	c.elog("Invalid syncChild on Special")
 }
@@ -219,10 +219,8 @@ func (special *Special) flush(c *ctx) quantumfs.ObjectKey {
 
 	key := quantumfs.EncodeSpecialKey(special.filetype, special.device)
 
-	special.parentSyncChild(c, func() (quantumfs.ObjectKey,
-		quantumfs.ObjectType) {
-
-		return key, quantumfs.ObjectTypeSpecial
+	special.parentSyncChild(c, func() quantumfs.ObjectKey {
+		return key
 	})
 
 	return key

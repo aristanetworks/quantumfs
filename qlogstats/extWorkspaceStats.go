@@ -35,7 +35,7 @@ type accumulatingStats struct {
 }
 
 type extWorkspaceStats struct {
-	StatExtractorBase
+	StatExtractorBaseWithGC
 
 	lock                utils.DeferableMutex
 	newRequests         map[uint64]newRequest
@@ -54,8 +54,8 @@ func NewExtWorkspaceStats(nametag string) StatExtractor {
 		finishedStats:       make(map[string]map[string]*basicStats),
 	}
 
-	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnPartialFormat,
-		[]string{"Mux::", daemon.FuseRequestWorkspace,
+	ext.StatExtractorBaseWithGC = NewStatExtractorBaseWithGC(nametag, ext,
+		OnPartialFormat, []string{"Mux::", daemon.FuseRequestWorkspace,
 			daemon.WorkspaceFinishedFormat})
 
 	ext.run()
@@ -91,7 +91,7 @@ func (ext *extWorkspaceStats) process(msg *qlog.LogOutput) {
 			lastUpdateGeneration: ext.CurrentGeneration,
 		}
 
-	case strings.Compare(msg.Format, daemon.FuseRequestWorkspace+"\n") == 0:
+	case msg.Format == daemon.FuseRequestWorkspace+"\n":
 		// This message contains the request ID -> workspace mapping
 		startMsg, exists := ext.newRequests[msg.ReqId]
 		if !exists {
