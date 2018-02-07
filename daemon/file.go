@@ -388,7 +388,7 @@ type blockAccessor interface {
 	convertTo(*ctx, quantumfs.ObjectType) blockAccessor
 
 	// Write file's metadata to the datastore and provide the key
-	sync(c *ctx) quantumfs.ObjectKey
+	sync(c *ctx, pub publishFn) quantumfs.ObjectKey
 
 	// Reload the content of the file from datastore
 	reload(c *ctx, key quantumfs.ObjectKey)
@@ -545,7 +545,7 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 
 	key := quantumfs.EmptyBlockKey
 	fi.parentSyncChild(c, func() (quantumfs.ObjectKey, quantumfs.ObjectType) {
-		key = fi.accessor.sync(c)
+		key = fi.accessor.sync(c, publishNow)
 		return key, fi.accessorType
 	})
 	return key

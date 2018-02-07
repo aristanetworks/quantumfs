@@ -418,11 +418,11 @@ func init() {
 	emptyAttrs = quantumfs.NewExtendedAttributes()
 }
 
-func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
-	newer quantumfs.ObjectKey, older quantumfs.ObjectKey,
-	prefer mergePreference) (quantumfs.ObjectKey, error) {
+func mergeExtendedAttrs(merge *merger, base quantumfs.ObjectKey,
+	newer quantumfs.ObjectKey, older quantumfs.ObjectKey) (quantumfs.ObjectKey,
+	error) {
 
-	baseAttrs, err := getRecordExtendedAttributes(c, base)
+	baseAttrs, err := getRecordExtendedAttributes(merge.c, base)
 	if err == fuse.ENOENT || base.IsEqualTo(quantumfs.ZeroKey) {
 		baseAttrs = emptyAttrs
 	} else if err != fuse.OK {
@@ -430,7 +430,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 			err.String())
 	}
 
-	newerAttrs, err := getRecordExtendedAttributes(c, newer)
+	newerAttrs, err := getRecordExtendedAttributes(merge.c, newer)
 	if err == fuse.ENOENT || newer.IsEqualTo(quantumfs.ZeroKey) {
 		newerAttrs = emptyAttrs
 	} else if err != fuse.OK {
@@ -438,7 +438,7 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 			err.String())
 	}
 
-	olderAttrs, err := getRecordExtendedAttributes(c, older)
+	olderAttrs, err := getRecordExtendedAttributes(merge.c, older)
 	if err == fuse.ENOENT || older.IsEqualTo(quantumfs.ZeroKey) {
 		olderAttrs = emptyAttrs
 	} else if err != fuse.OK {
@@ -502,10 +502,11 @@ func mergeExtendedAttrs(c *ctx, base quantumfs.ObjectKey,
 	}
 
 	// Publish the result
-	buffer := newBuffer(c, mergeAttrs.Bytes(), quantumfs.KeyTypeMetadata)
-	rtnKey, bufErr := buffer.Key(&c.Ctx)
+	buffer := newBuffer(merge.c, mergeAttrs.Bytes(), quantumfs.KeyTypeMetadata)
+	rtnKey, bufErr := merge.pubFn(merge.c, buffer)
 	if bufErr != nil {
-		c.elog("Error computing extended attribute key: %v", bufErr.Error())
+		merge.c.elog("Error computing extended attribute key: %v",
+			bufErr.Error())
 		return quantumfs.EmptyBlockKey, bufErr
 	}
 
@@ -531,9 +532,9 @@ func (mp mergePreference) pick(newer quantumfs.DirectoryRecord,
 }
 
 // Merge record attributes based on ContentTime
-func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
+func mergeAttributes(merge *merger, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord,
+	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
 	newer := local
 	older := remote
@@ -544,7 +545,7 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 
 	if base == nil {
 		// Without a base we cannot be any cleverer than our base preference.
-		return prefer.pick(newer, local, remote), nil
+		return merge.preference.pick(newer, local, remote), nil
 	}
 
 	if local.FileId() != remote.FileId() {
@@ -559,7 +560,7 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 			return local.Clone(), nil
 		} else {
 			// Both recreated, keep our preference
-			return prefer.pick(newer, local, remote), nil
+			return merge.preference.pick(newer, local, remote), nil
 		}
 	} else {
 		// local.FileId() == remote.FileId()
@@ -586,9 +587,8 @@ func mergeAttributes(c *ctx, base quantumfs.DirectoryRecord,
 			rtnRecord.SetGroup(older.Group())
 		}
 
-		newKey, err := mergeExtendedAttrs(c, base.ExtendedAttributes(),
-			newer.ExtendedAttributes(), older.ExtendedAttributes(),
-			prefer)
+		newKey, err := mergeExtendedAttrs(merge, base.ExtendedAttributes(),
+			newer.ExtendedAttributes(), older.ExtendedAttributes())
 		if err != nil {
 			return nil, err
 		}
@@ -618,8 +618,7 @@ func mergeRecord(merge *merger, base quantumfs.DirectoryRecord,
 	remoteTypeChanged := base == nil || !remote.Type().Matches(base.Type())
 	bothSameType := local.Type().Matches(remote.Type())
 
-	rtnRecord, err := mergeAttributes(merge.c, base, remote, local,
-		merge.preference)
+	rtnRecord, err := mergeAttributes(merge, base, remote, local)
 	if err != nil {
 		return nil, err
 	}
@@ -763,24 +762,24 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 	return iterator, iteratorRecord, other, otherRecord
 }
 
-func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
-	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	prefer mergePreference) (quantumfs.DirectoryRecord, error) {
+func mergeFile(merge *merger, base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord,
+	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
 	var baseAccessor blockAccessor
 	baseAvailable := false
 	if base != nil && base.Type().IsRegularFile() {
-		baseAccessor = loadAccessor(c, base)
+		baseAccessor = loadAccessor(merge.c, base)
 		baseAvailable = true
 	}
 
-	rtnRecord, err := mergeAttributes(c, base, remote, local, prefer)
+	rtnRecord, err := mergeAttributes(merge, base, remote, local)
 	if err != nil {
 		return nil, err
 	}
 
-	iterator, iteratorRecord, other, otherRecord := chooseAccessors(c, remote,
-		local)
+	iterator, iteratorRecord, other, otherRecord := chooseAccessors(merge.c,
+		remote, local)
 
 	if iterator != nil && other != nil &&
 		local.FileId() == remote.FileId() &&
@@ -797,7 +796,8 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 
 		// iterate through the smaller accessor so we don't have to handle
 		// reconciling the accessor type - the size won't change this way
-		operateOnBlocks(c, iterator, 0, uint32(other.fileLength(c)),
+		operateOnBlocks(merge.c, iterator, 0,
+			uint32(other.fileLength(merge.c)),
 			func(c *ctx, blockIdx int, offset uint64) error {
 				var err error
 				baseRead := 0
@@ -861,8 +861,8 @@ func mergeFile(c *ctx, base quantumfs.DirectoryRecord,
 
 		// Use the merged record as a base and update content relevant fields
 		rtnRecord.SetType(otherRecord.Type())
-		rtnRecord.SetSize(other.fileLength(c))
-		rtnRecord.SetID(other.sync(c))
+		rtnRecord.SetSize(other.fileLength(merge.c))
+		rtnRecord.SetID(other.sync(merge.c, merge.pubFn))
 
 		c.vlog("Merging file contents for %d %s", local.FileId(),
 			local.Filename())

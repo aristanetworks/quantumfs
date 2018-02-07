@@ -188,7 +188,7 @@ func (fi *VeryLargeFile) reload(c *ctx, key quantumfs.ObjectKey) {
 	}
 }
 
-func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
+func (fi *VeryLargeFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 	defer c.funcIn("VeryLargeFile::sync").Out()
 
 	_, store := quantumfs.NewVeryLargeFile(len(fi.parts))
@@ -204,7 +204,7 @@ func (fi *VeryLargeFile) sync(c *ctx) quantumfs.ObjectKey {
 
 	buffer := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
 
-	newFileKey, err := buffer.Key(&c.Ctx)
+	newFileKey, err := pub(c, buffer)
 	if err != nil {
 		panic("Failed to upload new very large file keys")
 	}
