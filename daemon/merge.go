@@ -139,16 +139,16 @@ func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) HardlinkTableEntry {
 }
 
 type merger struct {
-	c		*ctx
-	preference	mergePreference
-	pubFn		publishFn
+	c          *ctx
+	preference mergePreference
+	pubFn      publishFn
 }
 
 func newMerger(c *ctx) *merger {
-	return &merger {
-		c:		c,
-		preference:	quantumfs.PreferNewer,
-		pubFn:		publishNow,
+	return &merger{
+		c:          c,
+		preference: quantumfs.PreferNewer,
+		pubFn:      publishNow,
 	}
 }
 
@@ -206,17 +206,17 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	toSet := make(chan quantumfs.Buffer, maxUploadBacklog)
 	merge := newMerger(c)
 	merge.preference = prefer
-	merge.pubFn = func (c *ctx, buf quantumfs.Buffer) (quantumfs.ObjectKey,
+	merge.pubFn = func(c *ctx, buf quantumfs.Buffer) (quantumfs.ObjectKey,
 		error) {
 
-			if len(toSet) == maxUploadBacklog-1 {
-				c.elog("Merge uploading bandwidth maxed.")
-			}
-
-			toSet <- buf
-			return quantumfs.NewObjectKey(buf.KeyType(),
-				buf.ContentHash()), nil
+		if len(toSet) == maxUploadBacklog-1 {
+			c.elog("Merge uploading bandwidth maxed.")
 		}
+
+		toSet <- buf
+		return quantumfs.NewObjectKey(buf.KeyType(),
+			buf.ContentHash()), nil
+	}
 
 	var uploadErr error
 	var wg sync.WaitGroup
