@@ -247,7 +247,9 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	newInfo := WorkspaceInfo{
 		key: info.key,
 		nonce: quantumfs.WorkspaceNonce{
-			uint64(time.Now().UnixNano()), 0},
+			uint64(time.Now().UnixNano()),
+			uint64(time.Now().UnixNano()),
+		},
 		immutable: false,
 	}
 	wsdb.InsertMap_(dstTypespace, dstNamespace, dstWorkspace, &newInfo)
@@ -373,7 +375,7 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	}
 
 	wsdb.cache[typespace][namespace][workspace].key = newRootId
-	info.nonce.Iteration++
+	info.nonce.PublishTime = uint64(time.Now().UnixNano())
 
 	wsdb.notifySubscribers_(c, typespace, namespace, workspace, true)
 

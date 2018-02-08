@@ -16,8 +16,8 @@ import (
 // then recreated, the old workspace and new workspace would have different
 // WorkspaceNonces and therefore be distinguishable.
 type WorkspaceNonce struct {
-	Id        uint64
-	Iteration uint64
+	Id          uint64
+	PublishTime uint64
 }
 
 func (lhs *WorkspaceNonce) Equals(rhs *WorkspaceNonce) bool {
@@ -25,7 +25,7 @@ func (lhs *WorkspaceNonce) Equals(rhs *WorkspaceNonce) bool {
 }
 
 func (v *WorkspaceNonce) String() string {
-	return fmt.Sprintf("(%d : %d)", v.Id, v.Iteration)
+	return fmt.Sprintf("(%d : %d)", v.Id, v.PublishTime)
 }
 
 type WorkspaceState struct {

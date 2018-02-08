@@ -214,8 +214,8 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 						},
 						Nonce: &rpc.WorkspaceNonce{
 							Id: uint64(nonce.Id),
-							Iteration: uint64(
-								nonce.Iteration),
+							PublishTime: uint64(
+								nonce.PublishTime),
 						},
 						Immutable: immutable,
 						Deleted:   false,
@@ -293,7 +293,7 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 				RootId: quantumfs.NewObjectKeyFromBytes(
 					update.RootId.Data),
 				Nonce: quantumfs.WorkspaceNonce{
-					update.Nonce.Id, update.Nonce.Iteration},
+					update.Nonce.Id, update.Nonce.PublishTime},
 				Immutable: update.Immutable,
 				Deleted:   update.Deleted,
 			}
@@ -600,7 +600,7 @@ func (wsdb *workspaceDB) workspaceList(c *quantumfs.Ctx, typespace string,
 
 	for name, nonce := range response.Workspaces {
 		workspaces[name] = quantumfs.WorkspaceNonce{nonce.Id,
-			nonce.Iteration}
+			nonce.PublishTime}
 	}
 
 	return workspaces, nil
@@ -728,7 +728,7 @@ func (wsdb *workspaceDB) _fetchWorkspace(c *quantumfs.Ctx, workspaceName string)
 
 	key = quantumfs.NewObjectKeyFromBytes(response.Key.GetData())
 	nonce = quantumfs.WorkspaceNonce{
-		response.Nonce.Id, response.Nonce.Iteration}
+		response.Nonce.Id, response.Nonce.PublishTime}
 	immutable = response.Immutable
 
 	return key, nonce, immutable, nil
@@ -814,7 +814,9 @@ func (wsdb *workspaceDB) advanceWorkspace(c *quantumfs.Ctx, typespace string,
 		RequestId:     &rpc.RequestId{Id: c.RequestId},
 		WorkspaceName: workspaceName,
 		Nonce: &rpc.WorkspaceNonce{
-			Id: nonce.Id, Iteration: nonce.Iteration},
+			Id:          nonce.Id,
+			PublishTime: nonce.PublishTime,
+		},
 		CurrentRootId: &rpc.ObjectKey{Data: currentRootId.Value()},
 		NewRootId:     &rpc.ObjectKey{Data: newRootId.Value()},
 	}

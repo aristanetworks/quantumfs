@@ -388,7 +388,9 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 		newInfo := workspaceInfo{
 			Key: srcInfo.Key,
 			Nonce: quantumfs.WorkspaceNonce{
-				uint64(time.Now().UnixNano()), 0},
+				uint64(time.Now().UnixNano()),
+				uint64(time.Now().UnixNano()),
+			},
 			Immutable: false,
 		}
 
@@ -550,7 +552,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		// The workspace exists and the caller has the uptodate rootid, so
 		// advance the rootid in the DB.
 		info.Key = encodeKey(newRootId)
-		info.Nonce.Iteration++
+		info.Nonce.PublishTime = uint64(time.Now().UnixNano())
 		err := setWorkspaceInfo_(tx, typespace, namespace, workspace, *info)
 		if err == nil {
 			dbRootId = info.Key
