@@ -219,12 +219,13 @@ func (lw *LowMemFile) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (lw *LowMemFile) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
+	newKey quantumfs.ObjectKey) {
 
 	c.elog("Invalid syncChild on LowMemFile")
 }
 
-func (lw *LowMemFile) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
+func (lw *LowMemFile) setChildAttr(c *ctx, inodeNum InodeId,
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on LowMemFile")

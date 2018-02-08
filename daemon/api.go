@@ -243,12 +243,13 @@ func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey, newType quantumfs.ObjectType) {
+	newKey quantumfs.ObjectKey) {
 
 	c.elog("Invalid syncChild on ApiInode")
 }
 
-func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId, attr *fuse.SetAttrIn,
+func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
 	c.elog("Invalid setChildAttr on ApiInode")
@@ -495,6 +496,9 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdMergeWorkspaces:
 		c.vlog("Received merge request")
 		responseSize = api.mergeWorkspace(c, buf)
+	case quantumfs.CmdWorkspaceFinished:
+		c.vlog("Received WorkspaceFinished request")
+		responseSize = api.workspaceFinished(c, buf)
 	case quantumfs.CmdRefreshWorkspace:
 		c.vlog("Received refresh request")
 		responseSize = api.refreshWorkspace(c, buf)
@@ -1173,4 +1177,27 @@ func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) int {
 
 	return api.queueErrorResponse(quantumfs.ErrorOK,
 		"Making workspace immutable succeeded")
+}
+
+const WorkspaceFinishedFormat = "Workspace %s finished"
+
+func (api *ApiHandle) workspaceFinished(c *ctx, buf []byte) int {
+	defer c.funcIn("ApiHandle::workspaceFinished").Out()
+
+	var cmd quantumfs.WorkspaceFinishedRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		c.vlog("Error unmarshaling JSON: %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
+	}
+	if !isWorkspaceNameValid(cmd.WorkspacePath) {
+		c.vlog("workspace name '%s' is malformed", cmd.WorkspacePath)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.WorkspacePath)
+	}
+
+	c.vlog(WorkspaceFinishedFormat, cmd.WorkspacePath)
+
+	return api.queueErrorResponse(quantumfs.ErrorOK,
+		"WorkspaceFinished Succeeded")
 }

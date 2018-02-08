@@ -535,6 +535,8 @@ func mergeAttributes(merge *merger, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
+	defer merge.c.funcIn("mergeAttributes").Out()
+
 	newer := local
 	older := remote
 	if remote.ContentTime() > local.ContentTime() {
@@ -763,6 +765,8 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 func mergeFile(merge *merger, base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
+
+	defer merge.c.funcIn("mergeFile").Out()
 
 	var baseAccessor blockAccessor
 	baseAvailable := false

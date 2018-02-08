@@ -22,10 +22,16 @@ const W_OK = 2
 const X_OK = 1
 const F_OK = 0
 
-func modifyEntryWithAttr(c *ctx, attr *fuse.SetAttrIn,
+func modifyEntryWithAttr(c *ctx, newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	entry quantumfs.DirectoryRecord, updateMtime bool) {
 
-	defer c.funcIn("modifyEntryWithAttr").Out()
+	defer c.FuncIn("modifyEntryWithAttr", "valid %x", attr.Valid).Out()
+
+	// Update the type if needed
+	if newType != nil {
+		entry.SetType(*newType)
+		c.vlog("Type now %d", *newType)
+	}
 
 	valid := uint(attr.SetAttrInCommon.Valid)
 	// We don't support file locks yet, but when we do we need
@@ -402,7 +408,7 @@ func markType(type_ quantumfs.ObjectType,
 }
 
 func underlyingTypeOf(hardlinkTable HardlinkTable,
-	record quantumfs.DirectoryRecord) quantumfs.ObjectType {
+	record quantumfs.ImmutableDirectoryRecord) quantumfs.ObjectType {
 
 	if record.Type() != quantumfs.ObjectTypeHardlink {
 		return record.Type()
@@ -415,8 +421,9 @@ func underlyingTypeOf(hardlinkTable HardlinkTable,
 	return hardlinkRecord.Type()
 }
 
-func underlyingTypesMatch(hardlinkTable HardlinkTable, r1 quantumfs.DirectoryRecord,
-	r2 quantumfs.DirectoryRecord) bool {
+func underlyingTypesMatch(hardlinkTable HardlinkTable,
+	r1 quantumfs.ImmutableDirectoryRecord,
+	r2 quantumfs.ImmutableDirectoryRecord) bool {
 
 	return underlyingTypeOf(hardlinkTable, r1).Matches(
 		underlyingTypeOf(hardlinkTable, r2))
