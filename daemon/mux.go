@@ -1228,8 +1228,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 						inode.parentId_(), inodeNum))
 				}
 
-				parent.syncChild(c, inodeNum, key,
-					quantumfs.ObjectTypeInvalid)
+				parent.syncChild(c, inodeNum, key)
 
 				qfs.addUninstantiated(c, []InodeId{inodeNum},
 					inode.parentId_())

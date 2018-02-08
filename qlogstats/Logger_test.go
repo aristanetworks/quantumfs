@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 )
@@ -306,6 +307,57 @@ func TestPairStatsGC(t *testing.T) {
 		test.WaitFor("Request 1 to age out", func() bool {
 			return len(ext.requests) == 0
 		})
+	})
+}
+
+type testPartialMatchExtractor struct {
+	StatExtractorBase
+
+	numReceived uint64
+}
+
+func newTestPartialMatchExtractor(name string) StatExtractor {
+	ext := &testPartialMatchExtractor{}
+	ext.StatExtractorBase = NewStatExtractorBase(name, ext, OnPartialFormat,
+		[]string{"Match", "MatchMore"})
+
+	ext.run()
+
+	return ext
+}
+
+func (ext *testPartialMatchExtractor) process(msg *qlog.LogOutput) {
+	ext.numReceived++
+}
+
+func (ext *testPartialMatchExtractor) publish() []Measurement {
+	return []Measurement{{
+		name:   "testMeasurement",
+		tags:   []quantumfs.Tag{{Name: "tag1", Data: "name"}},
+		fields: []quantumfs.Field{{Name: "samples", Data: int64(1)}},
+	}}
+}
+
+func TestPartialMatchSingleCall(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		qlogHandle := test.Logger
+		t := int64(0)
+
+		qlogHandle.Log_(time.Unix(t, 2000+t), qlog.LogTest, uint64(t), 2,
+			"Match one")
+		t++
+		qlogHandle.Log_(time.Unix(t, 2000+t), qlog.LogTest, uint64(t), 2,
+			"MatchMore two")
+		t++
+
+		checker := func(memdb *processlocal.Memdb) {}
+
+		ext := newTestPartialMatchExtractor("partial")
+		test.runExtractorTest(qlogHandle, ext, checker)
+
+		testExt := ext.(*testPartialMatchExtractor)
+		test.Assert(testExt.numReceived == 2, "Wrong number processed: %d",
+			testExt.numReceived)
 	})
 }
 

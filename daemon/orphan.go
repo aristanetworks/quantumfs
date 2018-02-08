@@ -17,7 +17,8 @@ import (
 // we do not need to upload it or any of its content. When being unlinked we'll
 // orphan the Inode by making it its own parent.
 func (inode *InodeCommon) setOrphanChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn, out *fuse.AttrOut,
+	updateMtime bool) fuse.Status {
 
 	defer c.funcIn("InodeCommon::setOrphanChildAttr").Out()
 	defer inode.unlinkLock.Lock().Unlock()
@@ -26,7 +27,7 @@ func (inode *InodeCommon) setOrphanChildAttr(c *ctx, inodeNum InodeId,
 		panic("setChildAttr on self file before unlinking")
 	}
 
-	modifyEntryWithAttr(c, attr, inode.unlinkRecord, updateMtime)
+	modifyEntryWithAttr(c, newType, attr, inode.unlinkRecord, updateMtime)
 
 	if out != nil {
 		fillAttrOutCacheData(c, out)
@@ -194,7 +195,8 @@ func (inode *InodeCommon) setChildRecord(c *ctx, record quantumfs.DirectoryRecor
 }
 
 func (inode *InodeCommon) setChildAttr(c *ctx, inodeNum InodeId,
-	attr *fuse.SetAttrIn, out *fuse.AttrOut, updateMtime bool) fuse.Status {
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn, out *fuse.AttrOut,
+	updateMtime bool) fuse.Status {
 
 	defer c.funcIn("InodeCommon::setChildAttr").Out()
 
@@ -202,7 +204,7 @@ func (inode *InodeCommon) setChildAttr(c *ctx, inodeNum InodeId,
 		c.elog("Invalid setChildAttr on InodeCommon")
 		return fuse.EIO
 	}
-	return inode.setOrphanChildAttr(c, inodeNum, attr, out, updateMtime)
+	return inode.setOrphanChildAttr(c, inodeNum, newType, attr, out, updateMtime)
 }
 
 func (inode *InodeCommon) getChildXAttrSize(c *ctx, inodeNum InodeId,
