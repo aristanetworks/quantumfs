@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -142,6 +143,7 @@ type merger struct {
 	c          *ctx
 	preference mergePreference
 	pubFn      publishFn
+	start      time.Time
 }
 
 func newMerger(c *ctx) *merger {
@@ -149,6 +151,7 @@ func newMerger(c *ctx) *merger {
 		c:          c,
 		preference: quantumfs.PreferNewer,
 		pubFn:      publishNow,
+		start:      time.Now(),
 	}
 }
 
@@ -318,8 +321,9 @@ func mergeDirectory(merge *merger, dirName string, base quantumfs.ObjectKey,
 	skipPaths *mergeSkipPaths, breadcrumb string) (quantumfs.ObjectKey, error) {
 
 	breadcrumb += "/" + dirName
-	defer merge.c.FuncIn("mergeDirectory", "%s skipPaths len %d", breadcrumb,
-		len(skipPaths.paths)).Out()
+	defer merge.c.FuncIn("mergeDirectory", "%s skipPaths len %d mergeTime %s",
+		breadcrumb, len(skipPaths.paths),
+		time.Since(merge.start).String()).Out()
 
 	var err error
 	baseRecords := make(map[string]quantumfs.DirectoryRecord)
