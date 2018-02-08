@@ -482,7 +482,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 	}
 	if !nonce.SameIncarnation(&wsr.nonce) {
 		c.dlog("Not refreshing workspace %s due to mismatching "+
-			"nonces %d vs %d", name, wsr.nonce, nonce)
+			"nonces %s vs %s", name, wsr.nonce.String(), nonce.String())
 		return
 	}
 

@@ -567,7 +567,8 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 	workspaceName := wsr.fullname()
 	if !nonce.SameIncarnation(&wsr.nonce) {
 		c.dlog("Not refreshing workspace %s due to mismatching "+
-			"nonces %d vs %d", workspaceName, wsr.nonce, nonce)
+			"nonces %s vs %s", workspaceName,
+			wsr.nonce.String(), nonce.String())
 		return
 	}
 
@@ -586,8 +587,9 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 		c.vlog("Workspace updated again remotely. Refreshing anyway")
 		publishedRootId = rc.rootId
 	}
-	c.vlog("Workspace Refreshing %s rootid: %s -> %s", workspaceName,
-		wsr.publishedRootId.String(), publishedRootId.String())
+	c.vlog("Workspace Refreshing %s rootid: %s::%s -> %s::%s", workspaceName,
+		wsr.publishedRootId.String(), wsr.nonce.String(),
+		publishedRootId.String(), nonce.String())
 
 	wsr.refreshTo_(c, rc)
 	wsr.publishedRootId = publishedRootId
