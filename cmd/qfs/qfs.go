@@ -69,6 +69,7 @@ func printUsage() {
 	fmt.Println("          -r - Prefer remote in conflicts")
 	fmt.Println("          dir/to/skip - List of paths to not merge")
 	fmt.Println("  syncWorkspace <workspace>")
+	fmt.Println("  workspaceFinished <workspace>")
 }
 
 func main() {
@@ -115,6 +116,8 @@ func main() {
 		advanceWSDB()
 	case "syncWorkspace":
 		syncWorkspace()
+	case "workspaceFinished":
+		workspaceFinished()
 	}
 }
 
@@ -311,6 +314,24 @@ func syncWorkspace() {
 		os.Exit(exitApiNotFound)
 	}
 	if err := api.SyncWorkspace(workspace); err != nil {
+		fmt.Println("Operations failed:", err)
+		os.Exit(exitBadArgs)
+	}
+}
+
+func workspaceFinished() {
+	if flag.NArg() != 2 {
+		fmt.Println("Too few arguments for workspaceFinished command")
+		os.Exit(exitBadArgs)
+	}
+	workspace := flag.Arg(1)
+
+	api, err := quantumfs.NewApi()
+	if err != nil {
+		fmt.Println("Failed to find API:", err)
+		os.Exit(exitApiNotFound)
+	}
+	if err := api.WorkspaceFinished(workspace); err != nil {
 		fmt.Println("Operations failed:", err)
 		os.Exit(exitBadArgs)
 	}

@@ -11,9 +11,8 @@ import (
 )
 
 type extLogDataStats struct {
-	format    string
-	name      string
-	messages  chan StatCommand
+	StatExtractorBase
+
 	dataFetch func(*qlog.LogOutput) (int64, bool)
 	errors    int64
 
@@ -31,57 +30,29 @@ func NewExtLogDataStats(format string, nametag string, histo histogram,
 	fetchFn func(*qlog.LogOutput) (int64, bool)) StatExtractor {
 
 	ext := &extLogDataStats{
-		format:    format,
-		name:      nametag,
-		messages:  make(chan StatCommand, 10000),
 		dataFetch: fetchFn,
 		stats:     histo,
 	}
+	ext.StatExtractorBase = NewStatExtractorBase(nametag, ext, OnFormat,
+		[]string{format + "\n"})
 
-	go ext.process()
+	ext.run()
 
 	return ext
 }
 
-func (ext *extLogDataStats) TriggerStrings() []string {
-	rtn := make([]string, 0)
-
-	rtn = append(rtn, ext.format+"\n")
-	return rtn
-}
-
-func (ext *extLogDataStats) Chan() chan StatCommand {
-	return ext.messages
-}
-
-func (ext *extLogDataStats) Type() TriggerType {
-	return OnFormat
-}
-
-func (ext *extLogDataStats) process() {
-	for {
-		cmd := <-ext.messages
-		switch cmd.Type() {
-		case MessageCommandType:
-			log := cmd.Data().(*qlog.LogOutput)
-			data, success := ext.dataFetch(log)
-			if !success {
-				ext.errors++
-			} else {
-				ext.stats.NewPoint(data)
-			}
-		case PublishCommandType:
-			resultChannel := cmd.Data().(chan []Measurement)
-			resultChannel <- ext.publish()
-		case GcCommandType:
-			// do nothing since we clear every publish
-		}
+func (ext *extLogDataStats) process(msg *qlog.LogOutput) {
+	data, success := ext.dataFetch(msg)
+	if !success {
+		ext.errors++
+	} else {
+		ext.stats.NewPoint(data)
 	}
 }
 
 func (ext *extLogDataStats) publish() []Measurement {
 	tags := make([]quantumfs.Tag, 0)
-	tags = appendNewTag(tags, "statName", ext.name)
+	tags = appendNewTag(tags, "statName", ext.Name)
 
 	fields := make([]quantumfs.Field, 0)
 
