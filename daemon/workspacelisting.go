@@ -995,7 +995,7 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 	// First delete any outdated entries
 	for name, info := range wsl.workspacesByName {
 		wsdbNonce, exists := names[name]
-		if !exists || !wsdbNonce.Equals(&info.nonce) {
+		if !exists || !wsdbNonce.SameIncarnation(&info.nonce) {
 			c.vlog("Removing deleted child %s %s",
 				name, info.nonce.String())
 

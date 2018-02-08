@@ -480,7 +480,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		c.elog("Unable to get workspace rootId")
 		return
 	}
-	if !nonce.Equals(&wsr.nonce) {
+	if !nonce.SameIncarnation(&wsr.nonce) {
 		c.dlog("Not refreshing workspace %s due to mismatching "+
 			"nonces %d vs %d", name, wsr.nonce, nonce)
 		return
@@ -521,7 +521,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 		return err
 	}
 
-	if !nonce.Equals(&wsr.nonce) {
+	if !nonce.SameIncarnation(&wsr.nonce) {
 		c.wlog("Nothing to merge, new workspace")
 		return nil
 	}
@@ -544,7 +544,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 			return err
 		}
 
-		if !nonce.Equals(&wsr.nonce) {
+		if !nonce.SameIncarnation(&wsr.nonce) {
 			c.wlog("Nothing to merge, new workspace")
 			return nil
 		}

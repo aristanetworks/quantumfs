@@ -527,7 +527,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 				"Advance failed")
 		}
 
-		if !nonce.Equals(&info.Nonce) {
+		if !nonce.SameIncarnation(&info.Nonce) {
 			e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE,
 				"Nonce %d does not match WSDB (%d)", nonce,
 				info.Nonce)

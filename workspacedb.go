@@ -20,7 +20,7 @@ type WorkspaceNonce struct {
 	PublishTime uint64
 }
 
-func (lhs *WorkspaceNonce) Equals(rhs *WorkspaceNonce) bool {
+func (lhs *WorkspaceNonce) SameIncarnation(rhs *WorkspaceNonce) bool {
 	return lhs.Id == rhs.Id
 }
 
