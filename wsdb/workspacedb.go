@@ -7,7 +7,6 @@ package wsdb
 import (
 	"encoding/hex"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/aristanetworks/ether"
@@ -21,7 +20,10 @@ type ObjectKey []byte
 // path, but different lifetimes. For example, if a workspace path were deleted and
 // then recreated, the old workspace and new workspace would have different
 // WorkspaceNonces and therefore be distinguishable.
-type WorkspaceNonce int64
+type WorkspaceNonce struct {
+	Id          uint64
+	PublishTime uint64
+}
 
 func (key ObjectKey) String() string {
 	return hex.EncodeToString(key)
@@ -57,7 +59,7 @@ const (
 )
 
 // WorkspaceNonceInvalid is an invalid nonce
-const WorkspaceNonceInvalid = WorkspaceNonce(0)
+var WorkspaceNonceInvalid = WorkspaceNonce{0, 0}
 
 // Error represents the error returned from workspace DB APIs
 type Error struct {
@@ -94,21 +96,25 @@ func (err *Error) Error() string {
 
 // String returns the string representation for WorkspaceNonce
 func (nonce *WorkspaceNonce) String() string {
-	return strconv.FormatInt(int64(*nonce), 10)
+	return fmt.Sprintf("%d %d", nonce.Id, nonce.PublishTime)
 }
 
-// Value returns the int64 representation for WorkspaceNonce
+// Value returns the int64 representation for WorkspaceNonce Id
 func (nonce *WorkspaceNonce) Value() int64 {
-	return int64(*nonce)
+	return int64(nonce.Id)
 }
 
 // StringToNonce returns WorkspaceNonce for a given string
 func StringToNonce(nonceStr string) (WorkspaceNonce, error) {
-	num, err := strconv.ParseInt(nonceStr, 10, 64)
+	var id, publishTime uint64
+	n, err := fmt.Sscan(nonceStr, &id, &publishTime)
 	if err != nil {
-		return WorkspaceNonce(0), err
+		return WorkspaceNonceInvalid, err
 	}
-	return WorkspaceNonce(num), nil
+	if n != 2 {
+		return WorkspaceNonceInvalid, fmt.Errorf("Parsed %d elements", n)
+	}
+	return WorkspaceNonce{id, publishTime}, nil
 }
 
 // WorkspaceDB provides a cluster-wide and consistent mapping between names
