@@ -6,7 +6,10 @@ package utils
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
+
+	"github.com/silentred/gid"
 )
 
 // Mutex type which can have unlocking deferred. ie: defer df.Lock().Unlock()
@@ -36,20 +39,39 @@ type NeedWriteUnlock interface {
 // or defer drm.RLock().RUnlock().
 type DeferableRwMutex struct {
 	lock sync.RWMutex
+
+	// IDs of goroutines which are holding this lock for read
+	readHolderLock DeferableMutex
+	readHolders    map[int64]string
 }
 
 func (df *DeferableRwMutex) RLock() NeedReadUnlock {
+	defer df.readHolderLock.Lock().Unlock()
+	goid := gid.Get()
+	if df.readHolders == nil {
+		df.readHolders = make(map[int64]string)
+	}
+	location, ok := df.readHolders[goid]
+	Assert(!ok,
+		"goroutine %d attempted to RLock twice, previously at %s!", goid,
+		location)
+
+	_, f, l, _ := runtime.Caller(1)
+	df.readHolders[goid] = fmt.Sprintf("%s:%d", f, l)
+
 	df.lock.RLock()
-	return &df.lock
+	return df
+}
+
+func (df *DeferableRwMutex) RUnlock() {
+	defer df.readHolderLock.Lock().Unlock()
+	delete(df.readHolders, gid.Get())
+	df.lock.RUnlock()
 }
 
 func (df *DeferableRwMutex) Lock() NeedWriteUnlock {
 	df.lock.Lock()
 	return &df.lock
-}
-
-func (df *DeferableRwMutex) RUnlock() {
-	df.lock.RUnlock()
 }
 
 func (df *DeferableRwMutex) Unlock() {
