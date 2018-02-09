@@ -339,12 +339,10 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 		// quantumfs.ObjectTypeSmallFile:
 		// quantumfs.ObjectTypeSymlink:
 	case quantumfs.ObjectTypeHardlink:
-		// this ObjectType will only be seen when
-		// looking at a directoryRecord reached from
-		// directoryEntry and not when walking from
-		// hardlinkEntry table
-
-		// hence use key from hardlinkRecord
+		// This ObjectType will only be seen when looking at a
+		// directoryRecord reached from directoryEntry and not
+		// when walking from hardlinkEntry table hence use the
+		// key from the hardlinkRecord.
 		hldr, exists := c.hlkeys[dr.FileId()]
 
 		if !exists {
@@ -369,18 +367,11 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 }
 
-// DirectoryRecord.ExtendedAttributes() does not return EmptyBlockKey
-// when there are no EAs. Sometimes it returns fakeZeroKey and
-// sometime quantumfs.EmptyBlockKey. This is tracked with BUG/203685
-var fakeZeroKey = quantumfs.NewObjectKey(quantumfs.KeyTypeInvalid,
-	[quantumfs.ObjectKeyLength - 1]byte{})
-
 func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 	dr quantumfs.DirectoryRecord, keyChan chan<- *workerData) error {
 
 	extKey := dr.ExtendedAttributes()
-	if extKey.IsEqualTo(fakeZeroKey) ||
-		extKey.IsEqualTo(quantumfs.EmptyBlockKey) {
+	if extKey.IsEqualTo(quantumfs.EmptyBlockKey) {
 		return nil
 	}
 

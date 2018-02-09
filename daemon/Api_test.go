@@ -755,3 +755,15 @@ func TestInsertInodeSymlink(t *testing.T) {
 		})
 	})
 }
+
+func TestWorkspaceFinished(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.RelPath(test.NewWorkspace())
+		api := test.getApi()
+		api.WorkspaceFinished(workspace)
+
+		msg := fmt.Sprintf(WorkspaceFinishedFormat, workspace)
+		test.WaitForLogString(msg,
+			"Waiting for workspace to have finished message")
+	})
+}

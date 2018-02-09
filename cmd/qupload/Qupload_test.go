@@ -24,7 +24,8 @@ import (
 )
 
 func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
-	compare func(quantumfs.DirectoryRecord, quantumfs.DirectoryRecord)) {
+	compare func(quantumfs.ImmutableDirectoryRecord,
+		quantumfs.ImmutableDirectoryRecord)) {
 
 	th.SyncWorkspace(th.RelPath(workspace))
 
@@ -83,8 +84,8 @@ func TestFileMatches(t *testing.T) {
 			"some data"))
 
 		test.checkUploadMatches(workspace+"/"+filename, workspace,
-			func(recA quantumfs.DirectoryRecord,
-				recB quantumfs.DirectoryRecord) {
+			func(recA quantumfs.ImmutableDirectoryRecord,
+				recB quantumfs.ImmutableDirectoryRecord) {
 
 				recADirect :=
 					recA.(*quantumfs.EncodedDirectoryRecord)
