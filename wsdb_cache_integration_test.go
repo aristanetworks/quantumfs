@@ -37,18 +37,19 @@ func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 	err = DoTestSchemaOp(confFile, SchemaCreate)
 	suite.Require().NoError(err, "DoTestSchemaOp SchemaCreate returned an error")
 
-	wsdb := NewWorkspaceDB(confFile)
-	cwsdb, ok := wsdb.(*cacheWsdb)
+	nwsdb := NewWorkspaceDB(confFile)
+	cwsdb, ok := nwsdb.(*cacheWsdb)
 	suite.Require().True(ok, "Incorrect type from newCacheWsdb")
 
 	suite.cache = cwsdb.cache
 
-	err = wsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName, qwsdb.NullSpaceName, qwsdb.NullSpaceName, 0, []byte(nil))
+	err = nwsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName, qwsdb.NullSpaceName, qwsdb.NullSpaceName,
+		wsdb.WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{
 		req: suite.Require(),
-		db:  wsdb,
+		db:  nwsdb,
 	}
 }
 
@@ -225,8 +226,12 @@ func getWorkspaceTestData(numTs, numNsPerTs, numWsPerNs int) *wsdata {
 func loadWorkspaceData(c ether.Ctx, db wsdb.WorkspaceDB, w *wsdata) error {
 	for _, ws := range w.l {
 		parts := strings.Split(ws, "/")
-		nonce, _ := wsdb.StringToNonce(parts[3])
-		err := db.CreateWorkspace(c, parts[0], parts[1], parts[2],
+		nonceStr := fmt.Sprintf("%s %d", parts[3], 0)
+		nonce, err := wsdb.StringToNonce(nonceStr)
+		if err != nil {
+			return err
+		}
+		err = db.CreateWorkspace(c, parts[0], parts[1], parts[2],
 			nonce, wsdb.ObjectKey{})
 		if err != nil {
 			return err
@@ -305,7 +310,7 @@ func countListChecker(c *testCtx, db wsdb.WorkspaceDB, w *wsdata) error {
 			}
 			wslist := make([]string, 0)
 			for w, n := range m {
-				if int64(n) == int64(0) {
+				if n == wsdb.WorkspaceNonceInvalid {
 					return fmt.Errorf("Found 0 nonce for Workspace(%s/%s/%s)",
 						ts, ns, w)
 				}

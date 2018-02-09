@@ -322,7 +322,8 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterEmptyDB() {
 		wsdb.NullSpaceName)
 	suite.Require().NoError(err4,
 		"WorkspaceList failed: %s", err4)
-	suite.Require().Equal(map[string]wsdb.WorkspaceNonce{wsdb.NullSpaceName: 0}, wsMap,
+	suite.Require().Equal(map[string]wsdb.WorkspaceNonce{
+		wsdb.NullSpaceName: wsdb.WorkspaceNonceInvalid}, wsMap,
 		"Incorrect workspaces in cache")
 
 }
@@ -383,7 +384,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 		"Incorrect number of workspaces in cache")
 	suite.Require().Contains(wsMap, "remoteWS",
 		"Incorrect workspaces in cache")
-	suite.Require().Equal(wsdb.WorkspaceNonce(5), wsMap["remoteWS"],
+	suite.Require().Equal(wsdb.WorkspaceNonce{5, 0}, wsMap["remoteWS"],
 		"Incorrect nonce value for remoteWS")
 }
 
@@ -453,7 +454,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 		"Incorrect number of workspaces in cache")
 	suite.Require().Contains(wsMap, "remoteWS2",
 		"Incorrect workspaces in cache")
-	suite.Require().Equal(wsdb.WorkspaceNonce(5), wsMap["remoteWS2"],
+	suite.Require().Equal(wsdb.WorkspaceNonce{5, 0}, wsMap["remoteWS2"],
 		"Incorrect nonce value for remoteWS2")
 
 }
@@ -578,7 +579,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 		"Expected workspace ws1 not in cache")
 	suite.Require().Contains(wsMap, "specialWS",
 		"Expected workspace specialWS not in cache")
-	suite.Require().Equal(wsdb.WorkspaceNonce(7), wsMap["specialWS"],
+	suite.Require().Equal(wsdb.WorkspaceNonce{7, 0}, wsMap["specialWS"],
 		"Incorrect nonce value for specialWS")
 }
 
@@ -714,7 +715,7 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 		"Expected null workspace not in cache")
 	suite.Require().Contains(wsMap, "specialWS",
 		"Unexpected workspace specialWS in cache")
-	suite.Require().Equal(wsdb.WorkspaceNonce(9), wsMap["specialWS"],
+	suite.Require().Equal(wsdb.WorkspaceNonce{9, 0}, wsMap["specialWS"],
 		"Incorrect nonce value for specialWS")
 	suite.Require().NotContains(wsMap, "newWS",
 		"Unexpected workspace newWS in cache")
@@ -1321,10 +1322,10 @@ func (suite *wsdbCacheTestSuite) TestCacheConcWsListWhenEmpty() {
 	suite.Require().Contains(wsMap2, "w1",
 		"Expected w1 workspace not seen in call2")
 
-	suite.Require().Equal(int(wsMap1["w1"]), 7,
-		"Expected nonce 7 not see in wsMap1, %d", wsMap1["w1"])
-	suite.Require().Equal(int(wsMap2["w1"]), 7,
-		"Expected nonce 7 not see in wsMap2, %d", wsMap2["w1"])
+	suite.Require().Equal(int(wsMap1["w1"].Id), 7,
+		"Expected nonce 7 not see in wsMap1, %d", wsMap1["w1"].Id)
+	suite.Require().Equal(int(wsMap2["w1"].Id), 7,
+		"Expected nonce 7 not see in wsMap2, %d", wsMap2["w1"].Id)
 }
 
 // TODO: once the APIs return errors, add appropriate test cases

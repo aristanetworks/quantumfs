@@ -37,5 +37,5 @@ func NewWorkspaceDB(confName string) wsdb.WorkspaceDB {
 var GetUniqueNonce = getTimeBasedNonce
 
 func getTimeBasedNonce() wsdb.WorkspaceNonce {
-	return wsdb.WorkspaceNonce(time.Now().UnixNano())
+	return wsdb.WorkspaceNonce{uint64(time.Now().UnixNano()), 0}
 }

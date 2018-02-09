@@ -112,7 +112,7 @@ func (cw *cacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 		var nonce wsdb.WorkspaceNonce
 		// There should be exactlty 1 nonce for a ts/ns/ws
 		if len(nonceStr) != 1 {
-			nonce = wsdb.WorkspaceNonce(0)
+			nonce = wsdb.WorkspaceNonceInvalid
 			c.Elog("cacheWsdb::WorkspaceList %d nonces for %s/%s/%s", len(nonceStr),
 				typespace, namespace, ws)
 		} else {
@@ -121,7 +121,7 @@ func (cw *cacheWsdb) WorkspaceList(c ether.Ctx, typespace string,
 				panic(fmt.Sprintf("Nonce is not a valid int64: %s", err.Error()))
 			}
 		}
-		wsMap[ws] = wsdb.WorkspaceNonce(nonce)
+		wsMap[ws] = nonce
 	}
 
 	return wsMap, err
@@ -131,8 +131,8 @@ func (cw *cacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace st
 	workspace string, nonce wsdb.WorkspaceNonce, wsKey wsdb.ObjectKey) error {
 
 	keyHex := hex.EncodeToString(wsKey)
-	defer c.FuncIn("cacheWsdb::CreateWorkspace", "%s/%s/%s(%s)(%d)", typespace, namespace,
-		workspace, keyHex, nonce).Out()
+	defer c.FuncIn("cacheWsdb::CreateWorkspace", "%s/%s/%s(%s)(%s)", typespace, namespace,
+		workspace, keyHex, nonce.String()).Out()
 
 	err := cw.base.CreateWorkspace(c, typespace, namespace, workspace, nonce, wsKey)
 	if err != nil {
@@ -154,7 +154,7 @@ func (cw *cacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string, srcNamesp
 	srcNonce, dstNonce, err := cw.base.BranchWorkspace(c, srcTypespace, srcNamespace, srcWorkspace,
 		dstTypespace, dstNamespace, dstWorkspace)
 	if err != nil {
-		return 0, 0, err
+		return wsdb.WorkspaceNonceInvalid, wsdb.WorkspaceNonceInvalid, err
 	}
 
 	cw.cache.InsertEntities(c, srcTypespace, srcNamespace, srcWorkspace, srcNonce.String())
@@ -201,7 +201,7 @@ func (cw *cacheWsdb) Workspace(c ether.Ctx, typespace string, namespace string,
 
 	key, nonce, err := cw.base.Workspace(c, typespace, namespace, workspace)
 	if err != nil {
-		return wsdb.ObjectKey{}, 0, err
+		return wsdb.ObjectKey{}, wsdb.WorkspaceNonceInvalid, err
 	}
 	cw.cache.InsertEntities(c, typespace, namespace, workspace, nonce.String())
 	return key, nonce, nil
@@ -215,8 +215,8 @@ func (cw *cacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	currentKeyHex := hex.EncodeToString(currentRootID)
 	newKeyHex := hex.EncodeToString(newRootID)
 
-	defer c.FuncIn("cacheWsdb::AdvanceWorkspace", "%s/%s/%s(%s -> %s) old-nonce:%d", typespace, namespace,
-		workspace, currentKeyHex, newKeyHex, nonce).Out()
+	defer c.FuncIn("cacheWsdb::AdvanceWorkspace", "%s/%s/%s(%s -> %s) old-nonce:%s", typespace, namespace,
+		workspace, currentKeyHex, newKeyHex, nonce.String()).Out()
 
 	start := time.Now()
 	defer func() { cw.advanceStats.RecordOp(time.Since(start)) }()
