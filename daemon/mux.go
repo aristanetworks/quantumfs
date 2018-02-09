@@ -30,11 +30,11 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-const InodeNameLog = "Inode %d Name %s"
-const InodeOnlyLog = "Inode %d"
-const FileHandleLog = "Fh: %d"
-const FileOffsetLog = "Fh: %d offset %d"
-const SetAttrArgLog = "Inode %d valid 0x%x size %d"
+const InodeNameLog = "inode %d name %s"
+const InodeOnlyLog = "inode %d"
+const FileHandleLog = "Fh %d"
+const FileOffsetLog = "Fh %d offset %d"
+const SetAttrArgLog = "inode %d valid 0x%x size %d"
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
@@ -2148,7 +2148,7 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 }
 
 const FlushLog = "Mux::Flush"
-const FlushDebugLog = "Fh: %v Context %d %d %d"
+const FlushDebugLog = "Fh %v Context %d %d %d"
 
 func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 	result = fuse.EIO
