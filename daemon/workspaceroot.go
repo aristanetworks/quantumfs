@@ -277,8 +277,7 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 
-	wsr.lock.RLock()
-	defer wsr.lock.RUnlock()
+	defer wsr.RLock().RUnlock()
 	// Ensure linklock is held because hardlinkTable needs to be protected
 	defer wsr.hardlinkTable.linkLock.RLock().RUnlock()
 
