@@ -523,7 +523,10 @@ func (m *mux) FetchWorkspace(ctx context.Context, request *rpc.WorkspaceName) (
 	ok, err := parseWorkspaceDbError(c, response.Header, err)
 	if ok {
 		response.Key.Data = key.Value()
-		response.Nonce = &rpc.WorkspaceNonce{nonce.Id, nonce.PublishTime}
+		response.Nonce = &rpc.WorkspaceNonce{
+			Id:          nonce.Id,
+			PublishTime: nonce.PublishTime,
+		}
 		response.Immutable = false
 	}
 
