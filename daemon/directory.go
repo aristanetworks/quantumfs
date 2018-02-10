@@ -558,7 +558,7 @@ func (dir *Directory) Open(c *ctx, flags uint32, mode uint32,
 	return fuse.ENOSYS
 }
 
-const OpenedInodeDebug = "Opened inode %d as Fh: %d"
+const OpenedInodeDebug = "Opened inode %d as Fh %d"
 
 func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
@@ -755,7 +755,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 		fileHandleNum, file.treeLock())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
-	c.vlog("New file inode %d, fileHandle %d", file.inodeNum(), fileHandleNum)
+	c.vlog("New file inode %d, Fh %d", file.inodeNum(), fileHandleNum)
 
 	out.OpenOut.OpenFlags = fuse.FOPEN_KEEP_CACHE
 	out.OpenOut.Fh = uint64(fileHandleNum)
