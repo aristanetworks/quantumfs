@@ -154,7 +154,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
-	c.dlog("Opened inode %d as Fh %d", fi.inodeNum(), fileHandleNum)
+	c.dlog(OpenedInodeDebug, fi.inodeNum(), fileHandleNum)
 
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 	out.Fh = uint64(fileHandleNum)
