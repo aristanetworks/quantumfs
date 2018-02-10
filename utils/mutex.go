@@ -45,10 +45,12 @@ type DeferableRwMutex struct {
 	readHolders    map[int64]uintptr
 }
 
-var checkForRecursiveRLock bool
+// Set to true to have DeferableRwMutex panic if a single goroutine attempts to call
+// RLock() on the same lock more than once.
+var CheckForRecursiveRLock bool
 
 func (df *DeferableRwMutex) RLock() NeedReadUnlock {
-	if checkForRecursiveRLock {
+	if CheckForRecursiveRLock {
 		defer df.readHolderLock.Lock().Unlock()
 		goid := gid.Get()
 		if df.readHolders == nil {
@@ -74,7 +76,7 @@ func (df *DeferableRwMutex) RLock() NeedReadUnlock {
 }
 
 func (df *DeferableRwMutex) RUnlock() {
-	if checkForRecursiveRLock {
+	if CheckForRecursiveRLock {
 		defer df.readHolderLock.Lock().Unlock()
 		delete(df.readHolders, gid.Get())
 	}
