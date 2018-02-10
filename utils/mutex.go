@@ -45,33 +45,39 @@ type DeferableRwMutex struct {
 	readHolders    map[int64]uintptr
 }
 
+var checkForRecursiveRLock bool
+
 func (df *DeferableRwMutex) RLock() NeedReadUnlock {
-	defer df.readHolderLock.Lock().Unlock()
-	goid := gid.Get()
-	if df.readHolders == nil {
-		df.readHolders = make(map[int64]uintptr)
-	}
-	pc, alreadyHeld := df.readHolders[goid]
-	if alreadyHeld {
-		f := runtime.FuncForPC(pc)
-		file, line := f.FileLine(pc)
-		location := fmt.Sprintf("%s:%d", file, line)
+	if checkForRecursiveRLock {
+		defer df.readHolderLock.Lock().Unlock()
+		goid := gid.Get()
+		if df.readHolders == nil {
+			df.readHolders = make(map[int64]uintptr)
+		}
+		pc, alreadyHeld := df.readHolders[goid]
+		if alreadyHeld {
+			f := runtime.FuncForPC(pc)
+			file, line := f.FileLine(pc)
+			location := fmt.Sprintf("%s:%d", file, line)
 
-		Assert(!alreadyHeld,
-			"goroutine %d attempted to RLock twice, previously at %s!",
-			goid, location)
-	}
+			Assert(!alreadyHeld,
+				"goroutine %d attempted to RLock twice, "+
+					"previously at %s!", goid, location)
+		}
 
-	pc, _, _, _ = runtime.Caller(1)
-	df.readHolders[goid] = pc
+		pc, _, _, _ = runtime.Caller(1)
+		df.readHolders[goid] = pc
+	}
 
 	df.lock.RLock()
 	return df
 }
 
 func (df *DeferableRwMutex) RUnlock() {
-	defer df.readHolderLock.Lock().Unlock()
-	delete(df.readHolders, gid.Get())
+	if checkForRecursiveRLock {
+		defer df.readHolderLock.Lock().Unlock()
+		delete(df.readHolders, gid.Get())
+	}
 	df.lock.RUnlock()
 }
 
