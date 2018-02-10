@@ -42,22 +42,28 @@ type DeferableRwMutex struct {
 
 	// IDs of goroutines which are holding this lock for read
 	readHolderLock DeferableMutex
-	readHolders    map[int64]string
+	readHolders    map[int64]uintptr
 }
 
 func (df *DeferableRwMutex) RLock() NeedReadUnlock {
 	defer df.readHolderLock.Lock().Unlock()
 	goid := gid.Get()
 	if df.readHolders == nil {
-		df.readHolders = make(map[int64]string)
+		df.readHolders = make(map[int64]uintptr)
 	}
-	location, ok := df.readHolders[goid]
-	Assert(!ok,
-		"goroutine %d attempted to RLock twice, previously at %s!", goid,
-		location)
+	pc, alreadyHeld := df.readHolders[goid]
+	if alreadyHeld {
+		f := runtime.FuncForPC(pc)
+		file, line := f.FileLine(pc)
+		location := fmt.Sprintf("%s:%d", file, line)
 
-	_, f, l, _ := runtime.Caller(1)
-	df.readHolders[goid] = fmt.Sprintf("%s:%d", f, l)
+		Assert(!alreadyHeld,
+			"goroutine %d attempted to RLock twice, previously at %s!",
+			goid, location)
+	}
+
+	pc, _, _, _ = runtime.Caller(1)
+	df.readHolders[goid] = pc
 
 	df.lock.RLock()
 	return df
