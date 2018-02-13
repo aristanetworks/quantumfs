@@ -1106,6 +1106,12 @@ func DecodeExtendedKey(packet string) (ObjectKey, ObjectType, uint64, error) {
 		return ZeroKey, 0, 0, err
 	}
 
+	if len(bDec) != sourceDataLength {
+		return ZeroKey, 0, 0,
+			fmt.Errorf("packet \"%s\" decoded to %d bytes. Expected %d.",
+				packet, len(bDec), sourceDataLength)
+	}
+
 	key := NewObjectKeyFromBytes(bDec[:sourceDataLength-9])
 	type_ := ObjectType(bDec[sourceDataLength-9])
 	size := binary.LittleEndian.Uint64(bDec[sourceDataLength-8:])
