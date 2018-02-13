@@ -39,7 +39,7 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 	// Create the null workspace
 	nullWorkspace := WorkspaceInfo{
 		key:       quantumfs.EmptyWorkspaceKey,
-		nonce:     0,
+		nonce:     quantumfs.WorkspaceNonce{0, 0},
 		immutable: true,
 	}
 	wsdb.InsertMap_(type_, name_, work_, &nullWorkspace)
@@ -248,8 +248,11 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	}
 
 	newInfo := WorkspaceInfo{
-		key:       info.key,
-		nonce:     quantumfs.WorkspaceNonce(time.Now().UnixNano()),
+		key: info.key,
+		nonce: quantumfs.WorkspaceNonce{
+			uint64(time.Now().UnixNano()),
+			uint64(time.Now().UnixNano()),
+		},
 		immutable: false,
 	}
 	wsdb.InsertMap_(dstTypespace, dstNamespace, dstWorkspace, &newInfo)
@@ -326,7 +329,7 @@ func (wsdb *WorkspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	defer wsdb.CacheMutex.RLock().RUnlock()
 	info, err := wsdb.Workspace_(c, typespace, namespace, workspace)
 	if err != nil {
-		return quantumfs.ObjectKey{}, 0, err
+		return quantumfs.ObjectKey{}, quantumfs.WorkspaceNonce{}, err
 	}
 	return info.key, info.nonce, nil
 }
@@ -337,7 +340,7 @@ func (wsdb *WorkspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 
 	err := wsdb.SubscribeTo(typespace + "/" + namespace + "/" + workspace)
 	if err != nil {
-		return quantumfs.ObjectKey{}, 0, err
+		return quantumfs.ObjectKey{}, quantumfs.WorkspaceNonce{}, err
 	}
 
 	return wsdb.Workspace(c, typespace, namespace, workspace)
@@ -360,9 +363,10 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		return quantumfs.ZeroKey, e
 	}
 
-	if nonce != info.nonce {
+	if !nonce.SameIncarnation(&info.nonce) {
 		e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE,
-			"Nonce %d does not match WSDB (%d)", nonce, info.nonce)
+			"Nonce %s does not match WSDB (%s)",
+			nonce.String(), info.nonce.String())
 		return info.key, e
 	}
 
@@ -374,6 +378,7 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	}
 
 	wsdb.cache[typespace][namespace][workspace].key = newRootId
+	info.nonce.PublishTime = uint64(time.Now().UnixNano())
 
 	wsdb.notifySubscribers_(c, typespace, namespace, workspace, true)
 

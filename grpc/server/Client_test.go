@@ -94,7 +94,8 @@ func TestAdvanceNonExistentWorkspace(t *testing.T) {
 		client := test.newClient()
 
 		_, err := client.AdvanceWorkspace(test.ctx, "test", "test",
-			"test", 1, quantumfs.EmptyWorkspaceKey, quantumfs.ZeroKey)
+			"test", quantumfs.WorkspaceNonce{},
+			quantumfs.EmptyWorkspaceKey, quantumfs.ZeroKey)
 		wsdbErr, ok := err.(quantumfs.WorkspaceDbErr)
 		test.Assert(ok, "Error isn't WorkspaceDbErr: %s", err.Error())
 
