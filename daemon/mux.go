@@ -30,11 +30,11 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-const InodeNameLog = "Inode %d Name %s"
-const InodeOnlyLog = "Inode %d"
-const FileHandleLog = "Fh: %d"
-const FileOffsetLog = "Fh: %d offset %d"
-const SetAttrArgLog = "Inode %d valid 0x%x size %d"
+const InodeNameLog = "inode %d name %s"
+const InodeOnlyLog = "inode %d"
+const FileHandleLog = "Fh %d"
+const FileOffsetLog = "Fh %d offset %d"
+const SetAttrArgLog = "inode %d valid 0x%x size %d"
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
@@ -481,9 +481,9 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		c.elog("Unable to get workspace rootId")
 		return
 	}
-	if nonce != wsr.nonce {
+	if !nonce.SameIncarnation(&wsr.nonce) {
 		c.dlog("Not refreshing workspace %s due to mismatching "+
-			"nonces %d vs %d", name, wsr.nonce, nonce)
+			"nonces %s vs %s", name, wsr.nonce.String(), nonce.String())
 		return
 	}
 
@@ -522,7 +522,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 		return err
 	}
 
-	if nonce != wsr.nonce {
+	if !nonce.SameIncarnation(&wsr.nonce) {
 		c.wlog("Nothing to merge, new workspace")
 		return nil
 	}
@@ -545,7 +545,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 			return err
 		}
 
-		if nonce != wsr.nonce {
+		if !nonce.SameIncarnation(&wsr.nonce) {
 			c.wlog("Nothing to merge, new workspace")
 			return nil
 		}
@@ -2148,7 +2148,7 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 }
 
 const FlushLog = "Mux::Flush"
-const FlushDebugLog = "Fh: %v Context %d %d %d"
+const FlushDebugLog = "Fh %v Context %d %d %d"
 
 func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 	result = fuse.EIO

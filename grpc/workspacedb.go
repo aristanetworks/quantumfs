@@ -213,7 +213,9 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 							Data: key.Value(),
 						},
 						Nonce: &rpc.WorkspaceNonce{
-							Nonce: uint64(nonce),
+							Id: uint64(nonce.Id),
+							PublishTime: uint64(
+								nonce.PublishTime),
 						},
 						Immutable: immutable,
 						Deleted:   false,
@@ -290,8 +292,8 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 			wsdb.updates[update.Name] = quantumfs.WorkspaceState{
 				RootId: quantumfs.NewObjectKeyFromBytes(
 					update.RootId.Data),
-				Nonce: quantumfs.WorkspaceNonce(
-					update.Nonce.Nonce),
+				Nonce: quantumfs.WorkspaceNonce{
+					update.Nonce.Id, update.Nonce.PublishTime},
 				Immutable: update.Immutable,
 				Deleted:   update.Deleted,
 			}
@@ -597,7 +599,8 @@ func (wsdb *workspaceDB) workspaceList(c *quantumfs.Ctx, typespace string,
 	}
 
 	for name, nonce := range response.Workspaces {
-		workspaces[name] = quantumfs.WorkspaceNonce(nonce.Nonce)
+		workspaces[name] = quantumfs.WorkspaceNonce{nonce.Id,
+			nonce.PublishTime}
 	}
 
 	return workspaces, nil
@@ -712,17 +715,20 @@ func (wsdb *workspaceDB) _fetchWorkspace(c *quantumfs.Ctx, workspaceName string)
 	response, err := wsdb.server.FetchWorkspace(context.TODO(), &request)
 	if err != nil {
 		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
-		return quantumfs.ZeroKey, 0, false, wsdb.handleGrpcError(err)
+		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{},
+			false, wsdb.handleGrpcError(err)
 	}
 
 	if response.Header.Err != 0 {
 		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
 			response.Header.Err, response.Header.ErrCause)
-		return quantumfs.ZeroKey, 0, false, wsdb.convertErr(*response.Header)
+		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{},
+			false, wsdb.convertErr(*response.Header)
 	}
 
 	key = quantumfs.NewObjectKeyFromBytes(response.Key.GetData())
-	nonce = quantumfs.WorkspaceNonce(response.Nonce.Nonce)
+	nonce = quantumfs.WorkspaceNonce{
+		response.Nonce.Id, response.Nonce.PublishTime}
 	immutable = response.Immutable
 
 	return key, nonce, immutable, nil
@@ -765,7 +771,7 @@ func (wsdb *workspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 
 	err := wsdb.SubscribeTo(typespace + "/" + namespace + "/" + workspace)
 	if err != nil {
-		return quantumfs.ZeroKey, 0, err
+		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{}, err
 	}
 
 	return wsdb.Workspace(c, typespace, namespace, workspace)
@@ -807,7 +813,10 @@ func (wsdb *workspaceDB) advanceWorkspace(c *quantumfs.Ctx, typespace string,
 	request := rpc.AdvanceWorkspaceRequest{
 		RequestId:     &rpc.RequestId{Id: c.RequestId},
 		WorkspaceName: workspaceName,
-		Nonce:         &rpc.WorkspaceNonce{Nonce: uint64(nonce)},
+		Nonce: &rpc.WorkspaceNonce{
+			Id:          nonce.Id,
+			PublishTime: nonce.PublishTime,
+		},
 		CurrentRootId: &rpc.ObjectKey{Data: currentRootId.Value()},
 		NewRootId:     &rpc.ObjectKey{Data: newRootId.Value()},
 	}

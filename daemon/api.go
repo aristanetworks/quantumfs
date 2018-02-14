@@ -156,6 +156,9 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out.OpenFlags = 0
 	handle := newApiHandle(c, api.treeLock())
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
+
+	c.dlog(OpenedInodeDebug, api.id, handle.id)
+
 	out.Fh = uint64(handle.FileHandleCommon.id)
 	return fuse.OK
 }

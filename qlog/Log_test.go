@@ -263,7 +263,7 @@ func TestLogFnPair(t *testing.T) {
 		t.Fatal("Obvious mismatch matches")
 	}
 
-	if !IsLogFnPair("---In Mux::ReleaseDirEnter Fh: %d\n",
+	if !IsLogFnPair("---In Mux::ReleaseDirEnter Fh %d\n",
 		"Out-- Mux::ReleaseDir\n") {
 
 		t.Fatal("Real example mismatch")
