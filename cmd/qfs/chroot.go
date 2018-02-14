@@ -332,6 +332,14 @@ func copyDirStayOnFs(src string, dst string) error {
 func nonPersistentChroot(username string, rootdir string, workingdir string,
 	cmd []string) error {
 
+	// Unshare() is an OS thread specific attribute. We must ensure that all the
+	// subsequent operations are performed on the thread which is in the new
+	// namespace. Failure to do so might result in mounting the chroot root over
+	// the host root leading, generally, to a broken host. We don't call
+	// UnlockOsThread() because we want the entire chroot process to run in its
+	// entirety within the new namespace from here-on-out.
+	runtime.LockOSThread()
+
 	// isolate the mount namespace of this process from the rest of the machine
 	if err := syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
 		return fmt.Errorf("Unshare error: %s", err.Error())

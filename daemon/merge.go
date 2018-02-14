@@ -26,7 +26,7 @@ type hardlinkTracker struct {
 	merged map[quantumfs.FileId]HardlinkTableEntry
 }
 
-func newHardlinkTracker(merge *merger, base map[quantumfs.FileId]HardlinkTableEntry,
+func (merge *merger) newHardlinkTracker(base map[quantumfs.FileId]HardlinkTableEntry,
 	remote map[quantumfs.FileId]HardlinkTableEntry,
 	local map[quantumfs.FileId]HardlinkTableEntry) *hardlinkTracker {
 
@@ -51,7 +51,7 @@ func newHardlinkTracker(merge *merger, base map[quantumfs.FileId]HardlinkTableEn
 				baseRecord = baseEntry.record
 			}
 
-			mergedRecord, err := mergeFile(merge, baseRecord,
+			mergedRecord, err := merge.mergeFile(baseRecord,
 				remoteEntry.record, localEntry.record)
 			if err != nil {
 				panic(err)
@@ -146,11 +146,11 @@ type merger struct {
 	start      time.Time
 }
 
-func newMerger(c *ctx) *merger {
+func newMerger(c *ctx, prefer mergePreference, pub publishFn) *merger {
 	return &merger{
 		c:          c,
-		preference: quantumfs.PreferNewer,
-		pubFn:      publishNow,
+		preference: prefer,
+		pubFn:      pub,
 		start:      time.Now(),
 	}
 }
@@ -207,10 +207,8 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		len(skipPaths.paths), breadcrumb).Out()
 
 	toSet := make(chan quantumfs.Buffer, maxUploadBacklog)
-	merge := newMerger(c)
-	merge.preference = prefer
-	merge.pubFn = func(c *ctx, buf quantumfs.Buffer) (quantumfs.ObjectKey,
-		error) {
+	merge := newMerger(c, prefer, func(c *ctx,
+		buf quantumfs.Buffer) (quantumfs.ObjectKey, error) {
 
 		if len(toSet) == maxUploadBacklog-1 {
 			c.elog("Merge uploading bandwidth maxed.")
@@ -219,7 +217,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		toSet <- buf
 		return quantumfs.NewObjectKey(buf.KeyType(),
 			buf.ContentHash()), nil
-	}
+	})
 
 	var uploadErr error
 	var wg sync.WaitGroup
@@ -240,10 +238,10 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		return local, err
 	}
 
-	tracker := newHardlinkTracker(merge, baseHardlinks, remoteHardlinks,
+	tracker := merge.newHardlinkTracker(baseHardlinks, remoteHardlinks,
 		localHardlinks)
 
-	localDirectory, err = mergeDirectory(merge, "/", baseDirectory,
+	localDirectory, err = merge.mergeDirectory("/", baseDirectory,
 		remoteDirectory, localDirectory, true, tracker, skipPaths,
 		breadcrumb)
 
@@ -257,7 +255,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	// Ensure everything is uploaded before we continue
 	close(toSet)
 	wg.Wait()
-	return rtn, nil
+	return rtn, uploadErr
 }
 
 func loadRecords(c *ctx,
@@ -315,7 +313,7 @@ func childSkipPaths(c *ctx, parentSkipPaths *mergeSkipPaths,
 
 // sometimes, in theory, two workspaces could simultaneously create directories or
 // records with the same name. We handle these cases like mostly normal conflicts.
-func mergeDirectory(merge *merger, dirName string, base quantumfs.ObjectKey,
+func (merge *merger) mergeDirectory(dirName string, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
 	baseExists bool, ht *hardlinkTracker,
 	skipPaths *mergeSkipPaths, breadcrumb string) (quantumfs.ObjectKey, error) {
@@ -361,7 +359,7 @@ func mergeDirectory(merge *merger, dirName string, base quantumfs.ObjectKey,
 				continue
 			}
 
-			mergedRecords[name], err = mergeRecord(merge, baseChild,
+			mergedRecords[name], err = merge.mergeRecord(baseChild,
 				remoteRecord, localChild, ht,
 				childSkipPaths(merge.c, skipPaths, name), breadcrumb)
 			if err != nil {
@@ -423,7 +421,7 @@ func init() {
 	emptyAttrs = quantumfs.NewExtendedAttributes()
 }
 
-func mergeExtendedAttrs(merge *merger, base quantumfs.ObjectKey,
+func (merge *merger) mergeExtendedAttrs(base quantumfs.ObjectKey,
 	newer quantumfs.ObjectKey, older quantumfs.ObjectKey) (quantumfs.ObjectKey,
 	error) {
 
@@ -537,7 +535,7 @@ func (mp mergePreference) pick(newer quantumfs.DirectoryRecord,
 }
 
 // Merge record attributes based on ContentTime
-func mergeAttributes(merge *merger, base quantumfs.DirectoryRecord,
+func (merge *merger) mergeAttributes(base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
@@ -594,7 +592,7 @@ func mergeAttributes(merge *merger, base quantumfs.DirectoryRecord,
 			rtnRecord.SetGroup(older.Group())
 		}
 
-		newKey, err := mergeExtendedAttrs(merge, base.ExtendedAttributes(),
+		newKey, err := merge.mergeExtendedAttrs(base.ExtendedAttributes(),
 			newer.ExtendedAttributes(), older.ExtendedAttributes())
 		if err != nil {
 			return nil, err
@@ -613,7 +611,7 @@ func mergeAttributes(merge *merger, base quantumfs.DirectoryRecord,
 	}
 }
 
-func mergeRecord(merge *merger, base quantumfs.DirectoryRecord,
+func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
 	ht *hardlinkTracker, skipPaths *mergeSkipPaths, breadcrumb string) (
 	quantumfs.DirectoryRecord, error) {
@@ -626,7 +624,7 @@ func mergeRecord(merge *merger, base quantumfs.DirectoryRecord,
 	remoteTypeChanged := base == nil || !remote.Type().Matches(base.Type())
 	bothSameType := local.Type().Matches(remote.Type())
 
-	rtnRecord, err := mergeAttributes(merge, base, remote, local)
+	rtnRecord, err := merge.mergeAttributes(base, remote, local)
 	if err != nil {
 		return nil, err
 	}
@@ -641,7 +639,7 @@ func mergeRecord(merge *merger, base quantumfs.DirectoryRecord,
 				baseId = base.ID()
 			}
 
-			mergedKey, err := mergeDirectory(merge, local.Filename(),
+			mergedKey, err := merge.mergeDirectory(local.Filename(),
 				baseId, remote.ID(), local.ID(), (base != nil), ht,
 				skipPaths, breadcrumb)
 			if err != nil {
@@ -671,7 +669,7 @@ func mergeRecord(merge *merger, base quantumfs.DirectoryRecord,
 	case quantumfs.ObjectTypeVeryLargeFile:
 		if bothSameType {
 			// We can potentially do an intra-file merge
-			return mergeFile(merge, base, remote, local)
+			return merge.mergeFile(base, remote, local)
 		}
 	}
 
@@ -769,7 +767,7 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 	return iterator, iteratorRecord, other, otherRecord
 }
 
-func mergeFile(merge *merger, base quantumfs.DirectoryRecord,
+func (merge *merger) mergeFile(base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
@@ -782,7 +780,7 @@ func mergeFile(merge *merger, base quantumfs.DirectoryRecord,
 		baseAvailable = true
 	}
 
-	rtnRecord, err := mergeAttributes(merge, base, remote, local)
+	rtnRecord, err := merge.mergeAttributes(base, remote, local)
 	if err != nil {
 		return nil, err
 	}
