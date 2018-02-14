@@ -184,11 +184,14 @@ func mergeUploader(c *ctx, buffers chan quantumfs.Buffer, rtnErr *error,
 	defer wg.Done()
 
 	for buffer := range buffers {
+		// if there's been an error, just throw out the buffers
+		if *rtnErr != nil {
+			continue
+		}
+
 		_, err := buffer.Key(&c.Ctx)
 		if err != nil {
 			*rtnErr = err
-			close(buffers)
-			return
 		}
 	}
 }
