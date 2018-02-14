@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -142,6 +143,7 @@ type merger struct {
 	c          *ctx
 	preference mergePreference
 	pubFn      publishFn
+	start      time.Time
 }
 
 func newMerger(c *ctx, prefer mergePreference, pub publishFn) *merger {
@@ -149,6 +151,7 @@ func newMerger(c *ctx, prefer mergePreference, pub publishFn) *merger {
 		c:          c,
 		preference: prefer,
 		pubFn:      pub,
+		start:      time.Now(),
 	}
 }
 
@@ -198,10 +201,10 @@ const maxUploadBacklog = 1000
 
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
 	local quantumfs.ObjectKey, prefer mergePreference,
-	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
+	skipPaths *mergeSkipPaths, breadcrumb string) (quantumfs.ObjectKey, error) {
 
-	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d", prefer,
-		len(skipPaths.paths)).Out()
+	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d wsr %s", prefer,
+		len(skipPaths.paths), breadcrumb).Out()
 
 	toSet := make(chan quantumfs.Buffer, maxUploadBacklog)
 	merge := newMerger(c, prefer, func(c *ctx,
@@ -239,7 +242,8 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		localHardlinks)
 
 	localDirectory, err = merge.mergeDirectory("/", baseDirectory,
-		remoteDirectory, localDirectory, true, tracker, skipPaths)
+		remoteDirectory, localDirectory, true, tracker, skipPaths,
+		breadcrumb)
 
 	if err != nil {
 		return local, err
@@ -312,10 +316,12 @@ func childSkipPaths(c *ctx, parentSkipPaths *mergeSkipPaths,
 func (merge *merger) mergeDirectory(dirName string, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
 	baseExists bool, ht *hardlinkTracker,
-	skipPaths *mergeSkipPaths) (quantumfs.ObjectKey, error) {
+	skipPaths *mergeSkipPaths, breadcrumb string) (quantumfs.ObjectKey, error) {
 
-	defer merge.c.FuncIn("mergeDirectory", "%s skipPaths len %d", dirName,
-		len(skipPaths.paths)).Out()
+	breadcrumb += "/" + dirName
+	defer merge.c.FuncIn("mergeDirectory", "%s skipPaths len %d mergeTime %s",
+		breadcrumb, len(skipPaths.paths),
+		time.Since(merge.start).String()).Out()
 
 	var err error
 	baseRecords := make(map[string]quantumfs.DirectoryRecord)
@@ -355,7 +361,7 @@ func (merge *merger) mergeDirectory(dirName string, base quantumfs.ObjectKey,
 
 			mergedRecords[name], err = merge.mergeRecord(baseChild,
 				remoteRecord, localChild, ht,
-				childSkipPaths(merge.c, skipPaths, name))
+				childSkipPaths(merge.c, skipPaths, name), breadcrumb)
 			if err != nil {
 				return local, err
 			}
@@ -607,10 +613,11 @@ func (merge *merger) mergeAttributes(base quantumfs.DirectoryRecord,
 
 func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
-	ht *hardlinkTracker, skipPaths *mergeSkipPaths) (
+	ht *hardlinkTracker, skipPaths *mergeSkipPaths, breadcrumb string) (
 	quantumfs.DirectoryRecord, error) {
 
-	defer merge.c.FuncIn("mergeRecord", "%s", local.Filename()).Out()
+	breadcrumb += "/" + local.Filename()
+	defer merge.c.FuncIn("mergeRecord", "%s", breadcrumb).Out()
 
 	// Merge differently depending on if the type is preserved
 	localTypeChanged := base == nil || !local.Type().Matches(base.Type())
@@ -634,7 +641,7 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 
 			mergedKey, err := merge.mergeDirectory(local.Filename(),
 				baseId, remote.ID(), local.ID(), (base != nil), ht,
-				skipPaths)
+				skipPaths, breadcrumb)
 			if err != nil {
 				return local, err
 			}
