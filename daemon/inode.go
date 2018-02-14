@@ -309,15 +309,18 @@ func (inode *InodeCommon) parentUpdateSize(c *ctx,
 	defer inode.parentLock.RLock().RUnlock()
 	defer inode.lock.Lock().Unlock()
 
-	if !inode.isOrphaned_() {
-		inode.dirty(c)
-	}
-
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
 	attr.Size = getSize_()
-	return inode.parent_(c).setChildAttr(c, inode.inodeNum(), nil, &attr, nil,
-		true)
+
+	if !inode.isOrphaned_() {
+		inode.dirty(c)
+		return inode.parent_(c).setChildAttr(c, inode.inodeNum(), nil, &attr,
+			nil, true)
+	} else {
+		return inode.setOrphanChildAttr(c, inode.inodeNum(), nil, &attr, nil,
+			true)
+	}
 }
 
 func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
@@ -330,10 +333,15 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
+		return inode.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
+			updateMtime)
+	} else if inode.id == inodeNum {
+		return inode.setOrphanChildAttr(c, inodeNum, newType, attr, out,
+			updateMtime)
+	} else {
+		panic("Request for non-self while orphaned")
 	}
 
-	return inode.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
-		updateMtime)
 }
 
 func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,
@@ -342,7 +350,13 @@ func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,
 	defer c.funcIn("InodeCommon::parentGetChildXAttrSize").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
-	return inode.parent_(c).getChildXAttrSize(c, inodeNum, attr)
+	if !inode.isOrphaned_() {
+		return inode.parent_(c).getChildXAttrSize(c, inodeNum, attr)
+	} else if inode.id == inodeNum {
+		return inode.getOrphanChildXAttrSize(c, inodeNum, attr)
+	} else {
+		panic("Request for non-self while orphaned")
+	}
 }
 
 func (inode *InodeCommon) parentGetChildXAttrData(c *ctx, inodeNum InodeId,
@@ -351,7 +365,13 @@ func (inode *InodeCommon) parentGetChildXAttrData(c *ctx, inodeNum InodeId,
 	defer c.funcIn("InodeCommon::parentGetChildXAttrData").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
-	return inode.parent_(c).getChildXAttrData(c, inodeNum, attr)
+	if !inode.isOrphaned_() {
+		return inode.parent_(c).getChildXAttrData(c, inodeNum, attr)
+	} else if inode.id == inodeNum {
+		return inode.getOrphanChildXAttrData(c, inodeNum, attr)
+	} else {
+		panic("Request for non-self while orphaned")
+	}
 }
 
 func (inode *InodeCommon) parentListChildXAttr(c *ctx,
@@ -360,7 +380,13 @@ func (inode *InodeCommon) parentListChildXAttr(c *ctx,
 	defer c.funcIn("InodeCommon::parentListChildXAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
-	return inode.parent_(c).listChildXAttr(c, inodeNum)
+	if !inode.isOrphaned_() {
+		return inode.parent_(c).listChildXAttr(c, inodeNum)
+	} else if inode.id == inodeNum {
+		return inode.listOrphanChildXAttr(c, inodeNum)
+	} else {
+		panic("Request for non-self while orphaned")
+	}
 }
 
 func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr string,
@@ -372,9 +398,12 @@ func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr str
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
+		return inode.parent_(c).setChildXAttr(c, inodeNum, attr, data)
+	} else if inode.id == inodeNum {
+		return inode.setOrphanChildXAttr(c, inodeNum, attr, data)
+	} else {
+		panic("Request for non-self while orphaned")
 	}
-
-	return inode.parent_(c).setChildXAttr(c, inodeNum, attr, data)
 }
 
 func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
@@ -386,9 +415,12 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
+		return inode.parent_(c).removeChildXAttr(c, inodeNum, attr)
+	} else if inode.id == inodeNum {
+		return inode.removeOrphanChildXAttr(c, inodeNum, attr)
+	} else {
+		panic("Request for non-self while orphaned")
 	}
-
-	return inode.parent_(c).removeChildXAttr(c, inodeNum, attr)
 }
 
 func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
@@ -397,7 +429,14 @@ func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
 	defer c.funcIn("InodeCommon::parentGetChildRecordCopy").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
-	return inode.parent_(c).getChildRecordCopy(c, inodeNum)
+
+	if !inode.isOrphaned_() {
+		return inode.parent_(c).getChildRecordCopy(c, inodeNum)
+	} else if inode.id == inodeNum {
+		return inode.getOrphanChildRecordCopy(c, inodeNum)
+	} else {
+		panic("Request for non-self while orphaned")
+	}
 }
 
 // When iterating up the directory tree, we need to lock parents as we go,
