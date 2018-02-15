@@ -20,11 +20,15 @@ type RealCluster struct {
 // NewRealCluster returns a default Cluster struct with the given hosts
 func NewRealCluster(clusterCfg ClusterConfig) Cluster {
 
-	nodes, err := net.LookupHost(clusterCfg.ClusterName)
-	if err != nil {
-		fmt.Fprintf(os.Stderr,
-			"** WARNING: LookupHost failed for %s **\n", clusterCfg.ClusterName)
-		nodes = clusterCfg.Nodes
+	var err error
+	nodes := clusterCfg.Nodes
+	if clusterCfg.ClusterName != "" {
+		nodes, err = net.LookupHost(clusterCfg.ClusterName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr,
+				"** WARNING: LookupHost failed for %s . Using node IPs from config **\n", clusterCfg.ClusterName)
+			nodes = clusterCfg.Nodes
+		}
 	}
 	c := gocql.NewCluster(nodes...)
 	c.ProtoVersion = 3
