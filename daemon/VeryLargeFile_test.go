@@ -181,3 +181,21 @@ func TestVeryLargeFileTooBigTruncate(t *testing.T) {
 			err.Error())
 	})
 }
+
+func TestVeryLargeFileTooBigWrite(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+
+		file, err := os.Create(filename)
+		test.AssertNoErr(err)
+		defer file.Close()
+
+		_, err = file.Seek(math.MaxInt64-2, 0)
+		test.AssertNoErr(err)
+
+		_, err = syscall.Write(int(file.Fd()), []byte{1})
+		test.Assert(err == syscall.EFBIG, "Incorrect error received: %s",
+			err.Error())
+	})
+}
