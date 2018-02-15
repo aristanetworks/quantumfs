@@ -154,7 +154,7 @@ func (nc *noCacheWsdb) CreateWorkspace(c ether.Ctx, typespace string, namespace 
 
 	}
 
-	err := nc.wsdbKeyPut(c, typespace, namespace, workspace, wsKey, nonce.Value())
+	err := nc.wsdbKeyPut(c, typespace, namespace, workspace, wsKey, nonce)
 	if err != nil {
 		return wsdb.NewError(wsdb.ErrFatal,
 			"during Put in CreateWorkspace %s/%s/%s(%s) : %s",
@@ -210,14 +210,14 @@ func (nc *noCacheWsdb) BranchWorkspace(c ether.Ctx, srcTypespace string,
 	c.Vlog("Create Workspace %s/%s/%s dstNonce:%d",
 		dstTypespace, dstNamespace, dstWorkspace, dstNonce)
 	if err = nc.wsdbKeyPut(c, dstTypespace, dstNamespace,
-		dstWorkspace, key, dstNonce.Value()); err != nil {
+		dstWorkspace, key, dstNonce); err != nil {
 		return wsdb.WorkspaceNonceInvalid, wsdb.WorkspaceNonceInvalid, wsdb.NewError(wsdb.ErrFatal,
 			"during Put in BranchWorkspace %s/%s/%s dstNonce:(%d): %s",
 			dstTypespace, dstNamespace, dstWorkspace, dstNonce,
 			err.Error())
 	}
 
-	return wsdb.WorkspaceNonce{uint64(srcNonce), 0}, dstNonce, nil
+	return srcNonce, dstNonce, nil
 }
 
 func (nc *noCacheWsdb) Workspace(c ether.Ctx, typespace string, namespace string,
@@ -238,7 +238,7 @@ func (nc *noCacheWsdb) Workspace(c ether.Ctx, typespace string, namespace string
 			"during Workspace %s/%s/%s", typespace, namespace, workspace)
 	}
 
-	return key, wsdb.WorkspaceNonce{uint64(nonce), 0}, nil
+	return key, nonce, nil
 }
 
 func (nc *noCacheWsdb) DeleteWorkspace(c ether.Ctx, typespace string, namespace string,
@@ -285,10 +285,10 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 			typespace, namespace, workspace, err.Error())
 	}
 
-	if nonce != currentNonce.Value() {
+	if !nonce.SameIncarnation(&currentNonce) {
 		return key, wsdb.NewError(wsdb.ErrWorkspaceOutOfDate,
-			"nonce mispatch Expected:%d Received:%d",
-			currentNonce, nonce)
+			"nonce mispatch Expected:%s Received:%s",
+			currentNonce.String(), nonce.String())
 	}
 	if !present {
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrWorkspaceNotFound,
@@ -303,7 +303,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	}
 
 	if err := nc.wsdbKeyPut(c, typespace, namespace, workspace,
-		newRootID, currentNonce.Value()); err != nil {
+		newRootID, currentNonce); err != nil {
 
 		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
 			"during Put in AdvanceWorkspace %s/%s/%s : %s",
@@ -494,7 +494,7 @@ func (nc *noCacheWsdb) fetchDBWorkspaces(c ether.Ctx, typespace string,
 		namespace).Out()
 
 	qryStr := fmt.Sprintf(`
-SELECT workspace, nonce
+SELECT workspace, nonce, publishtime
 FROM %s.%s
 WHERE typespace = ? AND namespace = ?`, nc.keyspace, nc.cfName)
 
@@ -504,10 +504,11 @@ WHERE typespace = ? AND namespace = ?`, nc.keyspace, nc.cfName)
 	iter := query.Iter()
 	count := 0
 	var tempWorkspace string
-	var tempNonce int64
+	var nonceID int64
+	var publishTime int64
 	workspaceList := make(map[string]wsdb.WorkspaceNonce)
-	for iter.Scan(&tempWorkspace, &tempNonce) {
-		workspaceList[tempWorkspace] = wsdb.WorkspaceNonce{uint64(tempNonce), 0}
+	for iter.Scan(&tempWorkspace, &nonceID, &publishTime) {
+		workspaceList[tempWorkspace] = wsdb.WorkspaceNonce{Id: nonceID, PublishTime: publishTime}
 		count++
 	}
 	if err := iter.Close(); err != nil {
@@ -518,29 +519,34 @@ WHERE typespace = ? AND namespace = ?`, nc.keyspace, nc.cfName)
 }
 
 func (nc *noCacheWsdb) wsdbKeyGet(c ether.Ctx, typespace string,
-	namespace string, workspace string) (key []byte, nonce int64, present bool,
-	err error) {
+	namespace string, workspace string) (key []byte, nonce wsdb.WorkspaceNonce,
+	present bool, err error) {
 
 	defer c.FuncIn("noCacheWsdb::wsdbKeyGet", "%s/%s/%s", typespace,
 		namespace, workspace).Out()
 
 	qryStr := fmt.Sprintf(`
-SELECT key, nonce
+SELECT key, nonce, publishtime
 FROM %s.%s
 WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace,
 		namespace, workspace)
 
-	err = query.Scan(&key, &nonce)
+	var nonceID, publishTime int64
+	err = query.Scan(&key, &nonceID, &publishTime)
 	if err != nil {
 		switch err {
 		case gocql.ErrNotFound:
-			return nil, 0, false, nil
+			return nil, wsdb.WorkspaceNonceInvalid, false, nil
 		default:
-			return nil, 0, false, err
+			return nil, wsdb.WorkspaceNonceInvalid, false, err
 		}
 	} else {
+		nonce := wsdb.WorkspaceNonce{
+			Id:          nonceID,
+			PublishTime: publishTime,
+		}
 		return key, nonce, true, nil
 	}
 }
@@ -564,18 +570,18 @@ WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace, nc.cfName)
 
 func (nc *noCacheWsdb) wsdbKeyPut(c ether.Ctx, typespace string,
 	namespace string, workspace string,
-	key []byte, nonce int64) error {
+	key []byte, nonce wsdb.WorkspaceNonce) error {
 
-	defer c.FuncIn("noCacheWsdb::wsdbKeyPut", "%s/%s/%s key: %s nonce: %d", typespace,
-		namespace, workspace, hex.EncodeToString(key), nonce).Out()
+	defer c.FuncIn("noCacheWsdb::wsdbKeyPut", "%s/%s/%s key: %s nonce: %s", typespace,
+		namespace, workspace, hex.EncodeToString(key), nonce.String()).Out()
 
 	qryStr := fmt.Sprintf(`
 INSERT INTO %s.%s
-(typespace, namespace, workspace, key, nonce)
-VALUES (?,?,?,?,?)`, nc.keyspace, nc.cfName)
+(typespace, namespace, workspace, key, nonce, publishtime)
+VALUES (?,?,?,?,?,?)`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace,
-		namespace, workspace, key, nonce)
+		namespace, workspace, key, nonce.Id, nonce.PublishTime)
 
 	return query.Exec()
 }

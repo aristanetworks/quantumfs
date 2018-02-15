@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/aristanetworks/ether/qubit/wsdb"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -389,30 +390,34 @@ WHERE typespace=? AND namespace=? AND workspace=?`,
 }
 
 func mockWsdbKeyGet(sess *MockSession, typespace string,
-	namespace string, workspace string, key []byte, nonce int64, err error) {
+	namespace string, workspace string, key []byte,
+	nonce wsdb.WorkspaceNonce, err error) {
 
 	query := new(MockQuery)
 	qScanFunc := newMockQueryScanByteSlice(err, key, nonce)
-	query.On("Scan", mock.AnythingOfType("*[]uint8"), mock.AnythingOfType("*int64")).Return(qScanFunc)
+	query.On("Scan", mock.AnythingOfType("*[]uint8"), mock.AnythingOfType("*int64"),
+		mock.AnythingOfType("*int64")).Return(qScanFunc)
 
 	sess.On("Query", `
-SELECT key, nonce
+SELECT key, nonce, publishtime
 FROM ether.workspacedb
 WHERE typespace = ? AND namespace = ? AND workspace = ?`,
 		typespace, namespace, workspace).Return(query)
 }
 
 func mockWsdbKeyPut(sess *MockSession, typespace string,
-	namespace string, workspace string, key []byte, nonce int64, err error) {
+	namespace string, workspace string, key []byte,
+	nonce wsdb.WorkspaceNonce, err error) {
 
 	query := new(MockQuery)
 	stmt := `
 INSERT INTO ether.workspacedb
-(typespace, namespace, workspace, key, nonce)
-VALUES (?,?,?,?,?)`
+(typespace, namespace, workspace, key, nonce, publishtime)
+VALUES (?,?,?,?,?,?)`
 
 	sess.On("Query", stmt,
-		typespace, namespace, workspace, key, mock.AnythingOfType("int64")).Return(query)
+		typespace, namespace, workspace, key, mock.AnythingOfType("int64"),
+		mock.AnythingOfType("int64")).Return(query)
 	if err == nil {
 		query.On("Exec").Return(nil)
 	} else {
@@ -453,7 +458,7 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`
 }
 
 func newMockQueryScanByteSlice(err error,
-	val []byte, nonce int64) func(dest ...interface{}) error {
+	val []byte, nonce wsdb.WorkspaceNonce) func(dest ...interface{}) error {
 
 	return func(dest ...interface{}) error {
 
@@ -461,7 +466,8 @@ func newMockQueryScanByteSlice(err error,
 			// byte slice pointed by val is copied
 			// into dest[0]
 			assignValToDest(val, dest[0])
-			assignValToDest(nonce, dest[1])
+			assignValToDest(nonce.Id, dest[1])
+			assignValToDest(nonce.PublishTime, dest[2])
 		}
 		return err
 	}
@@ -515,7 +521,8 @@ func setupMockWsdbCacheCqlFetch2Args(sess *MockSession, iter *MockIter,
 	iter.On("Close").Return(err)
 	iter.SetRows(rows)
 	iterateRows := newMockIterScan(fetchPause, iter)
-	iter.On("Scan", mock.AnythingOfType("*string"), mock.AnythingOfType("*int64")).Return(iterateRows)
+	iter.On("Scan", mock.AnythingOfType("*string"), mock.AnythingOfType("*int64"),
+		mock.AnythingOfType("*int64")).Return(iterateRows)
 
 	fetchQuery := new(MockQuery)
 	fetchQuery.On("Iter").Return(iter)
@@ -570,7 +577,7 @@ FROM ether.workspacedb
 WHERE typespace = ?`
 
 const cacheWorkspaceFetchQuery = `
-SELECT workspace, nonce
+SELECT workspace, nonce, publishtime
 FROM ether.workspacedb
 WHERE typespace = ? AND namespace = ?`
 
@@ -619,14 +626,14 @@ func mockWsdbCacheWorkspaceFetchErr(sess *MockSession, err error) {
 func mockBranchWorkspace(sess *MockSession, srcTypespace string,
 	srcNamespace string, srcWorkspace string,
 	dstTypespace string, dstNamespace string, dstWorkspace string,
-	srcKey []byte, nonce int64, dstErr error) {
+	srcKey []byte, nonce wsdb.WorkspaceNonce, dstErr error) {
 
 	mockWsdbKeyGet(sess, srcTypespace, srcNamespace, srcWorkspace,
 		srcKey, nonce, nil)
 	mockWsdbKeyGet(sess, dstTypespace, dstNamespace, dstWorkspace,
 		nil, nonce, dstErr)
 	mockWsdbKeyPut(sess, dstTypespace, dstNamespace, dstWorkspace,
-		srcKey, 0, nil)
+		srcKey, wsdb.WorkspaceNonceInvalid, nil)
 }
 
 const isTablePresentQuery = `SELECT * FROM ether.%s LIMIT 1`

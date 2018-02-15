@@ -309,13 +309,14 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterEmptyDB() {
 	suite.Require().Equal(1, wsCount,
 		"Incorrect number of workspaces in cache: %d", wsCount)
 
-	wsRows := mockDbRows{{"_"}}
+	wsRows := mockDbRows{{"_", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"_", "_"}
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, nil)
 	mockWsdbKeyGet(suite.common.mockSess, wsdb.NullSpaceName,
-		wsdb.NullSpaceName, wsdb.NullSpaceName, []byte(nil), 0, nil)
+		wsdb.NullSpaceName, wsdb.NullSpaceName, []byte(nil),
+		wsdb.WorkspaceNonceInvalid, nil)
 
 	wsMap, err4 := suite.common.wsdb.WorkspaceList(unitTestEtherCtx,
 		wsdb.NullSpaceName,
@@ -341,7 +342,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 	nsIter := new(MockIter)
 	nsVals := []interface{}{"remoteTS"}
 
-	wsRows := mockDbRows{{"remoteWS"}}
+	wsRows := mockDbRows{{"remoteWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"remoteTS", "remoteNS"}
 
@@ -351,8 +352,9 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 		nsIter, nil)
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, nil)
+	nonce := wsdb.WorkspaceNonce{Id: 5, PublishTime: 0xbeef}
 	mockWsdbKeyGet(suite.common.mockSess, "remoteTS", "remoteNS", "remoteWS",
-		[]byte(nil), 5, nil)
+		[]byte(nil), nonce, nil)
 
 	suite.cache.enableCqlRefresh(unitTestEtherCtx)
 
@@ -384,7 +386,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 		"Incorrect number of workspaces in cache")
 	suite.Require().Contains(wsMap, "remoteWS",
 		"Incorrect workspaces in cache")
-	suite.Require().Equal(wsdb.WorkspaceNonce{5, 0}, wsMap["remoteWS"],
+	suite.Require().Equal(nonce, wsMap["remoteWS"],
 		"Incorrect nonce value for remoteWS")
 }
 
@@ -402,7 +404,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 	nsIter := new(MockIter)
 	nsVals := []interface{}{"remoteTS"}
 
-	wsRows := mockDbRows{{"remoteWS1", int64(0)}, {"remoteWS2", int64(0)}}
+	wsRows := mockDbRows{{"remoteWS1", int64(0), int64(0)}, {"remoteWS2", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"remoteTS", "remoteNS"}
 
@@ -412,8 +414,9 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 		nsIter, nil)
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, nil)
+	nonce := wsdb.WorkspaceNonce{Id: 5, PublishTime: 0xbeef}
 	mockWsdbKeyGet(suite.common.mockSess, "remoteTS", "remoteNS", "remoteWS2",
-		[]byte(nil), 5, nil)
+		[]byte(nil), nonce, nil)
 
 	suite.cache.enableCqlRefresh(unitTestEtherCtx)
 
@@ -440,7 +443,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 	// workspaces for remoteNS: remoteWS
 
 	// mock workspace DB fetch returning no workspaces for "remoteNS" namespace
-	wsRows = mockDbRows{[]interface{}{"remoteWS2", int64(0)}}
+	wsRows = mockDbRows{[]interface{}{"remoteWS2", int64(0), int64(0)}}
 	wsVals = []interface{}{"remoteTS", "remoteNS"}
 	wsIter.SetRows(wsRows)
 
@@ -454,7 +457,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 		"Incorrect number of workspaces in cache")
 	suite.Require().Contains(wsMap, "remoteWS2",
 		"Incorrect workspaces in cache")
-	suite.Require().Equal(wsdb.WorkspaceNonce{5, 0}, wsMap["remoteWS2"],
+	suite.Require().Equal(nonce, wsMap["remoteWS2"],
 		"Incorrect nonce value for remoteWS2")
 
 }
@@ -464,14 +467,14 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterBranching() {
 	// newly branched workspace must be in cache
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1",
-		[]byte(nil), 0, gocql.ErrNotFound)
+		[]byte(nil), wsdb.WorkspaceNonceInvalid, gocql.ErrNotFound)
 	_, n1, err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws2",
-		[]byte(nil), 0, gocql.ErrNotFound)
+		[]byte(nil), wsdb.WorkspaceNonceInvalid, gocql.ErrNotFound)
 	_, n2, err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws2")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
@@ -525,7 +528,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 
 	suite.cache.InsertEntities(unitTestEtherCtx, "ts1", "ns1", "specialWS", "0")
 
-	wsRows := mockDbRows{[]interface{}{"specialWS", int64(0)}}
+	wsRows := mockDbRows{[]interface{}{"specialWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"ts1", "ns1"}
 
@@ -537,8 +540,9 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, wsFetchPause)
+	nonce := wsdb.WorkspaceNonce{Id: 7, PublishTime: 0xbeef}
 	mockWsdbKeyGet(suite.common.mockSess, "ts1", "ns1", "specialWS",
-		[]byte(nil), 7, nil)
+		[]byte(nil), nonce, nil)
 
 	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour)
 	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour, "ts1")
@@ -559,7 +563,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 	// namespace
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1",
-		[]byte(nil), 0, gocql.ErrNotFound)
+		[]byte(nil), wsdb.WorkspaceNonceInvalid, gocql.ErrNotFound)
 
 	// causes a local insert of ws1 workspace for the null namespace
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
@@ -579,7 +583,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 		"Expected workspace ws1 not in cache")
 	suite.Require().Contains(wsMap, "specialWS",
 		"Expected workspace specialWS not in cache")
-	suite.Require().Equal(wsdb.WorkspaceNonce{7, 0}, wsMap["specialWS"],
+	suite.Require().Equal(nonce, wsMap["specialWS"],
 		"Incorrect nonce value for specialWS")
 }
 
@@ -596,7 +600,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 	suite.cache.InsertEntities(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, "specialWS", "7")
 
-	wsRows := mockDbRows{{wsdb.NullSpaceName}, {"specialWS"}}
+	wsRows := mockDbRows{{wsdb.NullSpaceName}, {"specialWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{wsdb.NullSpaceName, wsdb.NullSpaceName}
 
@@ -609,7 +613,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, wsFetchPause)
 	mockWsdbKeyGet(suite.common.mockSess, wsdb.NullSpaceName, wsdb.NullSpaceName, wsdb.NullSpaceName,
-		[]byte(nil), 0, nil)
+		[]byte(nil), wsdb.WorkspaceNonceInvalid, nil)
 
 	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour)
 	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour, wsdb.NullSpaceName)
@@ -660,7 +664,7 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 	// 4. Check that cache does not have the locally inserted and deleted WS,
 	//    but should have the new ws received from the db.
 
-	wsRows := mockDbRows{{wsdb.NullSpaceName}, {"specialWS"}}
+	wsRows := mockDbRows{{wsdb.NullSpaceName}, {"specialWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{wsdb.NullSpaceName, wsdb.NullSpaceName}
 	var wsMap map[string]wsdb.WorkspaceNonce
@@ -672,9 +676,10 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, wsFetchPause)
 	mockWsdbKeyGet(suite.common.mockSess, wsdb.NullSpaceName,
-		wsdb.NullSpaceName, wsdb.NullSpaceName, []byte(nil), 0, nil)
+		wsdb.NullSpaceName, wsdb.NullSpaceName, []byte(nil), wsdb.WorkspaceNonceInvalid, nil)
+	nonce := wsdb.WorkspaceNonce{Id: 9, PublishTime: 0xbeef}
 	mockWsdbKeyGet(suite.common.mockSess, wsdb.NullSpaceName,
-		wsdb.NullSpaceName, "specialWS", []byte(nil), 9, nil)
+		wsdb.NullSpaceName, "specialWS", []byte(nil), nonce, nil)
 
 	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour)
 	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour, wsdb.NullSpaceName)
@@ -715,7 +720,7 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 		"Expected null workspace not in cache")
 	suite.Require().Contains(wsMap, "specialWS",
 		"Unexpected workspace specialWS in cache")
-	suite.Require().Equal(wsdb.WorkspaceNonce{9, 0}, wsMap["specialWS"],
+	suite.Require().Equal(nonce, wsMap["specialWS"],
 		"Incorrect nonce value for specialWS")
 	suite.Require().NotContains(wsMap, "newWS",
 		"Unexpected workspace newWS in cache")
@@ -734,12 +739,12 @@ func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 	nonceA := GetUniqueNonce()
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "a",
-		[]byte(nil), nonceA.Value(), gocql.ErrNotFound)
+		[]byte(nil), nonceA, gocql.ErrNotFound)
 
 	nonceB := GetUniqueNonce()
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "b",
-		[]byte(nil), nonceB.Value(), gocql.ErrNotFound)
+		[]byte(nil), nonceB, gocql.ErrNotFound)
 
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "a")
@@ -749,7 +754,7 @@ func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts2", "ns2", "b")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
-	wsRows := mockDbRows{{"a"}, {"b"}}
+	wsRows := mockDbRows{{"a", int64(0), int64(0)}, {"b", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"ts2", "ns2"}
 	var wsMap map[string]wsdb.WorkspaceNonce
@@ -799,14 +804,14 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 	nonceChildWS := GetUniqueNonce()
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
-		"childWS", []byte(nil), nonceChildWS.Value(), gocql.ErrNotFound)
+		"childWS", []byte(nil), nonceChildWS, gocql.ErrNotFound)
 
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
 		"childWS")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
-	wsRows := mockDbRows{[]interface{}{"childWS"}}
+	wsRows := mockDbRows{[]interface{}{"childWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"ts", "parentNS"}
 	var wsMap map[string]wsdb.WorkspaceNonce
@@ -852,14 +857,14 @@ func (suite *wsdbCacheTestSuite) TestCacheAncestorDeleteDuringRefresh() {
 	nonceChildWS := GetUniqueNonce()
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
-		"childWS", []byte(nil), nonceChildWS.Value(), gocql.ErrNotFound)
+		"childWS", []byte(nil), nonceChildWS, gocql.ErrNotFound)
 
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
 		"childWS")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
-	wsRows := mockDbRows{[]interface{}{"childWS"}}
+	wsRows := mockDbRows{[]interface{}{"childWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"ts", "parentNS"}
 	var wsMap map[string]wsdb.WorkspaceNonce
@@ -906,7 +911,7 @@ func (suite *wsdbCacheTestSuite) TestCacheChildDeleteDuringRefresh() {
 	nonceChildWS := GetUniqueNonce()
 	mockBranchWorkspace(suite.common.mockSess, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
-		"childWS", []byte(nil), nonceChildWS.Value(), gocql.ErrNotFound)
+		"childWS", []byte(nil), nonceChildWS, gocql.ErrNotFound)
 
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts", "parentNS",
@@ -1021,7 +1026,7 @@ func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceNumOK() {
 	mockBranchWorkspace(suite.common.mockSess,
 		wsdb.NullSpaceName, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, "ts1", "ns1", "ws1", []byte(nil),
-		0, gocql.ErrNotFound)
+		wsdb.WorkspaceNonceInvalid, gocql.ErrNotFound)
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestEtherCtx, wsdb.NullSpaceName,
 		wsdb.NullSpaceName, wsdb.NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err,
@@ -1062,10 +1067,11 @@ func (suite *wsdbCacheTestSuite) TestCacheIgnoreField() {
 		stmt := `
 INSERT INTO ether.workspacedb
 (typespace, namespace, workspace, key, ignore)
-VALUES (?,?,?,?,?)`
+VALUES (?,?,?,?,?,?)`
 
 		suite.common.mockSess.On("Query", stmt,
 			"ts", "ns", "ws", []byte(nil),
+			mock.AnythingOfType("int64"),
 			mock.AnythingOfType("int64")).Return(mq)
 		mq.On("Exec").Return(nil)
 	}()
@@ -1075,7 +1081,7 @@ VALUES (?,?,?,?,?)`
 	query := suite.common.mockSess.Query(`
 INSERT INTO ether.workspacedb
 (typespace, namespace, workspace, key, ignore)
-VALUES (?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), nonce.Value())
+VALUES (?,?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), nonce.Id, nonce.PublishTime)
 
 	err := query.Exec()
 	suite.Require().NoError(err, "Insert failed with %s", err)
@@ -1157,7 +1163,6 @@ func (suite *wsdbCacheTestSuite) TestCacheConcTsListWhenEmptyErr() {
 	mockWsdbCacheTypespaceFetchPanic(suite.common.mockSess)
 
 	var tsWg sync.WaitGroup
-	var tsList1, tsList2 []string
 	// channel used to create concurrent TS list requests
 	tsListPause := make(chan bool)
 
@@ -1170,7 +1175,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcTsListWhenEmptyErr() {
 		var call1Ctx = &ether.StdCtx{RequestID: 1}
 		<-tsListPause
 
-		tsList1, err = suite.common.wsdb.TypespaceList(call1Ctx)
+		_, err = suite.common.wsdb.TypespaceList(call1Ctx)
 		suite.Require().Error(err, "call1 expected did not get error")
 		suite.Require().Equal("PanicOnFetch", err.Error(),
 			"Unexpected error %s in call1", err.Error())
@@ -1183,7 +1188,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcTsListWhenEmptyErr() {
 		var call2Ctx = &ether.StdCtx{RequestID: 2}
 		<-tsListPause
 
-		tsList2, err = suite.common.wsdb.TypespaceList(call2Ctx)
+		_, err = suite.common.wsdb.TypespaceList(call2Ctx)
 		suite.Require().Error(err, "call2 expected did not get error")
 		suite.Require().Equal("PanicOnFetch", err.Error(),
 			"Unexpected error %s in call2", err.Error())
@@ -1272,13 +1277,14 @@ func (suite *wsdbCacheTestSuite) TestCacheConcWsListWhenEmpty() {
 	var wsMap1, wsMap2 map[string]wsdb.WorkspaceNonce
 	wsFetchPause := make(chan bool)
 
-	wsRows := mockDbRows{{"w1"}}
+	wsRows := mockDbRows{{"w1", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"t1", "n1"}
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, wsFetchPause)
+	nonce := wsdb.WorkspaceNonce{Id: 7, PublishTime: 0xbeef}
 	mockWsdbKeyGet(suite.common.mockSess, "t1", "n1", "w1",
-		[]byte(nil), 7, nil)
+		[]byte(nil), nonce, nil)
 
 	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour)
 	suite.cache.disableCqlRefresh(unitTestEtherCtx, 1*time.Hour, "t1")
@@ -1322,9 +1328,9 @@ func (suite *wsdbCacheTestSuite) TestCacheConcWsListWhenEmpty() {
 	suite.Require().Contains(wsMap2, "w1",
 		"Expected w1 workspace not seen in call2")
 
-	suite.Require().Equal(int(wsMap1["w1"].Id), 7,
+	suite.Require().Equal(wsMap1["w1"], nonce,
 		"Expected nonce 7 not see in wsMap1, %d", wsMap1["w1"].Id)
-	suite.Require().Equal(int(wsMap2["w1"].Id), 7,
+	suite.Require().Equal(wsMap2["w1"], nonce,
 		"Expected nonce 7 not see in wsMap2, %d", wsMap2["w1"].Id)
 }
 

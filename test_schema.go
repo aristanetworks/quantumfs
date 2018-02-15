@@ -47,7 +47,7 @@ func DoTableOp(sess *gocql.Session, op SchemaOp,
 			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s"+
 				" ( typespace text, namespace text,"+
 				" workspace text, key blob, nonce bigint,"+
-				" immutable boolean,"+
+				" publishtime bigint, immutable boolean,"+
 				" PRIMARY KEY ( typespace, namespace, workspace ))"+
 				" WITH compaction = { 'class': 'LeveledCompactionStrategy' };",
 				keyspace, wsdbName),
