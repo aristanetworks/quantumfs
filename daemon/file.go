@@ -204,9 +204,9 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 				return fuse.EIO
 			}
 
-			err = fi.accessor.truncate(c, uint64(attr.Size))
-			if err != nil {
-				return fuse.EIO
+			result := fi.accessor.truncate(c, uint64(attr.Size))
+			if result != fuse.OK {
+				return result
 			}
 
 			fi.self.dirty(c)
@@ -387,7 +387,7 @@ type blockAccessor interface {
 	reload(c *ctx, key quantumfs.ObjectKey)
 
 	// Truncate to lessen length *only*, error otherwise
-	truncate(c *ctx, newLength uint64) error
+	truncate(c *ctx, newLength uint64) fuse.Status
 }
 
 func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,

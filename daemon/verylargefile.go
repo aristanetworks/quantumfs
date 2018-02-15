@@ -5,7 +5,12 @@ package daemon
 
 // This contains very large file types and methods
 
-import "github.com/aristanetworks/quantumfs"
+import (
+	"syscall"
+
+	"github.com/aristanetworks/quantumfs"
+	"github.com/hanwen/go-fuse/fuse"
+)
 
 type VeryLargeFile struct {
 	parts []LargeFile
@@ -229,13 +234,13 @@ func (fi *VeryLargeFile) convertTo(c *ctx,
 	return nil
 }
 
-func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) error {
+func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) fuse.Status {
 	defer c.FuncIn("VeryLargeFile::truncate", "new size %d",
 		newLengthBytes).Out()
 
 	if newLengthBytes == 0 {
 		fi.parts = nil
-		return nil
+		return fuse.OK
 	}
 
 	// If we're expanding the length, handle that first
@@ -244,7 +249,11 @@ func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) error {
 	lastPartIdx := lastBlockIdx / quantumfs.MaxBlocksLargeFile()
 	newNumParts := lastPartIdx + 1
 
-	if newNumParts > len(fi.parts) {
+	if newNumParts > quantumfs.MaxPartsVeryLargeFile() {
+		c.vlog("File larger than maximum %d > %d parts", newNumParts,
+			quantumfs.MaxPartsVeryLargeFile())
+		return fuse.Status(syscall.EFBIG)
+	} else if newNumParts > len(fi.parts) {
 		fi.expandTo(newNumParts)
 	} else {
 		fi.parts = fi.parts[:newNumParts]
