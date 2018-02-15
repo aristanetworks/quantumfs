@@ -7,6 +7,7 @@ package daemon
 
 import (
 	"errors"
+	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -432,8 +433,8 @@ func operateOnBlocks(c *ctx, accessor blockAccessor, offset uint64, size uint32,
 	c.dlog("Reading initial block %d offset %d", startBlkIdx, offset)
 	err := fn(c, startBlkIdx, offset)
 	if err != nil {
-		c.elog("Unable to operate on first data block: %s", err.Error())
-		return errors.New("Unable to operate on first data block")
+		c.dlog("Unable to operate on first data block: %s", err.Error())
+		return err
 	}
 
 	c.vlog("Processing blocks %d to %d", startBlkIdx+1, endBlkIdx)
@@ -512,6 +513,9 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 			})
 
 		if err != nil {
+			if errno, ok := err.(syscall.Errno); ok {
+				return 0, fuse.Status(errno)
+			}
 			return 0, fuse.EIO
 		}
 		fi.self.dirty(c)
