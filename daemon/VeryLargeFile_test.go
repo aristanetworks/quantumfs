@@ -9,8 +9,10 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"math"
 	"os"
 	"strconv"
+	"syscall"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
@@ -162,5 +164,20 @@ func TestVeryLargeFileReadPastEnd(t *testing.T) {
 		test.Assert(err == io.EOF, "Expected EOF got: %v", err)
 
 		file.Close()
+	})
+}
+
+func TestVeryLargeFileTooBigTruncate(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+
+		file, err := os.Create(filename)
+		test.AssertNoErr(err)
+		defer file.Close()
+
+		err = syscall.Ftruncate(int(file.Fd()), math.MaxInt64)
+		test.Assert(err == syscall.EFBIG, "Incorrect error received: %s",
+			err.Error())
 	})
 }
