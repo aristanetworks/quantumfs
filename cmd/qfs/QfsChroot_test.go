@@ -284,8 +284,6 @@ func testNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T, rootTest string) {
 }
 
 func TestNonPersistentChrootAbsWsrAbsDirAbsCmd(t *testing.T) {
-	// BUG 239570
-	t.Skip()
 	func() {
 		rootTest := setupWorkspace(t)
 		defer cleanupWorkspace(rootTest, t)
@@ -316,8 +314,6 @@ func testNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T, rootTest string) {
 }
 
 func TestNonPersistentChrootAbsWsrAbsDirRelCmd(t *testing.T) {
-	// BUG 239570
-	t.Skip()
 	func() {
 		rootTest := setupWorkspace(t)
 		defer cleanupWorkspace(rootTest, t)
@@ -354,8 +350,6 @@ func testNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T, rootTest string) {
 }
 
 func TestNonPersistentChrootRelWsrAbsDirAbsCmd(t *testing.T) {
-	// BUG 239570
-	t.Skip()
 	func() {
 		rootTest := setupWorkspace(t)
 		defer cleanupWorkspace(rootTest, t)
@@ -392,8 +386,6 @@ func testNonPersistentChrootRelWsrAbsDirRelCmd(t *testing.T, rootTest string) {
 }
 
 func TestNonPersistentChrootRelWsrAbsDirRelCmd(t *testing.T) {
-	// BUG 239570
-	t.Skip()
 	func() {
 		rootTest := setupWorkspace(t)
 		defer cleanupWorkspace(rootTest, t)
@@ -424,8 +416,6 @@ func testNonPersistentChrootAbsWsrRelDirAbsCmd(t *testing.T, rootTest string) {
 }
 
 func TestNonPersistentChrootAbsWsrRelDirAbsCmd(t *testing.T) {
-	// BUG 239570
-	t.Skip()
 	func() {
 		rootTest := setupWorkspace(t)
 		defer cleanupWorkspace(rootTest, t)
@@ -456,8 +446,6 @@ func testNonPersistentChrootAbsWsrRelDirRelCmd(t *testing.T, rootTest string) {
 }
 
 func TestNonPersistentChrootAbsWsrRelDirRelCmd(t *testing.T) {
-	// BUG 239570
-	t.Skip()
 	func() {
 		rootTest := setupWorkspace(t)
 		defer cleanupWorkspace(rootTest, t)
@@ -495,8 +483,6 @@ func testNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T, rootTest string) {
 }
 
 func TestNonPersistentChrootRelWsrRelDirAbsCmd(t *testing.T) {
-	// BUG 239570
-	t.Skip()
 	func() {
 		rootTest := setupWorkspace(t)
 		defer cleanupWorkspace(rootTest, t)
@@ -534,8 +520,6 @@ func testNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T, rootTest string) {
 }
 
 func TestNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T) {
-	// BUG 239570
-	t.Skip()
 	func() {
 		rootTest := setupWorkspace(t)
 		defer cleanupWorkspace(rootTest, t)
