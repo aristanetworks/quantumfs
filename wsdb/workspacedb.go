@@ -21,8 +21,8 @@ type ObjectKey []byte
 // then recreated, the old workspace and new workspace would have different
 // WorkspaceNonces and therefore be distinguishable.
 type WorkspaceNonce struct {
-	Id          uint64
-	PublishTime uint64
+	Id          int64
+	PublishTime int64
 }
 
 func (key ObjectKey) String() string {
@@ -99,14 +99,14 @@ func (nonce *WorkspaceNonce) String() string {
 	return fmt.Sprintf("%d %d", nonce.Id, nonce.PublishTime)
 }
 
-// Value returns the int64 representation for WorkspaceNonce Id
-func (nonce *WorkspaceNonce) Value() int64 {
-	return int64(nonce.Id)
+// SameIncarnation returns true if nonce and other are the same incarnation of a workspace
+func (nonce *WorkspaceNonce) SameIncarnation(other *WorkspaceNonce) bool {
+	return nonce.Id == other.Id
 }
 
 // StringToNonce returns WorkspaceNonce for a given string
 func StringToNonce(nonceStr string) (WorkspaceNonce, error) {
-	var id, publishTime uint64
+	var id, publishTime int64
 	n, err := fmt.Sscan(nonceStr, &id, &publishTime)
 	if err != nil {
 		return WorkspaceNonceInvalid, err
