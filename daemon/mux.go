@@ -533,7 +533,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 	}
 
 	newRootId := publishWorkspaceRoot(c,
-		wsr.baseLayerId, wsr.hardlinkTable.hardlinks)
+		wsr.baseLayerId, wsr.hardlinkTable.hardlinks, publishNow)
 
 	// We should eventually be able to Advance after merging
 	for {
@@ -552,7 +552,8 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 
 		mergedId, err := mergeWorkspaceRoot(c, wsr.publishedRootId, rootId,
 			newRootId, quantumfs.PreferNewer,
-			&mergeSkipPaths{paths: make(map[string]struct{}, 0)})
+			&mergeSkipPaths{paths: make(map[string]struct{}, 0)},
+			wsr.typespace+"/"+wsr.namespace+"/"+wsr.workspace)
 
 		if err != nil {
 			c.elog("Unable to merge: %s", err.Error())
