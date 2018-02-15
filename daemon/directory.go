@@ -347,7 +347,7 @@ func modeToPermissions(mode uint32, umask uint32) uint32 {
 }
 
 func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
-	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
+	nextKey quantumfs.ObjectKey, pub publishFn) quantumfs.ObjectKey {
 
 	defer c.funcIn("publishDirectoryEntry").Out()
 
@@ -355,14 +355,14 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 	bytes := layer.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	newKey, err := buf.Key(&c.Ctx)
+	newKey, err := pub(c, buf)
 	utils.Assert(err == nil, "Failed to upload new baseLayer object: %v", err)
 
 	return newKey
 }
 
 func publishDirectoryRecords(c *ctx,
-	records []quantumfs.DirectoryRecord) quantumfs.ObjectKey {
+	records []quantumfs.DirectoryRecord, pub publishFn) quantumfs.ObjectKey {
 
 	defer c.funcIn("publishDirectoryRecords").Out()
 
@@ -382,7 +382,7 @@ func publishDirectoryRecords(c *ctx,
 			c.vlog("Block full with %d entries", entryIdx)
 			baseLayer.SetNumEntries(entryIdx)
 			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
-				newBaseLayerId)
+				newBaseLayerId, pub)
 			numEntries, baseLayer =
 				quantumfs.NewDirectoryEntry(numEntries)
 			entryIdx = 0
@@ -394,7 +394,7 @@ func publishDirectoryRecords(c *ctx,
 	}
 
 	baseLayer.SetNumEntries(entryIdx)
-	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
+	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId, pub)
 	return newBaseLayerId
 }
 
@@ -404,7 +404,7 @@ func (dir *Directory) publish_(c *ctx) {
 
 	oldBaseLayer := dir.baseLayerId
 	dir.baseLayerId = publishDirectoryRecords(c,
-		dir.children.publishableRecords(c))
+		dir.children.publishableRecords(c), publishNow)
 
 	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
 		dir.baseLayerId.String())

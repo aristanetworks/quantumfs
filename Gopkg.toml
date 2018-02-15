@@ -33,12 +33,12 @@
 [[constraint]]
   name = "github.com/aristanetworks/ether"
   source = "gerrit.corp.arista.io/ether"
-  version = "=v0.12"
+  version = "=v0.14"
 
 [[override]]
   name = "github.com/aristanetworks/ether"
   source = "gerrit.corp.arista.io/ether"
-  version = "=v0.12"
+  version = "=v0.14"
 
 [[constraint]]
   name = "github.com/gocql/gocql"
