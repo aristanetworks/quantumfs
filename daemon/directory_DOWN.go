@@ -239,7 +239,7 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 	remoteRecord quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
 	defer c.funcIn("Directory::normalizeHardlinks_DOWN_").Out()
-	inodeId := dir.children.inodeNum(remoteRecord.Filename())
+	inodeId := dir.children.inodeNum(localRecord.Filename())
 	inode := c.qfs.inodeNoInstantiate(c, inodeId)
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
@@ -282,6 +282,21 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 	}
 	c.qfs.noteChildCreated(c, dir.id, remoteRecord.Filename())
 	return inodeId
+}
+
+func (dir *Directory) moveToHardlinkLeg_DOWN(c *ctx, newParent Inode, oldName string,
+	remoteRecord quantumfs.DirectoryRecord, inodeId InodeId) {
+	defer c.FuncIn("Directory::moveToHardlinkLeg_DOWN", "%d : %s : %d",
+		dir.inodeNum(), remoteRecord.Filename(), inodeId).Out()
+
+	// Unlike regular rename, we throw away the result of delChild_ and just use
+	// the new remote Record for creating the move target
+	dir.delChild_(c, oldName)
+
+	dst := asDirectory(newParent)
+	defer dst.childRecordLock.Lock().Unlock()
+	hll := newHardlinkLegFromRecord(remoteRecord, dir.hardlinkTable)
+	dst.children.setRecord(c, inodeId, hll)
 }
 
 // The caller must hold the childRecordLock
@@ -449,7 +464,11 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 			return
 		}
 		if missingDentry {
-			if record.Type() == quantumfs.ObjectTypeHardlink {
+			if record.Type() != quantumfs.ObjectTypeHardlink {
+				// Will be handled in the later moveDentries stage
+				return
+			}
+			if !rc.setHardlinkAsMoveTarget(c, localRecord, record) {
 				dir.loadNewChild_DOWN_(c, record, inodeId)
 			}
 			return

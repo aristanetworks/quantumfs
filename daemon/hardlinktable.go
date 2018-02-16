@@ -300,6 +300,9 @@ func (ht *HardlinkTableImpl) updateHardlinkInodeId(c *ctx, fileId quantumfs.File
 	hardlink, exists := ht.hardlinks[fileId]
 	utils.Assert(exists, "Hardlink id %d does not exist.", fileId)
 
+	if hardlink.inodeId == inodeId {
+		return
+	}
 	utils.Assert(hardlink.inodeId == quantumfs.InodeIdInvalid,
 		"Hardlink id %d already has associated inodeid %d",
 		fileId, hardlink.inodeId)
