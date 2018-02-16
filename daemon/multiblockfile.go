@@ -10,6 +10,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 // These variables are always correct. Where the datastore value length disagrees,
@@ -226,7 +227,7 @@ func (fi *MultiBlockFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 	return key
 }
 
-func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
+func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) fuse.Status {
 	defer c.FuncIn("MultiBlockFile::truncate", "new length %d",
 		newLengthBytes).Out()
 
@@ -240,7 +241,7 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 		fi.toSync = make(map[int]quantumfs.Buffer)
 		fi.metadata.Blocks = make([]quantumfs.ObjectKey, 0)
 		fi.metadata.LastBlockBytes = 0
-		return nil
+		return fuse.OK
 	}
 
 	// If we're increasing the length, we need to update the block num
@@ -256,7 +257,7 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 		expandingFile {
 
 		fi.metadata.LastBlockBytes = uint32(lastBlockLen)
-		return nil
+		return fuse.OK
 	}
 
 	// If we're decreasing length, we need to throw away toSync
@@ -270,5 +271,5 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 	block.SetSize(int(lastBlockLen))
 	fi.metadata.LastBlockBytes = uint32(lastBlockLen)
 
-	return nil
+	return fuse.OK
 }

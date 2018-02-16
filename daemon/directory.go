@@ -32,6 +32,7 @@ type Directory struct {
 	InodeCommon
 
 	hardlinkTable HardlinkTable
+	hardlinkDelta *HardlinkDelta
 
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
@@ -87,6 +88,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.treeLock_ = treeLock
 	dir.hardlinkTable = hardlinkTable
 	dir.baseLayerId = baseLayerId
+	dir.hardlinkDelta = newHardlinkDelta()
 
 	container, uninstantiated := newChildContainer(c, dir, dir.baseLayerId)
 	dir.children = container
@@ -163,7 +165,7 @@ func (dir *Directory) prepareForOrphaning(c *ctx, name string,
 		newRecord.SetFilename(name)
 		return newRecord
 	}
-	if dir.hardlinkTable.hardlinkDec(record.FileId()) {
+	if dir.hardlinkDec(record.FileId()) {
 		// If the refcount was greater than one we shouldn't
 		// reparent.
 		c.vlog("Hardlink referenced elsewhere")
@@ -422,11 +424,6 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 			c.vlog("Non-root cannot change UID")
 			return fuse.EPERM
 		}
-	}
-
-	if dir.isOrphaned() && dir.id == inodeNum {
-		return dir.setOrphanChildAttr(c, inodeNum, newType, attr, out,
-			updateMtime)
 	}
 
 	result := func() fuse.Status {
@@ -807,10 +804,6 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
 
 	defer c.funcIn("Directory::getChildRecordCopy").Out()
-
-	if dir.isOrphaned() && dir.id == inodeNum {
-		return dir.getOrphanChildRecordCopy(c, inodeNum)
-	}
 
 	defer dir.RLock().RUnlock()
 	defer dir.childRecordLock.Lock().Unlock()
@@ -1355,7 +1348,7 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d %s",
 		dir.inodeNum(), inodeNum, newKey.String()).Out()
@@ -1372,6 +1365,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	}
 
 	dir.children.setID(c, entry.Filename(), newKey)
+	dir.hardlinkDelta.populateFrom(hardlinkDelta)
 }
 
 func getRecordExtendedAttributes(c *ctx,
@@ -1449,10 +1443,6 @@ func (dir *Directory) getChildXAttrSize(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("Directory::getChildXAttrSize").Out()
 
-	if dir.isOrphaned() && dir.id == inodeNum {
-		return dir.getOrphanChildXAttrSize(c, inodeNum, attr)
-	}
-
 	buffer, status := dir.getChildXAttrBuffer(c, inodeNum, attr)
 	if status != fuse.OK {
 		return 0, status
@@ -1466,10 +1456,6 @@ func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("Directory::getChildXAttrData").Out()
 
-	if dir.isOrphaned() && dir.id == inodeNum {
-		return dir.getOrphanChildXAttrData(c, inodeNum, attr)
-	}
-
 	buffer, status := dir.getChildXAttrBuffer(c, inodeNum, attr)
 	if status != fuse.OK {
 		return []byte{}, status
@@ -1481,10 +1467,6 @@ func (dir *Directory) listChildXAttr(c *ctx,
 	inodeNum InodeId) (attributes []byte, result fuse.Status) {
 
 	defer c.FuncIn("Directory::listChildXAttr", "%d", inodeNum).Out()
-
-	if dir.isOrphaned() && dir.id == inodeNum {
-		return dir.listOrphanChildXAttr(c, inodeNum)
-	}
 
 	defer dir.RLock().RUnlock()
 
@@ -1516,10 +1498,6 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 
 	defer c.FuncIn("Directory::setChildXAttr", "%d, %s len %d", inodeNum, attr,
 		len(data)).Out()
-
-	if dir.isOrphaned() && dir.id == inodeNum {
-		return dir.setOrphanChildXAttr(c, inodeNum, attr, data)
-	}
 
 	defer dir.Lock().Unlock()
 
@@ -1616,10 +1594,6 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	attr string) fuse.Status {
 
 	defer c.FuncIn("Directory::removeChildXAttr", "%d, %s", inodeNum, attr).Out()
-
-	if dir.isOrphaned() && dir.id == inodeNum {
-		return dir.removeOrphanChildXAttr(c, inodeNum, attr)
-	}
 
 	defer dir.Lock().Unlock()
 
@@ -1879,13 +1853,23 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
 		dir.name_).Out()
 
-	dir.parentSyncChild(c, func() quantumfs.ObjectKey {
+	dir.parentSyncChild(c, func() (quantumfs.ObjectKey, *HardlinkDelta) {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
-		return dir.baseLayerId
+		return dir.baseLayerId, dir.hardlinkDelta
 	})
 
 	return dir.baseLayerId
+}
+
+func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
+	dir.hardlinkDelta.inc(fileId)
+	dir.hardlinkTable.hardlinkInc(fileId)
+}
+
+func (dir *Directory) hardlinkDec(fileId quantumfs.FileId) bool {
+	dir.hardlinkDelta.dec(fileId)
+	return dir.hardlinkTable.hardlinkDec(fileId)
 }
 
 type directoryContents struct {

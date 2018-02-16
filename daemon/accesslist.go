@@ -22,7 +22,7 @@ func NewAccessList() *accessList {
 }
 
 func (al *accessList) generate(c *ctx,
-	hardlinks map[quantumfs.FileId]HardlinkTableEntry) quantumfs.PathsAccessed {
+	accessMap map[quantumfs.FileId][]string) quantumfs.PathsAccessed {
 
 	defer c.funcIn("accessList::generate").Out()
 	defer al.lock.Lock().Unlock()
@@ -34,8 +34,8 @@ func (al *accessList) generate(c *ctx,
 	}
 
 	for fileId, pathFlags := range al.hardlinks {
-		hardlink := hardlinks[fileId]
-		for _, path := range hardlink.paths {
+		paths := accessMap[fileId]
+		for _, path := range paths {
 			path = "/" + path
 
 			if current, exists := rtn[path]; exists {

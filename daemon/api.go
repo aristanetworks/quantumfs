@@ -245,12 +245,6 @@ func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fuse.ENODATA
 }
 
-func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
-
-	c.elog("Invalid syncChild on ApiInode")
-}
-
 func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
@@ -861,6 +855,14 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 
 	dst := strings.Split(cmd.DstPath, "/")
 	key, type_, size, err := quantumfs.DecodeExtendedKey(cmd.Key)
+
+	if err != nil {
+		c.vlog("Could not decode key \"%s\". Errror %s",
+			cmd.Key, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Could not decode key \"%s\". Errror %s",
+			cmd.Key, err.Error())
+	}
 	permissions := cmd.Permissions
 	uid := quantumfs.ObjectUid(uint32(cmd.Uid), uint32(cmd.Uid))
 	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
