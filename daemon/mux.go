@@ -1229,7 +1229,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 						inode.parentId_(), inodeNum))
 				}
 
-				parent.syncChild(c, inodeNum, key)
+				parent.syncChild(c, inodeNum, key, nil)
 
 				qfs.addUninstantiated(c, []InodeId{inodeNum},
 					inode.parentId_())
@@ -1248,6 +1248,10 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 
 	defer c.FuncIn("QuantumFs::getWsrLineageNoInstantiate", "%s/%s/%s",
 		typespace, namespace, workspace).Out()
+
+	var id InodeId
+	var exists bool
+
 	ids = append(ids, quantumfs.InodeIdRoot)
 	inode := qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
 	if inode == nil {
@@ -1257,11 +1261,19 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	if !ok {
 		return nil, fmt.Errorf("bad typespacelist")
 	}
-	id, exists := typespacelist.typespacesByName[typespace]
-	if !exists {
-		c.vlog("typespace %s does not exist", typespace)
+	keepSearching := func() bool {
+		defer typespacelist.RLock().RUnlock()
+		id, exists = typespacelist.typespacesByName[typespace]
+		if !exists {
+			c.vlog("typespace %s does not exist", typespace)
+			return false
+		}
+		return true
+	}()
+	if !keepSearching {
 		return
 	}
+
 	ids = append(ids, id)
 	inode = qfs.inodeNoInstantiate(c, id)
 	if inode == nil {
@@ -1272,10 +1284,18 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	if !ok {
 		return nil, fmt.Errorf("bad namespacelist")
 	}
-	id, exists = namespacelist.namespacesByName[namespace]
-	if !exists {
+	keepSearching = func() bool {
+		defer namespacelist.RLock().RUnlock()
+		id, exists = namespacelist.namespacesByName[namespace]
+		if !exists {
+			return false
+		}
+		return true
+	}()
+	if !keepSearching {
 		return
 	}
+
 	ids = append(ids, id)
 	inode = qfs.inodeNoInstantiate(c, id)
 	if inode == nil {
@@ -1286,10 +1306,19 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	if !ok {
 		return nil, fmt.Errorf("bad workspacelist")
 	}
-	wsrInfo, exists := workspacelist.workspacesByName[workspace]
-	if !exists {
+	var wsrInfo workspaceInfo
+	keepSearching = func() bool {
+		defer workspacelist.RLock().RUnlock()
+		wsrInfo, exists = workspacelist.workspacesByName[workspace]
+		if !exists {
+			return false
+		}
+		return true
+	}()
+	if !keepSearching {
 		return
 	}
+
 	ids = append(ids, wsrInfo.id)
 	return
 }
