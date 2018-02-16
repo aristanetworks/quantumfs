@@ -3,6 +3,7 @@
 # Arista Networks, Inc. Confidential and Proprietary.
 
 QFSCONFIG=/etc/quantumfsd.conf
+WSDB_ADDR=wsdb
 
 # The error output isn't very clear for the following cases so it's best to
 # check for them ourselves.
@@ -29,5 +30,5 @@ trap cleanup EXIT
 # Start the QuantumFS daemon.
 quantumfsd \
   -datastore ether.cql -datastoreconf $QFSCONFIG \
-  -workspaceDB ether.cql -workspaceDBconf $QFSCONFIG
+  -workspaceDB grpc -workspaceDBconf $WSDB_ADDR
 
