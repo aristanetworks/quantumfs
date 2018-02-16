@@ -904,7 +904,7 @@ func TestMergeOmitIdentical(t *testing.T) {
 				"/dirA/dirB/dirC/fileA", "test dAtA changed AAA"))
 			test.AssertNoErr(testutils.OverWriteFile(remoteWs+
 				"/dirA/dirB/dirC/fileA", "test DaTa changed BBB"))
-			
+
 			return func(merged string) {
 				test.CheckData(merged+"/dirA/dirB/dirC/fileA",
 					[]byte("test DATA changed BBB"))

@@ -644,7 +644,7 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 	case quantumfs.ObjectTypeDirectory:
 		if needDeeperMerge(remote, local) &&
 			((!localTypeChanged && !remoteTypeChanged) ||
-			(base == nil && bothSameType)) {
+				(base == nil && bothSameType)) {
 
 			var baseId quantumfs.ObjectKey
 			if base != nil {
@@ -788,8 +788,18 @@ func (merge *merger) mergeFile(base quantumfs.DirectoryRecord,
 
 	defer merge.c.FuncIn("mergeFile", "%s", local.Filename()).Out()
 
+<<<<<<< HEAD
 	if !needDeeperMerge(remote, local) {
 		return nil
+=======
+	rtnRecord, err := merge.mergeAttributes(base, remote, local)
+	if err != nil {
+		return nil, err
+	}
+
+	if !needDeeperMerge(remote, local) {
+		return rtnRecord, nil
+>>>>>>> shallowMerge
 	}
 
 	var baseAccessor blockAccessor
