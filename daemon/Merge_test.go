@@ -904,14 +904,19 @@ func TestMergeOmitIdentical(t *testing.T) {
 				"/dirA/dirB/dirC/fileA", "test dAtA changed AAA"))
 			test.AssertNoErr(testutils.OverWriteFile(remoteWs+
 				"/dirA/dirB/dirC/fileA", "test DaTa changed BBB"))
-			
+
 			return func(merged string) {
 				test.CheckData(merged+"/dirA/dirB/dirC/fileA",
 					[]byte("test DATA changed BBB"))
 				test.CheckData(merged+"/dirA/dirD/dirE/fileB",
 					[]byte("unchanging data"))
-				test.Assert(test.CountLogStrings("mergeFile") == 1,
-					"Incorrect number of mergeFiles called")
+				fileMerges := test.CountLogStrings("mergeFile fileA")
+				badMerges := test.CountLogStrings("mergeFile fileB")
+				test.Assert(fileMerges == 1,
+					"Incorrect number of mergeFiles called %d",
+					fileMerges)
+				test.Assert(badMerges == 0,
+					"fileB in unchanged directory was touched")
 			}
 		})
 	})
