@@ -41,8 +41,14 @@ func NewRealCluster(clusterCfg ClusterConfig) Cluster {
 		// ParseConsistency will panic if illegal values are used
 		c.Consistency = gocql.ParseConsistency(cl)
 	}
-	c.PoolConfig.HostSelectionPolicy =
-		gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
+
+	singleHostPolicy := os.Getenv("GOCQL_HOST_POLICY_SINGLE")
+	if singleHostPolicy != "" {
+		c.PoolConfig.HostSelectionPolicy = newSingleHostPolicy()
+	} else {
+		c.PoolConfig.HostSelectionPolicy =
+			gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
+	}
 	c.Events.DisableSchemaEvents = true
 
 	if clusterCfg.Username != "" && clusterCfg.Password != "" {

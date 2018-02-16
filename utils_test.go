@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gocql/gocql"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -144,6 +145,63 @@ func (s *setupTests) TestInvalidConfigFormat() {
 	bls, err := NewCqlBlobStore(name)
 	s.Require().Error(err)
 	s.Require().Equal(bls, nil, "bls should be nil but is not")
+}
+
+// When host is present and up in the single host policy,
+// same host be returned for each query retry attempt
+func (s *setupTests) TestSingleHostPolicyOK() {
+	policy := newSingleHostPolicy()
+	host := &gocql.HostInfo{}
+	policy.AddHost(host)
+
+	maxRetries := 5
+	rt := &gocql.SimpleRetryPolicy{NumRetries: maxRetries}
+	query := &gocql.Query{}
+	query.RetryPolicy(rt)
+
+	nextHostFunc := policy.Pick(query)
+	// Following loop mimics the sequence in GoCQL core driver
+	//
+	// The driver will invoke nextHostFunc() for each
+	// failure in query. The single host policy will continue
+	// to provide the same host for each of these calls
+	for retry := 1; retry < maxRetries; retry++ {
+		nextHost := nextHostFunc()
+		s.Require().NotNil(nextHost)
+		s.Require().Equal(host, nextHost.Info())
+	}
+}
+
+func (s *setupTests) TestSingleHostPolicyHostDown() {
+	query := &gocql.Query{}
+	host := &gocql.HostInfo{}
+
+	policy := newSingleHostPolicy()
+	// policy is not managing any hosts at this point
+
+	nextHostFunc := policy.Pick(query)
+	nextHost := nextHostFunc()
+	s.Require().Nil(nextHost, "nextHost is non-nil when policy has no hosts")
+
+	policy.AddHost(host)
+	nextHostFunc = policy.Pick(query)
+	nextHost = nextHostFunc()
+	s.Require().NotNil(nextHost, "nextHost is nil even when host was added")
+
+	policy.RemoveHost("any hostname")
+	nextHostFunc = policy.Pick(query)
+	nextHost = nextHostFunc()
+	s.Require().Nil(nextHost, "nextHost is non-nil after removing the host")
+
+	policy.HostUp(host)
+	nextHostFunc = policy.Pick(query)
+	nextHost = nextHostFunc()
+	s.Require().NotNil(nextHost, "nextHost is nil after host Up")
+
+	policy.HostDown("any hostname")
+	nextHostFunc = policy.Pick(query)
+	nextHost = nextHostFunc()
+	s.Require().Nil(nextHost, "nextHost is non-nil host Down")
 }
 
 func TestSetup(t *testing.T) {
