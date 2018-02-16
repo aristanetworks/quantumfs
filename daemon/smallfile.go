@@ -10,6 +10,7 @@ import (
 	"math"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 type SmallFile struct {
@@ -197,8 +198,8 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 	return nil
 }
 
-func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
+func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) fuse.Status {
 	defer c.FuncIn("SmallFile::truncate", "new size %d", newLengthBytes).Out()
 	fi.getBufferToDirty(c).SetSize(int(newLengthBytes))
-	return nil
+	return fuse.OK
 }

@@ -7,6 +7,7 @@ package daemon
 
 import (
 	"errors"
+	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -204,9 +205,9 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 				return fuse.EIO
 			}
 
-			err = fi.accessor.truncate(c, uint64(attr.Size))
-			if err != nil {
-				return fuse.EIO
+			result := fi.accessor.truncate(c, uint64(attr.Size))
+			if result != fuse.OK {
+				return result
 			}
 
 			fi.self.dirty(c)
@@ -383,7 +384,7 @@ type blockAccessor interface {
 	reload(c *ctx, key quantumfs.ObjectKey)
 
 	// Truncate to lessen length *only*, error otherwise
-	truncate(c *ctx, newLength uint64) error
+	truncate(c *ctx, newLength uint64) fuse.Status
 }
 
 func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
@@ -428,8 +429,8 @@ func operateOnBlocks(c *ctx, accessor blockAccessor, offset uint64, size uint32,
 	c.dlog("Reading initial block %d offset %d", startBlkIdx, offset)
 	err := fn(c, startBlkIdx, offset)
 	if err != nil {
-		c.elog("Unable to operate on first data block: %s", err.Error())
-		return errors.New("Unable to operate on first data block")
+		c.dlog("Unable to operate on first data block: %s", err.Error())
+		return err
 	}
 
 	c.vlog("Processing blocks %d to %d", startBlkIdx+1, endBlkIdx)
@@ -508,6 +509,9 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 			})
 
 		if err != nil {
+			if errno, ok := err.(syscall.Errno); ok {
+				return 0, fuse.Status(errno)
+			}
 			return 0, fuse.EIO
 		}
 		fi.self.dirty(c)
