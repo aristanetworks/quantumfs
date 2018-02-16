@@ -575,7 +575,7 @@ func (merge *merger) mergeAttributes(base quantumfs.DirectoryRecord,
 
 		rtnRecord := newer.Clone()
 
-		if base.ID() == newer.ID() {
+		if base.ID().IsEqualTo(newer.ID()) {
 			rtnRecord.SetID(older.ID())
 			// type and size must match the content set via ID
 			rtnRecord.SetSize(older.Size())
@@ -610,6 +610,12 @@ func (merge *merger) mergeAttributes(base quantumfs.DirectoryRecord,
 	}
 }
 
+func needDeeperMerge(remote quantumfs.DirectoryRecord,
+	local quantumfs.DirectoryRecord) bool {
+
+	return !local.ID().IsEqualTo(remote.ID())
+}
+
 func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord,
 	ht *hardlinkTracker, skipPaths *mergeSkipPaths, breadcrumb string) (
@@ -630,8 +636,9 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 
 	switch local.Type() {
 	case quantumfs.ObjectTypeDirectory:
-		if (!localTypeChanged && !remoteTypeChanged) ||
-			(base == nil && bothSameType) {
+		if needDeeperMerge(remote, local) &&
+			((!localTypeChanged && !remoteTypeChanged) ||
+			(base == nil && bothSameType)) {
 
 			var baseId quantumfs.ObjectKey
 			if base != nil {
@@ -702,7 +709,8 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 
 	// if we took remote for a directory, we have to accommodate its
 	// hardlinks in the hardlink tracker
-	if rtnRecord.ID() == remote.ID() && remote.ID() != local.ID() &&
+	if rtnRecord.ID().IsEqualTo(remote.ID()) &&
+		!remote.ID().IsEqualTo(local.ID()) &&
 		remote.Type() == quantumfs.ObjectTypeDirectory {
 
 		// Add new links
@@ -770,18 +778,22 @@ func (merge *merger) mergeFile(base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord,
 	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
 
-	defer merge.c.funcIn("mergeFile").Out()
+	defer merge.c.FuncIn("mergeFile", "%s", local.Filename()).Out()
+
+	rtnRecord, err := merge.mergeAttributes(base, remote, local)
+	if err != nil {
+		return nil, err
+	}
+
+	if !needDeeperMerge(remote, local) {
+		return rtnRecord, nil
+	}
 
 	var baseAccessor blockAccessor
 	baseAvailable := false
 	if base != nil && base.Type().IsRegularFile() {
 		baseAccessor = loadAccessor(merge.c, base)
 		baseAvailable = true
-	}
-
-	rtnRecord, err := merge.mergeAttributes(base, remote, local)
-	if err != nil {
-		return nil, err
 	}
 
 	iterator, iteratorRecord, other, otherRecord := chooseAccessors(merge.c,
