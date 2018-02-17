@@ -266,6 +266,60 @@ func TestRefreshHardlinkRemoval(t *testing.T) {
 	})
 }
 
+func TestRefreshHardlinkRename(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		name := "testFile"
+		leg1 := "leg1"
+		leg2 := "leg2"
+
+		content1 := "original content"
+		appendContent := " appended."
+		content2 := "CONTENT2"
+		ctx := test.TestCtx()
+
+		test.AssertNoErr(CreateSmallFile(workspace+"/"+leg1, content1))
+		newRootId1 := test.linkFileSync(workspace, leg1, leg2)
+
+		file, err := os.OpenFile(workspace+"/"+leg1, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		test.verifyContentStartsWith(file, content1)
+
+		test.AssertNoErr(testutils.OverWriteFile(workspace+"/"+leg1,
+			content2))
+		test.verifyContentStartsWith(file, content2)
+		test.removeFile(workspace, leg2)
+		newRootId2 := test.moveFileSync(workspace, leg1, name)
+
+		test.verifyContentStartsWith(file, content2)
+		file.Close()
+
+		test.remountFilesystem()
+		var stat syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(workspace+"/"+name, &stat))
+		file, err = os.OpenFile(workspace+"/"+name, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+
+		refreshTestNoRemount(ctx, test, workspace, newRootId2, newRootId1)
+
+		test.verifyContentStartsWith(file, content1)
+		_, err = file.Write([]byte(appendContent))
+		test.AssertNoErr(err)
+		file.Close()
+
+		test.remountFilesystem()
+		file, err = os.OpenFile(workspace+"/"+leg1, os.O_RDWR, 0777)
+		test.AssertNoErr(err)
+		test.verifyContentStartsWith(file, content1+appendContent)
+		file.Close()
+
+		test.assertNoFile(workspace + "/" + name)
+		test.removeFile(workspace, leg1)
+		test.removeFile(workspace, leg2)
+	})
+}
+
 func TestRefreshNlinkDrop(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
