@@ -110,13 +110,13 @@ func (fi *VeryLargeFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 	newNumParts := partIdx + 1
 
 	if newNumParts > quantumfs.MaxPartsVeryLargeFile() {
-		c.vlog("File larger than maximum %d > %d parts", partIdx,
+		c.vlog("File larger than maximum %d > %d parts", newNumParts,
 			quantumfs.MaxPartsVeryLargeFile())
 		return 0, syscall.Errno(syscall.EFBIG)
 	}
 
 	// Ensure we have a part to write to
-	for len(fi.parts) <= partIdx {
+	for len(fi.parts) < newNumParts {
 		fi.expandTo(newNumParts)
 	}
 
