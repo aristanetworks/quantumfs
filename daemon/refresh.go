@@ -47,7 +47,8 @@ type RefreshContext struct {
 	rootId       quantumfs.ObjectKey
 }
 
-func newRefreshContext(c *ctx, rootId quantumfs.ObjectKey) *RefreshContext {
+// should be called under the treelock
+func newRefreshContext_(c *ctx, rootId quantumfs.ObjectKey) *RefreshContext {
 	rc := RefreshContext{
 		fileMap:      make(map[quantumfs.FileId]*FileLoadRecord, 0),
 		staleRecords: make([]FileRemoveRecord, 0),
