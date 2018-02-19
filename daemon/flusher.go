@@ -234,7 +234,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) bool {
 	defer logRequestPanic(c)
 
 	if flushAll {
-		dq.sortTopologically(c)
+		dq.sortTopologically_(c)
 	}
 
 	for dq.Len_() > 0 {
@@ -327,28 +327,31 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 }
 
 // flusher lock must be held
-func (dq *DirtyQueue) requeue_(c *ctx, inodeNum InodeId) {
-	defer c.FuncIn("DirtyQueue::requeue", "inode %d", inodeNum).Out()
+func (dq *DirtyQueue) requeue_(c *ctx, inode Inode) {
+	defer c.FuncIn("DirtyQueue::requeue_", "inode %d", inode.inodeNum()).Out()
 
-	inode := c.qfs.inodeNoInstantiate(c, inodeNum)
-	if inode == nil {
-		c.vlog("Not instantiated")
-		return
-	}
+	for {
+		dq.moveToBackOfQueue_(c, inode)
 
-	if dir, ok := inode.(inodeHolder); ok {
-		for _, child := range dir.directChildInodes() {
-			dq.requeue_(c, child)
+		defer inode.getParentLock().RLock().RUnlock()
+		if inode.isWorkspaceRoot() || inode.isOrphaned() {
+			c.elog("Got WSR in requeue_")
+			return
 		}
-	}
 
+		inode = inode.parent_(c)
+	}
+}
+
+// Must hold flusher lock
+func (dq *DirtyQueue) moveToBackOfQueue_(c *ctx, inode Inode) {
 	de := inode.markClean_()
 	if de != nil {
-		c.vlog("Moving %d to end of dirty queue", inodeNum)
+		c.vlog("Moving inode %d to end of dirty queue", inode.inodeNum())
 		di := dq.Remove_(de)
 		inode.markUnclean_(dq.PushBack_(di))
 	} else {
-		c.vlog("Adding %d to end of dirty queue", inodeNum)
+		c.vlog("Adding inode %d to end of dirty queue", inode.inodeNum())
 		inode.dirty_(c)
 	}
 }
@@ -358,32 +361,29 @@ func (dq *DirtyQueue) requeue_(c *ctx, inodeNum InodeId) {
 // dirty queue. When syncing the entire queue we can flush any particular
 // inode only once by flushing in revert topological order, from the leaves
 // up to the root.
-func (dq *DirtyQueue) sortTopologically(c *ctx) {
+//
+// Must hold the flusher lock
+func (dq *DirtyQueue) sortTopologically_(c *ctx) {
 	defer c.funcIn("DirtyQueue::sortTopologically").Out()
 
-	// The general strategy is to do a depth-first walk of the instantiated
-	// Inodes within the workspace, possibly dequeuing, then requeuing each such
-	// inode on the dirty queue. The parents are requeued after the children to
-	// ensure each child is published only once.
+	// The general strategy is to dirty all the parents and grand-parents of each
+	// inode on the dirty queue up to the WSR. At the end we'll have a close,
+	// though not necessarily perfect, approximation of a reverse topological
+	// sort. At least the WSR will only be uploaded once, which is the primary
+	// goal.
 
-	// If one of the dirty inodes is both instantiated and not orphaned then we
-	// can get the WSR from it.
-	var wsr *WorkspaceRoot
-	for elem := dq.l.Front(); elem != nil; elem = elem.Next() {
-		di := elem.Value.(*dirtyInode)
-		wsr = getWsr(c, di.inode)
+	dirtyInodes := make([]*dirtyInode, 0, dq.Len_())
+	for e := dq.Front_(); e != nil; e = e.Next() {
+		dirtyInodes = append(dirtyInodes, e.Value.(*dirtyInode))
+	}
 
-		if wsr != nil {
-			break
+	for _, di := range dirtyInodes {
+		if di.inode.isOrphaned() {
+			continue
 		}
-	}
-	if wsr == nil {
-		// If there are no such dirty inodes then we have nothing to sort.
-		c.vlog("No dirty inodes to sort")
-		return
-	}
 
-	dq.requeue_(c, wsr.inodeNum())
+		dq.requeue_(c, di.inode)
+	}
 }
 
 type Flusher struct {
