@@ -885,12 +885,12 @@ func (merge *merger) mergeFile(base quantumfs.DirectoryRecord,
 		(*premergedRecord).SetSize(other.fileLength(merge.c))
 		(*premergedRecord).SetID(other.sync(merge.c, merge.pubFn))
 
-		merge.c.vlog("Merging file contents for %d %s", local.FileId(),
+		merge.c.vlog("Merging file contents: %d %s", local.FileId(),
 			local.Filename())
 		return nil
 	}
 
-	merge.c.vlog("File conflict for %s resulting in overwrite. %d %d",
+	merge.c.vlog("File conflict for %s: %d %d",
 		local.Filename(), local.FileId(), remote.FileId())
 
 	return nil
