@@ -3,7 +3,7 @@
 
 package utils
 
-// From https://play.golang.org/p/tkE2lH6AlQ
+// Idea from  https://play.golang.org/p/tkE2lH6AlQ
 //
 // Use:
 //
