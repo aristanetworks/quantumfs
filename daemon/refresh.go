@@ -168,8 +168,8 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 	localRecords := make(map[quantumfs.FileId]quantumfs.DirectoryRecord)
 	if !localDir.IsEqualTo(quantumfs.EmptyDirKey) {
 		foreachDentry(c, localDir, func(record quantumfs.DirectoryRecord) {
-				localRecords[record.FileId()] = record
-			})
+			localRecords[record.FileId()] = record
+		})
 	}
 
 	c.vlog("Loading remote records")

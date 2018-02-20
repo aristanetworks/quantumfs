@@ -469,11 +469,6 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
-	if qfs.workspaceIsMutable(c, wsr) {
-		c.wlog("Refusing to refresh locally mutable workspace %s", name)
-		return
-	}
-
 	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
 		parts[0], parts[1], parts[2])
 
