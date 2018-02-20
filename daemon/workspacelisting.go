@@ -480,7 +480,7 @@ func (tsl *TypespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (tsl *TypespaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	c.vlog("TypespaceList::syncChild doing nothing")
 }
@@ -805,7 +805,7 @@ func (nsl *NamespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	c.vlog("NamespaceList::syncChild doing nothing")
 }
@@ -1195,7 +1195,7 @@ func (wsl *WorkspaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	c.vlog("WorkspaceList::syncChild doing nothing")
 }

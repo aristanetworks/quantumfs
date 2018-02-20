@@ -32,6 +32,7 @@ type Directory struct {
 	InodeCommon
 
 	hardlinkTable HardlinkTable
+	hardlinkDelta *HardlinkDelta
 
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
@@ -87,6 +88,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.treeLock_ = treeLock
 	dir.hardlinkTable = hardlinkTable
 	dir.baseLayerId = baseLayerId
+	dir.hardlinkDelta = newHardlinkDelta()
 
 	container, uninstantiated := newChildContainer(c, dir, dir.baseLayerId)
 	dir.children = container
@@ -163,7 +165,7 @@ func (dir *Directory) prepareForOrphaning(c *ctx, name string,
 		newRecord.SetFilename(name)
 		return newRecord
 	}
-	if dir.hardlinkTable.hardlinkDec(record.FileId()) {
+	if dir.hardlinkDec(record.FileId()) {
 		// If the refcount was greater than one we shouldn't
 		// reparent.
 		c.vlog("Hardlink referenced elsewhere")
@@ -1346,7 +1348,7 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d %s",
 		dir.inodeNum(), inodeNum, newKey.String()).Out()
@@ -1363,6 +1365,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	}
 
 	dir.children.setID(c, entry.Filename(), newKey)
+	dir.hardlinkDelta.populateFrom(hardlinkDelta)
 }
 
 func getRecordExtendedAttributes(c *ctx,
@@ -1850,13 +1853,23 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
 		dir.name_).Out()
 
-	dir.parentSyncChild(c, func() quantumfs.ObjectKey {
+	dir.parentSyncChild(c, func() (quantumfs.ObjectKey, *HardlinkDelta) {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
-		return dir.baseLayerId
+		return dir.baseLayerId, dir.hardlinkDelta
 	})
 
 	return dir.baseLayerId
+}
+
+func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
+	dir.hardlinkDelta.inc(fileId)
+	dir.hardlinkTable.hardlinkInc(fileId)
+}
+
+func (dir *Directory) hardlinkDec(fileId quantumfs.FileId) bool {
+	dir.hardlinkDelta.dec(fileId)
+	return dir.hardlinkTable.hardlinkDec(fileId)
 }
 
 type directoryContents struct {
