@@ -408,7 +408,10 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 		} else {
 			rc.addStaleEntry(c, dir.inodeNum(), childId, localRecord)
 		}
-		if localRecord.Type() == quantumfs.ObjectTypeDirectory {
+
+		// Ensure we ignore any subdirectories that haven't changed
+		if localRecord.Type() == quantumfs.ObjectTypeDirectory &&
+			!localRecord.ID().IsEqualTo(remoteRecord.ID()) {
 			updateMapDescend_DOWN(c, rc, childId, remoteRecord)
 		}
 	})

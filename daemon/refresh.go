@@ -57,7 +57,7 @@ func newRefreshContext_(c *ctx, currentRootId quantumfs.ObjectKey,
 		rootId:       newRootId,
 	}
 
-	rc.buildRefreshMap(c, currentRootId, newRootId, "")
+	rc.buildRefreshMapWsr(c, currentRootId, newRootId)
 	return &rc
 }
 
@@ -117,37 +117,63 @@ func (rc *RefreshContext) isInodeUsedAfterRefresh(c *ctx,
 		return remoteRecord != nil &&
 			localRecord.FileId() == remoteRecord.FileId()
 	}
+
+	// localRecord is populated the first time we encounter it. In most cases
+	// if we hit it twice then we have a problem and should assert
 	if loadRecord.localRecord == nil {
 		return true
 	}
+
 	utils.Assert(localRecord.Type() == quantumfs.ObjectTypeDirectory,
 		"Object of type %d already has a match.", localRecord.Type())
 	return false
 }
 
-func (rc *RefreshContext) buildRefreshMap(c *ctx, localRootId quantumfs.ObjectKey,
-	remoteRootId quantumfs.ObjectKey, path string) {
+func (rc *RefreshContext) buildRefreshMapWsr(c *ctx, localRootId quantumfs.ObjectKey,
+	remoteRootId quantumfs.ObjectKey) {
+
+	defer c.funcIn("RefreshContext::buildRefreshMapWsr").Out()
+
+	localWsr := c.dataStore.Get(&c.Ctx, localRootId).AsWorkspaceRoot()
+	remoteWsr := c.dataStore.Get(&c.Ctx, remoteRootId).AsWorkspaceRoot()
+
+	rc.buildRefreshMap(c, localWsr.BaseLayer(), remoteWsr.BaseLayer(), "")
+
+	// we need to include all hardlink legs, since hardlink legs may have been
+	// skipped in buildRefreshMap
+
+	hardlinks := loadHardlinks(c, remoteWsr.HardlinkEntry())
+	for fileId, linkEntry := range hardlinks {
+		utils.Assert(linkEntry.record.FileId() == fileId, "FileId mistmatch")
+
+		record := newHardlinkLegFromRecord(linkEntry.record, nil)
+		pubRecord := record.Publishable()
+
+		rc.fileMap[fileId] = &FileLoadRecord{
+			remoteRecord:  pubRecord.AsImmutable(),
+			inodeId:       quantumfs.InodeIdInvalid,
+			parentId:      quantumfs.InodeIdInvalid,
+			newParentPath: "",
+			moved:         false,
+		}
+	}
+}
+
+func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
+	remoteDir quantumfs.ObjectKey, path string) {
 
 	defer c.FuncIn("RefreshContext::buildRefreshMap", "%s", path).Out()
 
-	utils.Assert(!localRootId.IsEqualTo(remoteRootId),
-		"building refresh map for identical wsrs")
-
-	remoteWsr := c.dataStore.Get(&c.Ctx, remoteRootId).AsWorkspaceRoot()
-
 	c.vlog("Loading local records")
 	localRecords := make(map[quantumfs.FileId]quantumfs.DirectoryRecord)
-	if !localRootId.IsEqualTo(quantumfs.EmptyBlockKey) {
-		localWsr := c.dataStore.Get(&c.Ctx, localRootId).AsWorkspaceRoot()
-		foreachDentry(c, localWsr.BaseLayer(),
-			func(record quantumfs.DirectoryRecord) {
+	if !localDir.IsEqualTo(quantumfs.EmptyDirKey) {
+		foreachDentry(c, localDir, func(record quantumfs.DirectoryRecord) {
 				localRecords[record.FileId()] = record
 			})
 	}
 
 	c.vlog("Loading remote records")
-	foreachDentry(c, remoteWsr.BaseLayer(),
-		func(record quantumfs.DirectoryRecord) {
+	foreachDentry(c, remoteDir, func(record quantumfs.DirectoryRecord) {
 
 		c.vlog("Added filemap entry for %s: %x", record.Filename(),
 			record.FileId())
@@ -160,7 +186,7 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localRootId quantumfs.ObjectKe
 		}
 
 		if record.Type() == quantumfs.ObjectTypeDirectory {
-			localKey := quantumfs.EmptyBlockKey
+			localKey := quantumfs.EmptyDirKey
 
 			// don't recurse into any directories that haven't changed
 			localRecord, exists := localRecords[record.FileId()]
@@ -178,29 +204,6 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localRootId quantumfs.ObjectKe
 				path+"/"+record.Filename())
 		}
 	})
-
-	c.vlog("Done loading remotes")
-	// We've ignored any identical directories, so we need to add all hardlink
-	// table entries so we can handle different legs (if this is the root)
-	if len(path) != 0 {
-		return
-	}
-
-	hardlinks := loadHardlinks(c, remoteWsr.HardlinkEntry())
-	for fileId, linkEntry := range hardlinks {
-		utils.Assert(linkEntry.record.FileId() == fileId, "FileId mistmatch")
-
-		record := newHardlinkLegFromRecord(linkEntry.record, nil)
-		pubRecord := record.Publishable()
-
-		rc.fileMap[fileId] = &FileLoadRecord{
-			remoteRecord:  pubRecord.AsImmutable(),
-			inodeId:       quantumfs.InodeIdInvalid,
-			parentId:      quantumfs.InodeIdInvalid,
-			newParentPath: "",
-			moved:         false,
-		}
-	}
 }
 
 func shouldHideLocalRecord(localRecord quantumfs.ImmutableDirectoryRecord,
