@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/processlocal"
@@ -258,7 +259,7 @@ func TestNoImplicitSync(t *testing.T) {
 	})
 }
 
-func (test *testHelper) workspaceWaitChan(workspaceName string) <-chan struct{} {
+func (test *testHelper) workspaceWaitChan(workspaceName string) chan struct{} {
 	c := make(chan struct{})
 	wsdb := test.qfsInstances[0].config.WorkspaceDB
 	wsdbPl := wsdb.(*processlocal.WorkspaceDB)
@@ -333,5 +334,36 @@ func TestPublishedHardlinksToBeConsistent(t *testing.T) {
 		test.AssertNoErr(err)
 		defer file.Close()
 		test.verifyContentStartsWith(file, content)
+	})
+}
+
+func TestFlushAllSorting(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		numberOfPublishes := 0
+		publishUpdates := test.workspaceWaitChan(test.RelPath(workspace))
+		go func() {
+			<-publishUpdates
+			numberOfPublishes = 1
+			// Panic if more than one update is seen
+			close(publishUpdates)
+		}()
+
+		dirs := workspace + "/dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9"
+		file := dirs + "/file"
+
+		test.AssertNoErr(utils.MkdirAll(dirs, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file, "data"))
+
+		test.SyncAllWorkspaces()
+
+		test.WaitFor("Workspace to publish", func() bool {
+			return numberOfPublishes == 1
+		})
+
+		// Allow time for additional publishes to occur and fail in the
+		// waiting goroutine.
+		time.Sleep(500 * time.Millisecond)
 	})
 }
