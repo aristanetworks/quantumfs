@@ -84,7 +84,8 @@ func TestExtendedAttrList(t *testing.T) {
 		const N = 100
 		for i := 0; i < N; i++ {
 			attrName := fmt.Sprintf("user.attr%d", i)
-			err = syscall.Setxattr(testFilename, attrName, []byte("a"), 0)
+			err = syscall.Setxattr(testFilename, attrName, []byte("a"),
+				0)
 			test.Assert(err == nil, "Error setting XAttr %s: %v",
 				attrName, err)
 		}
@@ -172,7 +173,8 @@ func TestExtendedAttrRemove(t *testing.T) {
 		N := 100
 		for i := 0; i < N; i++ {
 			attrName := fmt.Sprintf("user.attr%d", i)
-			err = syscall.Setxattr(testFilename, attrName, []byte("a"), 0)
+			err = syscall.Setxattr(testFilename, attrName, []byte("a"),
+				0)
 			test.Assert(err == nil, "Error setting XAttr %s: %v",
 				attrName, err)
 		}
