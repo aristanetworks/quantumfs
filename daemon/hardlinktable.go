@@ -381,7 +381,7 @@ func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
 	hardlinkDelta.foreach(func(fileId quantumfs.FileId, delta int) {
 		entry, exists := ht.hardlinks[fileId]
 		if !exists {
-			c.vlog("Did not find %d. Dropping delta %d",
+			c.elog("Did not find %d. Dropping delta %d",
 				fileId, delta)
 			return
 		}
