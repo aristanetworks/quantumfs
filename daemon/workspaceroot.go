@@ -216,7 +216,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 		return
 	}
 
-	rc := newRefreshContext_(c, publishedRootId)
+	rc := newRefreshContext_(c, wsr.publishedRootId, publishedRootId)
 	c.vlog("Workspace Refreshing %s rootid: %s::%s -> %s::%s", workspaceName,
 		wsr.publishedRootId.String(), wsr.nonce.String(),
 		publishedRootId.String(), nonce.String())

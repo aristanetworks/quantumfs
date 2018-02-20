@@ -48,15 +48,16 @@ type RefreshContext struct {
 }
 
 // should be called under the treelock
-func newRefreshContext_(c *ctx, rootId quantumfs.ObjectKey) *RefreshContext {
+func newRefreshContext_(c *ctx, currentRootId quantumfs.ObjectKey,
+	newRootId quantumfs.ObjectKey) *RefreshContext {
+
 	rc := RefreshContext{
 		fileMap:      make(map[quantumfs.FileId]*FileLoadRecord, 0),
 		staleRecords: make([]FileRemoveRecord, 0),
-		rootId:       rootId,
+		rootId:       newRootId,
 	}
-	workspaceRoot := c.dataStore.Get(&c.Ctx, rootId).AsWorkspaceRoot()
-	baseLayerId := workspaceRoot.BaseLayer()
-	rc.buildRefreshMap(c, baseLayerId, "")
+
+	rc.buildRefreshMap(c, currentRootId, newRootId, "")
 	return &rc
 }
 
@@ -124,11 +125,32 @@ func (rc *RefreshContext) isInodeUsedAfterRefresh(c *ctx,
 	return false
 }
 
-func (rc *RefreshContext) buildRefreshMap(c *ctx, baseLayerId quantumfs.ObjectKey,
-	path string) {
+func (rc *RefreshContext) buildRefreshMap(c *ctx, localRootId quantumfs.ObjectKey,
+	remoteRootId quantumfs.ObjectKey, path string) {
 
 	defer c.FuncIn("RefreshContext::buildRefreshMap", "%s", path).Out()
-	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
+
+	utils.Assert(!localRootId.IsEqualTo(remoteRootId),
+		"building refresh map for identical wsrs")
+
+	remoteWsr := c.dataStore.Get(&c.Ctx, remoteRootId).AsWorkspaceRoot()
+
+	c.vlog("Loading local records")
+	localRecords := make(map[quantumfs.FileId]quantumfs.DirectoryRecord)
+	if !localRootId.IsEqualTo(quantumfs.EmptyBlockKey) {
+		localWsr := c.dataStore.Get(&c.Ctx, localRootId).AsWorkspaceRoot()
+		foreachDentry(c, localWsr.BaseLayer(),
+			func(record quantumfs.DirectoryRecord) {
+				localRecords[record.FileId()] = record
+			})
+	}
+
+	c.vlog("Loading remote records")
+	foreachDentry(c, remoteWsr.BaseLayer(),
+		func(record quantumfs.DirectoryRecord) {
+
+		c.vlog("Added filemap entry for %s: %x", record.Filename(),
+			record.FileId())
 		rc.fileMap[record.FileId()] = &FileLoadRecord{
 			remoteRecord:  record,
 			inodeId:       quantumfs.InodeIdInvalid,
@@ -136,11 +158,49 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, baseLayerId quantumfs.ObjectKe
 			newParentPath: path,
 			moved:         false,
 		}
+
 		if record.Type() == quantumfs.ObjectTypeDirectory {
-			rc.buildRefreshMap(c, record.ID(),
+			localKey := quantumfs.EmptyBlockKey
+
+			// don't recurse into any directories that haven't changed
+			localRecord, exists := localRecords[record.FileId()]
+			if exists {
+				if localRecord.ID().IsEqualTo(record.ID()) {
+					c.vlog("Skipping %s since no change",
+						localRecord.Filename())
+					return
+				}
+
+				localKey = localRecord.ID()
+			}
+
+			rc.buildRefreshMap(c, localKey, record.ID(),
 				path+"/"+record.Filename())
 		}
 	})
+
+	c.vlog("Done loading remotes")
+	// We've ignored any identical directories, so we need to add all hardlink
+	// table entries so we can handle different legs (if this is the root)
+	if len(path) != 0 {
+		return
+	}
+
+	hardlinks := loadHardlinks(c, remoteWsr.HardlinkEntry())
+	for fileId, linkEntry := range hardlinks {
+		utils.Assert(linkEntry.record.FileId() == fileId, "FileId mistmatch")
+
+		record := newHardlinkLegFromRecord(linkEntry.record, nil)
+		pubRecord := record.Publishable()
+
+		rc.fileMap[fileId] = &FileLoadRecord{
+			remoteRecord:  pubRecord.AsImmutable(),
+			inodeId:       quantumfs.InodeIdInvalid,
+			parentId:      quantumfs.InodeIdInvalid,
+			newParentPath: "",
+			moved:         false,
+		}
+	}
 }
 
 func shouldHideLocalRecord(localRecord quantumfs.ImmutableDirectoryRecord,

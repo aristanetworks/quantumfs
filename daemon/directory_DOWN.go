@@ -425,7 +425,12 @@ func (dir *Directory) findLocalMatch_DOWN_(c *ctx, rc *RefreshContext,
 		// perfect match, the file has not moved
 		return localRecord, localEntries[record.Filename()], false
 	}
-	matchingLoadRecord := rc.fileMap[record.FileId()]
+	matchingLoadRecord, exists := rc.fileMap[record.FileId()]
+	if !exists {
+		c.elog("Missing filemap record for %s", record.Filename())
+	}
+
+	c.vlog("find for %s: %x", record.Filename(), record.FileId())
 	return matchingLoadRecord.localRecord, matchingLoadRecord.inodeId, true
 }
 
