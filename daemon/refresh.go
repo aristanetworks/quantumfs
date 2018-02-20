@@ -89,7 +89,11 @@ func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
 		// The dentry has been re-created, update its fileId in our caller to
 		// match the new incarnation
 		fileId = remoteRecord.FileId()
-		loadRecord = rc.fileMap[remoteRecord.FileId()]
+		loadRecord, found = rc.fileMap[remoteRecord.FileId()]
+		if !found {
+			c.elog("Dir moved, but not found in buildmap %d",
+				localRecord.Filename())
+		}
 		moved = false
 	}
 	loadRecord.localRecord = localRecord
@@ -191,7 +195,9 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 			// don't recurse into any directories that haven't changed
 			localRecord, exists := localRecords[record.FileId()]
 			if exists {
-				if localRecord.ID().IsEqualTo(record.ID()) {
+				skip := (localRecord.ID().IsEqualTo(record.ID()) &&
+					localRecord.Filename() == record.Filename())
+				if skip {
 					c.vlog("Skipping %s since no change",
 						localRecord.Filename())
 					return
