@@ -314,9 +314,14 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 func (container *ChildContainer) directInodes() []InodeId {
 	inodes := make([]InodeId, 0, len(container.children))
 
-	for _, inodeId := range container.children {
-		isHardlink, _ := container.dir.hardlinkTable.checkHardlink(
-			inodeId)
+	for name, inodeId := range container.children {
+		records := container.effective[inodeId]
+		if records == nil {
+			records = container.publishable[inodeId]
+		}
+		utils.Assert(records != nil, "did not find child %s", name)
+		record := records[name]
+		_, isHardlink := record.(*HardlinkLeg)
 		if !isHardlink {
 			inodes = append(inodes, inodeId)
 		}
