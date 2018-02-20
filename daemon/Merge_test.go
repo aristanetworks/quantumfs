@@ -889,3 +889,35 @@ func TestMergeSkipFiles(t *testing.T) {
 			})
 	})
 }
+
+func TestMergeOmitIdentical(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(bws string) {
+			test.AssertNoErr(utils.MkdirAll(bws+"/dirA/dirB/dirC", 0777))
+			test.AssertNoErr(utils.MkdirAll(bws+"/dirA/dirD/dirE", 0777))
+			test.AssertNoErr(testutils.PrintToFile(bws+
+				"/dirA/dirB/dirC/fileA", "test data"))
+			test.AssertNoErr(testutils.PrintToFile(bws+
+				"/dirA/dirD/dirE/fileB", "unchanging data"))
+		}, func(localWs string, remoteWs string) mergeTestCheck {
+			test.AssertNoErr(testutils.OverWriteFile(localWs+
+				"/dirA/dirB/dirC/fileA", "test dAtA changed AAA"))
+			test.AssertNoErr(testutils.OverWriteFile(remoteWs+
+				"/dirA/dirB/dirC/fileA", "test DaTa changed BBB"))
+
+			return func(merged string) {
+				test.CheckData(merged+"/dirA/dirB/dirC/fileA",
+					[]byte("test DATA changed BBB"))
+				test.CheckData(merged+"/dirA/dirD/dirE/fileB",
+					[]byte("unchanging data"))
+				fileMerges := test.CountLogStrings("mergeFile fileA")
+				badMerges := test.CountLogStrings("mergeFile fileB")
+				test.Assert(fileMerges == 1,
+					"Incorrect number of mergeFiles called %d",
+					fileMerges)
+				test.Assert(badMerges == 0,
+					"fileB in unchanged directory was touched")
+			}
+		})
+	})
+}
