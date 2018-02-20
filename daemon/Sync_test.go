@@ -92,6 +92,17 @@ func TestSyncToDatastore(t *testing.T) {
 		test.startQuantumFs(config, nil, false)
 		workspace := test.NewWorkspace()
 
+		expectedWsrSyncCount := 0
+		actualWsrSyncCount := 0
+
+		go func() {
+			c := test.workspaceWaitChan(test.RelPath(workspace))
+
+			for _ := range c {
+				actualWsrSyncCount++
+			}
+		}()
+
 		// Generate some deterministic, pseudorandom data for a folder
 		// structure, treating each number as a command. Ensure GenData
 		// generates a long enough string of natural numbers to ensure at
@@ -102,6 +113,7 @@ func TestSyncToDatastore(t *testing.T) {
 			// and occasionally force a sync
 			if data[i] == '0' {
 				test.SyncAllWorkspaces()
+				expectedWsrSyncCount++
 			}
 
 			if data[i] < '3' {
@@ -119,6 +131,7 @@ func TestSyncToDatastore(t *testing.T) {
 
 		// Sync all of the data we've written
 		test.SyncAllWorkspaces()
+		expectedWsrSyncCount++
 
 		// Now end quantumfs A, and start B with the same datastore so we
 		// can verify that the data was preserved via the datastore
@@ -126,6 +139,10 @@ func TestSyncToDatastore(t *testing.T) {
 		err := test.qfs.server.Unmount()
 		test.Assert(err == nil, "Failed to unmount during test")
 		test.waitForQuantumFsToFinish()
+
+		test.Assert(actualWsrSyncCount == expectedWsrSyncCount,
+			"WSR flushed more than once for every sync %d vs %d",
+			actualWsrSyncCount, expectedWsrSyncCount)
 
 		test.startQuantumFs(config, nil, false)
 
