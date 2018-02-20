@@ -382,6 +382,11 @@ func (dq *DirtyQueue) sortTopologically_(c *ctx) {
 			continue
 		}
 
+		if di.inode.isListingType() {
+			c.vlog("Skipping listing inode %d", inodeNum)
+			continue
+		}
+
 		dirtyInodes = append(dirtyInodes, di)
 		c.vlog("Added inode %d to sorting list", inodeNum)
 	}
