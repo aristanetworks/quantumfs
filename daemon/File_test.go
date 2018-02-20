@@ -717,7 +717,7 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 			test.Assert(record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
 				"ID isn't empty block: %s", record.ID().String())
 			test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
-				"File isn't small file: %s", record.Type())
+				"File isn't small file: %d", record.Type())
 		}()
 
 		// Cause the file to be flushed
@@ -732,7 +732,7 @@ func TestChangeFileTypeBeforeSync(t *testing.T) {
 			test.Assert(!record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
 				"ID is empty block: %s", record.ID().String())
 			test.Assert(record.Type() == quantumfs.ObjectTypeMediumFile,
-				"File isn't medium file: %s", record.Type())
+				"File isn't medium file: %d", record.Type())
 		}()
 	})
 }

@@ -10,6 +10,7 @@ import (
 	"math"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 type SmallFile struct {
@@ -107,7 +108,7 @@ func (fi *SmallFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 	return int(blkIdx), remainingOffset
 }
 
-func (fi *SmallFile) sync(c *ctx) quantumfs.ObjectKey {
+func (fi *SmallFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 	defer c.funcIn("SmallFile::sync").Out()
 
 	if fi.buf == nil {
@@ -117,7 +118,7 @@ func (fi *SmallFile) sync(c *ctx) quantumfs.ObjectKey {
 
 	// No metadata to marshal for small files
 	buf := fi.getBuffer(c)
-	key, err := buf.Key(&c.Ctx)
+	key, err := pub(c, buf)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -197,8 +198,8 @@ func (fi *SmallFile) convertTo(c *ctx, newType quantumfs.ObjectType) blockAccess
 	return nil
 }
 
-func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) error {
+func (fi *SmallFile) truncate(c *ctx, newLengthBytes uint64) fuse.Status {
 	defer c.FuncIn("SmallFile::truncate", "new size %d", newLengthBytes).Out()
 	fi.getBufferToDirty(c).SetSize(int(newLengthBytes))
-	return nil
+	return fuse.OK
 }

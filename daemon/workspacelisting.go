@@ -480,7 +480,7 @@ func (tsl *TypespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (tsl *TypespaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	c.vlog("TypespaceList::syncChild doing nothing")
 }
@@ -805,7 +805,7 @@ func (nsl *NamespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	c.vlog("NamespaceList::syncChild doing nothing")
 }
@@ -997,8 +997,9 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 	// First delete any outdated entries
 	for name, info := range wsl.workspacesByName {
 		wsdbNonce, exists := names[name]
-		if !exists || wsdbNonce != info.nonce {
-			c.vlog("Removing deleted child %s (%d)", name, info.nonce)
+		if !exists || !wsdbNonce.SameIncarnation(&info.nonce) {
+			c.vlog("Removing deleted child %s %s",
+				name, info.nonce.String())
 
 			// Note: do not uninstantiate them now - remove them
 			// from their parents
@@ -1012,7 +1013,7 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 	// Then re-add any new entries
 	for name, nonce := range names {
 		if _, exists := wsl.workspacesByName[name]; !exists {
-			c.vlog("Adding new child %s (%d)", name, nonce)
+			c.vlog("Adding new child %s (%s)", name, nonce.String())
 			inodeId := c.qfs.newInodeId()
 			wsl.workspacesByName[name] = workspaceInfo{
 				id:    inodeId,
@@ -1194,7 +1195,7 @@ func (wsl *WorkspaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	c.vlog("WorkspaceList::syncChild doing nothing")
 }

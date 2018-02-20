@@ -7,6 +7,7 @@ package daemon
 
 import (
 	"errors"
+	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -154,7 +155,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
-	c.dlog("Opened Inode %d as Fh: %d", fi.inodeNum(), fileHandleNum)
+	c.dlog(OpenedInodeDebug, fi.inodeNum(), fileHandleNum)
 
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 	out.Fh = uint64(fileHandleNum)
@@ -204,9 +205,9 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 				return fuse.EIO
 			}
 
-			err = fi.accessor.truncate(c, uint64(attr.Size))
-			if err != nil {
-				return fuse.EIO
+			result := fi.accessor.truncate(c, uint64(attr.Size))
+			if result != fuse.OK {
+				return result
 			}
 
 			fi.self.dirty(c)
@@ -313,10 +314,6 @@ func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
 	return nil, nil
 }
 
-func (fi *File) syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey) {
-	c.elog("Invalid syncChild on File")
-}
-
 func resize(buffer []byte, size int) []byte {
 	if len(buffer) > size {
 		return buffer[:size]
@@ -381,13 +378,13 @@ type blockAccessor interface {
 	convertTo(*ctx, quantumfs.ObjectType) blockAccessor
 
 	// Write file's metadata to the datastore and provide the key
-	sync(c *ctx) quantumfs.ObjectKey
+	sync(c *ctx, pub publishFn) quantumfs.ObjectKey
 
 	// Reload the content of the file from datastore
 	reload(c *ctx, key quantumfs.ObjectKey)
 
 	// Truncate to lessen length *only*, error otherwise
-	truncate(c *ctx, newLength uint64) error
+	truncate(c *ctx, newLength uint64) fuse.Status
 }
 
 func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
@@ -432,8 +429,8 @@ func operateOnBlocks(c *ctx, accessor blockAccessor, offset uint64, size uint32,
 	c.dlog("Reading initial block %d offset %d", startBlkIdx, offset)
 	err := fn(c, startBlkIdx, offset)
 	if err != nil {
-		c.elog("Unable to operate on first data block: %s", err.Error())
-		return errors.New("Unable to operate on first data block")
+		c.dlog("Unable to operate on first data block: %s", err.Error())
+		return err
 	}
 
 	c.vlog("Processing blocks %d to %d", startBlkIdx+1, endBlkIdx)
@@ -512,6 +509,9 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 			})
 
 		if err != nil {
+			if errno, ok := err.(syscall.Errno); ok {
+				return 0, fuse.Status(errno)
+			}
 			return 0, fuse.EIO
 		}
 		fi.self.dirty(c)
@@ -537,9 +537,9 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("File::flush", "%s", fi.name_).Out()
 
 	key := quantumfs.EmptyBlockKey
-	fi.parentSyncChild(c, func() quantumfs.ObjectKey {
-		key = fi.accessor.sync(c)
-		return key
+	fi.parentSyncChild(c, func() (quantumfs.ObjectKey, *HardlinkDelta) {
+		key = fi.accessor.sync(c, publishNow)
+		return key, nil
 	})
 	return key
 }

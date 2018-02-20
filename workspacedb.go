@@ -11,11 +11,26 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-// WorkspaceNonce is a number used to distinguish between workspaces of the same
-// path, but different lifetimes. For example, if a workspace path were deleted and
-// then recreated, the old workspace and new workspace would have different
-// WorkspaceNonces and therefore be distinguishable.
-type WorkspaceNonce uint64
+// WorkspaceNonce is used to:
+// 1. Distinguish between different incarnations of workspaces with the same name.
+// 2. Detect stale rootIds when refreshing a workspace.
+//
+// In order to achieve these, it stores a unique id as well as the last publish time
+// for each workspace. The id is immutable in the lifetime of the workspace, however,
+// the publishTime changes everytime a new rootId is published to the
+// workspace.
+type WorkspaceNonce struct {
+	Id          uint64
+	PublishTime uint64
+}
+
+func (lhs *WorkspaceNonce) SameIncarnation(rhs *WorkspaceNonce) bool {
+	return lhs.Id == rhs.Id
+}
+
+func (v *WorkspaceNonce) String() string {
+	return fmt.Sprintf("(%d : %d)", v.Id, v.PublishTime)
+}
 
 type WorkspaceState struct {
 	RootId    ObjectKey

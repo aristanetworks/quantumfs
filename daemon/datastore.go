@@ -297,6 +297,10 @@ func (buf *buffer) Set(data []byte, keyType quantumfs.KeyType) {
 	buf.dirty = true
 }
 
+func (buf *buffer) KeyType() quantumfs.KeyType {
+	return buf.keyType
+}
+
 func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 	return hash.Hash(buf.data)
 }

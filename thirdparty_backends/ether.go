@@ -390,7 +390,8 @@ func newEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 	// initializing the backends, this can be solved.
 	err := eWsdb.wsdb.CreateWorkspace(ether.DefaultCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, 0, quantumfs.EmptyWorkspaceKey.Value())
+		quantumfs.NullSpaceName, wsdb.WorkspaceNonceInvalid,
+		quantumfs.EmptyWorkspaceKey.Value())
 	if err != nil {
 		panic(fmt.Sprintf("Failed wsdb setup: %s", err.Error()))
 	}
@@ -489,7 +490,10 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	}
 	result := make(map[string]quantumfs.WorkspaceNonce, len(list))
 	for name := range list {
-		result[name] = quantumfs.WorkspaceNonce(list[name])
+		result[name] = quantumfs.WorkspaceNonce{
+			Id:          list[name].Id,
+			PublishTime: list[name].PublishTime,
+		}
 	}
 	return result, nil
 }
@@ -508,11 +512,15 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 	key, nonce, err := w.wsdb.Workspace((*wsApiCtx)(c), typespace,
 		namespace, workspace)
 	if err != nil {
-		return quantumfs.ZeroKey, 0, convertWsdbError(err)
+		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{},
+			convertWsdbError(err)
 	}
 
-	return quantumfs.NewObjectKeyFromBytes(key),
-		quantumfs.WorkspaceNonce(nonce), nil
+	qfsNonce := quantumfs.WorkspaceNonce{
+		Id:          nonce.Id,
+		PublishTime: nonce.PublishTime,
+	}
+	return quantumfs.NewObjectKeyFromBytes(key), qfsNonce, nil
 }
 
 func (w *etherWsdbTranslator) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
@@ -521,7 +529,7 @@ func (w *etherWsdbTranslator) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 
 	err := w.SubscribeTo(typespace + "/" + namespace + "/" + workspace)
 	if err != nil {
-		return quantumfs.ZeroKey, 0, err
+		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{}, err
 	}
 
 	return w.Workspace(c, typespace, namespace, workspace)
@@ -581,8 +589,12 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 		"%s/%s/%s %s -> %s", typespace, namespace, workspace,
 		currentRootId.String(), newRootId.String())
 
+	wsdbNonce := wsdb.WorkspaceNonce{
+		Id:          nonce.Id,
+		PublishTime: nonce.PublishTime,
+	}
 	key, err := w.wsdb.AdvanceWorkspace((*wsApiCtx)(c), typespace, namespace,
-		workspace, wsdb.WorkspaceNonce(nonce), currentRootId.Value(),
+		workspace, wsdbNonce, currentRootId.Value(),
 		newRootId.Value())
 	if err != nil {
 		return quantumfs.ZeroKey, convertWsdbError(err)

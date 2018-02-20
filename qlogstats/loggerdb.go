@@ -95,11 +95,116 @@ func (cmd *GcCommand) Data() interface{} {
 }
 
 type StatExtractor interface {
+	// Call this after the StatExtractor is fully initialized
+	run()
+
+	// Do the real processing
+	process(msg *qlog.LogOutput)
+	publish() []Measurement
+	gc() // Optional
+
+	// ExtractorBase below implements these
+
 	// This is the list of strings that the extractor will be triggered on and
 	// receive. Note that full formats include a trailing \n.
 	TriggerStrings() []string
-	Chan() chan StatCommand
 	Type() TriggerType
+	Chan() chan StatCommand
+
+	// Internal
+	_gc()
+}
+
+// A base class which handles the boiler plate for writing StatExtractors
+type StatExtractorBase struct {
+	Name     string
+	messages chan StatCommand
+	self     StatExtractor // Our superclass
+	type_    TriggerType
+	triggers []string
+}
+
+func NewStatExtractorBase(name string, self StatExtractor, type_ TriggerType,
+	triggerStrings []string) StatExtractorBase {
+
+	return StatExtractorBase{
+		Name:     name,
+		messages: make(chan StatCommand, 10000),
+		self:     self,
+		type_:    type_,
+		triggers: triggerStrings,
+	}
+}
+
+func (seb *StatExtractorBase) process(msg *qlog.LogOutput) {}
+
+func (seb *StatExtractorBase) publish() []Measurement {
+	return []Measurement{}
+}
+
+func (seb *StatExtractorBase) gc() {}
+
+func (seb *StatExtractorBase) _gc() {}
+
+func (seb *StatExtractorBase) run() {
+	go seb.listen()
+}
+
+func (seb *StatExtractorBase) listen() {
+	for {
+		cmd := <-seb.messages
+		switch cmd.Type() {
+		case MessageCommandType:
+			seb.self.process(cmd.Data().(*qlog.LogOutput))
+		case PublishCommandType:
+			resultChannel := cmd.Data().(chan []Measurement)
+			resultChannel <- seb.self.publish()
+		case GcCommandType:
+			seb.self._gc()
+		}
+	}
+}
+
+func (seb *StatExtractorBase) Chan() chan StatCommand {
+	return seb.messages
+}
+
+func (seb *StatExtractorBase) TriggerStrings() []string {
+	return seb.triggers
+}
+
+func (seb *StatExtractorBase) Type() TriggerType {
+	return seb.type_
+}
+
+type StatExtractorBaseWithGC struct {
+	StatExtractorBase
+	CurrentGeneration uint64
+}
+
+func NewStatExtractorBaseWithGC(name string, self StatExtractor, type_ TriggerType,
+	triggerStrings []string) StatExtractorBaseWithGC {
+
+	sebgc := StatExtractorBaseWithGC{
+		StatExtractorBase: NewStatExtractorBase(name, self,
+			type_, triggerStrings),
+	}
+
+	return sebgc
+}
+
+// Returns true if the given generation has reached death when
+// compared with StatExtractorBaseWithGC.CurrentGeneration.
+func (sebgc *StatExtractorBaseWithGC) AgedOut(generation uint64) bool {
+	if generation+2 < sebgc.CurrentGeneration {
+		return true
+	}
+	return false
+}
+
+func (sebgc *StatExtractorBaseWithGC) _gc() {
+	sebgc.CurrentGeneration++
+	sebgc.self.gc()
 }
 
 func AggregateLogs(mode qlog.LogProcessMode, filename string,
@@ -129,9 +234,10 @@ type Aggregator struct {
 	requestSequence list.List
 
 	extractors             []StatExtractor
-	triggerByFormat        map[string][]chan StatCommand
-	triggerByPartialFormat map[string][]chan StatCommand
-	triggerAll             []chan StatCommand
+	extractorChans         []chan StatCommand
+	triggerByFormat        map[string][]int
+	triggerByPartialFormat map[string][]int
+	triggerAll             []int
 
 	gcInternval     time.Duration
 	publishInterval time.Duration
@@ -150,9 +256,10 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 		db:                     db_,
 		daemonVersion:          daemonVersion_,
 		extractors:             extractors,
-		triggerByFormat:        make(map[string][]chan StatCommand),
-		triggerByPartialFormat: make(map[string][]chan StatCommand),
-		triggerAll:             make([]chan StatCommand, 0),
+		extractorChans:         make([]chan StatCommand, len(extractors)),
+		triggerByFormat:        make(map[string][]int),
+		triggerByPartialFormat: make(map[string][]int),
+		triggerAll:             make([]int, 0),
 		gcInternval:            time.Minute * 2,
 		publishInterval:        publishInterval,
 		queueLogs:              make([]*qlog.LogOutput, 0, 1000),
@@ -160,17 +267,18 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 	}
 
 	// Record the desired filtering
-	for _, extractor := range agg.extractors {
+	for i, extractor := range agg.extractors {
 		c := extractor.Chan()
+		agg.extractorChans[i] = c
 
 		if extractor.Type() == OnAll {
-			agg.triggerAll = append(agg.triggerAll, c)
+			agg.triggerAll = append(agg.triggerAll, i)
 			continue
 		}
 
 		triggers := extractor.TriggerStrings()
 		for _, trigger := range triggers {
-			var triggerList map[string][]chan StatCommand
+			var triggerList map[string][]int
 			if extractor.Type() == OnFormat {
 				triggerList = agg.triggerByFormat
 			} else { // OnPartialFormat
@@ -179,10 +287,10 @@ func NewAggregator(db_ quantumfs.TimeSeriesDB,
 
 			newTriggers, exists := triggerList[trigger]
 			if !exists {
-				newTriggers = make([]chan StatCommand, 0)
+				newTriggers = make([]int, 0)
 			}
 
-			newTriggers = append(newTriggers, c)
+			newTriggers = append(newTriggers, i)
 
 			if extractor.Type() == OnFormat {
 				agg.triggerByFormat[trigger] = newTriggers
@@ -262,26 +370,31 @@ func (agg *Aggregator) processThread() {
 
 func (agg *Aggregator) filterAndDistribute(log *qlog.LogOutput) {
 	// These always match
-	for _, extractor := range agg.triggerAll {
-		extractor <- &MessageCommand{
+	for _, extractorIdx := range agg.triggerAll {
+		agg.extractorChans[extractorIdx] <- &MessageCommand{
 			log: log,
 		}
 	}
 
 	// These match the format string fully
 	matching := agg.triggerByFormat[log.Format]
-	for _, extractor := range matching {
-		extractor <- &MessageCommand{
+	for _, extractorIdx := range matching {
+		agg.extractorChans[extractorIdx] <- &MessageCommand{
 			log: log,
 		}
 	}
 
 	// These partially match the format string
+	notified := make(map[int]bool, 0)
 	for trigger, extractors := range agg.triggerByPartialFormat {
 		if strings.Contains(log.Format, trigger) {
-			for _, extractor := range extractors {
-				extractor <- &MessageCommand{
-					log: log,
+			for _, extractorIdx := range extractors {
+				if _, exists := notified[extractorIdx]; !exists {
+					c := agg.extractorChans[extractorIdx]
+					c <- &MessageCommand{
+						log: log,
+					}
+					notified[extractorIdx] = true
 				}
 			}
 		}

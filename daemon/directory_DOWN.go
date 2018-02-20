@@ -111,12 +111,9 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 	defer c.FuncIn("Directory::generateChildTypeKey_DOWN", "inode %d",
 		inodeNum).Out()
 
-	// flush already acquired an Inode lock exclusively. In case of the dead
-	// lock, the Inode lock for reading should be required after releasing its
-	// exclusive lock. The gap between two locks, other threads cannot come in
-	// because the function holds the exclusive tree lock, so it is the only
-	// thread accessing this Inode. Also, recursive lock requiring won't occur.
-	defer dir.RLock().RUnlock()
+	// We hold the exclusive tree lock and so cannot be racing against another
+	// access. Thus it is safe to assume nothing has changed between the flush in
+	// our caller and the lock grab in getChildRecordCopy() below.
 	record, err := dir.getChildRecordCopy(c, inodeNum)
 	if err != nil {
 		c.elog("Unable to get record from parent for inode %s", inodeNum)
@@ -171,9 +168,9 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 	defer c.FuncIn("Directory::convertToHardlinkLeg_DOWN",
 		"inode %d name %s", childId, childname).Out()
 
-	child := dir.children.recordById(c, childId)
+	child := dir.children.recordByName(c, childname)
 	if child == nil {
-		c.elog("No child record for inode %d", childId)
+		c.elog("No child record for name %s", childname)
 		return nil, fuse.ENOENT
 	}
 
@@ -184,7 +181,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 		recordCopy := *link
 
 		// Ensure we update the ref count for this hardlink
-		dir.hardlinkTable.hardlinkInc(link.FileId())
+		dir.hardlinkInc(link.FileId())
 
 		return &recordCopy, fuse.OK
 	}
@@ -223,7 +220,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	isHardlink, id := dir.hardlinkTable.checkHardlink(toLink.inodeNum())
 	if isHardlink {
 		// Update the reference count
-		dir.hardlinkTable.hardlinkInc(id)
+		dir.hardlinkInc(id)
 
 		linkCopy := newHardlinkLeg(toLink.name(), id,
 			quantumfs.NewTime(time.Now()), dir.hardlinkTable)
@@ -398,12 +395,16 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 				remoteRecord.FileId() != localRecord.FileId()
 			fileId := rc.attachLocalRecord(c, dir.inodeNum(), childId,
 				moved, localRecord, remoteRecord)
-			dir.children.modifyChildWithFunc(c, childId,
-				func(record quantumfs.DirectoryRecord) {
+			if fileId != localRecord.FileId() {
+				// Don't be wasteful, only modify if a change
+				// occurred
+				dir.children.modifyChildWithFunc(c, childId,
+					func(record quantumfs.DirectoryRecord) {
 
-					record.SetFileId(fileId)
-				})
-			dir.children.makePublishable(c, childname)
+						record.SetFileId(fileId)
+					})
+				dir.children.makePublishable(c, childname)
+			}
 		} else {
 			rc.addStaleEntry(c, dir.inodeNum(), childId, localRecord)
 		}

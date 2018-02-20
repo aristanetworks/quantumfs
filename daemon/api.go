@@ -156,6 +156,9 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	out.OpenFlags = 0
 	handle := newApiHandle(c, api.treeLock())
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
+
+	c.dlog(OpenedInodeDebug, api.id, handle.id)
+
 	out.Fh = uint64(handle.FileHandleCommon.id)
 	return fuse.OK
 }
@@ -240,12 +243,6 @@ func (api *ApiInode) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
 func (api *ApiInode) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	c.vlog("ApiInode::RemoveXAttr doing nothing")
 	return fuse.ENODATA
-}
-
-func (api *ApiInode) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
-
-	c.elog("Invalid syncChild on ApiInode")
 }
 
 func (api *ApiInode) setChildAttr(c *ctx, inodeNum InodeId,
@@ -496,6 +493,9 @@ func (api *ApiHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	case quantumfs.CmdMergeWorkspaces:
 		c.vlog("Received merge request")
 		responseSize = api.mergeWorkspace(c, buf)
+	case quantumfs.CmdWorkspaceFinished:
+		c.vlog("Received WorkspaceFinished request")
+		responseSize = api.workspaceFinished(c, buf)
 	case quantumfs.CmdRefreshWorkspace:
 		c.vlog("Received refresh request")
 		responseSize = api.refreshWorkspace(c, buf)
@@ -642,7 +642,8 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 	}
 
 	newRootId, err := mergeWorkspaceRoot(c, baseRootId, remoteRootId,
-		localRootId, mergePreference(cmd.ConflictPreference), &skipPaths)
+		localRootId, mergePreference(cmd.ConflictPreference), &skipPaths,
+		cmd.LocalWorkspace)
 	if err != nil {
 		c.vlog("Merge failed: %s", err.Error())
 		return api.queueErrorResponse(quantumfs.ErrorCommandFailed,
@@ -854,6 +855,14 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 
 	dst := strings.Split(cmd.DstPath, "/")
 	key, type_, size, err := quantumfs.DecodeExtendedKey(cmd.Key)
+
+	if err != nil {
+		c.vlog("Could not decode key \"%s\". Errror %s",
+			cmd.Key, err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"Could not decode key \"%s\". Errror %s",
+			cmd.Key, err.Error())
+	}
 	permissions := cmd.Permissions
 	uid := quantumfs.ObjectUid(uint32(cmd.Uid), uint32(cmd.Uid))
 	gid := quantumfs.ObjectGid(uint32(cmd.Gid), uint32(cmd.Gid))
@@ -1174,4 +1183,27 @@ func (api *ApiHandle) setWorkspaceImmutable(c *ctx, buf []byte) int {
 
 	return api.queueErrorResponse(quantumfs.ErrorOK,
 		"Making workspace immutable succeeded")
+}
+
+const WorkspaceFinishedFormat = "Workspace %s finished"
+
+func (api *ApiHandle) workspaceFinished(c *ctx, buf []byte) int {
+	defer c.funcIn("ApiHandle::workspaceFinished").Out()
+
+	var cmd quantumfs.WorkspaceFinishedRequest
+	if err := json.Unmarshal(buf, &cmd); err != nil {
+		c.vlog("Error unmarshaling JSON: %s", err.Error())
+		return api.queueErrorResponse(quantumfs.ErrorBadJson, "%s",
+			err.Error())
+	}
+	if !isWorkspaceNameValid(cmd.WorkspacePath) {
+		c.vlog("workspace name '%s' is malformed", cmd.WorkspacePath)
+		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
+			"workspace name '%s' is malformed", cmd.WorkspacePath)
+	}
+
+	c.vlog(WorkspaceFinishedFormat, cmd.WorkspacePath)
+
+	return api.queueErrorResponse(quantumfs.ErrorOK,
+		"WorkspaceFinished Succeeded")
 }

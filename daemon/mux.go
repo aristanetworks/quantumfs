@@ -19,6 +19,7 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -29,18 +30,17 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-const InodeNameLog = "Inode %d Name %s"
-const InodeOnlyLog = "Inode %d"
-const FileHandleLog = "Fh: %d"
-const FileOffsetLog = "Fh: %d offset %d"
-const SetAttrArgLog = "Inode %d valid 0x%x size %d"
+const InodeNameLog = "inode %d name %s"
+const InodeOnlyLog = "inode %d"
+const FileHandleLog = "Fh %d"
+const FileOffsetLog = "Fh %d offset %d"
+const SetAttrArgLog = "inode %d valid 0x%x size %d"
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
 		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
-		fileHandles:            make(map[FileHandleId]FileHandle),
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
@@ -123,9 +123,10 @@ type QuantumFs struct {
 
 	// This is a leaf lock for protecting the instantiation maps
 	// Do not grab other locks while holding this
-	mapMutex    utils.DeferableRwMutex
-	inodes      map[InodeId]Inode
-	fileHandles map[FileHandleId]FileHandle
+	mapMutex utils.DeferableRwMutex
+	inodes   map[InodeId]Inode
+
+	fileHandles sync.Map // map[FileHandleId]FileHandle
 
 	metaInodeMutex           utils.DeferableMutex
 	metaInodeDeletionRecords []MetaInodeDeletionRecord
@@ -480,9 +481,9 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		c.elog("Unable to get workspace rootId")
 		return
 	}
-	if nonce != wsr.nonce {
+	if !nonce.SameIncarnation(&wsr.nonce) {
 		c.dlog("Not refreshing workspace %s due to mismatching "+
-			"nonces %d vs %d", name, wsr.nonce, nonce)
+			"nonces %s vs %s", name, wsr.nonce.String(), nonce.String())
 		return
 	}
 
@@ -521,7 +522,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 		return err
 	}
 
-	if nonce != wsr.nonce {
+	if !nonce.SameIncarnation(&wsr.nonce) {
 		c.wlog("Nothing to merge, new workspace")
 		return nil
 	}
@@ -532,7 +533,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 	}
 
 	newRootId := publishWorkspaceRoot(c,
-		wsr.baseLayerId, wsr.hardlinks)
+		wsr.baseLayerId, wsr.hardlinkTable.hardlinks, publishNow)
 
 	// We should eventually be able to Advance after merging
 	for {
@@ -544,14 +545,15 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 			return err
 		}
 
-		if nonce != wsr.nonce {
+		if !nonce.SameIncarnation(&wsr.nonce) {
 			c.wlog("Nothing to merge, new workspace")
 			return nil
 		}
 
 		mergedId, err := mergeWorkspaceRoot(c, wsr.publishedRootId, rootId,
 			newRootId, quantumfs.PreferNewer,
-			&mergeSkipPaths{paths: make(map[string]struct{}, 0)})
+			&mergeSkipPaths{paths: make(map[string]struct{}, 0)},
+			wsr.typespace+"/"+wsr.namespace+"/"+wsr.workspace)
 
 		if err != nil {
 			c.elog("Unable to merge: %s", err.Error())
@@ -975,16 +977,14 @@ func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 
 // Get a file handle in a thread safe way
 func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
-	defer qfs.mapMutex.RLock().RUnlock()
-	fileHandle := qfs.fileHandles[id]
-	return fileHandle
+	fileHandle, _ := qfs.fileHandles.Load(id)
+	return fileHandle.(FileHandle)
 }
 
 // Set a file handle in a thread safe way, set to nil to delete
 func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
 	defer c.funcIn("Mux::setFileHandle").Out()
 
-	defer qfs.mapMutex.Lock().Unlock()
 	qfs.setFileHandle_(c, id, fileHandle)
 }
 
@@ -993,15 +993,15 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 	fileHandle FileHandle) {
 
 	if fileHandle != nil {
-		qfs.fileHandles[id] = fileHandle
+		qfs.fileHandles.Store(id, fileHandle)
 	} else {
 		// clean up any remaining response queue size from the apiFileSize
-		fileHandle = qfs.fileHandles[id]
-		if api, ok := fileHandle.(*ApiHandle); ok {
+		fh, _ := qfs.fileHandles.Load(id)
+		if api, ok := fh.(*ApiHandle); ok {
 			api.drainResponseData(c)
 		}
 
-		delete(qfs.fileHandles, id)
+		qfs.fileHandles.Delete(id)
 	}
 }
 
@@ -1154,8 +1154,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		// non-existence of lookupCount as zero value and bypass the
 		// if-statement
 		if !exists && !initial {
-			c.vlog("Inode %d with nil lookupCount "+
-				"is uninstantiated by its child", inodeNum)
+			c.vlog("Inode %d is uninstantiated by its child", inodeNum)
 			break
 		}
 		initial = false
@@ -1229,7 +1228,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 						inode.parentId_(), inodeNum))
 				}
 
-				parent.syncChild(c, inodeNum, key)
+				parent.syncChild(c, inodeNum, key, nil)
 
 				qfs.addUninstantiated(c, []InodeId{inodeNum},
 					inode.parentId_())
@@ -1248,6 +1247,10 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 
 	defer c.FuncIn("QuantumFs::getWsrLineageNoInstantiate", "%s/%s/%s",
 		typespace, namespace, workspace).Out()
+
+	var id InodeId
+	var exists bool
+
 	ids = append(ids, quantumfs.InodeIdRoot)
 	inode := qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
 	if inode == nil {
@@ -1257,11 +1260,19 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	if !ok {
 		return nil, fmt.Errorf("bad typespacelist")
 	}
-	id, exists := typespacelist.typespacesByName[typespace]
-	if !exists {
-		c.vlog("typespace %s does not exist", typespace)
+	keepSearching := func() bool {
+		defer typespacelist.RLock().RUnlock()
+		id, exists = typespacelist.typespacesByName[typespace]
+		if !exists {
+			c.vlog("typespace %s does not exist", typespace)
+			return false
+		}
+		return true
+	}()
+	if !keepSearching {
 		return
 	}
+
 	ids = append(ids, id)
 	inode = qfs.inodeNoInstantiate(c, id)
 	if inode == nil {
@@ -1272,10 +1283,18 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	if !ok {
 		return nil, fmt.Errorf("bad namespacelist")
 	}
-	id, exists = namespacelist.namespacesByName[namespace]
-	if !exists {
+	keepSearching = func() bool {
+		defer namespacelist.RLock().RUnlock()
+		id, exists = namespacelist.namespacesByName[namespace]
+		if !exists {
+			return false
+		}
+		return true
+	}()
+	if !keepSearching {
 		return
 	}
+
 	ids = append(ids, id)
 	inode = qfs.inodeNoInstantiate(c, id)
 	if inode == nil {
@@ -1286,10 +1305,19 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	if !ok {
 		return nil, fmt.Errorf("bad workspacelist")
 	}
-	wsrInfo, exists := workspacelist.workspacesByName[workspace]
-	if !exists {
+	var wsrInfo workspaceInfo
+	keepSearching = func() bool {
+		defer workspacelist.RLock().RUnlock()
+		wsrInfo, exists = workspacelist.workspacesByName[workspace]
+		if !exists {
+			return false
+		}
+		return true
+	}()
+	if !keepSearching {
 		return
 	}
+
 	ids = append(ids, wsrInfo.id)
 	return
 }
@@ -2149,7 +2177,7 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 }
 
 const FlushLog = "Mux::Flush"
-const FlushDebugLog = "Fh: %v Context %d %d %d"
+const FlushDebugLog = "Fh %v Context %d %d %d"
 
 func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 	result = fuse.EIO
