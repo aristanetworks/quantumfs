@@ -2021,6 +2021,10 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 		return fuse.EPERM
 	}
 
+	if len(data) == 0 {
+		return fuse.OK
+	}
+
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
 	logInodeWorkspace(c, inode)
