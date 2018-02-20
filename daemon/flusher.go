@@ -335,7 +335,6 @@ func (dq *DirtyQueue) requeue_(c *ctx, inode Inode) {
 
 		defer inode.getParentLock().RLock().RUnlock()
 		if inode.isWorkspaceRoot() || inode.isOrphaned() {
-			c.elog("Got WSR in requeue_")
 			return
 		}
 
