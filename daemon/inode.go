@@ -186,6 +186,7 @@ type Inode interface {
 	RLockTree() *TreeLock
 
 	isWorkspaceRoot() bool
+	isListingType() bool
 
 	// cleanup() is called when the Inode has been uninstantiated, but before the
 	// final reference has been released. It should perform any deterministic
@@ -732,6 +733,14 @@ func (inode *InodeCommon) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 func (inode *InodeCommon) isWorkspaceRoot() bool {
 	_, isWsr := inode.self.(*WorkspaceRoot)
 	return isWsr
+}
+
+func (inode *InodeCommon) isListingType() bool {
+	switch inode.self.(type) {
+	case *TypespaceList, *NamespaceList, *WorkspaceList:
+		return true
+	}
+	return false
 }
 
 // Deleting a child may require that we orphan it, and because we *must* lock from
