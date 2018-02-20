@@ -374,14 +374,19 @@ func (dq *DirtyQueue) sortTopologically_(c *ctx) {
 
 	dirtyInodes := make([]*dirtyInode, 0, dq.Len_())
 	for e := dq.Front_(); e != nil; e = e.Next() {
-		dirtyInodes = append(dirtyInodes, e.Value.(*dirtyInode))
-	}
+		di := e.Value.(*dirtyInode)
+		inodeNum := di.inode.inodeNum()
 
-	for _, di := range dirtyInodes {
 		if di.inode.isOrphaned() {
+			c.vlog("Skipping orphaned inode %d", inodeNum)
 			continue
 		}
 
+		dirtyInodes = append(dirtyInodes, di)
+		c.vlog("Added inode %d to sorting list", inodeNum)
+	}
+
+	for _, di := range dirtyInodes {
 		dq.requeue_(c, di.inode)
 	}
 }
