@@ -91,6 +91,25 @@ func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
 		loadRecord = rc.fileMap[remoteRecord.FileId()]
 		moved = false
 	}
+	if loadRecord.localRecord != nil {
+		c.vlog("Overwriting loadRecord")
+		// Previously a localRecord has been attached to this load record.
+		// This can only happen when local is a hardlinkleg and another
+		// leg has been attached. Remove that leg now as we have found an
+		// exact match.
+		utils.Assert(localRecord.Type() == quantumfs.ObjectTypeHardlink,
+			"Tried to overwrite object of type %d", localRecord.Type())
+		utils.Assert(localRecord.Filename() == remoteRecord.Filename(),
+			"Overriding needs an exact match, got %s vs %s",
+			localRecord.Filename(), remoteRecord.Filename())
+		if remoteRecord.Type() != quantumfs.ObjectTypeHardlink {
+			// remote record is not a hardlink, so it can only have
+			// one match
+			rc.addStaleEntry(c, loadRecord.parentId, loadRecord.inodeId,
+				loadRecord.localRecord)
+		}
+
+	}
 	loadRecord.localRecord = localRecord
 	loadRecord.inodeId = inodeId
 	loadRecord.parentId = parentId
@@ -125,7 +144,7 @@ func (rc *RefreshContext) setHardlinkAsMoveDst(c *ctx,
 	return false
 }
 
-func (rc *RefreshContext) isInodeUsedAfterRefresh(c *ctx,
+func (rc *RefreshContext) isLocalRecordUsable(c *ctx,
 	localRecord quantumfs.ImmutableDirectoryRecord,
 	remoteRecord quantumfs.DirectoryRecord) bool {
 
@@ -139,8 +158,17 @@ func (rc *RefreshContext) isInodeUsedAfterRefresh(c *ctx,
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
 		// the fact that it exists does not tell us anything
 		// for hardlinks, detach it
-		return remoteRecord != nil &&
-			localRecord.FileId() == remoteRecord.FileId()
+		if remoteRecord != nil &&
+			localRecord.FileId() == remoteRecord.FileId() {
+			return true
+		}
+		if loadRecord.remoteRecord != nil &&
+			loadRecord.localRecord == nil {
+			// assume a move if no local record is attached yet
+			return loadRecord.remoteRecord.Type() !=
+				quantumfs.ObjectTypeHardlink
+		}
+		return false
 	}
 	if loadRecord.localRecord == nil {
 		return true
@@ -258,7 +286,7 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx,
 
 // The caller must hold the tree lock
 func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
-	remoteRecord quantumfs.DirectoryRecord,
+	oldType quantumfs.ObjectType, remoteRecord quantumfs.DirectoryRecord,
 	inodeId InodeId, parentId InodeId, path string) {
 
 	defer c.FuncIn("WorkspaceRoot::moveDentry_", "%s %d %d",
@@ -271,14 +299,30 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 
 	srcInode := c.qfs.inode(c, parentId)
 
+	inode := c.qfs.inodeNoInstantiate(c, inodeId)
+
 	switch remoteRecord.Type() {
 	case quantumfs.ObjectTypeDirectory:
 		utils.Assert(false, "directories cannot be moved when refreshing.")
 	case quantumfs.ObjectTypeHardlink:
-		asDirectory(srcInode).moveToHardlinkLeg_DOWN(c, newParent, oldName,
+		remoteRecord = newHardlinkLegFromRecord(remoteRecord,
+			wsr.hardlinkTable)
+		asDirectory(srcInode).moveHardlinkLeg_DOWN(c, newParent, oldName,
 			remoteRecord, inodeId)
+
+		if inode != nil {
+			wsr.hardlinkTable.claimAsChild(inode)
+		}
+		wsr.hardlinkTable.updateHardlinkInodeId(c, remoteRecord.FileId(),
+			inodeId)
 	default:
-		if parentId == newParent.inodeNum() {
+		if oldType == quantumfs.ObjectTypeHardlink {
+			asDirectory(srcInode).moveHardlinkLeg_DOWN(c, newParent,
+				oldName, remoteRecord, inodeId)
+			if inode != nil {
+				inode.setParent(newParent.inodeNum())
+			}
+		} else if parentId == newParent.inodeNum() {
 			srcInode.RenameChild(c, oldName, remoteRecord.Filename())
 		} else {
 			srcInode.MvChild(c, newParent, oldName,
@@ -298,23 +342,14 @@ func (wsr *WorkspaceRoot) moveDentries_(c *ctx, rc *RefreshContext) {
 		if loadRecord.moved {
 			oldName := loadRecord.localRecord.Filename()
 			path := wsName + loadRecord.newParentPath + "/" + oldName
-			wsr.moveDentry_(c, oldName, loadRecord.remoteRecord,
+			wsr.moveDentry_(c, oldName, loadRecord.localRecord.Type(),
+				loadRecord.remoteRecord,
 				loadRecord.inodeId, loadRecord.parentId, path)
 			inode := c.qfs.inodeNoInstantiate(c, loadRecord.inodeId)
 			if inode != nil {
 				reload(c, wsr.hardlinkTable, rc, inode,
 					loadRecord.remoteRecord)
 				c.qfs.invalidateInode(c, loadRecord.inodeId)
-			}
-			if loadRecord.remoteRecord.Type() ==
-				quantumfs.ObjectTypeHardlink {
-
-				if inode != nil {
-					wsr.hardlinkTable.claimAsChild(inode)
-				}
-				wsr.hardlinkTable.updateHardlinkInodeId(c,
-					loadRecord.remoteRecord.FileId(),
-					loadRecord.inodeId)
 			}
 		}
 	}
