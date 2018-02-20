@@ -258,7 +258,7 @@ func TestNoImplicitSync(t *testing.T) {
 	})
 }
 
-func (test *testHelper) workspaceWaitChan(workspaceName string) <-chan struct{} {
+func (test *testHelper) workspaceWaitChan(workspaceName string) chan struct{} {
 	c := make(chan struct{})
 	wsdb := test.qfsInstances[0].config.WorkspaceDB
 	wsdbPl := wsdb.(*processlocal.WorkspaceDB)
@@ -304,15 +304,7 @@ func TestPublishRecordsToBeConsistent(t *testing.T) {
 		// Register for all workspace updates so we know when the first
 		// update happens after the sync above and therefore when we need to
 		// check the newly added file.
-		wait := make(chan struct{})
-		wsdb := test.qfsInstances[0].config.WorkspaceDB
-		wsdbPl := wsdb.(*processlocal.WorkspaceDB)
-		wsdb = wsdbPl.GetAdditionalHead()
-		callback := func(updates map[string]quantumfs.WorkspaceState) {
-			wait <- struct{}{}
-		}
-		wsdb.SetCallback(callback)
-		wsdb.SubscribeTo(workspaceName)
+		wait := test.workspaceWaitChan(workspaceName)
 
 		// This will create testFile1 which fills the dirty queue with:
 		// [testFile1] [dir] [WSR]
