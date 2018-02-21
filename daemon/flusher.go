@@ -71,8 +71,8 @@ func (dq *DirtyQueue) Len_() int {
 }
 
 // flusher lock must be locked when calling this function
-func (dq *DirtyQueue) Remove_(element *list.Element) interface{} {
-	return dq.l.Remove(element)
+func (dq *DirtyQueue) Remove_(element *list.Element) {
+	dq.l.Remove(element)
 }
 
 // flusher lock must be locked when calling this function
