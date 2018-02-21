@@ -259,7 +259,7 @@ func TestNoImplicitSync(t *testing.T) {
 	})
 }
 
-func (test *testHelper) workspaceWaitChan(workspaceName string) chan struct{} {
+func (test *testHelper) workspaceWaitChan(workspaceName string) <-chan struct{} {
 	c := make(chan struct{})
 	wsdb := test.qfsInstances[0].config.WorkspaceDB
 	wsdbPl := wsdb.(*processlocal.WorkspaceDB)
@@ -341,20 +341,32 @@ func TestFlushAllSorting(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 
+		dirs1 := workspace + "/dir1/dir2/dir3/dir4"
+		dirs2 := dirs1 + "/dir5/dir6/dir7/dir8/dir9"
+		file1 := dirs2 + "/file1"
+		file2 := workspace + "/file2"
+		file3 := workspace + "/file3"
+
+		test.AssertNoErr(utils.MkdirAll(dirs2, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file1, "data"))
+		test.AssertNoErr(testutils.PrintToFile(file2, "data"))
+
+		test.SyncAllWorkspaces()
+
 		numberOfPublishes := 0
 		publishUpdates := test.workspaceWaitChan(test.RelPath(workspace))
 		go func() {
 			<-publishUpdates
 			numberOfPublishes = 1
-			// Panic if more than one update is seen
-			close(publishUpdates)
+			test.Log("Received publish")
+
+			<-publishUpdates
+			test.T.Fatalf("Received a second publish update")
 		}()
 
-		dirs := workspace + "/dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9"
-		file := dirs + "/file"
-
-		test.AssertNoErr(utils.MkdirAll(dirs, 0777))
-		test.AssertNoErr(testutils.PrintToFile(file, "data"))
+		test.AssertNoErr(syscall.Link(file2, workspace+"/link2"))
+		test.AssertNoErr(testutils.PrintToFile(file3, "data"))
+		test.AssertNoErr(testutils.PrintToFile(file1, "data2"))
 
 		test.SyncAllWorkspaces()
 
