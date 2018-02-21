@@ -169,6 +169,7 @@ const (
 )
 
 type ObjectKey struct {
+	_   utils.Uncomparable
 	key encoding.ObjectKey
 }
 
