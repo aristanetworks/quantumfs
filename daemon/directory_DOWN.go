@@ -286,12 +286,16 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 
 func (dir *Directory) moveToHardlinkLeg_DOWN(c *ctx, newParent Inode, oldName string,
 	remoteRecord quantumfs.DirectoryRecord, inodeId InodeId) {
+
 	defer c.FuncIn("Directory::moveToHardlinkLeg_DOWN", "%d : %s : %d",
 		dir.inodeNum(), remoteRecord.Filename(), inodeId).Out()
 
-	// Unlike regular rename, we throw away the result of delChild_ and just use
-	// the new remote Record for creating the move target
-	dir.delChild_(c, oldName)
+	// Unlike regular rename, we throw away the result of deleteChild and
+	// just use the new remote record for creating the move destination
+	func() {
+		defer dir.childRecordLock.Lock().Unlock()
+		dir.children.deleteChild(c, oldName)
+	}()
 
 	dst := asDirectory(newParent)
 	defer dst.childRecordLock.Lock().Unlock()
@@ -468,7 +472,7 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 				// Will be handled in the later moveDentries stage
 				return
 			}
-			if !rc.setHardlinkAsMoveTarget(c, localRecord, record) {
+			if !rc.setHardlinkAsMoveDst(c, localRecord, record) {
 				dir.loadNewChild_DOWN_(c, record, inodeId)
 			}
 			return

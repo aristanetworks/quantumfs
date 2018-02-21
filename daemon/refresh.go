@@ -99,10 +99,10 @@ func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
 	return fileId
 }
 
-// See if the remoteRecord can be used as a target of a move from localRecord.
-// Only one leg can be the target of the move and it will be handled as part of
+// See if the remoteRecord can be used as a destination of a move from localRecord.
+// Only one leg can be the destination of the move and it will be handled as part of
 // moveDentry()
-func (rc *RefreshContext) setHardlinkAsMoveTarget(c *ctx,
+func (rc *RefreshContext) setHardlinkAsMoveDst(c *ctx,
 	localRecord quantumfs.ImmutableDirectoryRecord,
 	remoteRecord quantumfs.DirectoryRecord) bool {
 
@@ -310,7 +310,7 @@ func (wsr *WorkspaceRoot) moveDentries_(c *ctx, rc *RefreshContext) {
 				quantumfs.ObjectTypeHardlink {
 
 				if inode != nil {
-					wsr.hardlinkTable.claimAsChild_(inode)
+					wsr.hardlinkTable.claimAsChild(inode)
 				}
 				wsr.hardlinkTable.updateHardlinkInodeId(c,
 					loadRecord.remoteRecord.FileId(),
