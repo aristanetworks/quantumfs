@@ -51,8 +51,14 @@ func (merge *merger) newHardlinkTracker(base map[quantumfs.FileId]HardlinkTableE
 				baseRecord = baseEntry.record
 			}
 
-			mergedRecord, err := merge.mergeFile(baseRecord,
+			mergedRecord, err := merge.mergeAttributes(baseRecord,
 				remoteEntry.record, localEntry.record)
+			if err != nil {
+				panic(err)
+			}
+
+			err = merge.mergeFile(baseRecord,
+				remoteEntry.record, localEntry.record, &mergedRecord)
 			if err != nil {
 				panic(err)
 			}
@@ -670,7 +676,8 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 	case quantumfs.ObjectTypeVeryLargeFile:
 		if bothSameType {
 			// We can potentially do an intra-file merge
-			return merge.mergeFile(base, remote, local)
+			err = merge.mergeFile(base, remote, local, &rtnRecord)
+			return rtnRecord, err
 		}
 	}
 
@@ -771,17 +778,13 @@ func chooseAccessors(c *ctx, remote quantumfs.DirectoryRecord,
 
 func (merge *merger) mergeFile(base quantumfs.DirectoryRecord,
 	remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) (quantumfs.DirectoryRecord, error) {
+	local quantumfs.DirectoryRecord,
+	premergedRecord *quantumfs.DirectoryRecord) error {
 
 	defer merge.c.FuncIn("mergeFile", "%s", local.Filename()).Out()
 
-	rtnRecord, err := merge.mergeAttributes(base, remote, local)
-	if err != nil {
-		return nil, err
-	}
-
 	if !needDeeperMerge(remote, local) {
-		return rtnRecord, nil
+		return nil
 	}
 
 	var baseAccessor blockAccessor
@@ -873,17 +876,17 @@ func (merge *merger) mergeFile(base quantumfs.DirectoryRecord,
 			})
 
 		// Use the merged record as a base and update content relevant fields
-		rtnRecord.SetType(otherRecord.Type())
-		rtnRecord.SetSize(other.fileLength(merge.c))
-		rtnRecord.SetID(other.sync(merge.c, merge.pubFn))
+		(*premergedRecord).SetType(otherRecord.Type())
+		(*premergedRecord).SetSize(other.fileLength(merge.c))
+		(*premergedRecord).SetID(other.sync(merge.c, merge.pubFn))
 
-		merge.c.vlog("Merging file contents for %d %s", local.FileId(),
+		merge.c.vlog("Merging file contents: %d %s", local.FileId(),
 			local.Filename())
-		return rtnRecord, nil
+		return nil
 	}
 
-	merge.c.vlog("File conflict for %s resulting in overwrite. %d %d",
+	merge.c.vlog("File conflict for %s: %d %d",
 		local.Filename(), local.FileId(), remote.FileId())
 
-	return rtnRecord, nil
+	return nil
 }
