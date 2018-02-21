@@ -344,11 +344,10 @@ func (dq *DirtyQueue) requeue_(c *ctx, inode Inode) {
 
 // Must hold flusher lock
 func (dq *DirtyQueue) moveToBackOfQueue_(c *ctx, inode Inode) {
-	de := inode.markClean_()
+	de := inode.dirtyElement_()
 	if de != nil {
 		c.vlog("Moving inode %d to end of dirty queue", inode.inodeNum())
-		di := dq.Remove_(de)
-		inode.markUnclean_(dq.PushBack_(di))
+		dq.l.MoveToBack(de)
 	} else {
 		c.vlog("Adding inode %d to end of dirty queue", inode.inodeNum())
 		inode.dirty_(c)
@@ -358,7 +357,7 @@ func (dq *DirtyQueue) moveToBackOfQueue_(c *ctx, inode Inode) {
 // When flushing the dirty queue normally the WSR will be dirtied many times
 // as it is occasionally published, but children of that WSR are still on the
 // dirty queue. When syncing the entire queue we can flush any particular
-// inode only once by flushing in revert topological order, from the leaves
+// inode only once by flushing in reverse topological order, from the leaves
 // up to the root.
 //
 // Must hold the flusher lock
