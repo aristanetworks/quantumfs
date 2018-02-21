@@ -1403,9 +1403,10 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	return inode.(*WorkspaceRoot), wsrCleanup, true
 }
 
-func getWsr(c *ctx, inode Inode) *WorkspaceRoot {
-	var wsr *WorkspaceRoot
+func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
+	defer c.FuncIn("Mux::workspaceIsMutable", "inode %d", inode.inodeNum()).Out()
 
+	var wsr *WorkspaceRoot
 	switch inode.(type) {
 	// The default cases will be inode such as file, symlink, hardlink etc, they
 	// get workspaceroots from their parents.
@@ -1413,7 +1414,7 @@ func getWsr(c *ctx, inode Inode) *WorkspaceRoot {
 		defer inode.getParentLock().RLock().RUnlock()
 		// if inode is already forgotten, the workspace doesn't process it.
 		if inode.isOrphaned_() {
-			return nil
+			return true
 		}
 		parent := inode.parent_(c)
 		switch parent.(type) {
@@ -1421,7 +1422,7 @@ func getWsr(c *ctx, inode Inode) *WorkspaceRoot {
 			panic(fmt.Sprintf("The inode type is unexpected: %v",
 				reflect.TypeOf(parent)))
 		case *WorkspaceList:
-			return nil
+			return true
 		case *WorkspaceRoot:
 			wsr = parent.(*WorkspaceRoot)
 		case *Directory:
@@ -1435,24 +1436,12 @@ func getWsr(c *ctx, inode Inode) *WorkspaceRoot {
 	case *TypespaceList:
 		// If the inode is typespace/namespace/workspace/api, return true
 		// immediately since workspaceroot shouldn't have authority over them
-		return nil
+		return true
 	case *NamespaceList:
-		return nil
+		return true
 	case *WorkspaceList:
-		return nil
+		return true
 	case *ApiInode:
-		return nil
-	}
-
-	return wsr
-}
-
-func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
-	defer c.FuncIn("Mux::workspaceIsMutable", "inode %d", inode.inodeNum()).Out()
-
-	wsr := getWsr(c, inode)
-	if wsr == nil {
-		// Inode which are not part of a workspace are always mutable
 		return true
 	}
 
