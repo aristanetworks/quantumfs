@@ -483,7 +483,7 @@ func (merge *merger) mergeExtendedAttrs(base quantumfs.ObjectKey,
 
 		if baseAttrs != nil {
 			baseId, inBase := baseAttrs.AttributeByKey(key)
-			if (!inBase && !inNewer) || (baseId.IsEqualTo(newerId) {
+			if (!inBase && !inNewer) || baseId.IsEqualTo(newerId) {
 				setId = true
 			}
 		} else if newerId.IsEqualTo(quantumfs.EmptyBlockKey) {
