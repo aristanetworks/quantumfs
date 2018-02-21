@@ -477,13 +477,13 @@ func (merge *merger) mergeExtendedAttrs(base quantumfs.ObjectKey,
 	// Add attrs that were added or only changed by the older branch
 	for i := 0; i < olderAttrs.NumAttributes(); i++ {
 		key, olderId := olderAttrs.Attribute(i)
-		newerId, newerFound := newerAttrs.AttributeByKey(key)
+		newerId, inNewer := newerAttrs.AttributeByKey(key)
 
 		setId := false
 
 		if baseAttrs != nil {
-			baseId, baseFound := baseAttrs.AttributeByKey(key)
-			if (!baseFound && !newerFound) || (baseId == newerId) {
+			baseId, inBase := baseAttrs.AttributeByKey(key)
+			if (!inBase && !inNewer) || (baseId == newerId) {
 				setId = true
 			}
 		} else if newerId == quantumfs.EmptyBlockKey {
