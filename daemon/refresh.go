@@ -48,16 +48,16 @@ type RefreshContext struct {
 }
 
 // should be called under the treelock
-func newRefreshContext_(c *ctx, currentRootId quantumfs.ObjectKey,
-	newRootId quantumfs.ObjectKey) *RefreshContext {
+func newRefreshContext_(c *ctx, localRootId quantumfs.ObjectKey,
+	remoteRootId quantumfs.ObjectKey) *RefreshContext {
 
 	rc := RefreshContext{
 		fileMap:      make(map[quantumfs.FileId]*FileLoadRecord, 0),
 		staleRecords: make([]FileRemoveRecord, 0),
-		rootId:       newRootId,
+		rootId:       remoteRootId,
 	}
 
-	rc.buildRefreshMapWsr(c, currentRootId, newRootId)
+	rc.buildRefreshMapWsr(c, localRootId, remoteRootId)
 	return &rc
 }
 
@@ -195,9 +195,7 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 			// don't recurse into any directories that haven't changed
 			localRecord, exists := localRecords[record.FileId()]
 			if exists {
-				skip := (localRecord.ID().IsEqualTo(record.ID()) &&
-					localRecord.Filename() == record.Filename())
-				if skip {
+				if skipDir(localRecord, record) {
 					c.vlog("Skipping %s since no change",
 						localRecord.Filename())
 					return
@@ -210,6 +208,18 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 				path+"/"+record.Filename())
 		}
 	})
+}
+
+func skipDir(local quantumfs.ImmutableDirectoryRecord,
+	remote quantumfs.DirectoryRecord) bool {
+
+	if local == nil || remote == nil {
+		return false
+	}
+
+	return local.ID().IsEqualTo(remote.ID()) &&
+		local.FileId() == remote.FileId() &&
+		local.Filename() == remote.Filename()
 }
 
 func shouldHideLocalRecord(localRecord quantumfs.ImmutableDirectoryRecord,

@@ -410,11 +410,8 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 		}
 
 		// Ensure we ignore any subdirectories that haven't changed
-		remoteUnchanged := (remoteRecord != nil &&
-			localRecord.ID().IsEqualTo(remoteRecord.ID()))
-
 		if localRecord.Type() == quantumfs.ObjectTypeDirectory &&
-			!remoteUnchanged {
+			!skipDir(localRecord.AsImmutable(), remoteRecord) {
 
 			updateMapDescend_DOWN(c, rc, childId, remoteRecord)
 		}
@@ -437,7 +434,6 @@ func (dir *Directory) findLocalMatch_DOWN_(c *ctx, rc *RefreshContext,
 		c.elog("Missing filemap record for %s", record.Filename())
 	}
 
-	c.vlog("find for %s: %x", record.Filename(), record.FileId())
 	return matchingLoadRecord.localRecord, matchingLoadRecord.inodeId, true
 }
 
