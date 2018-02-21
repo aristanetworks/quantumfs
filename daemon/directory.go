@@ -1421,8 +1421,8 @@ func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 		return nil, fuse.EIO
 	}
 
-	key := attributeList.AttributeByKey(attr)
-	if key == quantumfs.EmptyBlockKey {
+	key, found := attributeList.AttributeByKey(attr)
+	if !found {
 		c.vlog("XAttr name not found")
 		return nil, fuse.ENODATA
 	}
