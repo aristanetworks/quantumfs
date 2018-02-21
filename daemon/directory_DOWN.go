@@ -430,9 +430,7 @@ func (dir *Directory) findLocalMatch_DOWN_(c *ctx, rc *RefreshContext,
 		return localRecord, localEntries[record.Filename()], false
 	}
 	matchingLoadRecord, exists := rc.fileMap[record.FileId()]
-	if !exists {
-		c.elog("Missing filemap record for %s", record.Filename())
-	}
+	utils.Assert(exists, "Missing filemap record for %s", record.Filename())
 
 	return matchingLoadRecord.localRecord, matchingLoadRecord.inodeId, true
 }
