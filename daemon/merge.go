@@ -228,6 +228,12 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go mergeUploader(c, toSet, &uploadErr, &wg)
+	defer func() {
+		// Ensure everything is uploaded before we return. Defer this close
+		// to ensure that the mergeUploader thread ends even if we panic
+		close(toSet)
+		wg.Wait()
+	}()
 
 	baseHardlinks, baseDirectory, err := loadWorkspaceRoot(c, base)
 	if err != nil {
@@ -257,9 +263,6 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	rtn := publishWorkspaceRoot(c, localDirectory, tracker.merged,
 		merge.pubFn)
 
-	// Ensure everything is uploaded before we continue
-	close(toSet)
-	wg.Wait()
 	return rtn, uploadErr
 }
 
