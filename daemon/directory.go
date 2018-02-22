@@ -583,7 +583,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	defer dir.RLock().RUnlock()
 
-	children := make([]directoryContents, 0, 200) // 200 arbitrarily chosen
+	children := make([]directoryContents, 0, dir.children.count()+2)
 
 	c.vlog("Adding .")
 	entryInfo := directoryContents{
