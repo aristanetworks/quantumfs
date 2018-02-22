@@ -14,7 +14,12 @@ import (
 // Returns 0 if there is no valid FUSE filetype
 func objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 	defer c.FuncIn("objectTypeToFileType", "type %d", objectType).Out()
+	return _objectTypeToFileType(c, objectType)
+}
 
+// Non-tracing version. This is useful where it is called many times from a
+// well-known context, such that the function tracing isn't useful.
+func _objectTypeToFileType(c *ctx, objectType quantumfs.ObjectType) uint32 {
 	switch objectType {
 	case quantumfs.ObjectTypeSmallFile,
 		quantumfs.ObjectTypeMediumFile,
