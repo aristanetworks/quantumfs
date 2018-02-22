@@ -345,15 +345,14 @@ func (container *ChildContainer) publishableRecords(
 	return records
 }
 
-func (container *ChildContainer) records() []quantumfs.ImmutableDirectoryRecord {
-	records := make([]quantumfs.ImmutableDirectoryRecord, 0, container.count())
+func (container *ChildContainer) records() map[string]quantumfs.ImmutableDirectoryRecord {
+	records := make(map[string]quantumfs.ImmutableDirectoryRecord, container.count())
 
 	for name, inodeId := range container.children {
 		if effective, exists := container.effective[inodeId]; exists {
-			records = append(records, effective[name])
+			records[name] = effective[name]
 		} else {
-			records = append(records,
-				container.publishable[inodeId][name])
+			records[name] = container.publishable[inodeId][name]
 		}
 	}
 
