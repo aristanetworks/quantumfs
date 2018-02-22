@@ -333,12 +333,17 @@ func (dq *DirtyQueue) requeue_(c *ctx, inode Inode) {
 	for {
 		dq.moveToBackOfQueue_(c, inode)
 
-		defer inode.getParentLock().RLock().RUnlock()
-		if inode.isWorkspaceRoot() || inode.isOrphaned_() {
+		done := func() bool {
+			defer inode.getParentLock().RLock().RUnlock()
+			if inode.isWorkspaceRoot() || inode.isOrphaned_() {
+				return true
+			}
+			inode = inode.parent_(c)
+			return false
+		}()
+		if done {
 			return
 		}
-
-		inode = inode.parent_(c)
 	}
 }
 
