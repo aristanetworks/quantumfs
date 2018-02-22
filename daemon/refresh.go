@@ -90,10 +90,9 @@ func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
 		// match the new incarnation
 		fileId = remoteRecord.FileId()
 		loadRecord, found = rc.fileMap[remoteRecord.FileId()]
-		if !found {
-			c.elog("Dir moved, but not found in buildmap %d",
-				localRecord.Filename())
-		}
+		utils.Assert(found, "Dir moved, but not found in buildmap %d",
+			localRecord.Filename())
+
 		moved = false
 	}
 	loadRecord.localRecord = localRecord
@@ -122,12 +121,12 @@ func (rc *RefreshContext) isInodeUsedAfterRefresh(c *ctx,
 			localRecord.FileId() == remoteRecord.FileId()
 	}
 
-	// localRecord is populated the first time we encounter it. In most cases
-	// if we hit it twice then we have a problem and should assert
 	if loadRecord.localRecord == nil {
 		return true
 	}
 
+	// localRecord is populated the first time we encounter it. Except for
+	// directories, if we hit it twice then we have a problem and should assert
 	utils.Assert(localRecord.Type() == quantumfs.ObjectTypeDirectory,
 		"Object of type %d already has a match.", localRecord.Type())
 	return false
@@ -170,17 +169,15 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 
 	c.vlog("Loading local records")
 	localRecords := make(map[quantumfs.FileId]quantumfs.DirectoryRecord)
-	if !localDir.IsEqualTo(quantumfs.EmptyDirKey) {
-		foreachDentry(c, localDir, func(record quantumfs.DirectoryRecord) {
-			localRecords[record.FileId()] = record
-		})
-	}
+	foreachDentry(c, localDir, func(record quantumfs.DirectoryRecord) {
+		localRecords[record.FileId()] = record
+	})
 
 	c.vlog("Loading remote records")
 	foreachDentry(c, remoteDir, func(record quantumfs.DirectoryRecord) {
-
 		c.vlog("Added filemap entry for %s: %x", record.Filename(),
 			record.FileId())
+
 		rc.fileMap[record.FileId()] = &FileLoadRecord{
 			remoteRecord:  record,
 			inodeId:       quantumfs.InodeIdInvalid,
