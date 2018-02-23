@@ -1520,8 +1520,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	} else {
 		var err error
 		dataBuf := newBufferCopy(c, data, quantumfs.KeyTypeData)
-		dataKey, err = dataBuf.Key(&c.Ctx)
-		if err != nil {
+		if dataKey, err = c.dataStore.Set(&c.Ctx, dataBuf); err != nil {
 			c.elog("Error uploading XAttr data: %v", err)
 			return fuse.EIO
 		}
@@ -1554,9 +1553,9 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	}
 
 	buffer := newBuffer(c, attributeList.Bytes(), quantumfs.KeyTypeMetadata)
-	key, err := buffer.Key(&c.Ctx)
+	key, err := c.dataStore.Set(&c.Ctx, buffer)
 	if err != nil {
-		c.elog("Error computing extended attribute key: %v", err)
+		c.elog("Error uploading extended attributes: %v", err)
 		return fuse.EIO
 	}
 
@@ -1631,7 +1630,7 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 		buffer := newBuffer(c, attributeList.Bytes(),
 			quantumfs.KeyTypeMetadata)
 		var err error
-		key, err = buffer.Key(&c.Ctx)
+		key, err = c.dataStore.Set(&c.Ctx, buffer)
 		if err != nil {
 			c.elog("Error computing extended attribute key: %v", err)
 			return fuse.EIO

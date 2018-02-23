@@ -195,7 +195,7 @@ func mergeUploader(c *ctx, buffers chan quantumfs.Buffer, rtnErr *error,
 			continue
 		}
 
-		_, err := buffer.Key(&c.Ctx)
+		_, err := c.dataStore.Set(&c.Ctx, buffer)
 		if err != nil {
 			*rtnErr = err
 		}

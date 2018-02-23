@@ -99,21 +99,24 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	return <-resultChannel
 }
 
-func (store *dataStore) Set(c *quantumfs.Ctx, buf quantumfs.Buffer) error {
+func (store *dataStore) Set(c *quantumfs.Ctx,
+	buf quantumfs.Buffer) (quantumfs.ObjectKey, error) {
+
 	defer c.FuncInName(qlog.LogDaemon, "dataStore::Set").Out()
 
 	key, err := buf.Key(c)
 	if err != nil {
 		c.Vlog(qlog.LogDaemon, "Error computing key %s", err.Error())
-		return err
+		return quantumfs.EmptyBlockKey, err
 	}
 
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to set embedded key")
 	}
+
 	buf_ := buf.(*buffer)
 	store.cache.storeInCache(c, key, buf_)
-	return store.durableStore.Set(c, key, buf)
+	return key, store.durableStore.Set(c, key, buf)
 }
 
 func newEmptyBuffer() buffer {
@@ -306,18 +309,14 @@ func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 }
 
 func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
-	defer c.FuncInName(qlog.LogDaemon, "buffer::Key").Out()
+	defer c.FuncIn(qlog.LogDaemon, "buffer::Key", "%t", buf.dirty).Out()
 
 	if !buf.dirty {
-		c.Vlog(qlog.LogDaemon, "Buffer not dirty")
 		return buf.key, nil
 	}
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
-	buf.dirty = false
-	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.String())
-	err := buf.dataStore.Set(c, buf)
-	return buf.key, err
+	return buf.key, nil
 }
 
 func (buf *buffer) SetSize(size int) {
