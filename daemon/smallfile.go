@@ -38,7 +38,7 @@ func (fi *SmallFile) getBuffer(c *ctx) quantumfs.Buffer {
 	if buf != nil {
 		buf.SetSize(fi.size)
 	}
-	return buf
+	return buf.clone()
 }
 
 func (fi *SmallFile) getBufferToDirty(c *ctx) quantumfs.Buffer {

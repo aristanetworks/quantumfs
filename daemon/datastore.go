@@ -55,7 +55,7 @@ func (store *dataStore) Freshen(c *ctx, key quantumfs.ObjectKey) error {
 }
 
 func (store *dataStore) Get(c *quantumfs.Ctx,
-	key quantumfs.ObjectKey) quantumfs.Buffer {
+	key quantumfs.ObjectKey) utils.ImmutableBuffer {
 
 	defer c.FuncIn(qlog.LogDaemon, "dataStore::Get",
 		"key %s", key.String()).Out()
@@ -69,7 +69,8 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	err := quantumfs.ConstantStore.Get(c, key, &thinBuf)
 	if err == nil {
 		c.Vlog(qlog.LogDaemon, "Found key in constant store")
-		return &thinBuf
+		return newImmutableBuffer(thinBuf.data, thinBuf.keyType, thinBuf.key,
+			thinBuf.dataStore)
 	}
 
 	// Check cache
@@ -137,10 +138,16 @@ func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 
 // Like newBuffer(), but 'in' is copied and ownership is not assumed
 func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
-	inSize := len(in)
-
 	defer c.FuncIn("newBufferCopy", "keyType %d inSize %d", keyType,
 		len(in)).Out()
+
+	return newBufferCopyDs(c.dataStore, in, keyType)
+}
+
+func newBufferCopyDs(store *dataStore, in []byte,
+	keyType quantumfs.KeyType) quantumfs.Buffer {
+
+	inSize := len(in)
 
 	var newData []byte
 	// ensure our buffer meets min capacity
@@ -155,7 +162,7 @@ func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffe
 		data:      newData,
 		dirty:     true,
 		keyType:   keyType,
-		dataStore: c.dataStore,
+		dataStore: store,
 	}
 }
 
@@ -192,7 +199,6 @@ type buffer struct {
 	keyType    quantumfs.KeyType
 	key        quantumfs.ObjectKey
 	dataStore  *dataStore
-	lruElement *list.Element
 }
 
 func (buf *buffer) padWithZeros(newLength int) {
@@ -386,7 +392,8 @@ func (buf *buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
 
 type cacheEntry struct {
 	buf     *buffer
-	waiting []chan quantumfs.Buffer
+	waiting []chan utils.ImmutableBuffer
+	lruElement *list.Element
 }
 
 type combiningCache struct {
@@ -422,8 +429,8 @@ func (cc *combiningCache) shutdown() {
 // get either returns a buffer copy from the cache, or a channel that the buffer
 // will come back on
 func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
-	fetch func() *buffer) (cached quantumfs.Buffer,
-	resultChannel chan quantumfs.Buffer) {
+	fetch func() *buffer) (cached utils.ImmutableBuffer,
+	resultChannel chan utils.ImmutableBuffer) {
 
 	defer cc.lock.Lock().Unlock()
 
@@ -431,14 +438,14 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	if exists {
 		if entry.buf != nil {
 			// refresh an existing cached entry
-			cc.lru.MoveToBack(entry.buf.lruElement)
-			return entry.buf.clone(), nil
+			cc.lru.MoveToBack(entry.lruElement)
+			return entry.buf, nil
 		} // else we need to wait for the result
 	} else {
 		// Prepare a placeholder to indicate the result is being fetched
 		entry = &cacheEntry{
 			buf:     nil,
-			waiting: make([]chan quantumfs.Buffer, 0),
+			waiting: make([]chan utils.ImmutableBuffer, 0),
 		}
 
 		// Asynchronously fetch and store the result
@@ -450,7 +457,7 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	}
 
 	// Waiting for data, so add on a channel
-	waitChan := make(chan quantumfs.Buffer)
+	waitChan := make(chan utils.ImmutableBuffer)
 	entry.waiting = append(entry.waiting, waitChan)
 	// Note: the cache entry will only get pushed into the lru queue when its
 	// data is set into the cache
@@ -467,17 +474,16 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, key quantumfs.ObjectKey
 
 	defer cc.lock.Lock().Unlock()
 
+	// Convert the daemon buffer to an immutable one
+	immutable := newImmutableBuffer(buf.data, buf.keyType, buf.key,
+		buf.dataStore)
+
 	// Satisfy any channels waiting for this data, no matter what
 	entry, exists := cc.entryMap[key.String()]
 	if exists && entry.buf == nil && entry.waiting != nil {
 		// Send copies to each waiter and then nullify the queue of them
 		for _, channel := range entry.waiting {
-			var qfsBuffer quantumfs.Buffer
-			if buf != nil {
-				qfsBuffer = buf.clone()
-			}
-
-			channel <- qfsBuffer
+			channel <- immutable
 		}
 		entry.waiting = nil
 	}
@@ -531,8 +537,8 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, key quantumfs.ObjectKey
 		cc.freeSpace += evictedBuf.Size()
 		delete(cc.entryMap, evictedBuf.key.String())
 	}
-	buf.lruElement = cc.lru.PushBack(buf)
 	cc.entryMap[buf.key.String()] = &cacheEntry{
 		buf: buf,
+		lruElement: cc.lru.PushBack(buf),
 	}
 }

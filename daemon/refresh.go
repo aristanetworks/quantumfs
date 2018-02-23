@@ -55,7 +55,7 @@ func newRefreshContext(c *ctx, rootId quantumfs.ObjectKey) *RefreshContext {
 		rootId:       rootId,
 	}
 	workspaceRoot := c.dataStore.Get(&c.Ctx, rootId).AsWorkspaceRoot()
-	baseLayerId := workspaceRoot.BaseLayer()
+	baseLayerId := workspaceRoot.clone().BaseLayer()
 	rc.buildRefreshMap(c, baseLayerId, "")
 	return &rc
 }
@@ -374,7 +374,7 @@ func (wsr *WorkspaceRoot) refreshTo_(c *ctx, rc *RefreshContext) {
 	defer c.funcIn("WorkspaceRoot::refreshTo_").Out()
 
 	buffer := c.dataStore.Get(&c.Ctx, rc.rootId)
-	workspaceRoot := buffer.AsWorkspaceRoot()
+	workspaceRoot := buffer.clone().AsWorkspaceRoot()
 	baseLayerId := workspaceRoot.BaseLayer()
 	hardlinkEntry := workspaceRoot.HardlinkEntry()
 

@@ -57,7 +57,7 @@ func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 		if buffer == nil {
 			panic("No baseLayer object")
 		}
-		baseLayer := buffer.AsDirectoryEntry()
+		baseLayer := buffer.clone().AsDirectoryEntry()
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			visitor(baseLayer.Entry(i))
@@ -1383,7 +1383,7 @@ func getRecordExtendedAttributes(c *ctx,
 		return nil, fuse.EIO
 	}
 
-	attributeList := buffer.AsExtendedAttributes()
+	attributeList := buffer.clone().AsExtendedAttributes()
 	return &attributeList, fuse.OK
 }
 
@@ -1405,7 +1405,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 }
 
 func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
-	attr string) (quantumfs.Buffer, fuse.Status) {
+	attr string) (utils.ImmutableBuffer, fuse.Status) {
 
 	defer c.FuncIn("Directory::getChildXAttrBuffer", "%d %s", inodeNum,
 		attr).Out()

@@ -60,7 +60,7 @@ func (inode *InodeCommon) parseExtendedAttributes_(c *ctx) {
 		return
 	}
 
-	attributes := buffer.AsExtendedAttributes()
+	attributes := buffer.clone().AsExtendedAttributes()
 
 	for i := 0; i < attributes.NumAttributes(); i++ {
 		name, attrKey := attributes.Attribute(i)

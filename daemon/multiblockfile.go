@@ -41,7 +41,7 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 		panic("Unable to fetch metadata for new file creation")
 	}
 
-	store := buffer.AsMultiBlockFile()
+	store := buffer.clone().AsMultiBlockFile()
 
 	rtn.metadata.BlockSize = store.BlockSize()
 	rtn.metadata.LastBlockBytes = store.SizeOfLastBlock()
@@ -74,7 +74,7 @@ func (fi *MultiBlockFile) retrieveDataBlock(c *ctx, blockIdx int) quantumfs.Buff
 		blockIdx).Out()
 	block, exists := fi.toSync[blockIdx]
 	if !exists {
-		return c.dataStore.Get(&c.Ctx, fi.metadata.Blocks[blockIdx])
+		return c.dataStore.Get(&c.Ctx, fi.metadata.Blocks[blockIdx]).clone()
 	}
 
 	return block
@@ -191,7 +191,7 @@ func (fi *MultiBlockFile) reload(c *ctx, key quantumfs.ObjectKey) {
 		panic("Unable to fetch metadata for reloading")
 	}
 
-	store := buffer.AsMultiBlockFile()
+	store := buffer.clone().AsMultiBlockFile()
 
 	fi.metadata.BlockSize = store.BlockSize()
 	fi.metadata.LastBlockBytes = store.SizeOfLastBlock()
