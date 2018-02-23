@@ -118,7 +118,7 @@ func (fi *SmallFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 
 	// No metadata to marshal for small files
 	buf := fi.getBuffer(c)
-	key, err := pub(c, buf)
+	key, err := pub(c, newImmutableBuffer(buf.Get(), buf.KeyType(), c.dataStore))
 	if err != nil {
 		panic(err.Error())
 	}

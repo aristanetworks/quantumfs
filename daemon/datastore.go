@@ -540,6 +540,10 @@ type ImmutableBuffer struct {
 	dataStore *dataStore
 }
 
+func CastToImmutableBuffer(c *ctx, buf quantumfs.Buffer) *ImmutableBuffer {
+	return newImmutableBuffer(buf.Get(), buf.KeyType(), c.dataStore)
+}
+
 func newImmutableBufferDataCopy(in []byte, keyType_ quantumfs.KeyType,
 	store *dataStore) *ImmutableBuffer {
 
