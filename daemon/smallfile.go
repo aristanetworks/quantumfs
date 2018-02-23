@@ -16,7 +16,7 @@ import (
 type SmallFile struct {
 	key  quantumfs.ObjectKey
 	size int
-	buf  quantumfs.Buffer
+	buf  ImmutableBuffer
 }
 
 func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
@@ -29,17 +29,23 @@ func newSmallAccessor(c *ctx, size uint64, key quantumfs.ObjectKey) *SmallFile {
 	}
 }
 
-func (fi *SmallFile) getBuffer(c *ctx) quantumfs.Buffer {
+func (fi *SmallFile) getBuffer(c *ctx) ImmutableBuffer {
 	if fi.buf != nil {
 		return fi.buf
 	}
 
-	buf := c.dataStore.Get(&c.Ctx, fi.key).clone()
-	if buf != nil {
-		buf.SetSize(fi.size)
+	buf := c.dataStore.Get(&c.Ctx, fi.key)
+	if buf != nil && buf.Size() != fi.size {
+		c.wlog("getBuffer forced to be resized")
+		mutable := buf.clone()
+		mutable.SetSize(fi.size)
+		return newImmutableBuffer(mutable.Get(), mutable.KeyType(),
+			c.dataStore)
 	}
 	return buf
 }
+
+
 
 func (fi *SmallFile) getBufferToDirty(c *ctx) quantumfs.Buffer {
 	fi.buf = fi.getBuffer(c)
@@ -134,7 +140,7 @@ func (fi *SmallFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 func (fi *SmallFile) reload(c *ctx, key quantumfs.ObjectKey) {
 	defer c.funcIn("SmallFile::reload").Out()
 	fi.key = key
-	fi.buf = c.dataStore.Get(&c.Ctx, fi.key).clone()
+	fi.buf = c.dataStore.Get(&c.Ctx, fi.key)
 	if fi.buf == nil {
 		panic(key.String())
 	}
