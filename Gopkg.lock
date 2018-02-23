@@ -25,9 +25,9 @@
     "utils/stats",
     "utils/stats/inmem"
   ]
-  revision = "776903f52d6ec89bbb171500b018f634daad266f"
+  revision = "d1de2e1b0134f0dc004efda46409fab8364d96d7"
   source = "gerrit.corp.arista.io/ether"
-  version = "v0.14"
+  version = "v0.15"
 
 [[projects]]
   branch = "master"
@@ -225,6 +225,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "68e8fb63124cf2ab7f0a2fbbf6e061df35ab68881a4c82949a1cba435ff8d64f"
+  inputs-digest = "0d19cd3b87a4b3fe57292156a2135fe87aed7d19dce39ecd72d8817a3560a780"
   solver-name = "gps-cdcl"
   solver-version = 1

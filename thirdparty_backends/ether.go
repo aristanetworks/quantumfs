@@ -491,8 +491,8 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	result := make(map[string]quantumfs.WorkspaceNonce, len(list))
 	for name := range list {
 		result[name] = quantumfs.WorkspaceNonce{
-			Id:          list[name].Id,
-			PublishTime: list[name].PublishTime,
+			Id:          uint64(list[name].Id),
+			PublishTime: uint64(list[name].PublishTime),
 		}
 	}
 	return result, nil
@@ -517,8 +517,8 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 	}
 
 	qfsNonce := quantumfs.WorkspaceNonce{
-		Id:          nonce.Id,
-		PublishTime: nonce.PublishTime,
+		Id:          uint64(nonce.Id),
+		PublishTime: uint64(nonce.PublishTime),
 	}
 	return quantumfs.NewObjectKeyFromBytes(key), qfsNonce, nil
 }
@@ -590,8 +590,8 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 		currentRootId.String(), newRootId.String())
 
 	wsdbNonce := wsdb.WorkspaceNonce{
-		Id:          nonce.Id,
-		PublishTime: nonce.PublishTime,
+		Id:          int64(nonce.Id),
+		PublishTime: int64(nonce.PublishTime),
 	}
 	key, err := w.wsdb.AdvanceWorkspace((*wsApiCtx)(c), typespace, namespace,
 		workspace, wsdbNonce, currentRootId.Value(),
