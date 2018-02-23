@@ -69,26 +69,26 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	err := quantumfs.ConstantStore.Get(c, key, &thinBuf)
 	if err == nil {
 		c.Vlog(qlog.LogDaemon, "Found key in constant store")
-		return newImmutableBuffer(thinBuf.data, thinBuf.keyType, thinBuf.key,
+		return newImmutableBufferWithKey(thinBuf.data, thinBuf.key,
 			thinBuf.dataStore)
 	}
 
 	// Check cache
 	bufResult, resultChannel := store.cache.get(c, key,
-		func() *buffer {
+		func() *ImmutableBuffer {
 			buf := newEmptyBuffer()
 			initBuffer(&buf, store, key)
 
 			err := store.durableStore.Get(c, key, &buf)
-			if err == nil {
-				c.Vlog(qlog.LogDaemon, "Found key in durable store")
-				return &buf
+			if err != nil {
+				c.Elog(qlog.LogDaemon, "Couldn't get from any "+
+					"store: %s Key %s", err.Error(),
+					key.String())
+				return nil
 			}
 
-			c.Elog(qlog.LogDaemon, "Couldn't get from any store: %s. "+
-				"Key %s", err.Error(), key.String())
-
-			return nil
+			return newImmutableBufferWithKey(buf.data, buf.key,
+				buf.dataStore)
 		})
 
 	if bufResult != nil {
@@ -100,21 +100,18 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	return <-resultChannel
 }
 
-func (store *dataStore) Set(c *quantumfs.Ctx, buf quantumfs.Buffer) error {
+func (store *dataStore) Set(c *quantumfs.Ctx,
+	buf *ImmutableBuffer) (quantumfs.ObjectKey, error) {
+
 	defer c.FuncInName(qlog.LogDaemon, "dataStore::Set").Out()
 
-	key, err := buf.Key(c)
-	if err != nil {
-		c.Vlog(qlog.LogDaemon, "Error computing key %s", err.Error())
-		return err
-	}
-
+	key := buf.Key()
 	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to set embedded key")
 	}
-	buf_ := buf.(*buffer)
-	store.cache.storeInCache(c, key, buf_)
-	return store.durableStore.Set(c, key, buf)
+
+	store.cache.storeInCache(c, key, buf)
+	return key, store.durableStore.Set(c, key, buf.CastToMutable())
 }
 
 func newEmptyBuffer() buffer {
@@ -312,18 +309,14 @@ func (buf *buffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 }
 
 func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
-	defer c.FuncInName(qlog.LogDaemon, "buffer::Key").Out()
+	defer c.FuncIn(qlog.LogDaemon, "buffer::Key", "%t", buf.dirty).Out()
 
 	if !buf.dirty {
-		c.Vlog(qlog.LogDaemon, "Buffer not dirty")
 		return buf.key, nil
 	}
 
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
-	buf.dirty = false
-	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.String())
-	err := buf.dataStore.Set(c, buf)
-	return buf.key, err
+	return buf.key, nil
 }
 
 func (buf *buffer) SetSize(size int) {
@@ -429,7 +422,7 @@ func (cc *combiningCache) shutdown() {
 // get either returns a buffer copy from the cache, or a channel that the buffer
 // will come back on
 func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
-	fetch func() *buffer) (cached *ImmutableBuffer,
+	fetch func() *ImmutableBuffer) (cached *ImmutableBuffer,
 	resultChannel chan *ImmutableBuffer) {
 
 	defer cc.lock.Lock().Unlock()
@@ -467,23 +460,19 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 }
 
 func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, key quantumfs.ObjectKey,
-	buf *buffer) {
+	buf *ImmutableBuffer) {
 
 	defer c.FuncIn(qlog.LogDaemon, "dataStore::storeInCache", "Key: %s",
 		key.String()).Out()
 
 	defer cc.lock.Lock().Unlock()
 
-	// Convert the daemon buffer to an immutable one
-	immutable := newImmutableBuffer(buf.data, buf.keyType, buf.key,
-		buf.dataStore)
-
 	// Satisfy any channels waiting for this data, no matter what
 	entry, exists := cc.entryMap[key.String()]
 	if exists && entry.buf == nil && entry.waiting != nil {
 		// Send copies to each waiter and then nullify the queue of them
 		for _, channel := range entry.waiting {
-			channel <- immutable
+			channel <- buf
 		}
 		entry.waiting = nil
 	}
@@ -503,7 +492,7 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, key quantumfs.ObjectKey
 		}
 		// ensure we remove any entries that may signal that we're waiting
 		// for this data to come back any more
-		delete(cc.entryMap, buf.key.String())
+		delete(cc.entryMap, buf.Key().String())
 		return
 	}
 
@@ -535,36 +524,61 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, key quantumfs.ObjectKey
 		// placed in the lru yet and as such will never be evicted
 		evictedBuf := cc.lru.Remove(cc.lru.Front()).(*cacheEntry)
 		cc.freeSpace += evictedBuf.buf.Size()
-		delete(cc.entryMap, evictedBuf.buf.key.String())
+		delete(cc.entryMap, evictedBuf.buf.Key().String())
 	}
 
 	newEntry := &cacheEntry{
-		buf: immutable,
+		buf: buf,
 	}
 	newEntry.lruElement = cc.lru.PushBack(newEntry)
-	cc.entryMap[buf.key.String()] = newEntry
+	cc.entryMap[buf.Key().String()] = newEntry
 }
 
 type ImmutableBuffer struct {
 	data      []byte
-	keyType   quantumfs.KeyType
 	key       quantumfs.ObjectKey
 	dataStore *dataStore
 }
 
-func newImmutableBuffer(newData []byte, keyType_ quantumfs.KeyType,
-	key_ quantumfs.ObjectKey, store *dataStore) *ImmutableBuffer {
+func newImmutableBufferDataCopy(in []byte, keyType_ quantumfs.KeyType,
+	store *dataStore) *ImmutableBuffer {
+
+	inSize := len(in)
+
+	var newData []byte
+	// ensure our buffer meets min capacity
+	if inSize < initBlockSize {
+		newData = make([]byte, inSize, initBlockSize)
+	} else {
+		newData = make([]byte, inSize)
+	}
+	copy(newData, in)
+
+	return newImmutableBuffer(newData, keyType_, store)
+}
+
+func newImmutableBuffer(newData []byte, keyType quantumfs.KeyType,
+	store *dataStore) *ImmutableBuffer {
 
 	return &ImmutableBuffer{
 		data:      newData,
-		keyType:   keyType_,
-		key:       key_,
+		key:       quantumfs.NewObjectKey(keyType, hash.Hash(newData)),
+		dataStore: store,
+	}
+}
+
+func newImmutableBufferWithKey(newData []byte, key quantumfs.ObjectKey,
+	store *dataStore) *ImmutableBuffer {
+
+	return &ImmutableBuffer{
+		data:      newData,
+		key:       key,
 		dataStore: store,
 	}
 }
 
 func (buf *ImmutableBuffer) clone() quantumfs.Buffer {
-	return newBufferCopyDs(buf.dataStore, buf.data, buf.keyType)
+	return newBufferCopyDs(buf.dataStore, buf.data, buf.key.Type())
 }
 
 func (buf *ImmutableBuffer) Read(out []byte, offset uint32) int {
@@ -572,15 +586,15 @@ func (buf *ImmutableBuffer) Read(out []byte, offset uint32) int {
 }
 
 func (buf *ImmutableBuffer) KeyType() quantumfs.KeyType {
-	return buf.keyType
+	return buf.key.Type()
 }
 
 func (buf *ImmutableBuffer) ContentHash() [quantumfs.ObjectKeyLength - 1]byte {
 	return hash.Hash(buf.data)
 }
 
-func (buf *ImmutableBuffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
-	return buf.key, nil
+func (buf *ImmutableBuffer) Key() quantumfs.ObjectKey {
+	return buf.key
 }
 
 func (buf *ImmutableBuffer) Size() int {
@@ -595,6 +609,6 @@ func (buf *ImmutableBuffer) Get() []byte {
 func (buf *ImmutableBuffer) CastToMutable() *buffer {
 	var rtn buffer
 	initBuffer(&rtn, buf.dataStore, buf.key)
-	rtn.Set(buf.data, buf.keyType)
+	rtn.Set(buf.data, buf.key.Type())
 	return &rtn
 }
