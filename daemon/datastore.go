@@ -102,18 +102,17 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 func (store *dataStore) Set(c *quantumfs.Ctx, buf quantumfs.Buffer) error {
 	defer c.FuncInName(qlog.LogDaemon, "dataStore::Set").Out()
 
-	key, err := buf.Key(c)
-	if err != nil {
-		c.Vlog(qlog.LogDaemon, "Error computing key %s", err.Error())
-		return err
-	}
-
-	if key.Type() == quantumfs.KeyTypeEmbedded {
+	if buf.KeyType() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to set embedded key")
 	}
+
+	if buf.Key().IsEqualTo(quantumfs.ZeroKey) {
+		panic("Attempted Set without provided Key")
+	}
+
 	buf_ := buf.(*buffer)
-	store.cache.storeInCache(c, key, buf_)
-	return store.durableStore.Set(c, key, buf)
+	store.cache.storeInCache(c, buf.Key(), buf_)
+	return store.durableStore.Set(c, buf.Key(), buf)
 }
 
 func newEmptyBuffer() buffer {
