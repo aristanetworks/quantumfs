@@ -432,5 +432,5 @@ func underlyingTypesMatch(hardlinkTable HardlinkTable,
 type publishFn func(*ctx, quantumfs.Buffer) (quantumfs.ObjectKey, error)
 
 func publishNow(c *ctx, buf quantumfs.Buffer) (quantumfs.ObjectKey, error) {
-	return buf.Key(&c.Ctx)
+	return c.dataStore.Set(&c.Ctx, buf)
 }
