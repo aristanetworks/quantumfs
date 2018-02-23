@@ -1152,8 +1152,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		// non-existence of lookupCount as zero value and bypass the
 		// if-statement
 		if !exists && !initial {
-			c.vlog("Inode %d with nil lookupCount "+
-				"is uninstantiated by its child", inodeNum)
+			c.vlog("Inode %d is uninstantiated by its child", inodeNum)
 			break
 		}
 		initial = false
