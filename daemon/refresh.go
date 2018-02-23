@@ -177,10 +177,9 @@ func (rc *RefreshContext) buildRefreshMapWsr(c *ctx, localRootId quantumfs.Objec
 		utils.Assert(linkEntry.record.FileId() == fileId, "FileId mistmatch")
 
 		record := newHardlinkLegFromRecord(linkEntry.record, nil)
-		pubRecord := record.Publishable()
 
 		rc.fileMap[fileId] = &FileLoadRecord{
-			remoteRecord:  pubRecord.AsImmutable(),
+			remoteRecord:  record,
 			inodeId:       quantumfs.InodeIdInvalid,
 			parentId:      quantumfs.InodeIdInvalid,
 			newParentPath: "",
