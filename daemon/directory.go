@@ -638,9 +638,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	defer dir.childRecordLock.Lock().Unlock()
 	records := dir.children.records()
 
-	for _, entry := range records {
-		filename := entry.Filename()
-
+	for filename, entry := range records {
 		entryInfo := directoryContents{
 			filename: filename,
 		}
