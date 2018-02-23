@@ -54,8 +54,8 @@ func newRefreshContext(c *ctx, rootId quantumfs.ObjectKey) *RefreshContext {
 		staleRecords: make([]FileRemoveRecord, 0),
 		rootId:       rootId,
 	}
-	workspaceRoot := c.dataStore.Get(&c.Ctx, rootId).AsWorkspaceRoot()
-	baseLayerId := workspaceRoot.clone().BaseLayer()
+	workspaceRoot := c.dataStore.Get(&c.Ctx, rootId).clone().AsWorkspaceRoot()
+	baseLayerId := workspaceRoot.BaseLayer()
 	rc.buildRefreshMap(c, baseLayerId, "")
 	return &rc
 }

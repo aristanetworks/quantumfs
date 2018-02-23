@@ -34,11 +34,11 @@ func (fi *SmallFile) getBuffer(c *ctx) quantumfs.Buffer {
 		return fi.buf
 	}
 
-	buf := c.dataStore.Get(&c.Ctx, fi.key)
+	buf := c.dataStore.Get(&c.Ctx, fi.key).clone()
 	if buf != nil {
 		buf.SetSize(fi.size)
 	}
-	return buf.clone()
+	return buf
 }
 
 func (fi *SmallFile) getBufferToDirty(c *ctx) quantumfs.Buffer {
@@ -134,7 +134,7 @@ func (fi *SmallFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 func (fi *SmallFile) reload(c *ctx, key quantumfs.ObjectKey) {
 	defer c.funcIn("SmallFile::reload").Out()
 	fi.key = key
-	fi.buf = c.dataStore.Get(&c.Ctx, fi.key)
+	fi.buf = c.dataStore.Get(&c.Ctx, fi.key).clone()
 	if fi.buf == nil {
 		panic(key.String())
 	}
