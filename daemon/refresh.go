@@ -192,8 +192,8 @@ func (rc *RefreshContext) buildRefreshMapWsr(c *ctx, localRootId quantumfs.Objec
 
 	defer c.funcIn("RefreshContext::buildRefreshMapWsr").Out()
 
-	localWsr := c.dataStore.Get(&c.Ctx, localRootId).AsWorkspaceRoot()
-	remoteWsr := c.dataStore.Get(&c.Ctx, remoteRootId).AsWorkspaceRoot()
+	localWsr := c.dataStore.Get(&c.Ctx, localRootId).clone().AsWorkspaceRoot()
+	remoteWsr := c.dataStore.Get(&c.Ctx, remoteRootId).clone().AsWorkspaceRoot()
 
 	rc.buildRefreshMap(c, localWsr.BaseLayer(), remoteWsr.BaseLayer(), "")
 

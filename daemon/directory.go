@@ -1624,8 +1624,8 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 		attributeList.SetAttribute(i, lastName, lastId)
 		attributeList.SetNumAttributes(lastIndex)
 
-		buffer := newImmutableBuffer(attributeList.Bytes(),
-			quantumfs.KeyTypeMetadata, c.dataStore)
+		buffer := newBuffer(c, attributeList.Bytes(),
+			quantumfs.KeyTypeMetadata)
 		var err error
 		key, err = buffer.Key(&c.Ctx)
 		if err != nil {
