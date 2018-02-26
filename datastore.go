@@ -169,6 +169,7 @@ const (
 )
 
 type ObjectKey struct {
+	_   utils.Uncomparable
 	key encoding.ObjectKey
 }
 
@@ -1284,14 +1285,16 @@ func (ea *ExtendedAttributes) Attribute(i int) (name string, id ObjectKey) {
 	return attribute.Name(), overlayObjectKey(attribute.Id())
 }
 
-func (ea *ExtendedAttributes) AttributeByKey(attr string) ObjectKey {
+func (ea *ExtendedAttributes) AttributeByKey(attr string) (key ObjectKey,
+	exists bool) {
+
 	for i := 0; i < ea.NumAttributes(); i++ {
 		name, key := ea.Attribute(i)
 		if name == attr {
-			return key
+			return key, true
 		}
 	}
-	return EmptyBlockKey
+	return EmptyBlockKey, false
 }
 
 func (ea *ExtendedAttributes) SetAttribute(i int, name string, id ObjectKey) {

@@ -498,8 +498,6 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
-	rc := newRefreshContext(c, rootId)
-
 	defer wsr.LockTree().Unlock()
 
 	err = qfs.flusher.syncWorkspace_(c, name)
@@ -508,7 +506,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
-	wsr.refresh_(c, rc)
+	wsr.refresh_(c)
 }
 
 func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
@@ -1054,7 +1052,7 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 		return err
 	}
 
-	wsr.refresh_(c, nil)
+	wsr.refresh_(c)
 	return nil
 }
 
@@ -1154,8 +1152,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		// non-existence of lookupCount as zero value and bypass the
 		// if-statement
 		if !exists && !initial {
-			c.vlog("Inode %d with nil lookupCount "+
-				"is uninstantiated by its child", inodeNum)
+			c.vlog("Inode %d is uninstantiated by its child", inodeNum)
 			break
 		}
 		initial = false

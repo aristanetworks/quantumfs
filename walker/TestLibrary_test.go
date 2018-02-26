@@ -73,6 +73,7 @@ func (th *testHelper) testHelperUpcast(
 type testDataStore struct {
 	datastore quantumfs.DataStore
 	test      *testHelper
+	lock      utils.DeferableMutex
 	keys      map[string]int
 }
 
@@ -85,16 +86,19 @@ func newTestDataStore(test *testHelper, ds quantumfs.DataStore) *testDataStore {
 }
 
 func (store *testDataStore) FlushKeyList() {
+	defer store.lock.Lock().Unlock()
 	store.keys = make(map[string]int)
 }
 
 func (store *testDataStore) GetKeyList() map[string]int {
+	defer store.lock.Lock().Unlock()
 	return store.keys
 }
 
 func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
+	defer store.lock.Lock().Unlock()
 	store.keys[key.String()] = 1
 	return store.datastore.Get(c, key, buf)
 }
@@ -102,6 +106,7 @@ func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
+	defer store.lock.Lock().Unlock()
 	return store.datastore.Set(c, key, buf)
 }
 
