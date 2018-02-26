@@ -334,7 +334,16 @@ func (dq *DirtyQueue) requeue_(c *ctx, inode Inode) {
 		dq.moveToBackOfQueue_(c, inode)
 
 		done := func() bool {
-			defer inode.getParentLock().RLock().RUnlock()
+			// Normally we would need to take the parent lock here to
+			// prevent the inode from being reparented while we traverse
+			// up the tree. However, we cannot do that because we already
+			// hold the flusher lock and so cannot safely grab the parent
+			// lock (for example see Directory.parentSetChildAttr()).
+			// Luckily it isn't important that the queue is sorted
+			// absolutely correctly in all cases and we can thus retrieve
+			// the parent without holding the parent lock because if we
+			// receive an out of date parent we'll still operate
+			// correctly, just less efficiently.
 			if inode.isWorkspaceRoot() || inode.isOrphaned_() {
 				return true
 			}
