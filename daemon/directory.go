@@ -209,8 +209,6 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	owner fuse.Owner, entry_ quantumfs.ImmutableDirectoryRecord) {
 
-	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d", inodeNum).Out()
-
 	// Ensure we have a flattened DirectoryRecord to ensure the type is the
 	// underlying type for Hardlinks. This is required in order for
 	// objectTypeToFileType() to have access to the correct type to report.
@@ -218,7 +216,11 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 	attr.Ino = uint64(inodeNum)
 
-	fileType := objectTypeToFileType(c, entry.Type())
+	fileType := _objectTypeToFileType(c, entry.Type())
+
+	c.vlog("filling attr inode %d type %d/%x perms %o links %d",
+		inodeNum, entry.Type(), fileType, entry.Permissions(), attr.Nlink)
+
 	switch fileType {
 	case fuse.S_IFDIR:
 		// Approximate the read size of the Directory objects in the
@@ -251,10 +253,6 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Atimensec = entry.ModificationTime().Nanoseconds()
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
 	attr.Ctimensec = entry.ContentTime().Nanoseconds()
-
-	c.dlog("type %x permissions %o links %d",
-		fileType, entry.Permissions(), attr.Nlink)
-
 	attr.Mode = fileType | permissionsToMode(entry.Permissions())
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
 	attr.Owner.Gid = quantumfs.SystemGid(entry.Group(), owner.Gid)
@@ -583,7 +581,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	defer dir.RLock().RUnlock()
 
-	children := make([]directoryContents, 0, 200) // 200 arbitrarily chosen
+	children := make([]directoryContents, 0, dir.children.count()+2)
 
 	c.vlog("Adding .")
 	entryInfo := directoryContents{
@@ -638,9 +636,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	defer dir.childRecordLock.Lock().Unlock()
 	records := dir.children.records()
 
-	for _, entry := range records {
-		filename := entry.Filename()
-
+	for filename, entry := range records {
 		entryInfo := directoryContents{
 			filename: filename,
 		}
