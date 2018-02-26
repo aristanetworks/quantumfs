@@ -99,20 +99,21 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	return <-resultChannel
 }
 
-func (store *dataStore) Set(c *quantumfs.Ctx, buf quantumfs.Buffer) error {
+func (store *dataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+	buf *buffer) error {
+
 	defer c.FuncInName(qlog.LogDaemon, "dataStore::Set").Out()
 
-	if buf.KeyType() == quantumfs.KeyTypeEmbedded {
+	if key.Type() == quantumfs.KeyTypeEmbedded {
 		panic("Attempted to set embedded key")
 	}
 
-	if buf.Key().IsEqualTo(quantumfs.ZeroKey) {
+	if key.IsEqualTo(quantumfs.ZeroKey) {
 		panic("Attempted Set without provided Key")
 	}
 
-	buf_ := buf.(*buffer)
-	store.cache.storeInCache(c, buf.Key(), buf_)
-	return store.durableStore.Set(c, buf.Key(), buf)
+	store.cache.storeInCache(c, key, buf)
+	return store.durableStore.Set(c, key, buf)
 }
 
 func newEmptyBuffer() buffer {
@@ -315,7 +316,7 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
 	buf.dirty = false
 	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.String())
-	err := buf.dataStore.Set(c, buf)
+	err := buf.dataStore.Set(c, buf.key, buf)
 	return buf.key, err
 }
 
