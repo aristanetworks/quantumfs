@@ -104,13 +104,11 @@ func (store *dataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 	defer c.FuncInName(qlog.LogDaemon, "dataStore::Set").Out()
 
-	if key.Type() == quantumfs.KeyTypeEmbedded {
-		panic("Attempted to set embedded key")
-	}
+	utils.Assert(key.Type() != quantumfs.KeyTypeEmbedded,
+		"Attempted to set embedded key")
 
-	if key.IsEqualTo(quantumfs.ZeroKey) {
-		panic("Attempted Set without provided Key")
-	}
+	utils.Assert(!key.IsEqualTo(quantumfs.ZeroKey),
+		"Attempted Set without provided Key")
 
 	store.cache.storeInCache(c, key, buf)
 	return store.durableStore.Set(c, key, buf)
