@@ -1579,7 +1579,3 @@ func (ir *ImmutableRecord) Nlinks() uint32 {
 func (ir *ImmutableRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(ir.ID(), ir.Type(), ir.Size())
 }
-
-func (ir *ImmutableRecord) AsImmutable() ImmutableDirectoryRecord {
-	return ir
-}
