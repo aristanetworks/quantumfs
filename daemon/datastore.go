@@ -50,7 +50,7 @@ func (store *dataStore) Freshen(c *ctx, key quantumfs.ObjectKey) error {
 			"block missing from db", key.String())
 	}
 
-	err := store.durableStore.Set(&c.Ctx, key, buf.CastToMutable())
+	err := store.durableStore.Set(&c.Ctx, key, castToMutable(buf))
 	return err
 }
 
@@ -114,7 +114,7 @@ func (store *dataStore) Set(c *quantumfs.Ctx, buf *ImmutableBuffer) error {
 	}
 
 	store.cache.storeInCache(c, key, buf)
-	return store.durableStore.Set(c, key, buf.CastToMutable())
+	return store.durableStore.Set(c, key, castToMutable(buf))
 }
 
 func newEmptyBuffer() buffer {
@@ -615,7 +615,7 @@ func (buf *ImmutableBuffer) Get() []byte {
 	return buf.data
 }
 
-func (buf *ImmutableBuffer) CastToMutable() *buffer {
+func castToMutable(buf *ImmutableBuffer) *buffer {
 	var rtn buffer
 	initBuffer(&rtn, buf.dataStore, buf.key)
 	rtn.Set(buf.data, buf.key.Type())
