@@ -1748,3 +1748,24 @@ func TestRefreshDualInstancesMultiDirty(t *testing.T) {
 		test.verifyContentStartsWith(file, content1)
 	})
 }
+
+func TestRefreshShortcutting(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		utils.MkdirAll(workspace+"/commondir/commonsubdir", 0777)
+		test.createFile(workspace, "commondir/fileA", 1000)
+		test.createFile(workspace, "commondir/fileB", 1000)
+		test.createFile(workspace, "commondir/commonsubdir/fileC", 1000)
+		ctx := test.TestCtx()
+
+		name := "diffFile"
+		newRootId1 := test.createFileSync(workspace, name, 1000)
+		newRootId2 := test.removeFileSync(workspace, name)
+
+		refreshTest(ctx, test, workspace, newRootId2, newRootId1)
+		test.Assert(test.CountLogStrings("buildRefreshMap") > 0,
+			"Refresh never happened")
+		test.Assert(test.CountLogStrings("buildRefreshMap "+workspace+
+			"/commondir") == 0, "Common directory not skipped")
+	})
+}

@@ -284,7 +284,11 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 	return inodeId
 }
 
-func (dir *Directory) moveToHardlinkLeg_DOWN(c *ctx, newParent Inode, oldName string,
+// This function is a simplified alternative to Rename/Move which is called
+// while refreshing. This function is required as the regular Rename/Move
+// function have to update the hardlink table and normalize the source and
+// destination of the operation
+func (dir *Directory) moveHardlinkLeg_DOWN(c *ctx, newParent Inode, oldName string,
 	remoteRecord quantumfs.DirectoryRecord, inodeId InodeId) {
 
 	defer c.FuncIn("Directory::moveToHardlinkLeg_DOWN", "%d : %s : %d",
@@ -299,8 +303,7 @@ func (dir *Directory) moveToHardlinkLeg_DOWN(c *ctx, newParent Inode, oldName st
 
 	dst := asDirectory(newParent)
 	defer dst.childRecordLock.Lock().Unlock()
-	hll := newHardlinkLegFromRecord(remoteRecord, dir.hardlinkTable)
-	dst.children.setRecord(c, inodeId, hll)
+	dst.children.setRecord(c, inodeId, remoteRecord)
 }
 
 // The caller must hold the childRecordLock
@@ -405,7 +408,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 		c.vlog("Processing %s local %t remote %t", childname,
 			localRecord != nil, remoteRecord != nil)
 
-		if rc.isInodeUsedAfterRefresh(c, localRecord, remoteRecord) {
+		if rc.isLocalRecordUsable(c, localRecord, remoteRecord) {
 			if shouldHideLocalRecord(localRecord, remoteRecord) {
 				childname = dir.hideEntry_DOWN_(c, childId,
 					localRecord)
@@ -427,7 +430,11 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 		} else {
 			rc.addStaleEntry(c, dir.inodeNum(), childId, localRecord)
 		}
-		if localRecord.Type() == quantumfs.ObjectTypeDirectory {
+
+		// Ensure we ignore any subdirectories that haven't changed
+		if localRecord.Type() == quantumfs.ObjectTypeDirectory &&
+			!skipDir(localRecord.AsImmutable(), remoteRecord) {
+
 			updateMapDescend_DOWN(c, rc, childId, remoteRecord)
 		}
 	})
@@ -444,7 +451,9 @@ func (dir *Directory) findLocalMatch_DOWN_(c *ctx, rc *RefreshContext,
 		// perfect match, the file has not moved
 		return localRecord, localEntries[record.Filename()], false
 	}
-	matchingLoadRecord := rc.fileMap[record.FileId()]
+	matchingLoadRecord, exists := rc.fileMap[record.FileId()]
+	utils.Assert(exists, "Missing filemap record for %s", record.Filename())
+
 	return matchingLoadRecord.localRecord, matchingLoadRecord.inodeId, true
 }
 

@@ -213,9 +213,10 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 			return link.key, nil
 		}
 
-		key, err := c.dataStore.Set(&c.Ctx,
-			newImmutableBuffer([]byte(link.dirtyPointsTo),
-				quantumfs.KeyTypeMetadata, c.dataStore))
+		buf := newBuffer(c, []byte(link.dirtyPointsTo),
+			quantumfs.KeyTypeMetadata)
+
+		key, err := buf.Key(&c.Ctx)
 		if err != nil {
 			panic(fmt.Sprintf("Failed to upload block: %v", err))
 		}
