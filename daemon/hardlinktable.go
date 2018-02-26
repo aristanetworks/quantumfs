@@ -45,6 +45,7 @@ type HardlinkTable interface {
 		fnSetter func(dir quantumfs.DirectoryRecord))
 	nlinks(fileId quantumfs.FileId) uint32
 	claimAsChild_(inode Inode)
+	claimAsChild(inode Inode)
 	getWorkspaceRoot() *WorkspaceRoot
 	apply(c *ctx, hardlinkDelta *HardlinkDelta)
 }
@@ -91,6 +92,11 @@ func newHardlinkTable(c *ctx, wsr *WorkspaceRoot,
 
 // Must be called with inode's parentLock locked for writing
 func (ht *HardlinkTableImpl) claimAsChild_(inode Inode) {
+	inode.setParent_(ht.getWorkspaceRoot().inodeNum())
+}
+
+func (ht *HardlinkTableImpl) claimAsChild(inode Inode) {
+	defer inode.getParentLock().Lock().Unlock()
 	inode.setParent_(ht.getWorkspaceRoot().inodeNum())
 }
 
@@ -300,6 +306,9 @@ func (ht *HardlinkTableImpl) updateHardlinkInodeId(c *ctx, fileId quantumfs.File
 	hardlink, exists := ht.hardlinks[fileId]
 	utils.Assert(exists, "Hardlink id %d does not exist.", fileId)
 
+	if hardlink.inodeId == inodeId {
+		return
+	}
 	utils.Assert(hardlink.inodeId == quantumfs.InodeIdInvalid,
 		"Hardlink id %d already has associated inodeid %d",
 		fileId, hardlink.inodeId)

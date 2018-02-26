@@ -52,10 +52,10 @@ type TypespaceList struct {
 	realTreeLock sync.RWMutex
 }
 
-func (tsl *TypespaceList) dirty(c *ctx) {
-	// Override InodeCommon.dirty() because namespaces don't get dirty in the
+func (tsl *TypespaceList) dirty_(c *ctx) {
+	// Override InodeCommon.dirty_() because namespaces don't get dirty in the
 	// traditional manner
-	c.vlog("TypespaceList::dirty doing nothing")
+	c.vlog("TypespaceList::dirty_ doing nothing")
 }
 
 func (tsl *TypespaceList) dirtyChild(c *ctx, child InodeId) {
@@ -587,10 +587,10 @@ type NamespaceList struct {
 	realTreeLock sync.RWMutex
 }
 
-func (nsl *NamespaceList) dirty(c *ctx) {
-	// Override InodeCommon.dirty() because namespaces don't get dirty in the
+func (nsl *NamespaceList) dirty_(c *ctx) {
+	// Override InodeCommon.dirty_() because namespaces don't get dirty in the
 	// traditional manner
-	c.vlog("NamespaceList::dirty doing nothing")
+	c.vlog("NamespaceList::dirty_ doing nothing")
 }
 
 func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
@@ -930,10 +930,10 @@ type WorkspaceList struct {
 	realTreeLock sync.RWMutex
 }
 
-func (wsl *WorkspaceList) dirty(c *ctx) {
-	// Override InodeCommon.dirty() because workspaces don't get dirty in the
+func (wsl *WorkspaceList) dirty_(c *ctx) {
+	// Override InodeCommon.dirty_() because workspaces don't get dirty in the
 	// traditional manner.
-	c.vlog("WorkspaceList::dirty doing nothing")
+	c.vlog("WorkspaceList::dirty_ doing nothing")
 }
 
 func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
