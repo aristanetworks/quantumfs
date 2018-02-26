@@ -227,7 +227,7 @@ func specialOverrideAttr(entry quantumfs.ImmutableDirectoryRecord,
 	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = entry.Nlinks()
 
-	filetype, dev, err := quantumfs.DecodeSpecialKey(entry.ID())
+	filetype, dev, err := quantumfs.DecodeSpecialKey(underlyingID(entry))
 	if err != nil {
 		panic(fmt.Sprintf("Decoding special file failed: %v",
 			err))

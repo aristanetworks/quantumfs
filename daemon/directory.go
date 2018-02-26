@@ -207,19 +207,15 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 }
 
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
-	owner fuse.Owner, entry_ quantumfs.ImmutableDirectoryRecord) {
-
-	// Ensure we have a flattened DirectoryRecord to ensure the type is the
-	// underlying type for Hardlinks. This is required in order for
-	// objectTypeToFileType() to have access to the correct type to report.
-	entry := entry_.AsImmutable()
+	owner fuse.Owner, entry quantumfs.ImmutableDirectoryRecord) {
 
 	attr.Ino = uint64(inodeNum)
 
-	fileType := _objectTypeToFileType(c, entry.Type())
+	entryType := underlyingType(entry)
+	fileType := _objectTypeToFileType(c, entryType)
 
 	c.vlog("filling attr inode %d type %d/%x perms %o links %d",
-		inodeNum, entry.Type(), fileType, entry.Permissions(), attr.Nlink)
+		inodeNum, entryType, fileType, entry.Permissions(), attr.Nlink)
 
 	switch fileType {
 	case fuse.S_IFDIR:
@@ -878,8 +874,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 			return nil, err
 		}
 
-		recordCopy := record.AsImmutable()
-		type_ := objectTypeToFileType(c, recordCopy.Type())
+		type_ := objectTypeToFileType(c, underlyingType(record))
 
 		if type_ == fuse.S_IFDIR {
 			c.vlog("Directory::Unlink directory")
@@ -916,21 +911,17 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 		var inode InodeId
 		result := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
-			record_ := dir.children.recordByName(c, name)
-			if record_ == nil {
+			record := dir.children.recordByName(c, name)
+			if record == nil {
 				return fuse.ENOENT
 			}
-
-			// Use a shallow copy of record to ensure the right type for
-			// objectTypeToFileType
-			record := record_.AsImmutable()
 
 			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
 			if err != fuse.OK {
 				return err
 			}
 
-			type_ := objectTypeToFileType(c, record.Type())
+			type_ := objectTypeToFileType(c, underlyingType(record))
 			if type_ != fuse.S_IFDIR {
 				return fuse.ENOTDIR
 			}
