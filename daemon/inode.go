@@ -157,6 +157,7 @@ type Inode interface {
 	parentCheckLinkReparent(c *ctx, parent *Directory)
 
 	dirty(c *ctx)              // Mark this Inode dirty
+	dirty_(c *ctx)             // Mark this Inode dirty
 	markClean_() *list.Element // Mark this Inode as cleaned
 	// Undo marking the inode as clean
 	markUnclean_(dirtyElement *list.Element) bool
@@ -187,6 +188,7 @@ type Inode interface {
 	RLockTree() *TreeLock
 
 	isWorkspaceRoot() bool
+	isListingType() bool
 
 	// cleanup() is called when the Inode has been uninstantiated, but before the
 	// final reference has been released. It should perform any deterministic
@@ -563,6 +565,13 @@ func (inode *InodeCommon) inodeNum() InodeId {
 func (inode *InodeCommon) dirty(c *ctx) {
 	defer c.funcIn("InodeCommon::dirty").Out()
 	defer c.qfs.flusher.lock.Lock().Unlock()
+
+	inode.dirty_(c)
+}
+
+// Add this Inode to the dirty list
+// Must hold flusher lock
+func (inode *InodeCommon) dirty_(c *ctx) {
 	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
 		inode.dirtyElement__ = c.qfs.queueDirtyInode_(c, inode.self)
@@ -733,6 +742,14 @@ func (inode *InodeCommon) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 func (inode *InodeCommon) isWorkspaceRoot() bool {
 	_, isWsr := inode.self.(*WorkspaceRoot)
 	return isWsr
+}
+
+func (inode *InodeCommon) isListingType() bool {
+	switch inode.self.(type) {
+	case *TypespaceList, *NamespaceList, *WorkspaceList:
+		return true
+	}
+	return false
 }
 
 // Deleting a child may require that we orphan it, and because we *must* lock from
