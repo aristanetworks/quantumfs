@@ -232,6 +232,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		// Ensure everything is uploaded before we return. Defer this close
 		// to ensure that the mergeUploader thread ends even if we panic
 		close(toSet)
+		c.vlog("Waiting for last merge blocks to finish uploading")
 		wg.Wait()
 	}()
 

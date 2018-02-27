@@ -29,8 +29,13 @@ type dirtyInode struct {
 
 type triggerCmd struct {
 	flushAll bool
-	finished chan struct{}
+	finished chan error
 	ctx      *ctx
+}
+
+type FlushRequest struct {
+	cmd		FlushCmd
+	response	chan error
 }
 
 type FlushCmd int
@@ -45,13 +50,9 @@ type DirtyQueue struct {
 	// The Front of the list are the Inodes next in line to flush.
 	l        *list.List
 	trigger  chan triggerCmd
-	cmd      chan FlushCmd
+	cmd      chan FlushRequest
 	done     chan error
 	treelock *TreeLock
-
-	// Protected by the flusher lock - used to avoid sending into trigger if
-	// it's closed due to panic
-	aborted bool
 }
 
 func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
@@ -62,7 +63,7 @@ func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
 		// cmds to be queued for the flusher thread
 		// without the callers worrying about blocking
 		// This should change to consolidate all KICKs into one
-		cmd:      make(chan FlushCmd, 1000),
+		cmd:      make(chan FlushRequest, 1000),
 		done:     make(chan error),
 		treelock: treelock,
 	}
@@ -103,7 +104,10 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 
 	for {
 		sleepTime := getSleepTime(c, nextExpiringInode)
-		cmd := KICK
+		cmd := FlushRequest {
+			cmd:		KICK,
+			response:	nil,
+		}
 		done := false
 
 		select {
@@ -117,19 +121,19 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 			dq.treelock.lock.RLock()
 			defer dq.treelock.lock.RUnlock()
 
-			doneChan := make(chan struct{})
+			doneChan := make(chan error, 10)
 			func() {
 				defer c.qfs.flusher.lock.Lock().Unlock()
 
 				// By the time we get the flusher lock, the flush
 				// thread may be done and gone by now, so we have to
 				// check before we even think of waiting on it
-				if dq.Len_() == 0 || dq.aborted {
+				if dq.Len_() == 0 {
 					done = true
 					return
 				}
 
-				switch cmd {
+				switch cmd.cmd {
 				case KICK:
 					dq.trigger <- triggerCmd{
 						flushAll: false,
@@ -176,14 +180,14 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 
 // Try sending a command to the dirtyqueue, failing immediately
 // if it would have blocked
-func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushCmd) error {
+func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushRequest) error {
 	c.vlog("Sending cmd %d to dirtyqueue %s", cmd, dq.treelock.name)
 	select {
 	case dq.cmd <- cmd:
 		return nil
 	default:
-		c.vlog("sending cmd %d would have blocked", cmd)
-		return fmt.Errorf("sending cmd %d would have blocked", cmd)
+		c.vlog("sending cmd %d would have blocked", cmd.cmd)
+		return fmt.Errorf("sending cmd %d would have blocked", cmd.cmd)
 	}
 }
 
@@ -232,9 +236,11 @@ func (dq *DirtyQueue) handleFlushError_(c *ctx, inodeId InodeId) {
 }
 
 // treeLock and flusher lock must be locked R/W when calling this function
-func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) bool {
+func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) {
 
 	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()
+	defer logRequestPanic(c)
+	err = fmt.Errorf("flushQueue panic")
 
 	for dq.Len_() > 0 {
 		// Should we clean this inode?
@@ -244,7 +250,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) bool {
 		now := time.Now()
 		if !flushAll && candidate.expiryTime.After(now) {
 			// all expiring inodes have been flushed
-			return false
+			return false, nil
 		}
 
 		if !dq.flushCandidate_(c, candidate) {
@@ -253,11 +259,11 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) bool {
 			if flushAll {
 				dq.handleFlushError_(c, candidate.inode.inodeNum())
 			}
-			return false
+			return false, nil
 		}
 		dq.Remove_(element)
 	}
-	return true
+	return true, nil
 }
 
 func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
@@ -278,9 +284,10 @@ func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 func (dq *DirtyQueue) flusher(c *ctx) {
 	defer c.FuncIn("DirtyQueue::flusher", "%s", dq.treelock.name).Out()
 	defer logRequestPanic(c)
+	done := false
 	var empty struct{}
 
-	for {
+	for !done {
 		trigger := <-dq.trigger
 		c = trigger.ctx
 		c.vlog("trigger, flushAll: %v", trigger.flushAll)
@@ -289,64 +296,55 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 		// be locked by the caller (the thread that pushed into dq.trigger),
 		// exclusively or not
 
-		finished := func() bool {
+		done = func() bool {
 			defer c.qfs.flusher.lock.Lock().Unlock()
-			// Assume by default we're done by default in case
-			// flushQueue_ panics
-			done := true
-			panicked := true
 
-			// Ensure we cleanup even if we panic
+			var err error
+			flushFinished := false
 			defer func() {
-				if done {
-					// Cleanup
-					if panicked {
-						dq.done <- fmt.Errorf("Panic " +
-							"during flushQueue_")
-					}
-					close(dq.done)
-					delete(c.qfs.flusher.dqs, dq.treelock)
+				if !flushFinished {
+					return
+				}
 
-					// end the kicker thread and cleanup triggers
-					dq.TryCommand(c, RETURN)
-					close(dq.trigger)
-					close(dq.cmd)
-					dq.aborted = panicked
+				// Cleanup
+				close(dq.done)
+				delete(c.qfs.flusher.dqs, dq.treelock)
 
-					// consume any leftover triggers
-					for trigger := range dq.trigger {
-						if trigger.finished != nil {
-							trigger.finished <- empty
-						}
+				// end the kicker thread and cleanup triggers
+				dq.TryCommand(c, RETURN)
+				close(dq.trigger)
+				close(dq.cmd)
+
+				// consume any leftover triggers
+				for trigger := range dq.trigger {
+					if trigger.finished != nil {
+						trigger.finished <- err
 					}
 				}
 			}()
 
-			done = dq.flushQueue_(c, trigger.flushAll)
-			panicked = false
+			flushFinished, err = dq.flushQueue_(c, trigger.flushAll)
 
-			if dq.Len_() == 0 {
-				done = true
-			} else if done {
+			if err != nil {
+				trigger.finished <- err
+			else if dq.Len_() == 0 {
+				flushFinished = true
+			} else if flushFinished {
 				c.elog("Done without empty dirty queue")
 			}
 
-			return done
+			return flushFinished
 		}()
 
 		if trigger.finished != nil {
-			trigger.finished <- empty
-		}
-
-		if finished {
-			break
+			trigger.finished <- nil
 		}
 	}
 
 	// consume any leftover triggers
 	for trigger := range dq.trigger {
 		if trigger.finished != nil {
-			trigger.finished <- empty
+			trigger.finished <- nil
 		}
 	}
 }
