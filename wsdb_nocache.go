@@ -265,7 +265,7 @@ func (nc *noCacheWsdb) DeleteWorkspace(c ether.Ctx, typespace string, namespace 
 func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	namespace string, workspace string, currentNonce wsdb.WorkspaceNonce,
 	currentRootID wsdb.ObjectKey,
-	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
+	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, wsdb.WorkspaceNonce, error) {
 
 	currentKeyHex := hex.EncodeToString(currentRootID)
 	newKeyHex := hex.EncodeToString(newRootID)
@@ -274,30 +274,30 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 		namespace, workspace, currentKeyHex, newKeyHex).Out()
 
 	if isTypespaceLocked(typespace) && currentRootID != nil {
-		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrLocked,
+		return wsdb.ObjectKey{}, wsdb.WorkspaceNonceInvalid, wsdb.NewError(wsdb.ErrLocked,
 			"Branch failed: "+wsdb.NullSpaceName+" typespace is locked")
 	}
 
 	key, nonce, present, err := nc.wsdbKeyGet(c, typespace, namespace, workspace)
 	if err != nil {
-		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
+		return wsdb.ObjectKey{}, wsdb.WorkspaceNonceInvalid, wsdb.NewError(wsdb.ErrFatal,
 			"during Get in AdvanceWorkspace %s/%s/%s : %s",
 			typespace, namespace, workspace, err.Error())
 	}
 
 	if !nonce.SameIncarnation(&currentNonce) {
-		return key, wsdb.NewError(wsdb.ErrWorkspaceOutOfDate,
+		return key, nonce, wsdb.NewError(wsdb.ErrWorkspaceOutOfDate,
 			"nonce mispatch Expected:%s Received:%s",
 			currentNonce.String(), nonce.String())
 	}
 	if !present {
-		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrWorkspaceNotFound,
+		return wsdb.ObjectKey{}, wsdb.WorkspaceNonceInvalid, wsdb.NewError(wsdb.ErrWorkspaceNotFound,
 			"cannot advance workspace %s/%s/%s", typespace,
 			namespace, workspace)
 	}
 
 	if !bytes.Equal(currentRootID, key) {
-		return key, wsdb.NewError(wsdb.ErrWorkspaceOutOfDate,
+		return key, wsdb.WorkspaceNonceInvalid, wsdb.NewError(wsdb.ErrWorkspaceOutOfDate,
 			"cannot advance workspace expected:%s found:%s",
 			currentKeyHex, hex.EncodeToString(key))
 	}
@@ -305,12 +305,12 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	if err := nc.wsdbKeyPut(c, typespace, namespace, workspace,
 		newRootID, currentNonce); err != nil {
 
-		return wsdb.ObjectKey{}, wsdb.NewError(wsdb.ErrFatal,
+		return wsdb.ObjectKey{}, wsdb.WorkspaceNonceInvalid, wsdb.NewError(wsdb.ErrFatal,
 			"during Put in AdvanceWorkspace %s/%s/%s : %s",
 			typespace, namespace, workspace, err.Error())
 	}
 
-	return newRootID, nil
+	return newRootID, currentNonce, nil
 }
 
 func (nc *noCacheWsdb) WorkspaceLastWriteTime(c ether.Ctx, typespace string,
