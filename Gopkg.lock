@@ -119,6 +119,12 @@
   version = "v1.0.0"
 
 [[projects]]
+  name = "github.com/silentred/gid"
+  packages = ["."]
+  revision = "2f53d9f5fdda6553cd2bfbcf4bd2fc470de4a177"
+  version = "v0.1.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/stretchr/objx"
   packages = ["."]
