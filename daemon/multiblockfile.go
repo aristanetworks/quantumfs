@@ -10,6 +10,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 // These variables are always correct. Where the datastore value length disagrees,
@@ -198,12 +199,12 @@ func (fi *MultiBlockFile) reload(c *ctx, key quantumfs.ObjectKey) {
 	fi.toSync = make(map[int]quantumfs.Buffer)
 }
 
-func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
+func (fi *MultiBlockFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 	defer c.funcIn("MultiBlockFile::sync").Out()
 
 	for i, block := range fi.toSync {
 		c.vlog("Syncing block %d", i)
-		key, err := block.Key(&c.Ctx)
+		key, err := pub(c, block)
 		if err != nil {
 			panic("TODO Failed to update datablock")
 		}
@@ -220,13 +221,13 @@ func (fi *MultiBlockFile) sync(c *ctx) quantumfs.ObjectKey {
 	bytes := store.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	key, err := buf.Key(&c.Ctx)
+	key, err := pub(c, buf)
 	utils.Assert(err == nil, "Failed to upload new file metadata: %v", err)
 
 	return key
 }
 
-func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
+func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) fuse.Status {
 	defer c.FuncIn("MultiBlockFile::truncate", "new length %d",
 		newLengthBytes).Out()
 
@@ -240,7 +241,7 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 		fi.toSync = make(map[int]quantumfs.Buffer)
 		fi.metadata.Blocks = make([]quantumfs.ObjectKey, 0)
 		fi.metadata.LastBlockBytes = 0
-		return nil
+		return fuse.OK
 	}
 
 	// If we're increasing the length, we need to update the block num
@@ -256,7 +257,7 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 		expandingFile {
 
 		fi.metadata.LastBlockBytes = uint32(lastBlockLen)
-		return nil
+		return fuse.OK
 	}
 
 	// If we're decreasing length, we need to throw away toSync
@@ -270,5 +271,5 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) error {
 	block.SetSize(int(lastBlockLen))
 	fi.metadata.LastBlockBytes = uint32(lastBlockLen)
 
-	return nil
+	return fuse.OK
 }

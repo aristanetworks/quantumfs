@@ -77,7 +77,8 @@ type Inode interface {
 		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 
 	// Update the key for only this child
-	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey)
+	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey,
+		hardlinkDelta *HardlinkDelta)
 
 	setChildRecord(c *ctx, record quantumfs.DirectoryRecord)
 
@@ -135,7 +136,8 @@ type Inode interface {
 			err fuse.Status)) fuse.Status
 
 	parentMarkAccessed(c *ctx, path string, op quantumfs.PathFlags)
-	parentSyncChild(c *ctx, publishFn func() quantumfs.ObjectKey)
+	parentSyncChild(c *ctx, publishFn func() (quantumfs.ObjectKey,
+		*HardlinkDelta))
 	parentSetChildAttr(c *ctx, inodeNum InodeId, newType *quantumfs.ObjectType,
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
@@ -155,6 +157,7 @@ type Inode interface {
 	parentCheckLinkReparent(c *ctx, parent *Directory)
 
 	dirty(c *ctx)              // Mark this Inode dirty
+	dirty_(c *ctx)             // Mark this Inode dirty
 	markClean_() *list.Element // Mark this Inode as cleaned
 	// Undo marking the inode as clean
 	markUnclean_(dirtyElement *list.Element) bool
@@ -185,6 +188,7 @@ type Inode interface {
 	RLockTree() *TreeLock
 
 	isWorkspaceRoot() bool
+	isListingType() bool
 
 	// cleanup() is called when the Inode has been uninstantiated, but before the
 	// final reference has been released. It should perform any deterministic
@@ -281,7 +285,7 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 }
 
 func (inode *InodeCommon) parentSyncChild(c *ctx,
-	publishFn func() quantumfs.ObjectKey) {
+	publishFn func() (quantumfs.ObjectKey, *HardlinkDelta)) {
 
 	defer c.FuncIn("InodeCommon::parentSyncChild", "%d", inode.id).Out()
 
@@ -296,9 +300,9 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	}
 
 	// publish before we sync, once we know it's safe
-	baseLayerId := publishFn()
+	baseLayerId, hardlinkDelta := publishFn()
 
-	inode.parent_(c).syncChild(c, inode.id, baseLayerId)
+	inode.parent_(c).syncChild(c, inode.id, baseLayerId, hardlinkDelta)
 }
 
 func (inode *InodeCommon) parentUpdateSize(c *ctx,
@@ -561,6 +565,13 @@ func (inode *InodeCommon) inodeNum() InodeId {
 func (inode *InodeCommon) dirty(c *ctx) {
 	defer c.funcIn("InodeCommon::dirty").Out()
 	defer c.qfs.flusher.lock.Lock().Unlock()
+
+	inode.dirty_(c)
+}
+
+// Add this Inode to the dirty list
+// Must hold flusher lock
+func (inode *InodeCommon) dirty_(c *ctx) {
 	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
 		inode.dirtyElement__ = c.qfs.queueDirtyInode_(c, inode.self)
@@ -588,6 +599,13 @@ func (inode *InodeCommon) markUnclean_(dirtyElement *list.Element) (already bool
 func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
 	msg := fmt.Sprintf("Unsupported dirtyChild() call on Inode %d: %v", child,
 		inode)
+	panic(msg)
+}
+
+func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
+
+	msg := fmt.Sprintf("Unsupported syncChild() call on Inode %v", inode)
 	panic(msg)
 }
 
@@ -716,6 +734,14 @@ func (inode *InodeCommon) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 func (inode *InodeCommon) isWorkspaceRoot() bool {
 	_, isWsr := inode.self.(*WorkspaceRoot)
 	return isWsr
+}
+
+func (inode *InodeCommon) isListingType() bool {
+	switch inode.self.(type) {
+	case *TypespaceList, *NamespaceList, *WorkspaceList:
+		return true
+	}
+	return false
 }
 
 // Deleting a child may require that we orphan it, and because we *must* lock from

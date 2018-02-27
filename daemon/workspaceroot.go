@@ -115,7 +115,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) (Inode,
 	return wsr.Directory.instantiateChild(c, inodeId)
 }
 
-func publishHardlinkMap(c *ctx,
+func publishHardlinkMap(c *ctx, pub publishFn,
 	records map[quantumfs.FileId]HardlinkTableEntry) *quantumfs.HardlinkEntry {
 
 	defer c.funcIn("publishHardlinkMap").Out()
@@ -148,7 +148,7 @@ func publishHardlinkMap(c *ctx,
 			buf := newBuffer(c, baseLayer.Bytes(),
 				quantumfs.KeyTypeMetadata)
 
-			nextBaseLayerId, err = buf.Key(&c.Ctx)
+			nextBaseLayerId, err = pub(c, buf)
 			utils.Assert(err == nil,
 				"Failed to upload new baseLayer object: %v", err)
 
@@ -196,7 +196,7 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 // to avoid getting it built as part of refresh_() as that would be an expensive
 // operation. The caller can also choose to send a nil refresh context to ask it
 // to be built as part of refresh.
-func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
+func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh_").Out()
 
 	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
@@ -216,15 +216,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 		return
 	}
 
-	if rc == nil {
-		// We should avoid computing the refresh map under the tree lock
-		// if at all possible as it is a very expensive operation
-		rc = newRefreshContext(c, publishedRootId)
-	}
-	if !rc.rootId.IsEqualTo(publishedRootId) {
-		c.vlog("Workspace updated again remotely. Refreshing anyway")
-		publishedRootId = rc.rootId
-	}
+	rc := newRefreshContext_(c, wsr.publishedRootId, publishedRootId)
 	c.vlog("Workspace Refreshing %s rootid: %s::%s -> %s::%s", workspaceName,
 		wsr.publishedRootId.String(), wsr.nonce.String(),
 		publishedRootId.String(), nonce.String())
@@ -234,18 +226,19 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 }
 
 func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
-	hardlinks map[quantumfs.FileId]HardlinkTableEntry) quantumfs.ObjectKey {
+	hardlinks map[quantumfs.FileId]HardlinkTableEntry,
+	pub publishFn) quantumfs.ObjectKey {
 
 	defer c.funcIn("publishWorkspaceRoot").Out()
 
 	workspaceRoot := quantumfs.NewWorkspaceRoot()
 	workspaceRoot.SetBaseLayer(baseLayer)
-	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, hardlinks))
+	workspaceRoot.SetHardlinkEntry(publishHardlinkMap(c, pub, hardlinks))
 
 	bytes := workspaceRoot.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	newRootId, err := buf.Key(&c.Ctx)
+	newRootId, err := pub(c, buf)
 	utils.Assert(err == nil, "Failed to upload new workspace root: %v", err)
 
 	c.vlog("Publish: %s", newRootId.String())
@@ -278,12 +271,14 @@ func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 
 	defer wsr.RLock().RUnlock()
+
+	wsr.hardlinkTable.apply(c, wsr.Directory.hardlinkDelta)
+
 	// Ensure linklock is held because hardlinkTable needs to be protected
 	defer wsr.hardlinkTable.linkLock.RLock().RUnlock()
-
 	// Upload the workspaceroot object
 	newRootId := publishWorkspaceRoot(c, wsr.baseLayerId,
-		wsr.hardlinkTable.hardlinks)
+		wsr.hardlinkTable.hardlinks, publishNow)
 
 	// Update workspace rootId
 	if !newRootId.IsEqualTo(wsr.publishedRootId) {
@@ -391,7 +386,7 @@ func (wsr *WorkspaceRoot) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	defer c.funcIn("WorkspaceRoot::syncChild").Out()
 
@@ -411,7 +406,10 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 			entry.SetID(newKey)
 		}()
 	} else {
-		wsr.Directory.syncChild(c, inodeNum, newKey)
+		wsr.Directory.syncChild(c, inodeNum, newKey, nil)
+		if hardlinkDelta != nil {
+			wsr.hardlinkTable.apply(c, hardlinkDelta)
+		}
 	}
 }
 
@@ -470,7 +468,14 @@ func (wsr *WorkspaceRoot) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 func (wsr *WorkspaceRoot) getList(c *ctx) quantumfs.PathsAccessed {
 	defer wsr.hardlinkTable.linkLock.Lock().Unlock()
 
-	return wsr.accessList.generate(c, wsr.hardlinkTable.hardlinks)
+	accessMap := make(map[quantumfs.FileId][]string,
+		len(wsr.hardlinkTable.hardlinks))
+
+	for fileId, entry := range wsr.hardlinkTable.hardlinks {
+		accessMap[fileId] = entry.paths
+	}
+
+	return wsr.accessList.generate(c, accessMap)
 }
 
 func (wsr *WorkspaceRoot) clearList() {

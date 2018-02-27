@@ -498,8 +498,6 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
-	rc := newRefreshContext(c, rootId)
-
 	defer wsr.LockTree().Unlock()
 
 	err = qfs.flusher.syncWorkspace_(c, name)
@@ -508,7 +506,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
-	wsr.refresh_(c, rc)
+	wsr.refresh_(c)
 }
 
 func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
@@ -533,7 +531,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 	}
 
 	newRootId := publishWorkspaceRoot(c,
-		wsr.baseLayerId, wsr.hardlinkTable.hardlinks)
+		wsr.baseLayerId, wsr.hardlinkTable.hardlinks, publishNow)
 
 	// We should eventually be able to Advance after merging
 	for {
@@ -552,7 +550,8 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 
 		mergedId, err := mergeWorkspaceRoot(c, wsr.publishedRootId, rootId,
 			newRootId, quantumfs.PreferNewer,
-			&mergeSkipPaths{paths: make(map[string]struct{}, 0)})
+			&mergeSkipPaths{paths: make(map[string]struct{}, 0)},
+			wsr.typespace+"/"+wsr.namespace+"/"+wsr.workspace)
 
 		if err != nil {
 			c.elog("Unable to merge: %s", err.Error())
@@ -1053,7 +1052,7 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 		return err
 	}
 
-	wsr.refresh_(c, nil)
+	wsr.refresh_(c)
 	return nil
 }
 
@@ -1153,8 +1152,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		// non-existence of lookupCount as zero value and bypass the
 		// if-statement
 		if !exists && !initial {
-			c.vlog("Inode %d with nil lookupCount "+
-				"is uninstantiated by its child", inodeNum)
+			c.vlog("Inode %d is uninstantiated by its child", inodeNum)
 			break
 		}
 		initial = false
@@ -1228,7 +1226,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 						inode.parentId_(), inodeNum))
 				}
 
-				parent.syncChild(c, inodeNum, key)
+				parent.syncChild(c, inodeNum, key, nil)
 
 				qfs.addUninstantiated(c, []InodeId{inodeNum},
 					inode.parentId_())
@@ -1247,6 +1245,10 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 
 	defer c.FuncIn("QuantumFs::getWsrLineageNoInstantiate", "%s/%s/%s",
 		typespace, namespace, workspace).Out()
+
+	var id InodeId
+	var exists bool
+
 	ids = append(ids, quantumfs.InodeIdRoot)
 	inode := qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
 	if inode == nil {
@@ -1256,11 +1258,19 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	if !ok {
 		return nil, fmt.Errorf("bad typespacelist")
 	}
-	id, exists := typespacelist.typespacesByName[typespace]
-	if !exists {
-		c.vlog("typespace %s does not exist", typespace)
+	keepSearching := func() bool {
+		defer typespacelist.RLock().RUnlock()
+		id, exists = typespacelist.typespacesByName[typespace]
+		if !exists {
+			c.vlog("typespace %s does not exist", typespace)
+			return false
+		}
+		return true
+	}()
+	if !keepSearching {
 		return
 	}
+
 	ids = append(ids, id)
 	inode = qfs.inodeNoInstantiate(c, id)
 	if inode == nil {
@@ -1271,10 +1281,18 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	if !ok {
 		return nil, fmt.Errorf("bad namespacelist")
 	}
-	id, exists = namespacelist.namespacesByName[namespace]
-	if !exists {
+	keepSearching = func() bool {
+		defer namespacelist.RLock().RUnlock()
+		id, exists = namespacelist.namespacesByName[namespace]
+		if !exists {
+			return false
+		}
+		return true
+	}()
+	if !keepSearching {
 		return
 	}
+
 	ids = append(ids, id)
 	inode = qfs.inodeNoInstantiate(c, id)
 	if inode == nil {
@@ -1285,10 +1303,19 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	if !ok {
 		return nil, fmt.Errorf("bad workspacelist")
 	}
-	wsrInfo, exists := workspacelist.workspacesByName[workspace]
-	if !exists {
+	var wsrInfo workspaceInfo
+	keepSearching = func() bool {
+		defer workspacelist.RLock().RUnlock()
+		wsrInfo, exists = workspacelist.workspacesByName[workspace]
+		if !exists {
+			return false
+		}
+		return true
+	}()
+	if !keepSearching {
 		return
 	}
+
 	ids = append(ids, wsrInfo.id)
 	return
 }

@@ -32,6 +32,7 @@ type Directory struct {
 	InodeCommon
 
 	hardlinkTable HardlinkTable
+	hardlinkDelta *HardlinkDelta
 
 	// These fields are protected by the InodeCommon.lock
 	baseLayerId quantumfs.ObjectKey
@@ -87,6 +88,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.treeLock_ = treeLock
 	dir.hardlinkTable = hardlinkTable
 	dir.baseLayerId = baseLayerId
+	dir.hardlinkDelta = newHardlinkDelta()
 
 	container, uninstantiated := newChildContainer(c, dir, dir.baseLayerId)
 	dir.children = container
@@ -163,7 +165,7 @@ func (dir *Directory) prepareForOrphaning(c *ctx, name string,
 		newRecord.SetFilename(name)
 		return newRecord
 	}
-	if dir.hardlinkTable.hardlinkDec(record.FileId()) {
+	if dir.hardlinkDec(record.FileId()) {
 		// If the refcount was greater than one we shouldn't
 		// reparent.
 		c.vlog("Hardlink referenced elsewhere")
@@ -207,8 +209,6 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	owner fuse.Owner, entry_ quantumfs.ImmutableDirectoryRecord) {
 
-	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d", inodeNum).Out()
-
 	// Ensure we have a flattened DirectoryRecord to ensure the type is the
 	// underlying type for Hardlinks. This is required in order for
 	// objectTypeToFileType() to have access to the correct type to report.
@@ -216,7 +216,11 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 	attr.Ino = uint64(inodeNum)
 
-	fileType := objectTypeToFileType(c, entry.Type())
+	fileType := _objectTypeToFileType(c, entry.Type())
+
+	c.vlog("filling attr inode %d type %d/%x perms %o links %d",
+		inodeNum, entry.Type(), fileType, entry.Permissions(), attr.Nlink)
+
 	switch fileType {
 	case fuse.S_IFDIR:
 		// Approximate the read size of the Directory objects in the
@@ -249,10 +253,6 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Atimensec = entry.ModificationTime().Nanoseconds()
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
 	attr.Ctimensec = entry.ContentTime().Nanoseconds()
-
-	c.dlog("type %x permissions %o links %d",
-		fileType, entry.Permissions(), attr.Nlink)
-
 	attr.Mode = fileType | permissionsToMode(entry.Permissions())
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
 	attr.Owner.Gid = quantumfs.SystemGid(entry.Group(), owner.Gid)
@@ -347,7 +347,7 @@ func modeToPermissions(mode uint32, umask uint32) uint32 {
 }
 
 func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
-	nextKey quantumfs.ObjectKey) quantumfs.ObjectKey {
+	nextKey quantumfs.ObjectKey, pub publishFn) quantumfs.ObjectKey {
 
 	defer c.funcIn("publishDirectoryEntry").Out()
 
@@ -355,14 +355,14 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 	bytes := layer.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	newKey, err := buf.Key(&c.Ctx)
+	newKey, err := pub(c, buf)
 	utils.Assert(err == nil, "Failed to upload new baseLayer object: %v", err)
 
 	return newKey
 }
 
 func publishDirectoryRecords(c *ctx,
-	records []quantumfs.DirectoryRecord) quantumfs.ObjectKey {
+	records []quantumfs.DirectoryRecord, pub publishFn) quantumfs.ObjectKey {
 
 	defer c.funcIn("publishDirectoryRecords").Out()
 
@@ -382,7 +382,7 @@ func publishDirectoryRecords(c *ctx,
 			c.vlog("Block full with %d entries", entryIdx)
 			baseLayer.SetNumEntries(entryIdx)
 			newBaseLayerId = publishDirectoryEntry(c, baseLayer,
-				newBaseLayerId)
+				newBaseLayerId, pub)
 			numEntries, baseLayer =
 				quantumfs.NewDirectoryEntry(numEntries)
 			entryIdx = 0
@@ -394,7 +394,7 @@ func publishDirectoryRecords(c *ctx,
 	}
 
 	baseLayer.SetNumEntries(entryIdx)
-	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId)
+	newBaseLayerId = publishDirectoryEntry(c, baseLayer, newBaseLayerId, pub)
 	return newBaseLayerId
 }
 
@@ -404,7 +404,7 @@ func (dir *Directory) publish_(c *ctx) {
 
 	oldBaseLayer := dir.baseLayerId
 	dir.baseLayerId = publishDirectoryRecords(c,
-		dir.children.publishableRecords(c))
+		dir.children.publishableRecords(c), publishNow)
 
 	c.vlog("Directory key %s -> %s", oldBaseLayer.String(),
 		dir.baseLayerId.String())
@@ -581,7 +581,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	defer dir.RLock().RUnlock()
 
-	children := make([]directoryContents, 0, 200) // 200 arbitrarily chosen
+	children := make([]directoryContents, 0, dir.children.count()+2)
 
 	c.vlog("Adding .")
 	entryInfo := directoryContents{
@@ -636,9 +636,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	defer dir.childRecordLock.Lock().Unlock()
 	records := dir.children.records()
 
-	for _, entry := range records {
-		filename := entry.Filename()
-
+	for filename, entry := range records {
 		entryInfo := directoryContents{
 			filename: filename,
 		}
@@ -1346,7 +1344,7 @@ func (dir *Directory) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	defer c.FuncIn("Directory::syncChild", "dir inode %d child inode %d %s",
 		dir.inodeNum(), inodeNum, newKey.String()).Out()
@@ -1363,6 +1361,7 @@ func (dir *Directory) syncChild(c *ctx, inodeNum InodeId,
 	}
 
 	dir.children.setID(c, entry.Filename(), newKey)
+	dir.hardlinkDelta.populateFrom(hardlinkDelta)
 }
 
 func getRecordExtendedAttributes(c *ctx,
@@ -1418,8 +1417,8 @@ func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
 		return nil, fuse.EIO
 	}
 
-	key := attributeList.AttributeByKey(attr)
-	if key == quantumfs.EmptyBlockKey {
+	key, found := attributeList.AttributeByKey(attr)
+	if !found {
 		c.vlog("XAttr name not found")
 		return nil, fuse.ENODATA
 	}
@@ -1850,13 +1849,23 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
 		dir.name_).Out()
 
-	dir.parentSyncChild(c, func() quantumfs.ObjectKey {
+	dir.parentSyncChild(c, func() (quantumfs.ObjectKey, *HardlinkDelta) {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
-		return dir.baseLayerId
+		return dir.baseLayerId, dir.hardlinkDelta
 	})
 
 	return dir.baseLayerId
+}
+
+func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
+	dir.hardlinkDelta.inc(fileId)
+	dir.hardlinkTable.hardlinkInc(fileId)
+}
+
+func (dir *Directory) hardlinkDec(fileId quantumfs.FileId) bool {
+	dir.hardlinkDelta.dec(fileId)
+	return dir.hardlinkTable.hardlinkDec(fileId)
 }
 
 type directoryContents struct {

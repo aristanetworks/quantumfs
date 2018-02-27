@@ -16,6 +16,13 @@ type HardlinkTableEntry struct {
 	nlink   uint32
 	inodeId InodeId
 	paths   []string
+
+	// delta shows the changes made to the nlink in the tree that
+	// have not been published yet.
+	// The invariant for each entry is that nlink+delta is always
+	// coherent a user perspective and nlink is always consistent with
+	// the workspaceroot that is getting published
+	delta int
 }
 
 type HardlinkTable interface {
@@ -38,7 +45,9 @@ type HardlinkTable interface {
 		fnSetter func(dir quantumfs.DirectoryRecord))
 	nlinks(fileId quantumfs.FileId) uint32
 	claimAsChild_(inode Inode)
+	claimAsChild(inode Inode)
 	getWorkspaceRoot() *WorkspaceRoot
+	apply(c *ctx, hardlinkDelta *HardlinkDelta)
 }
 
 type HardlinkTableImpl struct {
@@ -54,6 +63,7 @@ func newLinkEntry(record_ quantumfs.DirectoryRecord) HardlinkTableEntry {
 		record:  record_,
 		nlink:   2,
 		inodeId: quantumfs.InodeIdInvalid,
+		delta:   0,
 	}
 }
 
@@ -85,6 +95,11 @@ func (ht *HardlinkTableImpl) claimAsChild_(inode Inode) {
 	inode.setParent_(ht.getWorkspaceRoot().inodeNum())
 }
 
+func (ht *HardlinkTableImpl) claimAsChild(inode Inode) {
+	defer inode.getParentLock().Lock().Unlock()
+	inode.setParent_(ht.getWorkspaceRoot().inodeNum())
+}
+
 func (ht *HardlinkTableImpl) getWorkspaceRoot() *WorkspaceRoot {
 	return ht.wsr
 }
@@ -97,7 +112,7 @@ func (ht *HardlinkTableImpl) nlinks(fileId quantumfs.FileId) uint32 {
 		panic(fmt.Sprintf("Invalid fileId in system %d", fileId))
 	}
 
-	return entry.nlink
+	return entry.effectiveNlink()
 }
 
 func (ht *HardlinkTableImpl) hardlinkInc(fileId quantumfs.FileId) {
@@ -111,7 +126,7 @@ func (ht *HardlinkTableImpl) hardlinkInc(fileId quantumfs.FileId) {
 	// Linking updates ctime
 	entry.record.SetContentTime(quantumfs.NewTime(time.Now()))
 
-	entry.nlink++
+	entry.delta++
 	ht.hardlinks[fileId] = entry
 }
 
@@ -123,8 +138,8 @@ func (ht *HardlinkTableImpl) hardlinkDec(fileId quantumfs.FileId) bool {
 		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", fileId))
 	}
 
-	if entry.nlink > 0 {
-		entry.nlink--
+	if entry.effectiveNlink() > 0 {
+		entry.delta--
 	} else {
 		panic("over decrement in hardlink ref count")
 	}
@@ -133,7 +148,7 @@ func (ht *HardlinkTableImpl) hardlinkDec(fileId quantumfs.FileId) bool {
 	entry.record.SetContentTime(quantumfs.NewTime(time.Now()))
 
 	// Normally, nlink should still be at least 1
-	if entry.nlink > 0 {
+	if entry.effectiveNlink() > 0 {
 		ht.hardlinks[fileId] = entry
 		return true
 	}
@@ -291,6 +306,9 @@ func (ht *HardlinkTableImpl) updateHardlinkInodeId(c *ctx, fileId quantumfs.File
 	hardlink, exists := ht.hardlinks[fileId]
 	utils.Assert(exists, "Hardlink id %d does not exist.", fileId)
 
+	if hardlink.inodeId == inodeId {
+		return
+	}
 	utils.Assert(hardlink.inodeId == quantumfs.InodeIdInvalid,
 		"Hardlink id %d already has associated inodeid %d",
 		fileId, hardlink.inodeId)
@@ -309,13 +327,14 @@ func (ht *HardlinkTableImpl) removeHardlink(c *ctx,
 
 	link, exists := ht.hardlinks[fileId]
 	if !exists {
-		c.vlog("Hardlink id %d does not exist.", link.nlink)
+		c.vlog("Hardlink id %d does not exist.", fileId)
 		return nil, quantumfs.InodeIdInvalid
 	}
 
-	if link.nlink > 1 {
+	if link.effectiveNlink() > 1 {
 		// Not ready to remove hardlink yet
-		c.vlog("Hardlink count %d, not ready to remove", link.nlink)
+		c.vlog("Hardlink count %d, not ready to remove",
+			link.effectiveNlink())
 		return nil, quantumfs.InodeIdInvalid
 	}
 
@@ -350,6 +369,10 @@ func (ht *HardlinkTableImpl) setHardlink(fileId quantumfs.FileId,
 
 	// It's critical that our lock covers both the fetch and this change
 	fnSetter(link.record)
+}
+
+func (hte *HardlinkTableEntry) effectiveNlink() uint32 {
+	return uint32(int(hte.nlink) + hte.delta)
 }
 
 func loadHardlinks(c *ctx,
@@ -392,4 +415,25 @@ func (ht *HardlinkTableImpl) markHardlinkPath(c *ctx, path string,
 
 	link.paths = append(link.paths, path)
 	ht.hardlinks[fileId] = link
+}
+
+func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
+	defer c.funcIn("HardlinkTableImpl::apply").Out()
+
+	defer ht.linkLock.Lock().Unlock()
+	hardlinkDelta.foreach(func(fileId quantumfs.FileId, delta int) {
+		entry, exists := ht.hardlinks[fileId]
+		if !exists {
+			c.vlog("Did not find %d. Dropping delta %d",
+				fileId, delta)
+			return
+		}
+		c.vlog("Updating nlink of %d: %d+%d (delta %d)", fileId,
+			entry.nlink, delta, entry.delta)
+
+		entry.nlink = uint32(int(entry.nlink) + delta)
+		entry.delta -= delta
+		ht.hardlinks[fileId] = entry
+	})
+	hardlinkDelta.reset()
 }

@@ -15,10 +15,19 @@
 
 [[projects]]
   name = "github.com/aristanetworks/ether"
-  packages = [".","blobstore","cql","filesystem","qubit/wsdb","utils","utils/stats","utils/stats/inmem"]
-  revision = "71105199b421d2f2c431650b35cb045918614545"
+  packages = [
+    ".",
+    "blobstore",
+    "cql",
+    "filesystem",
+    "qubit/wsdb",
+    "utils",
+    "utils/stats",
+    "utils/stats/inmem"
+  ]
+  revision = "d1de2e1b0134f0dc004efda46409fab8364d96d7"
   source = "gerrit.corp.arista.io/ether"
-  version = "v0.12"
+  version = "v0.15"
 
 [[projects]]
   branch = "master"
@@ -53,13 +62,24 @@
 
 [[projects]]
   name = "github.com/gocql/gocql"
-  packages = [".","internal/lru","internal/murmur","internal/streams"]
+  packages = [
+    ".",
+    "internal/lru",
+    "internal/murmur",
+    "internal/streams"
+  ]
   revision = "ffae44103aa14ada9e2b342329f44ce354f399fd"
 
 [[projects]]
   branch = "master"
   name = "github.com/golang/protobuf"
-  packages = ["proto","ptypes","ptypes/any","ptypes/duration","ptypes/timestamp"]
+  packages = [
+    "proto",
+    "ptypes",
+    "ptypes/any",
+    "ptypes/duration",
+    "ptypes/timestamp"
+  ]
   revision = "1e59b77b52bf8e4b449a57e6f79f21226d571845"
 
 [[projects]]
@@ -76,12 +96,19 @@
 
 [[projects]]
   name = "github.com/hanwen/go-fuse"
-  packages = ["fuse","splice"]
+  packages = [
+    "fuse",
+    "splice"
+  ]
   revision = "bd6c960a60d61508688f5ead6b2f80fc2e41980a"
 
 [[projects]]
   name = "github.com/influxdata/influxdb"
-  packages = ["client/v2","models","pkg/escape"]
+  packages = [
+    "client/v2",
+    "models",
+    "pkg/escape"
+  ]
   revision = "6d2685d1738277a1c2672fc58df7994627769be6"
   version = "v1.4.2"
 
@@ -105,14 +132,26 @@
 
 [[projects]]
   name = "github.com/stretchr/testify"
-  packages = ["assert","mock","require"]
+  packages = [
+    "assert",
+    "mock",
+    "require"
+  ]
   revision = "69483b4bd14f5845b5a1e55bca19e954e827f1d0"
   version = "v1.1.4"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
+  packages = [
+    "context",
+    "http2",
+    "http2/hpack",
+    "idna",
+    "internal/timeseries",
+    "lex/httplex",
+    "trace"
+  ]
   revision = "a8b9294777976932365dabb6640cf1468d95c70f"
 
 [[projects]]
@@ -130,7 +169,22 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
-  packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
+  packages = [
+    "collate",
+    "collate/build",
+    "internal/colltab",
+    "internal/gen",
+    "internal/tag",
+    "internal/triegen",
+    "internal/ucd",
+    "language",
+    "secure/bidirule",
+    "transform",
+    "unicode/bidi",
+    "unicode/cldr",
+    "unicode/norm",
+    "unicode/rangetable"
+  ]
   revision = "be25de41fadfae372d6470bda81ca6beb55ef551"
 
 [[projects]]
@@ -141,7 +195,30 @@
 
 [[projects]]
   name = "google.golang.org/grpc"
-  packages = [".","balancer","balancer/roundrobin","codes","connectivity","credentials","encoding","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","resolver","resolver/dns","resolver/manual","resolver/passthrough","stats","status","tap","transport"]
+  packages = [
+    ".",
+    "balancer",
+    "balancer/roundrobin",
+    "codes",
+    "connectivity",
+    "credentials",
+    "encoding",
+    "grpclb/grpc_lb_v1/messages",
+    "grpclog",
+    "internal",
+    "keepalive",
+    "metadata",
+    "naming",
+    "peer",
+    "resolver",
+    "resolver/dns",
+    "resolver/manual",
+    "resolver/passthrough",
+    "stats",
+    "status",
+    "tap",
+    "transport"
+  ]
   revision = "be077907e29fdb945d351e4284eb5361e7f8924e"
   version = "v1.8.1"
 
@@ -154,6 +231,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "77e595f12f6af36346628fbca10efdfdf3d0d8240d2b164ba2066aa74d5b2d14"
+  inputs-digest = "0d19cd3b87a4b3fe57292156a2135fe87aed7d19dce39ecd72d8817a3560a780"
   solver-name = "gps-cdcl"
   solver-version = 1

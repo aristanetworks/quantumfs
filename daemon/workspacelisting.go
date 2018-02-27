@@ -52,10 +52,10 @@ type TypespaceList struct {
 	realTreeLock sync.RWMutex
 }
 
-func (tsl *TypespaceList) dirty(c *ctx) {
-	// Override InodeCommon.dirty() because namespaces don't get dirty in the
+func (tsl *TypespaceList) dirty_(c *ctx) {
+	// Override InodeCommon.dirty_() because namespaces don't get dirty in the
 	// traditional manner
-	c.vlog("TypespaceList::dirty doing nothing")
+	c.vlog("TypespaceList::dirty_ doing nothing")
 }
 
 func (tsl *TypespaceList) dirtyChild(c *ctx, child InodeId) {
@@ -480,7 +480,7 @@ func (tsl *TypespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (tsl *TypespaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	c.vlog("TypespaceList::syncChild doing nothing")
 }
@@ -587,10 +587,10 @@ type NamespaceList struct {
 	realTreeLock sync.RWMutex
 }
 
-func (nsl *NamespaceList) dirty(c *ctx) {
-	// Override InodeCommon.dirty() because namespaces don't get dirty in the
+func (nsl *NamespaceList) dirty_(c *ctx) {
+	// Override InodeCommon.dirty_() because namespaces don't get dirty in the
 	// traditional manner
-	c.vlog("NamespaceList::dirty doing nothing")
+	c.vlog("NamespaceList::dirty_ doing nothing")
 }
 
 func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
@@ -805,7 +805,7 @@ func (nsl *NamespaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (nsl *NamespaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	c.vlog("NamespaceList::syncChild doing nothing")
 }
@@ -930,10 +930,10 @@ type WorkspaceList struct {
 	realTreeLock sync.RWMutex
 }
 
-func (wsl *WorkspaceList) dirty(c *ctx) {
-	// Override InodeCommon.dirty() because workspaces don't get dirty in the
+func (wsl *WorkspaceList) dirty_(c *ctx) {
+	// Override InodeCommon.dirty_() because workspaces don't get dirty in the
 	// traditional manner.
-	c.vlog("WorkspaceList::dirty doing nothing")
+	c.vlog("WorkspaceList::dirty_ doing nothing")
 }
 
 func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
@@ -1195,7 +1195,7 @@ func (wsl *WorkspaceList) RemoveXAttr(c *ctx, attr string) fuse.Status {
 }
 
 func (wsl *WorkspaceList) syncChild(c *ctx, inodeNum InodeId,
-	newKey quantumfs.ObjectKey) {
+	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	c.vlog("WorkspaceList::syncChild doing nothing")
 }
