@@ -34,8 +34,8 @@ type triggerCmd struct {
 }
 
 type FlushRequest struct {
-	cmd		FlushCmd
-	response	chan error
+	cmd      FlushCmd
+	response chan error
 }
 
 type FlushCmd int
@@ -51,7 +51,6 @@ type DirtyQueue struct {
 	l        *list.List
 	trigger  chan triggerCmd
 	cmd      chan FlushRequest
-	done     chan error
 	treelock *TreeLock
 }
 
@@ -64,7 +63,6 @@ func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
 		// without the callers worrying about blocking
 		// This should change to consolidate all KICKs into one
 		cmd:      make(chan FlushRequest, 1000),
-		done:     make(chan error),
 		treelock: treelock,
 	}
 	return &dq
@@ -104,20 +102,20 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 
 	for {
 		sleepTime := getSleepTime(c, nextExpiringInode)
-		cmd := FlushRequest {
-			cmd:		KICK,
-			response:	nil,
+		cmd := FlushRequest{
+			cmd:      KICK,
+			response: nil,
 		}
 		done := false
 
 		select {
 		case cmd = <-dq.cmd:
-			c.vlog("dq kicker cmd %d", cmd)
+			c.vlog("dq kicker cmd %d", cmd.cmd)
 		case <-time.After(sleepTime):
 			c.vlog("dq kicker woken up due to timer")
 		}
 
-		func() {
+		err := func() error {
 			dq.treelock.lock.RLock()
 			defer dq.treelock.lock.RUnlock()
 
@@ -154,13 +152,13 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 			}()
 
 			if done {
-				return
+				return nil
 			}
 
 			// With the flusher lock released, we've allowed the flush
 			// thread to do its job and inform us when we can release
 			// the treelock
-			<-doneChan
+			err := <-doneChan
 
 			defer c.qfs.flusher.lock.Lock().Unlock()
 			if dq.Len_() > 0 {
@@ -170,7 +168,14 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 			} else {
 				done = true
 			}
+
+			return err
 		}()
+
+		// notify the caller we're done
+		if cmd.response != nil {
+			cmd.response <- err
+		}
 
 		if done {
 			return
@@ -180,14 +185,20 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 
 // Try sending a command to the dirtyqueue, failing immediately
 // if it would have blocked
-func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushRequest) error {
+func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushCmd, response chan error) error {
 	c.vlog("Sending cmd %d to dirtyqueue %s", cmd, dq.treelock.name)
+
+	newCmd := FlushRequest{
+		cmd:      cmd,
+		response: response,
+	}
+
 	select {
-	case dq.cmd <- cmd:
+	case dq.cmd <- newCmd:
 		return nil
 	default:
-		c.vlog("sending cmd %d would have blocked", cmd.cmd)
-		return fmt.Errorf("sending cmd %d would have blocked", cmd.cmd)
+		c.vlog("sending cmd %d would have blocked", cmd)
+		return fmt.Errorf("sending cmd %d would have blocked", cmd)
 	}
 }
 
@@ -225,16 +236,6 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	return true
 }
 
-// flusher lock must be locked when calling this function
-func (dq *DirtyQueue) handleFlushError_(c *ctx, inodeId InodeId) {
-	// Release the flusher lock as the caller may not be waiting for us yet
-	c.qfs.flusher.lock.Unlock()
-	defer c.qfs.flusher.lock.Lock()
-	// Unblock the waiter with an error message as
-	// the flushing hit an error in this iteration
-	dq.done <- fmt.Errorf("Flushing inode %d failed", inodeId)
-}
-
 // treeLock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) {
 
@@ -261,7 +262,8 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) 
 			candidate.expiryTime = time.Now().Add(
 				c.qfs.config.DirtyFlushDelay)
 			if flushAll {
-				dq.handleFlushError_(c, candidate.inode.inodeNum())
+				return false, fmt.Errorf("Flushing inode %d failed",
+					candidate.inode.inodeNum())
 			}
 			return false, nil
 		}
@@ -289,7 +291,6 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 	defer c.FuncIn("DirtyQueue::flusher", "%s", dq.treelock.name).Out()
 	defer logRequestPanic(c)
 	done := false
-	var empty struct{}
 
 	for !done {
 		trigger := <-dq.trigger
@@ -300,22 +301,34 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 		// be locked by the caller (the thread that pushed into dq.trigger),
 		// exclusively or not
 
-		done = func() bool {
+		func() {
 			defer c.qfs.flusher.lock.Lock().Unlock()
 
 			var err error
-			flushFinished := false
-			defer func() {
-				if !flushFinished {
-					return
-				}
+			done, err = dq.flushQueue_(c, trigger.flushAll)
 
+			// Provide the triggerer a result
+			defer func() {
+				if trigger.finished != nil {
+					trigger.finished <- err
+				}
+			}()
+
+			if dq.Len_() == 0 {
+				done = true
+			} else if done {
+				c.elog("Done without empty dirty queue")
+			}
+
+			utils.Assert(!(done && err != nil),
+				"Somehow finished flush with error")
+
+			if done {
 				// Cleanup
-				close(dq.done)
 				delete(c.qfs.flusher.dqs, dq.treelock)
 
 				// end the kicker thread and cleanup triggers
-				dq.TryCommand(c, RETURN)
+				dq.TryCommand(c, RETURN, nil)
 				close(dq.trigger)
 				close(dq.cmd)
 
@@ -325,31 +338,15 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 						trigger.finished <- err
 					}
 				}
-			}()
 
-			flushFinished, err = dq.flushQueue_(c, trigger.flushAll)
-
-			if err != nil {
-				trigger.finished <- err
-			else if dq.Len_() == 0 {
-				flushFinished = true
-			} else if flushFinished {
-				c.elog("Done without empty dirty queue")
+				// consume any leftover kicker commands
+				for cmd := range dq.cmd {
+					if cmd.response != nil {
+						cmd.response <- err
+					}
+				}
 			}
-
-			return flushFinished
 		}()
-
-		if trigger.finished != nil {
-			trigger.finished <- nil
-		}
-	}
-
-	// consume any leftover triggers
-	for trigger := range dq.trigger {
-		if trigger.finished != nil {
-			trigger.finished <- nil
-		}
 	}
 }
 
@@ -477,6 +474,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 		c.vlog("Flusher: %d dirty queues should finish off",
 			len(flusher.dqs))
 		for _, dq := range flusher.dqs {
+			response := make(chan error, 10)
 			if workspace != "" {
 				if !strings.HasPrefix(workspace, dq.treelock.name) {
 					continue
@@ -487,18 +485,18 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 				// flusher thread manually
 				dq.trigger <- triggerCmd{
 					flushAll: true,
-					finished: nil,
+					finished: response,
 					ctx:      c,
 				}
 			} else {
-				err = dq.TryCommand(c, FLUSHALL)
+				err = dq.TryCommand(c, FLUSHALL, response)
 				if err != nil {
 					c.vlog("failed to send cmd to dirtyqueue")
 					return
 				}
 			}
 
-			doneChannels = append(doneChannels, dq.done)
+			doneChannels = append(doneChannels, response)
 		}
 	}()
 
@@ -575,6 +573,6 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 		go dq.kicker(c.flusherCtx())
 	}
 
-	dq.TryCommand(c, KICK)
+	dq.TryCommand(c, KICK, nil)
 	return dirtyElement
 }
