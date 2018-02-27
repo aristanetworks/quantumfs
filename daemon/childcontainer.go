@@ -314,9 +314,14 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 func (container *ChildContainer) directInodes() []InodeId {
 	inodes := make([]InodeId, 0, len(container.children))
 
-	for _, inodeId := range container.children {
-		isHardlink, _ := container.dir.hardlinkTable.checkHardlink(
-			inodeId)
+	for name, inodeId := range container.children {
+		records := container.effective[inodeId]
+		if records == nil {
+			records = container.publishable[inodeId]
+		}
+		utils.Assert(records != nil, "did not find child %s", name)
+		record := records[name]
+		_, isHardlink := record.(*HardlinkLeg)
 		if !isHardlink {
 			inodes = append(inodes, inodeId)
 		}
@@ -340,22 +345,14 @@ func (container *ChildContainer) publishableRecords(
 	return records
 }
 
-func (container *ChildContainer) records() []quantumfs.ImmutableDirectoryRecord {
-	records := make([]quantumfs.ImmutableDirectoryRecord, 0, container.count())
-	seen := make(map[string]bool, container.count())
+func (c *ChildContainer) records() map[string]quantumfs.ImmutableDirectoryRecord {
+	records := make(map[string]quantumfs.ImmutableDirectoryRecord, c.count())
 
-	for _, byInode := range container.effective {
-		for _, record := range byInode {
-			records = append(records, record)
-			seen[record.Filename()] = true
-		}
-	}
-
-	for _, byInode := range container.publishable {
-		for _, record := range byInode {
-			if !seen[record.Filename()] {
-				records = append(records, record)
-			}
+	for name, inodeId := range c.children {
+		if effective, exists := c.effective[inodeId]; exists {
+			records[name] = effective[name]
+		} else {
+			records[name] = c.publishable[inodeId][name]
 		}
 	}
 

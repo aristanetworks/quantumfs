@@ -169,6 +169,7 @@ const (
 )
 
 type ObjectKey struct {
+	_   utils.Uncomparable
 	key encoding.ObjectKey
 }
 
@@ -1284,14 +1285,16 @@ func (ea *ExtendedAttributes) Attribute(i int) (name string, id ObjectKey) {
 	return attribute.Name(), overlayObjectKey(attribute.Id())
 }
 
-func (ea *ExtendedAttributes) AttributeByKey(attr string) ObjectKey {
+func (ea *ExtendedAttributes) AttributeByKey(attr string) (key ObjectKey,
+	exists bool) {
+
 	for i := 0; i < ea.NumAttributes(); i++ {
 		name, key := ea.Attribute(i)
 		if name == attr {
-			return key
+			return key, true
 		}
 	}
-	return EmptyBlockKey
+	return EmptyBlockKey, false
 }
 
 func (ea *ExtendedAttributes) SetAttribute(i int, name string, id ObjectKey) {
@@ -1438,39 +1441,35 @@ func calcMaxBlocksLargeFile(maxSize int) int {
 }
 
 func init() {
-	if MaxBlockSize > 1024*1024*1024 || MaxBlockSize < 32*1024 {
-		// if a MaxBlockSize beyond this range is needed then
-		// notions like max medium file type size is 32MB etc needs
-		// to be revisited
-		panic(fmt.Sprintf("MaxBlockSize %d .Valid range is 32KB..1MB\n",
-			MaxBlockSize))
-	}
+
+	// If a MaxBlockSize beyond this range is needed then notions like max medium
+	// file type size is 32MB etc needs to be revisited
+	utils.Assert(MaxBlockSize <= 1024*1024*1024 && MaxBlockSize >= 32*1024,
+		"MaxBlockSize %d .Valid range is 32KB..1MB", MaxBlockSize)
 
 	maxBlocksLargeFile = calcMaxBlocksLargeFile(MaxBlockSize)
-	if maxBlocksLargeFile == 0 {
-		panic(fmt.Sprintf("MaxBlockSize %d is small for Large file type",
-			MaxBlockSize))
-	}
+	utils.Assert(maxBlocksLargeFile != 0,
+		"MaxBlockSize %d is small for Large file type", MaxBlockSize)
 
 	// maximum medium file size should be 32MB
 	// for supported range, maxBlocksMediumFile < maxBlocksLargeFile
 	maxBlocksMediumFile = (32 * 1024 * 1024) / MaxBlockSize
-	// if MaxBlockSize is within supported size then
+
+	// If MaxBlockSize is within supported size then
 	// maxBlocksMediumFile < (maxBlocksLargeFile-1)
+	utils.Assert(maxBlocksMediumFile < maxBlocksLargeFile-1,
+		"No distinction between medium and large files %d >= %d",
+		maxBlocksMediumFile, maxBlocksLargeFile)
 
 	maxPartsVeryLargeFile = MaxBlocksLargeFile()
 
 	maxDirectoryRecords = calcMaxDirectoryRecords(int(MaxBlockSize))
-	if maxDirectoryRecords == 0 {
-		panic(fmt.Sprintf("MaxBlockSize %d is small for DirectoryEntry",
-			MaxBlockSize))
-	}
+	utils.Assert(maxDirectoryRecords != 0,
+		"MaxBlockSize %d is small for DirectoryEntry", MaxBlockSize)
 
 	maxNumExtendedAttributes = calcMaxNumExtendedAttributes(int(MaxBlockSize))
-	if maxNumExtendedAttributes == 0 {
-		panic(fmt.Sprintf("MaxBlockSize %d is small for ExtendedAttributes",
-			MaxBlockSize))
-	}
+	utils.Assert(maxNumExtendedAttributes != 0,
+		"MaxBlockSize %d is small for ExtendedAttributes", MaxBlockSize)
 
 	emptyDirKey := createEmptyDirectory()
 	emptyBlockKey := createEmptyBlock()

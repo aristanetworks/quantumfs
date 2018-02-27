@@ -242,6 +242,10 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) 
 	defer logRequestPanic(c)
 	err = fmt.Errorf("flushQueue panic")
 
+	if flushAll {
+		dq.sortTopologically_(c)
+	}
+
 	for dq.Len_() > 0 {
 		// Should we clean this inode?
 		element := dq.Front_()
@@ -346,6 +350,88 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 		if trigger.finished != nil {
 			trigger.finished <- nil
 		}
+	}
+}
+
+// flusher lock must be held
+func (dq *DirtyQueue) requeue_(c *ctx, inode Inode) {
+	defer c.FuncIn("DirtyQueue::requeue_", "inode %d", inode.inodeNum()).Out()
+
+	for {
+		dq.moveToBackOfQueue_(c, inode)
+
+		done := func() bool {
+			// Normally we would need to take the parent lock here to
+			// prevent the inode from being reparented while we traverse
+			// up the tree. However, we cannot do that because we already
+			// hold the flusher lock and so cannot safely grab the parent
+			// lock (for example see Directory.parentSetChildAttr()).
+			// Luckily it isn't important that the queue is sorted
+			// absolutely correctly in all cases and we can thus retrieve
+			// the parent without holding the parent lock because if we
+			// receive an out of date parent we'll still operate
+			// correctly, just less efficiently.
+			if inode.isWorkspaceRoot() || inode.isOrphaned_() {
+				return true
+			}
+			inode = inode.parent_(c)
+			return false
+		}()
+		if done {
+			return
+		}
+	}
+}
+
+// Must hold flusher lock
+func (dq *DirtyQueue) moveToBackOfQueue_(c *ctx, inode Inode) {
+	de := inode.dirtyElement_()
+	if de != nil {
+		c.vlog("Moving inode %d to end of dirty queue", inode.inodeNum())
+		dq.l.MoveToBack(de)
+	} else {
+		c.vlog("Adding inode %d to end of dirty queue", inode.inodeNum())
+		inode.dirty_(c)
+	}
+}
+
+// When flushing the dirty queue normally the WSR will be dirtied many times
+// as it is occasionally published, but children of that WSR are still on the
+// dirty queue. When syncing the entire queue we can flush any particular
+// inode only once by flushing in reverse topological order, from the leaves
+// up to the root.
+//
+// Must hold the flusher lock
+func (dq *DirtyQueue) sortTopologically_(c *ctx) {
+	defer c.funcIn("DirtyQueue::sortTopologically").Out()
+
+	// The general strategy is to dirty all the parents and grand-parents of each
+	// inode on the dirty queue up to the WSR. At the end we'll have a close,
+	// though not necessarily perfect, approximation of a reverse topological
+	// sort. At least the WSR will only be uploaded once, which is the primary
+	// goal.
+
+	dirtyInodes := make([]*dirtyInode, 0, dq.Len_())
+	for e := dq.Front_(); e != nil; e = e.Next() {
+		di := e.Value.(*dirtyInode)
+		inodeNum := di.inode.inodeNum()
+
+		if di.inode.isOrphaned() {
+			c.vlog("Skipping orphaned inode %d", inodeNum)
+			continue
+		}
+
+		if di.inode.isListingType() {
+			c.vlog("Skipping listing inode %d", inodeNum)
+			continue
+		}
+
+		dirtyInodes = append(dirtyInodes, di)
+		c.vlog("Added inode %d to sorting list", inodeNum)
+	}
+
+	for _, di := range dirtyInodes {
+		dq.requeue_(c, di.inode)
 	}
 }
 

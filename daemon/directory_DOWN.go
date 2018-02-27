@@ -239,7 +239,7 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 	remoteRecord quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
 	defer c.funcIn("Directory::normalizeHardlinks_DOWN_").Out()
-	inodeId := dir.children.inodeNum(remoteRecord.Filename())
+	inodeId := dir.children.inodeNum(localRecord.Filename())
 	inode := c.qfs.inodeNoInstantiate(c, inodeId)
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
@@ -282,6 +282,28 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 	}
 	c.qfs.noteChildCreated(c, dir.id, remoteRecord.Filename())
 	return inodeId
+}
+
+// This function is a simplified alternative to Rename/Move which is called
+// while refreshing. This function is required as the regular Rename/Move
+// function have to update the hardlink table and normalize the source and
+// destination of the operation
+func (dir *Directory) moveHardlinkLeg_DOWN(c *ctx, newParent Inode, oldName string,
+	remoteRecord quantumfs.DirectoryRecord, inodeId InodeId) {
+
+	defer c.FuncIn("Directory::moveToHardlinkLeg_DOWN", "%d : %s : %d",
+		dir.inodeNum(), remoteRecord.Filename(), inodeId).Out()
+
+	// Unlike regular rename, we throw away the result of deleteChild and
+	// just use the new remote record for creating the move destination
+	func() {
+		defer dir.childRecordLock.Lock().Unlock()
+		dir.children.deleteChild(c, oldName)
+	}()
+
+	dst := asDirectory(newParent)
+	defer dst.childRecordLock.Lock().Unlock()
+	dst.children.setRecord(c, inodeId, remoteRecord)
 }
 
 // The caller must hold the childRecordLock
@@ -386,7 +408,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 		c.vlog("Processing %s local %t remote %t", childname,
 			localRecord != nil, remoteRecord != nil)
 
-		if rc.isInodeUsedAfterRefresh(c, localRecord, remoteRecord) {
+		if rc.isLocalRecordUsable(c, localRecord, remoteRecord) {
 			if shouldHideLocalRecord(localRecord, remoteRecord) {
 				childname = dir.hideEntry_DOWN_(c, childId,
 					localRecord)
@@ -455,7 +477,11 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 			return
 		}
 		if missingDentry {
-			if record.Type() == quantumfs.ObjectTypeHardlink {
+			if record.Type() != quantumfs.ObjectTypeHardlink {
+				// Will be handled in the later moveDentries stage
+				return
+			}
+			if !rc.setHardlinkAsMoveDst(c, localRecord, record) {
 				dir.loadNewChild_DOWN_(c, record, inodeId)
 			}
 			return

@@ -470,14 +470,12 @@ func (merge *merger) mergeExtendedAttrs(base quantumfs.ObjectKey,
 	// Add new attrs, but only if they weren't removed in the older branch
 	for i := 0; i < newerAttrs.NumAttributes(); i++ {
 		key, newerId := newerAttrs.Attribute(i)
-		olderId := olderAttrs.AttributeByKey(key)
+		_, inOlder := olderAttrs.AttributeByKey(key)
 
 		if baseAttrs != nil {
-			baseId := baseAttrs.AttributeByKey(key)
+			_, inBase := baseAttrs.AttributeByKey(key)
 			// skip this attribute since it was removed
-			if baseId != quantumfs.EmptyBlockKey &&
-				olderId == quantumfs.EmptyBlockKey {
-
+			if inBase && !inOlder {
 				continue
 			}
 		}
@@ -489,19 +487,16 @@ func (merge *merger) mergeExtendedAttrs(base quantumfs.ObjectKey,
 	// Add attrs that were added or only changed by the older branch
 	for i := 0; i < olderAttrs.NumAttributes(); i++ {
 		key, olderId := olderAttrs.Attribute(i)
-		newerId := newerAttrs.AttributeByKey(key)
+		newerId, inNewer := newerAttrs.AttributeByKey(key)
 
 		setId := false
 
 		if baseAttrs != nil {
-			baseId := baseAttrs.AttributeByKey(key)
-			if (baseId == quantumfs.EmptyBlockKey &&
-				newerId == quantumfs.EmptyBlockKey) ||
-				(baseId == newerId) {
-
+			baseId, inBase := baseAttrs.AttributeByKey(key)
+			if (!inBase && !inNewer) || baseId.IsEqualTo(newerId) {
 				setId = true
 			}
-		} else if newerId == quantumfs.EmptyBlockKey {
+		} else if newerId.IsEqualTo(quantumfs.EmptyBlockKey) {
 			setId = true
 		}
 
@@ -889,12 +884,12 @@ func (merge *merger) mergeFile(base quantumfs.DirectoryRecord,
 		(*premergedRecord).SetSize(other.fileLength(merge.c))
 		(*premergedRecord).SetID(other.sync(merge.c, merge.pubFn))
 
-		merge.c.vlog("Merging file contents for %d %s", local.FileId(),
+		merge.c.vlog("Merging file contents: %d %s", local.FileId(),
 			local.Filename())
 		return nil
 	}
 
-	merge.c.vlog("File conflict for %s resulting in overwrite. %d %d",
+	merge.c.vlog("File conflict for %s: %d %d",
 		local.Filename(), local.FileId(), remote.FileId())
 
 	return nil
