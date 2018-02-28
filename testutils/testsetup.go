@@ -34,6 +34,9 @@ func init() {
 		panic(fmt.Sprintf("Unable to chmod rootDir "+
 			" %s: %s", rootDir, err.Error()))
 	}
+
+	// Enable utils.DeferableRwMutex recursive grab checking
+	utils.CheckForRecursiveRLock = true
 }
 
 // Leave a record of the temporary directory's name
