@@ -98,18 +98,16 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	return <-resultChannel
 }
 
-func (store *dataStore) Set(c *quantumfs.Ctx, buf ImmutableBuffer) error {
+func (store *dataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
+	buf ImmutableBuffer) error {
 
 	defer c.FuncInName(qlog.LogDaemon, "dataStore::Set").Out()
 
-	key := buf.Key()
-	if key.Type() == quantumfs.KeyTypeEmbedded {
-		panic("Attempted to set embedded key")
-	}
+	utils.Assert(key.Type() != quantumfs.KeyTypeEmbedded,
+		"Attempted to set embedded key")
 
-	if key.IsEqualTo(quantumfs.ZeroKey) {
-		panic("Attempted Set without provided Key")
-	}
+	utils.Assert(!key.IsEqualTo(quantumfs.ZeroKey),
+		"Attempted Set without provided Key")
 
 	store.cache.storeInCache(c, key, buf)
 	return store.durableStore.Set(c, key, buf.(*buffer))

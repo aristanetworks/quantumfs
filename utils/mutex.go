@@ -6,7 +6,10 @@ package utils
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
+
+	"github.com/silentred/gid"
 )
 
 // Mutex type which can have unlocking deferred. ie: defer df.Lock().Unlock()
@@ -36,20 +39,57 @@ type NeedWriteUnlock interface {
 // or defer drm.RLock().RUnlock().
 type DeferableRwMutex struct {
 	lock sync.RWMutex
+
+	// IDs of goroutines which are holding this lock for read
+	readHolderLock DeferableMutex
+	readHolders    map[int64]uintptr
 }
 
+// Set to true to have DeferableRwMutex panic if a single goroutine attempts to call
+// RLock() on the same lock more than once.
+var CheckForRecursiveRLock bool
+
 func (df *DeferableRwMutex) RLock() NeedReadUnlock {
+	if CheckForRecursiveRLock {
+		func() {
+			defer df.readHolderLock.Lock().Unlock()
+			goid := gid.Get()
+			if df.readHolders == nil {
+				df.readHolders = make(map[int64]uintptr)
+			}
+			pc, alreadyHeld := df.readHolders[goid]
+			if alreadyHeld {
+				f := runtime.FuncForPC(pc)
+				file, line := f.FileLine(pc)
+				location := fmt.Sprintf("%s:%d", file, line)
+
+				Assert(!alreadyHeld,
+					"goroutine %d attempted to RLock twice, "+
+						"previously at %s!", goid, location)
+			}
+
+			pc, _, _, _ = runtime.Caller(1)
+			df.readHolders[goid] = pc
+		}()
+	}
+
 	df.lock.RLock()
-	return &df.lock
+	return df
+}
+
+func (df *DeferableRwMutex) RUnlock() {
+	if CheckForRecursiveRLock {
+		func() {
+			defer df.readHolderLock.Lock().Unlock()
+			delete(df.readHolders, gid.Get())
+		}()
+	}
+	df.lock.RUnlock()
 }
 
 func (df *DeferableRwMutex) Lock() NeedWriteUnlock {
 	df.lock.Lock()
 	return &df.lock
-}
-
-func (df *DeferableRwMutex) RUnlock() {
-	df.lock.RUnlock()
 }
 
 func (df *DeferableRwMutex) Unlock() {
