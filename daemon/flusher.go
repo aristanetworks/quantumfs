@@ -119,7 +119,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 			dq.treelock.lock.RLock()
 			defer dq.treelock.lock.RUnlock()
 
-			doneChan := make(chan error, 10)
+			doneChan := make(chan error, 1)
 			func() {
 				defer c.qfs.flusher.lock.Lock().Unlock()
 
@@ -236,12 +236,18 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	return true
 }
 
+func init() {
+	panicErr = fmt.Errorf("flushQueue panic")
+}
+
 // treeLock and flusher lock must be locked R/W when calling this function
+var panicErr error
+
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) {
 
 	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()
 	defer logRequestPanic(c)
-	err = fmt.Errorf("flushQueue panic")
+	err = panicErr
 
 	if flushAll {
 		dq.sortTopologically_(c)
@@ -474,7 +480,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 		c.vlog("Flusher: %d dirty queues should finish off",
 			len(flusher.dqs))
 		for _, dq := range flusher.dqs {
-			response := make(chan error, 10)
+			response := make(chan error, 1)
 			if workspace != "" {
 				if !strings.HasPrefix(workspace, dq.treelock.name) {
 					continue
