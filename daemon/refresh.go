@@ -192,8 +192,10 @@ func (rc *RefreshContext) buildRefreshMapWsr(c *ctx, localRootId quantumfs.Objec
 
 	defer c.funcIn("RefreshContext::buildRefreshMapWsr").Out()
 
-	localWsr := c.dataStore.Get(&c.Ctx, localRootId).clone().AsWorkspaceRoot()
-	remoteWsr := c.dataStore.Get(&c.Ctx, remoteRootId).clone().AsWorkspaceRoot()
+	localWsr := MutableCopy(c, c.dataStore.Get(&c.Ctx,
+		localRootId)).AsWorkspaceRoot()
+	remoteWsr := MutableCopy(c, c.dataStore.Get(&c.Ctx,
+		remoteRootId)).AsWorkspaceRoot()
 
 	rc.buildRefreshMap(c, localWsr.BaseLayer(), remoteWsr.BaseLayer(), "")
 
@@ -487,7 +489,7 @@ func (wsr *WorkspaceRoot) refreshTo_(c *ctx, rc *RefreshContext) {
 	defer c.funcIn("WorkspaceRoot::refreshTo_").Out()
 
 	buffer := c.dataStore.Get(&c.Ctx, rc.rootId)
-	workspaceRoot := buffer.clone().AsWorkspaceRoot()
+	workspaceRoot := MutableCopy(c, buffer).AsWorkspaceRoot()
 	baseLayerId := workspaceRoot.BaseLayer()
 	hardlinkEntry := workspaceRoot.HardlinkEntry()
 

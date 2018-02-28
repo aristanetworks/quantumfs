@@ -69,7 +69,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 	err := quantumfs.ConstantStore.Get(c, key, &thinBuf)
 	if err == nil {
 		c.Vlog(qlog.LogDaemon, "Found key in constant store")
-		return thinBuf
+		return &thinBuf
 	}
 
 	// Check cache
@@ -86,7 +86,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 				return nil
 			}
 
-			return buf
+			return &buf
 		})
 
 	if bufResult != nil {
@@ -315,12 +315,10 @@ func (buf *buffer) Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error) {
 		return buf.key, nil
 	}
 
-	setCopy := newImmutableBufferDataCopy(buf.data, buf.keyType, buf.dataStore)
-
-	buf.key = setCopy.Key()
+	buf.key = quantumfs.NewObjectKey(buf.keyType, buf.ContentHash())
 	buf.dirty = false
 	c.Vlog(qlog.LogDaemon, "New buffer key %s", buf.key.String())
-	err := buf.dataStore.Set(c, setCopy)
+	err := buf.dataStore.Set(c, buf.key, buf)
 	return buf.key, err
 }
 
@@ -390,6 +388,7 @@ func (buf *buffer) AsHardlinkEntry() quantumfs.HardlinkEntry {
 
 type cacheEntry struct {
 	buf        ImmutableBuffer
+	key        quantumfs.ObjectKey
 	waiting    []chan ImmutableBuffer
 	lruElement *list.Element
 }
@@ -443,6 +442,7 @@ func (cc *combiningCache) get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 		// Prepare a placeholder to indicate the result is being fetched
 		entry = &cacheEntry{
 			buf:     nil,
+			key:     key,
 			waiting: make([]chan ImmutableBuffer, 0),
 		}
 
@@ -497,7 +497,7 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, key quantumfs.ObjectKey
 		}
 		// ensure we remove any entries that may signal that we're waiting
 		// for this data to come back any more
-		delete(cc.entryMap, buf.Key().String())
+		delete(cc.entryMap, key.String())
 		return
 	}
 
@@ -529,60 +529,33 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, key quantumfs.ObjectKey
 		// placed in the lru yet and as such will never be evicted
 		evictedBuf := cc.lru.Remove(cc.lru.Front()).(*cacheEntry)
 		cc.freeSpace += evictedBuf.buf.Size()
-		delete(cc.entryMap, evictedBuf.buf.Key().String())
+		delete(cc.entryMap, evictedBuf.key.String())
 	}
 
 	newEntry := &cacheEntry{
 		buf: buf,
+		key: key,
 	}
 	newEntry.lruElement = cc.lru.PushBack(newEntry)
-	cc.entryMap[buf.Key().String()] = newEntry
+	cc.entryMap[key.String()] = newEntry
 }
 
 type ImmutableBuffer interface {
-	MutableCopy() quantumfs.Buffer
 	Read(out []byte, offset uint32) int
 	KeyType() quantumfs.KeyType
 	ContentHash() [quantumfs.ObjectKeyLength - 1]byte
-	Key() quantumfs.ObjectKey
+	Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error)
 	Size() int
 }
 
-/*
-func newImmutableBufferDataCopy(in []byte, keyType_ quantumfs.KeyType,
-	store *dataStore) ImmutableBuffer {
-
-	inSize := len(in)
-
-	var newData []byte
-	// ensure our buffer meets min capacity
-	if inSize < initBlockSize {
-		newData = make([]byte, inSize, initBlockSize)
-	} else {
-		newData = make([]byte, inSize)
-	}
-	copy(newData, in)
-
-	return newImmutableBuffer(newData, keyType_, store)
+func MutableCopy(c *ctx, buf ImmutableBuffer) quantumfs.Buffer {
+	dataCopy := make([]byte, buf.Size())
+	buf.Read(dataCopy, 0)
+	return newBuffer(c, dataCopy, buf.KeyType())
 }
 
-func newImmutableBuffer(newData []byte, keyType quantumfs.KeyType,
-	store *dataStore) ImmutableBuffer {
-
-	return &ImmutableBuffer{
-		data:      newData,
-		key:       quantumfs.NewObjectKey(keyType, hash.Hash(newData)),
-		dataStore: store,
-	}
+func slowCopy(buf ImmutableBuffer) []byte {
+	dataCopy := make([]byte, buf.Size())
+	buf.Read(dataCopy, 0)
+	return dataCopy
 }
-
-func newImmutableBufferWithKey(newData []byte, key quantumfs.ObjectKey,
-	store *dataStore) ImmutableBuffer {
-
-	return &ImmutableBuffer{
-		data:      newData,
-		key:       key,
-		dataStore: store,
-	}
-}
-*/

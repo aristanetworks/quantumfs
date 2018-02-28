@@ -1126,8 +1126,6 @@ func (api *ApiHandle) getBlock(c *ctx, buf []byte) int {
 			"Nil buffer returned from datastore")
 	}
 
-	dataCopy := make([]byte, buffer.Size())
-	buffer.Read(dataCopy, 0)
 	response := quantumfs.GetBlockResponse{
 		ErrorResponse: quantumfs.ErrorResponse{
 			CommandCommon: quantumfs.CommandCommon{
@@ -1136,7 +1134,7 @@ func (api *ApiHandle) getBlock(c *ctx, buf []byte) int {
 			ErrorCode: quantumfs.ErrorOK,
 			Message:   "",
 		},
-		Data: dataCopy,
+		Data: slowCopy(buffer),
 	}
 
 	bytes, err := json.Marshal(response)
