@@ -540,25 +540,16 @@ func (cc *combiningCache) storeInCache(c *quantumfs.Ctx, key quantumfs.ObjectKey
 	cc.entryMap[key.String()] = newEntry
 }
 
-func newImmutableBuffer(newData []byte, keyType quantumfs.KeyType,
-	store *dataStore) *ImmutableBuffer {
-
-	return &ImmutableBuffer{
-		data:      newData,
-		key:       quantumfs.NewObjectKey(keyType, hash.Hash(newData)),
-		dataStore: store,
-	}
-=======
-	cc.entryMap[key.String()] = newEntry
->>>>>>> immutableBuffers
-}
-
 type ImmutableBuffer interface {
 	Read(out []byte, offset uint32) int
 	KeyType() quantumfs.KeyType
 	ContentHash() [quantumfs.ObjectKeyLength - 1]byte
 	Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error)
 	Size() int
+}
+
+func ImmutableCopy(c *ctx, buf quantumfs.Buffer) ImmutableBuffer {
+	return MutableCopy(c, buf)
 }
 
 func MutableCopy(c *ctx, buf ImmutableBuffer) quantumfs.Buffer {

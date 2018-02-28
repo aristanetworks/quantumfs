@@ -355,8 +355,7 @@ func publishDirectoryEntry(c *ctx, layer *quantumfs.DirectoryEntry,
 	bytes := layer.Bytes()
 
 	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	newKey, err := pub(c, newImmutableBuffer(buf.data, buf.keyType,
-		buf.dataStore))
+	newKey, err := pub(c, ImmutableCopy(c, buf))
 	utils.Assert(err == nil, "Failed to upload new baseLayer object: %v", err)
 
 	return newKey

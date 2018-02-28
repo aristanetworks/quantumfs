@@ -429,8 +429,8 @@ func underlyingTypesMatch(hardlinkTable HardlinkTable,
 		underlyingTypeOf(hardlinkTable, r2))
 }
 
-type publishFn func(*ctx, *ImmutableBuffer) (quantumfs.ObjectKey, error)
+type publishFn func(*ctx, ImmutableBuffer) (quantumfs.ObjectKey, error)
 
-func publishNow(c *ctx, buf *ImmutableBuffer) (quantumfs.ObjectKey, error) {
+func publishNow(c *ctx, buf ImmutableBuffer) (quantumfs.ObjectKey, error) {
 	return buf.Key(&c.Ctx)
 }
