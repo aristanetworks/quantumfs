@@ -240,15 +240,15 @@ func benchBlobWrites(b *testing.B, cluster *gocql.ClusterConfig,
 	})
 }
 
-func benchBlob1MBWrites(b *testing.B, cluster *gocql.ClusterConfig, ttl int) {
+func benchBlob256KBWrites(b *testing.B, cluster *gocql.ClusterConfig, ttl int) {
 
-	buf := make([]byte, 1024*1024)
-	benchBlobWrites(b, cluster, "benchBlob1MBWrites", buf, ttl)
+	buf := make([]byte, 256*1024)
+	benchBlobWrites(b, cluster, "benchBlob256KBWrites", buf, ttl)
 }
 
-func benchBlob1MBCachedReads(b *testing.B, cluster *gocql.ClusterConfig, ttl int) {
+func benchBlob256KBCachedReads(b *testing.B, cluster *gocql.ClusterConfig, ttl int) {
 
-	buf := make([]byte, 1024*1024)
+	buf := make([]byte, 256*1024)
 	check := []byte{0xde, 0xad, 0xbe, 0xef}
 	copy(buf, check)
 
@@ -256,16 +256,16 @@ func benchBlob1MBCachedReads(b *testing.B, cluster *gocql.ClusterConfig, ttl int
 }
 
 // benchmark to get latency information for a small write
-func benchBlob4BWrites(b *testing.B, cluster *gocql.ClusterConfig, ttl int) {
+func benchBlob512BWrites(b *testing.B, cluster *gocql.ClusterConfig, ttl int) {
 
-	buf := make([]byte, 4)
-	benchBlobWrites(b, cluster, "benchBlob4BWrites", buf, ttl)
+	buf := make([]byte, 512)
+	benchBlobWrites(b, cluster, "benchBlob512BWrites", buf, ttl)
 }
 
 // benchmark to get latency information for a small cached read
-func benchBlob4BCachedReads(b *testing.B, cluster *gocql.ClusterConfig, ttl int) {
+func benchBlob512BCachedReads(b *testing.B, cluster *gocql.ClusterConfig, ttl int) {
 
-	buf := make([]byte, 4)
+	buf := make([]byte, 512)
 	check := []byte{0xde, 0xad, 0xbe, 0xef}
 	copy(buf, check)
 
@@ -297,20 +297,20 @@ func BenchmarkGoCQL(b *testing.B) {
 		{"Wsdb-CachedReads", benchWsdbCachedReads, -1},
 
 		// large blob io: no TTL, TTL=0, TTL > 0
-		{"Blob-1MB-Writes", benchBlob1MBWrites, -1},
-		{"Blob-1MB-Writes-TTL0", benchBlob1MBWrites, 0},
-		{"Blob-1MB-Writes-TTL", benchBlob1MBWrites, 3600},
-		{"Blob-1MB-CachedReads", benchBlob1MBCachedReads, -1},
-		{"Blob-1MB-CachedReads-TTL0", benchBlob1MBCachedReads, 0},
-		{"Blob-1MB-CachedReads-TTL", benchBlob1MBCachedReads, 3600},
+		{"Blob-256KB-Writes", benchBlob256KBWrites, -1},
+		{"Blob-256KB-Writes-TTL0", benchBlob256KBWrites, 0},
+		{"Blob-256KB-Writes-TTL", benchBlob256KBWrites, 3600},
+		{"Blob-256KB-CachedReads", benchBlob256KBCachedReads, -1},
+		{"Blob-256KB-CachedReads-TTL0", benchBlob256KBCachedReads, 0},
+		{"Blob-256KB-CachedReads-TTL", benchBlob256KBCachedReads, 3600},
 
 		// small blob io: no TTL, TTL=0, TTL > 0
-		{"Blob-4B-Writes", benchBlob4BWrites, -1},
-		{"Blob-4B-Writes-TTL0", benchBlob4BWrites, 0},
-		{"Blob-4B-Writes-TTL", benchBlob4BWrites, 3600},
-		{"Blob-4B-CachedReads", benchBlob4BCachedReads, -1},
-		{"Blob-4B-CachedReads-TTL0", benchBlob4BCachedReads, 0},
-		{"Blob-4B-CachedReads-TTL", benchBlob4BCachedReads, 3600},
+		{"Blob-512B-Writes", benchBlob512BWrites, -1},
+		{"Blob-512B-Writes-TTL0", benchBlob512BWrites, 0},
+		{"Blob-512B-Writes-TTL", benchBlob512BWrites, 3600},
+		{"Blob-512B-CachedReads", benchBlob512BCachedReads, -1},
+		{"Blob-512B-CachedReads-TTL0", benchBlob512BCachedReads, 0},
+		{"Blob-512B-CachedReads-TTL", benchBlob512BCachedReads, 3600},
 	}
 
 	// ensure a clean state
