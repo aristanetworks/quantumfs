@@ -65,7 +65,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	c.vlog("Workspace Loading %s %s", workspaceName, rootId.String())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
-	workspaceRoot := buffer.clone().AsWorkspaceRoot()
+	workspaceRoot := MutableCopy(c, buffer).AsWorkspaceRoot()
 
 	defer wsr.Lock().Unlock()
 
@@ -182,7 +182,7 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 			if buffer == nil {
 				panic("Missing next HardlinkEntry object")
 			}
-			entry = buffer.clone().AsHardlinkEntry()
+			entry = MutableCopy(c, buffer).AsHardlinkEntry()
 		} else {
 			break
 		}
@@ -196,7 +196,7 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 // to avoid getting it built as part of refresh_() as that would be an expensive
 // operation. The caller can also choose to send a nil refresh context to ask it
 // to be built as part of refresh.
-func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
+func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 	defer c.funcIn("WorkspaceRoot::refresh_").Out()
 
 	publishedRootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
@@ -216,15 +216,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx, rc *RefreshContext) {
 		return
 	}
 
-	if rc == nil {
-		// We should avoid computing the refresh map under the tree lock
-		// if at all possible as it is a very expensive operation
-		rc = newRefreshContext(c, publishedRootId)
-	}
-	if !rc.rootId.IsEqualTo(publishedRootId) {
-		c.vlog("Workspace updated again remotely. Refreshing anyway")
-		publishedRootId = rc.rootId
-	}
+	rc := newRefreshContext_(c, wsr.publishedRootId, publishedRootId)
 	c.vlog("Workspace Refreshing %s rootid: %s::%s -> %s::%s", workspaceName,
 		wsr.publishedRootId.String(), wsr.nonce.String(),
 		publishedRootId.String(), nonce.String())
@@ -278,8 +270,7 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 
-	wsr.lock.RLock()
-	defer wsr.lock.RUnlock()
+	defer wsr.RLock().RUnlock()
 
 	wsr.hardlinkTable.apply(c, wsr.Directory.hardlinkDelta)
 

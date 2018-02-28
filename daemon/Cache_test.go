@@ -125,7 +125,7 @@ func TestCacheLru(t *testing.T) {
 		// we should have the first (entryNum/2) entries in the cache.
 		test.Log("Priming LRU")
 		for i := entryNum - 1; i > 0; i-- {
-			buf := datastore.Get(c, keys[i])
+			buf := datastore.Get(c, keys[i]).(*buffer)
 			test.Assert(buf != nil, "Failed retrieving block %d", i)
 		}
 		test.Log("Verifying cache")
@@ -137,7 +137,8 @@ func TestCacheLru(t *testing.T) {
 				datastore.cache.size, cacheSize)
 			lruNum := cacheSize / quantumfs.ObjectKeyLength
 			for _, v := range datastore.cache.entryMap {
-				i := int(v.buf.data[1]) + int(v.buf.data[2])*256
+				buf := v.buf.(*buffer)
+				i := int(buf.data[1]) + int(buf.data[2])*256
 				test.Assert(i <= lruNum,
 					"Unexpected block in cache %d", i)
 			}
@@ -151,7 +152,7 @@ func TestCacheLru(t *testing.T) {
 				datastore.cache.freeSpace)
 			num := 1
 			for e := datastore.cache.lru.Back(); e != nil; e = e.Prev() {
-				buf := e.Value.(*cacheEntry).buf
+				buf := e.Value.(*cacheEntry).buf.(*buffer)
 				i := int(buf.data[1]) + int(buf.data[2])*256
 				test.Assert(i <= lruNum,
 					"Unexpected block in lru %d", i)
@@ -162,15 +163,15 @@ func TestCacheLru(t *testing.T) {
 		}()
 
 		// Cause a block to be refreshed to the beginning
-		buf := datastore.Get(c, keys[256])
+		buf := datastore.Get(c, keys[256]).(*buffer)
 		test.Assert(buf != nil, "Block not found")
 
 		defer datastore.cache.lock.Lock().Unlock()
-		data := datastore.cache.lru.Back().Value.(*cacheEntry).buf
+		data := datastore.cache.lru.Back().Value.(*cacheEntry).buf.(*buffer)
 		i := int(data.data[1]) + int(data.data[2])*256
 		test.Assert(i == 256, "Incorrect most recent block %d != 256", i)
 
-		data = datastore.cache.lru.Front().Value.(*cacheEntry).buf
+		data = datastore.cache.lru.Front().Value.(*cacheEntry).buf.(*buffer)
 		i = int(data.data[1]) + int(data.data[2])*256
 		test.Assert(i == 255, "Wrong least recent block %d != 255", i)
 	})
@@ -196,13 +197,13 @@ func TestCacheLruDiffSize(t *testing.T) {
 
 		test.Log("Priming LRU")
 		for i := entryNum - 1; i > 0; i-- {
-			buf := datastore.Get(c, keys[i])
+			buf := datastore.Get(c, keys[i]).(*buffer)
 			test.Assert(buf != nil, "Failed retrieving block %d", i)
 		}
 		// Update keys[257] whose size is greater than cacheSize, but it
 		// should not have an impact on the final result of lru list because
 		// it is too large
-		buf := datastore.Get(c, keys[257])
+		buf := datastore.Get(c, keys[257]).(*buffer)
 		test.Assert(buf != nil, "Failed retrieving block 257")
 
 		test.Log("Verifying cache")
@@ -217,7 +218,8 @@ func TestCacheLruDiffSize(t *testing.T) {
 			// 70 entries, and we can calculate free space accordingly
 			lruNum := 70
 			for _, v := range datastore.cache.entryMap {
-				i := int(v.buf.data[1]) + int(v.buf.data[2])*256
+				buf := v.buf.(*buffer)
+				i := int(buf.data[1]) + int(buf.data[2])*256
 				test.Assert(i <= lruNum,
 					"Unexpected block in cache %d", i)
 			}
@@ -231,7 +233,7 @@ func TestCacheLruDiffSize(t *testing.T) {
 				datastore.cache.freeSpace)
 			num := 1
 			for e := datastore.cache.lru.Back(); e != nil; e = e.Prev() {
-				buf := e.Value.(*cacheEntry).buf
+				buf := e.Value.(*cacheEntry).buf.(*buffer)
 				i := int(buf.data[1]) + int(buf.data[2])*256
 				test.Assert(i <= lruNum,
 					"Unexpected block in lru %d", i)
@@ -247,17 +249,17 @@ func TestCacheLruDiffSize(t *testing.T) {
 		// it will take off the space up to keys[14] and part of keys[13].
 		// Due to the mechanism of cache, all keys from keys[70] downto
 		// keys[13] should be evicted.
-		buf = datastore.Get(c, keys[298])
+		buf = datastore.Get(c, keys[298]).(*buffer)
 		test.Assert(buf != nil, "Block not found")
 
 		defer datastore.cache.lock.Lock().Unlock()
-		data := datastore.cache.lru.Back().Value.(*cacheEntry).buf
+		data := datastore.cache.lru.Back().Value.(*cacheEntry).buf.(*buffer)
 		i := int(data.data[1]) + int(data.data[2])*256
 		test.Assert(i == 298, "Incorrect most recent block %d != 298", i)
 
 		// The front element is supposed to be keys[13], but its size is too
 		// large, so it has to be removed from the cache
-		data = datastore.cache.lru.Front().Value.(*cacheEntry).buf
+		data = datastore.cache.lru.Front().Value.(*cacheEntry).buf.(*buffer)
 		i = int(data.data[1]) + int(data.data[2])*256
 		test.Assert(i == 12, "Wrong least recent block %d != 12", i)
 	})
@@ -278,10 +280,10 @@ func TestCacheCaching(t *testing.T) {
 
 		// Prime the cache
 		for i := 1; i <= 100; i++ {
-			buf := datastore.Get(c, keys[i])
+			buf := datastore.Get(c, keys[i]).(*buffer)
 			test.Assert(buf != nil, "Failed to get block %d", i)
 		}
-		buf := datastore.Get(c, keys[257])
+		buf := datastore.Get(c, keys[257]).(*buffer)
 		test.Assert(buf != nil, "Failed to get block 257")
 		test.Assert(buf.Size() == 101*quantumfs.ObjectKeyLength,
 			"Incorrect length of block 257: %d != %d", buf.Size(),
@@ -312,7 +314,7 @@ func TestCacheCaching(t *testing.T) {
 		// Reading again should come entirely from the cache. If not
 		// testDataStore will assert.
 		for i := 2; i <= 100; i++ {
-			buf := datastore.Get(c, keys[i])
+			buf := datastore.Get(c, keys[i]).(*buffer)
 			test.Assert(buf != nil, "Failed to get block %d", i)
 		}
 	})

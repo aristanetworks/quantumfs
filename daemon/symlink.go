@@ -146,7 +146,7 @@ func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 		return nil, fuse.EIO
 	}
 
-	return data.Get(), fuse.OK
+	return slowCopy(data), fuse.OK
 }
 
 func (link *Symlink) Mknod(c *ctx, name string, input *fuse.MknodIn,
@@ -213,9 +213,10 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 			return link.key, nil
 		}
 
-		key, err := c.dataStore.Set(&c.Ctx,
-			newImmutableBuffer([]byte(link.dirtyPointsTo),
-				quantumfs.KeyTypeMetadata, c.dataStore))
+		buf := newBuffer(c, []byte(link.dirtyPointsTo),
+			quantumfs.KeyTypeMetadata)
+
+		key, err := buf.Key(&c.Ctx)
 		if err != nil {
 			panic(fmt.Sprintf("Failed to upload block: %v", err))
 		}

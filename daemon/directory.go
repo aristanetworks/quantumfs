@@ -57,7 +57,7 @@ func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 		if buffer == nil {
 			panic("No baseLayer object")
 		}
-		baseLayer := buffer.clone().AsDirectoryEntry()
+		baseLayer := MutableCopy(c, buffer).AsDirectoryEntry()
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			visitor(baseLayer.Entry(i))
@@ -209,8 +209,6 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	owner fuse.Owner, entry_ quantumfs.ImmutableDirectoryRecord) {
 
-	defer c.FuncIn("fillAttrWithDirectoryRecord", "inode %d", inodeNum).Out()
-
 	// Ensure we have a flattened DirectoryRecord to ensure the type is the
 	// underlying type for Hardlinks. This is required in order for
 	// objectTypeToFileType() to have access to the correct type to report.
@@ -218,7 +216,11 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 
 	attr.Ino = uint64(inodeNum)
 
-	fileType := objectTypeToFileType(c, entry.Type())
+	fileType := _objectTypeToFileType(c, entry.Type())
+
+	c.vlog("filling attr inode %d type %d/%x perms %o links %d",
+		inodeNum, entry.Type(), fileType, entry.Permissions(), attr.Nlink)
+
 	switch fileType {
 	case fuse.S_IFDIR:
 		// Approximate the read size of the Directory objects in the
@@ -251,10 +253,6 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Atimensec = entry.ModificationTime().Nanoseconds()
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
 	attr.Ctimensec = entry.ContentTime().Nanoseconds()
-
-	c.dlog("type %x permissions %o links %d",
-		fileType, entry.Permissions(), attr.Nlink)
-
 	attr.Mode = fileType | permissionsToMode(entry.Permissions())
 	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
 	attr.Owner.Gid = quantumfs.SystemGid(entry.Group(), owner.Gid)
@@ -584,7 +582,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	defer dir.RLock().RUnlock()
 
-	children := make([]directoryContents, 0, 200) // 200 arbitrarily chosen
+	children := make([]directoryContents, 0, dir.children.count()+2)
 
 	c.vlog("Adding .")
 	entryInfo := directoryContents{
@@ -639,9 +637,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	defer dir.childRecordLock.Lock().Unlock()
 	records := dir.children.records()
 
-	for _, entry := range records {
-		filename := entry.Filename()
-
+	for filename, entry := range records {
 		entryInfo := directoryContents{
 			filename: filename,
 		}
@@ -1384,7 +1380,7 @@ func getRecordExtendedAttributes(c *ctx,
 		return nil, fuse.EIO
 	}
 
-	attributeList := buffer.clone().AsExtendedAttributes()
+	attributeList := MutableCopy(c, buffer).AsExtendedAttributes()
 	return &attributeList, fuse.OK
 }
 
@@ -1406,7 +1402,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 }
 
 func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
-	attr string) (*ImmutableBuffer, fuse.Status) {
+	attr string) (ImmutableBuffer, fuse.Status) {
 
 	defer c.FuncIn("Directory::getChildXAttrBuffer", "%d %s", inodeNum,
 		attr).Out()
@@ -1461,7 +1457,8 @@ func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 	if status != fuse.OK {
 		return []byte{}, status
 	}
-	return buffer.Get(), fuse.OK
+
+	return slowCopy(buffer), fuse.OK
 }
 
 func (dir *Directory) listChildXAttr(c *ctx,
@@ -1520,10 +1517,9 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		dataKey = quantumfs.EmptyBlockKey
 	} else {
 		var err error
-		if dataKey, err = c.dataStore.Set(&c.Ctx,
-			newImmutableBufferDataCopy(data, quantumfs.KeyTypeData,
-				c.dataStore)); err != nil {
-
+		dataBuf := newBufferCopy(c, data, quantumfs.KeyTypeData)
+		dataKey, err = dataBuf.Key(&c.Ctx)
+		if err != nil {
 			c.elog("Error uploading XAttr data: %v", err)
 			return fuse.EIO
 		}
@@ -1555,11 +1551,10 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		attributeList.SetNumAttributes(attributeList.NumAttributes() + 1)
 	}
 
-	buffer := newImmutableBuffer(attributeList.Bytes(),
-		quantumfs.KeyTypeMetadata, c.dataStore)
-	key, err := c.dataStore.Set(&c.Ctx, buffer)
+	buffer := newBuffer(c, attributeList.Bytes(), quantumfs.KeyTypeMetadata)
+	key, err := buffer.Key(&c.Ctx)
 	if err != nil {
-		c.elog("Error uploading extended attributes: %v", err)
+		c.elog("Error computing extended attribute key: %v", err)
 		return fuse.EIO
 	}
 
@@ -1631,10 +1626,10 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 		attributeList.SetAttribute(i, lastName, lastId)
 		attributeList.SetNumAttributes(lastIndex)
 
-		buffer := newImmutableBuffer(attributeList.Bytes(),
-			quantumfs.KeyTypeMetadata, c.dataStore)
+		buffer := newBuffer(c, attributeList.Bytes(),
+			quantumfs.KeyTypeMetadata)
 		var err error
-		key, err = c.dataStore.Set(&c.Ctx, buffer)
+		key, err = buffer.Key(&c.Ctx)
 		if err != nil {
 			c.elog("Error computing extended attribute key: %v", err)
 			return fuse.EIO
