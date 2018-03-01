@@ -118,22 +118,6 @@ func (fi *File) Access(c *ctx, mask uint32, uid uint32, gid uint32) fuse.Status 
 	return hasAccessPermission(c, fi, mask, uid, gid)
 }
 
-func (fi *File) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	defer c.funcIn("File::GetAttr").Out()
-
-	record, err := fi.parentGetChildRecordCopy(c, fi.InodeCommon.id)
-	if err != nil {
-		c.elog("Unable to get record from parent for inode %d", fi.id)
-		return fuse.EIO
-	}
-
-	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, fi.InodeCommon.id, c.fuseCtx.Owner,
-		record)
-
-	return fuse.OK
-}
-
 func (fi *File) OpenDir(c *ctx, flags_ uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 

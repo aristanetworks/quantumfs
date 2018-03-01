@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -182,6 +183,18 @@ func (inode *InodeCommon) getOrphanChildRecordCopy(c *ctx,
 	return inode.unlinkRecord.AsImmutable(), nil
 }
 
+func (inode *InodeCommon) getOrphanChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.Attr, owner fuse.Owner) {
+
+	defer c.funcIn("InodeCommon::getOrphanChildAttr").Out()
+	defer inode.unlinkLock.Lock().Unlock()
+
+	utils.Assert(inode.unlinkRecord != nil,
+		"getOrphanChildAttr on self before unlinking")
+
+	fillAttrWithDirectoryRecord(c, out, inodeNum, owner, inode.unlinkRecord)
+}
+
 func (inode *InodeCommon) setChildRecord(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.funcIn("InodeCommon::setChildRecord").Out()
 
@@ -277,4 +290,16 @@ func (inode *InodeCommon) getChildRecordCopy(c *ctx,
 		return nil, errors.New("Unsupported record fetch")
 	}
 	return inode.getOrphanChildRecordCopy(c, inodeNum)
+}
+
+func (inode *InodeCommon) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
+
+	defer c.funcIn("InodeCommon::getChildAttr").Out()
+
+	if !inode.isOrphaned() || inode.id != inodeNum {
+		panic("Unsupported record fetch on file")
+
+	}
+	inode.getOrphanChildAttr(c, inodeNum, out, owner)
 }
