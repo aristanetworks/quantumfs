@@ -7,7 +7,6 @@ package daemon
 // the directory hierarchy.
 
 import (
-	"errors"
 	"sync"
 	"syscall"
 	"time"
@@ -400,13 +399,6 @@ func (tsl *TypespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (tsl *TypespaceList) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
-
-	c.elog("Unsupported record fetch on TypespaceList")
-	return nil, errors.New("Unsupported record fetch on TypespaceList")
-}
-
 func (tsl *TypespaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 	owner fuse.Owner) {
 
@@ -729,13 +721,6 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 	c.vlog("NamespaceList::Mkdir doing nothing")
 	return fuse.EPERM
-}
-
-func (nsl *NamespaceList) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
-
-	c.elog("Unsupported record fetch on NamespaceList")
-	return nil, errors.New("Unsupported record fetch on NamespaceList")
 }
 
 func (nsl *NamespaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
@@ -1125,13 +1110,6 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 	c.vlog("WorkspaceList::Mkdir doing nothing")
 	return fuse.EPERM
-}
-
-func (wsl *WorkspaceList) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
-
-	c.elog("Unsupported record fetch on WorkspaceList")
-	return nil, errors.New("Unsupported record fetch on WorkspaceList")
 }
 
 func (wsl *WorkspaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
