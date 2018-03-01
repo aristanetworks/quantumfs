@@ -407,6 +407,12 @@ func (tsl *TypespaceList) getChildRecordCopy(c *ctx,
 	return nil, errors.New("Unsupported record fetch on TypespaceList")
 }
 
+func (tsl *TypespaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
+
+	panic("TypespaceList doesn't support record fetch")
+}
+
 func (tsl *TypespaceList) Unlink(c *ctx, name string) fuse.Status {
 	c.elog("Invalid Unlink on TypespaceList")
 	return fuse.ENOTDIR
@@ -730,6 +736,12 @@ func (nsl *NamespaceList) getChildRecordCopy(c *ctx,
 
 	c.elog("Unsupported record fetch on NamespaceList")
 	return nil, errors.New("Unsupported record fetch on NamespaceList")
+}
+
+func (nsl *NamespaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
+
+	panic("NamespaceList doesn't support record fetch")
 }
 
 func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
@@ -1120,6 +1132,12 @@ func (wsl *WorkspaceList) getChildRecordCopy(c *ctx,
 
 	c.elog("Unsupported record fetch on WorkspaceList")
 	return nil, errors.New("Unsupported record fetch on WorkspaceList")
+}
+
+func (wsl *WorkspaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
+
+	panic("WorkspaceList doesn't support record fetch")
 }
 
 func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {

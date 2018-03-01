@@ -132,6 +132,12 @@ func (wsr *ApiInode) getChildRecordCopy(c *ctx,
 	return nil, errors.New("Unsupported record fetch")
 }
 
+func (api *ApiInode) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
+
+	panic("Api doesn't support record fetch")
+}
+
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
 	c.elog("Invalid Unlink on ApiInode")
 	return fuse.ENOTDIR

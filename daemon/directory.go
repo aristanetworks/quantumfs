@@ -792,6 +792,21 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 	return nil, errors.New("Inode given is not a child of this directory")
 }
 
+func (dir *Directory) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
+
+	defer c.funcIn("Directory::getChildAttr").Out()
+
+	defer dir.RLock().RUnlock()
+	defer dir.childRecordLock.Lock().Unlock()
+
+	record := dir.getRecordChildCall_(c, inodeNum)
+	utils.Assert(record != nil, "Failed to get record for inode %d of %d",
+		inodeNum, dir.inodeNum())
+
+	fillAttrWithDirectoryRecord(c, out, inodeNum, owner, record)
+}
+
 // must have childRecordLock, fetches the child for calls that come UP from a child.
 // Should not be used by functions which aren't routed from a child, as even if dir
 // is wsr it should not accommodate getting hardlink records in those situations
