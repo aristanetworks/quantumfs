@@ -55,21 +55,6 @@ func (link *Symlink) Access(c *ctx, mask uint32, uid uint32,
 	return fuse.OK
 }
 
-func (link *Symlink) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	defer c.funcIn("Symlink::GetAttr").Out()
-	record, err := link.parentGetChildRecordCopy(c, link.InodeCommon.id)
-	if err != nil {
-		c.elog("Unable to get record from parent for inode %d", link.id)
-		return fuse.EIO
-	}
-
-	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, link.InodeCommon.id,
-		c.fuseCtx.Owner, record)
-
-	return fuse.OK
-}
-
 func (link *Symlink) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
 	c.elog("Invalid Lookup call on Symlink")
 	return fuse.ENOSYS
