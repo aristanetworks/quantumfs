@@ -202,7 +202,9 @@ func (rc *RefreshContext) buildRefreshMapWsr(c *ctx, localRootId quantumfs.Objec
 
 	hardlinks := loadHardlinks(c, remoteWsr.HardlinkEntry())
 	for fileId, linkEntry := range hardlinks {
-		utils.Assert(linkEntry.record.FileId() == fileId, "FileId mistmatch")
+		if _, exists := rc.fileMap[fileId]; exists {
+			continue
+		}
 
 		record := newHardlinkLegFromRecord(linkEntry.record, nil)
 

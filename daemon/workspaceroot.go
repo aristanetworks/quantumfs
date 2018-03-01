@@ -270,8 +270,7 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 
-	wsr.lock.RLock()
-	defer wsr.lock.RUnlock()
+	defer wsr.RLock().RUnlock()
 
 	wsr.hardlinkTable.apply(c, wsr.Directory.hardlinkDelta)
 
