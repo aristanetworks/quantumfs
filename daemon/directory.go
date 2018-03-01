@@ -805,12 +805,11 @@ func (dir *Directory) getChildRecordCopy(c *ctx,
 	defer dir.childRecordLock.Lock().Unlock()
 
 	record := dir.getRecordChildCall_(c, inodeNum)
-	if record == nil {
-		return nil,
-			errors.New("Inode given is not a child of this directory")
+	if record != nil {
+		return record.AsImmutable(), nil
 	}
 
-	return record, nil
+	return nil, errors.New("Inode given is not a child of this directory")
 }
 
 // must have childRecordLock, fetches the child for calls that come UP from a child.
