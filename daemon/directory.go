@@ -572,12 +572,8 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	// WorkspaceRoot.getChildSnapShot() will overwrite the first two entries with
 	// the correct data.
 	if !dir.self.isWorkspaceRoot() {
-		entry, err := dir.parentGetChildRecordCopy(c, dir.inodeNum())
-		utils.Assert(err == nil, "Failed to get record for inode %d %s",
-			dir.inodeNum(), err)
-
-		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
-			dir.inodeNum(), c.fuseCtx.Owner, entry)
+		dir.parentGetChildAttr(c, dir.inodeNum(), &entryInfo.attr,
+			c.fuseCtx.Owner)
 		entryInfo.fuseType = entryInfo.attr.Mode
 	}
 	children = append(children, entryInfo)
@@ -596,15 +592,9 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 				wsr := parent.(*WorkspaceRoot)
 				wsr.fillWorkspaceAttrReal(c, &entryInfo.attr)
 			} else {
-				entry, err := parent.parentGetChildRecordCopy(c,
-					parent.inodeNum())
-				utils.Assert(err == nil,
-					"Failed to get record for inode %d %s",
-					parent.inodeNum(), err)
-
 				c.vlog("Got record from grandparent")
-				fillAttrWithDirectoryRecord(c, &entryInfo.attr,
-					parent.inodeNum(), c.fuseCtx.Owner, entry)
+				parent.parentGetChildAttr(c, parent.inodeNum(),
+					&entryInfo.attr, c.fuseCtx.Owner)
 			}
 			entryInfo.fuseType = entryInfo.attr.Mode
 		}()
