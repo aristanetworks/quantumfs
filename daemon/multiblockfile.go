@@ -41,7 +41,7 @@ func newMultiBlockAccessor(c *ctx, key quantumfs.ObjectKey,
 		panic("Unable to fetch metadata for new file creation")
 	}
 
-	store := buffer.clone().AsMultiBlockFile()
+	store := MutableCopy(c, buffer).AsMultiBlockFile()
 
 	rtn.metadata.BlockSize = store.BlockSize()
 	rtn.metadata.LastBlockBytes = store.SizeOfLastBlock()
@@ -74,7 +74,8 @@ func (fi *MultiBlockFile) retrieveDataBlock(c *ctx, blockIdx int) quantumfs.Buff
 		blockIdx).Out()
 	block, exists := fi.toSync[blockIdx]
 	if !exists {
-		return c.dataStore.Get(&c.Ctx, fi.metadata.Blocks[blockIdx]).clone()
+		return MutableCopy(c, c.dataStore.Get(&c.Ctx,
+			fi.metadata.Blocks[blockIdx]))
 	}
 
 	return block
@@ -191,7 +192,7 @@ func (fi *MultiBlockFile) reload(c *ctx, key quantumfs.ObjectKey) {
 		panic("Unable to fetch metadata for reloading")
 	}
 
-	store := buffer.clone().AsMultiBlockFile()
+	store := MutableCopy(c, buffer).AsMultiBlockFile()
 
 	fi.metadata.BlockSize = store.BlockSize()
 	fi.metadata.LastBlockBytes = store.SizeOfLastBlock()
@@ -204,6 +205,7 @@ func (fi *MultiBlockFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 
 	for i, block := range fi.toSync {
 		c.vlog("Syncing block %d", i)
+		// It's okay to publish the block without copying since we delete it
 		key, err := pub(c, block)
 		if err != nil {
 			panic("TODO Failed to update datablock")
@@ -220,8 +222,7 @@ func (fi *MultiBlockFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 
 	bytes := store.Bytes()
 
-	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	key, err := pub(c, buf)
+	key, err := pub(c, newBuffer(c, bytes, quantumfs.KeyTypeMetadata))
 	utils.Assert(err == nil, "Failed to upload new file metadata: %v", err)
 
 	return key

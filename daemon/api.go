@@ -659,7 +659,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 			"Workspace rootId advanced after merge began, try again.")
 	}
 
-	localWsr.refresh_(c, nil)
+	localWsr.refresh_(c)
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Merge Succeeded")
 }
@@ -1134,7 +1134,7 @@ func (api *ApiHandle) getBlock(c *ctx, buf []byte) int {
 			ErrorCode: quantumfs.ErrorOK,
 			Message:   "",
 		},
-		Data: buffer.Get(),
+		Data: slowCopy(buffer),
 	}
 
 	bytes, err := json.Marshal(response)

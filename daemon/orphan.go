@@ -60,7 +60,7 @@ func (inode *InodeCommon) parseExtendedAttributes_(c *ctx) {
 		return
 	}
 
-	attributes := buffer.clone().AsExtendedAttributes()
+	attributes := MutableCopy(c, buffer).AsExtendedAttributes()
 
 	for i := 0; i < attributes.NumAttributes(); i++ {
 		name, attrKey := attributes.Attribute(i)
@@ -72,7 +72,7 @@ func (inode *InodeCommon) parseExtendedAttributes_(c *ctx) {
 			continue
 		}
 
-		inode.unlinkXAttr[name] = buffer.Get()
+		inode.unlinkXAttr[name] = slowCopy(buffer)
 	}
 }
 

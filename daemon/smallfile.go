@@ -37,10 +37,9 @@ func (fi *SmallFile) getBuffer(c *ctx) ImmutableBuffer {
 	buf := c.dataStore.Get(&c.Ctx, fi.key)
 	if buf != nil && buf.Size() != fi.size {
 		c.wlog("getBuffer forced to be resized")
-		mutable := buf.clone()
+		mutable := MutableCopy(c, buf)
 		mutable.SetSize(fi.size)
-		return newImmutableBuffer(mutable.Get(), mutable.KeyType(),
-			c.dataStore)
+		return mutable
 	}
 	return buf
 }
@@ -123,7 +122,8 @@ func (fi *SmallFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 	}
 
 	// No metadata to marshal for small files
-	buf := fi.getBuffer(c)
+	buf := fi.buf
+	fi.buf = nil
 	key, err := pub(c, buf)
 	if err != nil {
 		panic(err.Error())
@@ -132,7 +132,6 @@ func (fi *SmallFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 	// Now that we've flushed our data to the datastore, drop our local buffer
 	fi.key = key
 	fi.size = buf.Size()
-	fi.buf = nil
 
 	return key
 }
@@ -140,7 +139,7 @@ func (fi *SmallFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 func (fi *SmallFile) reload(c *ctx, key quantumfs.ObjectKey) {
 	defer c.funcIn("SmallFile::reload").Out()
 	fi.key = key
-	fi.buf = c.dataStore.Get(&c.Ctx, fi.key)
+	fi.buf = MutableCopy(c, c.dataStore.Get(&c.Ctx, fi.key))
 	if fi.buf == nil {
 		panic(key.String())
 	}
