@@ -39,7 +39,7 @@ func (fi *SmallFile) getBuffer(c *ctx) ImmutableBuffer {
 	utils.Assert(buf != nil, "Unable to get file buffer")
 
 	if buf.Size() != fi.size {
-		c.wlog("getBuffer forced to be resized")
+		c.elog("getBuffer forced to be resized")
 		mutable := MutableCopy(c, buf)
 		mutable.SetSize(fi.size)
 		fi.buf = mutable
@@ -176,7 +176,7 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 	dataInPrevBlocks := 0
 	if numBlocks > 0 {
 		c.dlog("Syncing smallFile dataBlock")
-		input.toSync[0] = MutableCopy(c, fi.getBuffer(c))
+		input.toSync[0] = fi.getBufferToDirty(c)
 		dataInPrevBlocks = (numBlocks - 1) * int(input.metadata.BlockSize)
 	}
 	// last block (could be the only block) may be full or partial

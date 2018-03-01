@@ -275,10 +275,8 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) fuse.Status {
 	fi.metadata.Blocks = fi.metadata.Blocks[:newEndBlkIdx+1]
 
 	// Truncate the new last block
-	block, exists := fi.toSync[int(newEndBlkIdx)]
-	if exists {
-		block.SetSize(int(lastBlockLen))
-	}
+	block := fi.getMutableBlock(c, int(newEndBlkIdx))
+	block.SetSize(int(lastBlockLen))
 	fi.metadata.LastBlockBytes = uint32(lastBlockLen)
 
 	return fuse.OK
