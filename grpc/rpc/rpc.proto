@@ -25,7 +25,8 @@ service WorkspaceDb {
 }
 
 message WorkspaceNonce {
-	fixed64 nonce = 1;
+	fixed64 id = 1;
+	fixed64 publishTime = 2;
 }
 
 message RequestId {

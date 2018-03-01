@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	MaxBlockSize       = uint32(1048576)
+	MaxBlockSize       = uint32(262144)
 	MaxFilenameLength  = uint32(256)
 	MaxXAttrnameLength = uint32(256)
 )
