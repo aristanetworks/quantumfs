@@ -205,7 +205,8 @@ func (fi *MultiBlockFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 
 	for i, block := range fi.toSync {
 		c.vlog("Syncing block %d", i)
-		key, err := pub(c, ImmutableCopy(c, block))
+		// It's okay to publish the block without copying since we delete it
+		key, err := pub(c, block)
 		if err != nil {
 			panic("TODO Failed to update datablock")
 		}

@@ -548,10 +548,6 @@ type ImmutableBuffer interface {
 	Size() int
 }
 
-func ImmutableCopy(c *ctx, buf quantumfs.Buffer) ImmutableBuffer {
-	return MutableCopy(c, buf)
-}
-
 func MutableCopy(c *ctx, buf ImmutableBuffer) quantumfs.Buffer {
 	dataCopy := make([]byte, buf.Size())
 	buf.Read(dataCopy, 0)
