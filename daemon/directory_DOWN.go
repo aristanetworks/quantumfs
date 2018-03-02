@@ -113,12 +113,16 @@ func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byt
 
 	// We hold the exclusive tree lock and so cannot be racing against another
 	// access. Thus it is safe to assume nothing has changed between the flush in
-	// our caller and the lock grab in getChildRecordCopy() below.
-	record, err := dir.getChildRecordCopy(c, inodeNum)
-	if err != nil {
+	// our caller and the lock grab in getRecordChildCall_() below.
+	defer dir.RLock().RUnlock()
+	defer dir.childRecordLock.Lock().Unlock()
+
+	record := dir.getRecordChildCall_(c, inodeNum)
+	if record == nil {
 		c.elog("Unable to get record from parent for inode %s", inodeNum)
 		return nil, fuse.EIO
 	}
+
 	typeKey := record.EncodeExtendedKey()
 
 	return typeKey, fuse.OK

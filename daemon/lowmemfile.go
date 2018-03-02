@@ -7,7 +7,6 @@ package daemon
 // mode to users.
 
 import (
-	"errors"
 	"syscall"
 	"time"
 
@@ -106,11 +105,10 @@ func (lw *LowMemFile) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.ENOTDIR
 }
 
-func (wsr *LowMemFile) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
+func (lm *LowMemFile) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
 
-	c.elog("LowMemFile doesn't support record fetch")
-	return nil, errors.New("Unsupported record fetch")
+	panic("LowMemFile doesn't support record fetch")
 }
 
 func (lw *LowMemFile) Unlink(c *ctx, name string) fuse.Status {

@@ -73,8 +73,6 @@ type Inode interface {
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
 
-	getChildRecordCopy(c *ctx,
-		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 	getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr, owner fuse.Owner)
 
 	// Update the key for only this child
@@ -152,8 +150,6 @@ type Inode interface {
 	parentSetChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		data []byte) fuse.Status
 	parentRemoveChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
-	parentGetChildRecordCopy(c *ctx,
-		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 	parentGetChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 		owner fuse.Owner)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
@@ -434,22 +430,6 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 		return inode.parent_(c).removeChildXAttr(c, inodeNum, attr)
 	} else if inode.id == inodeNum {
 		return inode.removeOrphanChildXAttr(c, inodeNum, attr)
-	} else {
-		panic("Request for non-self while orphaned")
-	}
-}
-
-func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
-
-	defer c.funcIn("InodeCommon::parentGetChildRecordCopy").Out()
-
-	defer inode.parentLock.RLock().RUnlock()
-
-	if !inode.isOrphaned_() {
-		return inode.parent_(c).getChildRecordCopy(c, inodeNum)
-	} else if inode.id == inodeNum {
-		return inode.getOrphanChildRecordCopy(c, inodeNum)
 	} else {
 		panic("Request for non-self while orphaned")
 	}
