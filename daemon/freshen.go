@@ -51,7 +51,7 @@ func freshenMultiBlock(c *ctx, key quantumfs.ObjectKey) error {
 			"block missing from db", key.String())
 	}
 
-	store := buf.AsMultiBlockFile()
+	store := MutableCopy(c, buf).AsMultiBlockFile()
 	for _, block := range store.ListOfBlocks() {
 		err = c.dataStore.Freshen(c, block)
 		if err != nil {
@@ -74,7 +74,7 @@ func freshenVeryLargeFile(c *ctx, key quantumfs.ObjectKey) error {
 			"block missing from db", key.String())
 	}
 
-	store := buf.AsVeryLargeFile()
+	store := MutableCopy(c, buf).AsVeryLargeFile()
 	for i := 0; i < store.NumberOfParts(); i++ {
 		err = freshenMultiBlock(c, store.LargeFileKey(i))
 		if err != nil {

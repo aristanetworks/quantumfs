@@ -442,7 +442,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 		// Ensure we ignore any subdirectories that haven't changed
 		if localRecord.Type() == quantumfs.ObjectTypeDirectory &&
-			!skipDir(localRecord.AsImmutable(), remoteRecord) {
+			!skipDir(localRecord, remoteRecord) {
 
 			updateMapDescend_DOWN(c, rc, childId, remoteRecord)
 		}

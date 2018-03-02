@@ -57,7 +57,7 @@ func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 		if buffer == nil {
 			panic("No baseLayer object")
 		}
-		baseLayer := buffer.AsDirectoryEntry()
+		baseLayer := MutableCopy(c, buffer).AsDirectoryEntry()
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			visitor(baseLayer.Entry(i))
@@ -901,22 +901,23 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 		defer dir.Lock().Unlock()
 
-		var recordCopy quantumfs.ImmutableDirectoryRecord
-		err := func() fuse.Status {
+		record, err := func() (quantumfs.ImmutableDirectoryRecord,
+			fuse.Status) {
+
 			defer dir.childRecordLock.Lock().Unlock()
 
 			record := dir.children.recordByName(c, name)
 			if record == nil {
-				return fuse.ENOENT
+				return nil, fuse.ENOENT
 			}
 
-			recordCopy = record.AsImmutable()
-			return fuse.OK
+			return record, fuse.OK
 		}()
 		if err != fuse.OK {
 			return nil, err
 		}
 
+		recordCopy := record.AsImmutable()
 		type_ := objectTypeToFileType(c, recordCopy.Type())
 
 		if type_ == fuse.S_IFDIR {
@@ -924,7 +925,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 			return nil, fuse.Status(syscall.EISDIR)
 		}
 
-		err = hasDirectoryWritePermSticky(c, dir, recordCopy.Owner())
+		err = hasDirectoryWritePermSticky(c, dir, record.Owner())
 		if err != fuse.OK {
 			return nil, err
 		}
@@ -1409,7 +1410,7 @@ func getRecordExtendedAttributes(c *ctx,
 		return nil, fuse.EIO
 	}
 
-	attributeList := buffer.AsExtendedAttributes()
+	attributeList := MutableCopy(c, buffer).AsExtendedAttributes()
 	return &attributeList, fuse.OK
 }
 
@@ -1431,7 +1432,7 @@ func (dir *Directory) getExtendedAttributes_(c *ctx,
 }
 
 func (dir *Directory) getChildXAttrBuffer(c *ctx, inodeNum InodeId,
-	attr string) (quantumfs.Buffer, fuse.Status) {
+	attr string) (ImmutableBuffer, fuse.Status) {
 
 	defer c.FuncIn("Directory::getChildXAttrBuffer", "%d %s", inodeNum,
 		attr).Out()
@@ -1486,7 +1487,8 @@ func (dir *Directory) getChildXAttrData(c *ctx, inodeNum InodeId,
 	if status != fuse.OK {
 		return []byte{}, status
 	}
-	return buffer.Get(), fuse.OK
+
+	return slowCopy(buffer), fuse.OK
 }
 
 func (dir *Directory) listChildXAttr(c *ctx,
