@@ -901,22 +901,23 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 		defer dir.Lock().Unlock()
 
-		var recordCopy quantumfs.ImmutableDirectoryRecord
-		err := func() fuse.Status {
+		record, err := func() (quantumfs.ImmutableDirectoryRecord,
+			fuse.Status) {
+
 			defer dir.childRecordLock.Lock().Unlock()
 
 			record := dir.children.recordByName(c, name)
 			if record == nil {
-				return fuse.ENOENT
+				return nil, fuse.ENOENT
 			}
 
-			recordCopy = record.AsImmutable()
-			return fuse.OK
+			return record, fuse.OK
 		}()
 		if err != fuse.OK {
 			return nil, err
 		}
 
+		recordCopy := record.AsImmutable()
 		type_ := objectTypeToFileType(c, recordCopy.Type())
 
 		if type_ == fuse.S_IFDIR {
@@ -924,7 +925,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 			return nil, fuse.Status(syscall.EISDIR)
 		}
 
-		err = hasDirectoryWritePermSticky(c, dir, recordCopy.Owner())
+		err = hasDirectoryWritePermSticky(c, dir, record.Owner())
 		if err != fuse.OK {
 			return nil, err
 		}
