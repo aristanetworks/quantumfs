@@ -183,7 +183,7 @@ type mergeSkipPaths struct {
 	paths map[string]struct{}
 }
 
-func mergeUploader(c *ctx, buffers chan quantumfs.Buffer, rtnErr *error,
+func mergeUploader(c *ctx, buffers chan ImmutableBuffer, rtnErr *error,
 	wg *sync.WaitGroup) {
 
 	defer c.funcIn("mergeUploader").Out()
@@ -211,9 +211,9 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d wsr %s", prefer,
 		len(skipPaths.paths), breadcrumb).Out()
 
-	toSet := make(chan quantumfs.Buffer, maxUploadBacklog)
+	toSet := make(chan ImmutableBuffer, maxUploadBacklog)
 	merge := newMerger(c, prefer, func(c *ctx,
-		buf quantumfs.Buffer) (quantumfs.ObjectKey, error) {
+		buf ImmutableBuffer) (quantumfs.ObjectKey, error) {
 
 		if len(toSet) == maxUploadBacklog-1 {
 			c.elog("Merge uploading bandwidth maxed.")

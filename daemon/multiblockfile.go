@@ -205,6 +205,8 @@ func (fi *MultiBlockFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 
 	for i, block := range fi.toSync {
 		c.vlog("Syncing block %d", i)
+		// It's okay to publish the block without copying since we drop
+		// our reference
 		key, err := pub(c, block)
 		if err != nil {
 			panic("TODO Failed to update datablock")
@@ -221,8 +223,7 @@ func (fi *MultiBlockFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 
 	bytes := store.Bytes()
 
-	buf := newBuffer(c, bytes, quantumfs.KeyTypeMetadata)
-	key, err := pub(c, buf)
+	key, err := pub(c, newBuffer(c, bytes, quantumfs.KeyTypeMetadata))
 	utils.Assert(err == nil, "Failed to upload new file metadata: %v", err)
 
 	return key

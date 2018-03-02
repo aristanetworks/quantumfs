@@ -117,7 +117,8 @@ func (fi *SmallFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 	}
 
 	// No metadata to marshal for small files
-	buf := fi.getBuffer(c)
+	buf := fi.buf
+	fi.buf = nil
 	key, err := pub(c, buf)
 	if err != nil {
 		panic(err.Error())
@@ -126,7 +127,6 @@ func (fi *SmallFile) sync(c *ctx, pub publishFn) quantumfs.ObjectKey {
 	// Now that we've flushed our data to the datastore, drop our local buffer
 	fi.key = key
 	fi.size = buf.Size()
-	fi.buf = nil
 
 	return key
 }
