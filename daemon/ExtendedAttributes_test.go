@@ -296,17 +296,17 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 		test.Assert(err == nil, "Error stat'ing symlink: %v", err)
 		id := InodeId(stat.Ino)
 
-		test.withInodeRecord(id,
-			func(record quantumfs.ImmutableDirectoryRecord) {
+		test.withInodeRecord(id, func(
+			record quantumfs.ImmutableDirectoryRecord) {
 
-				// Verify the type and key matching
-				test.Assert(type_ == quantumfs.ObjectTypeSymlink &&
-					size == record.Size() &&
-					bytes.Equal(key.Value(), record.ID().Value()),
-					"Error getting the link key: %v with %d, "+
-						"keys of %v-%v", err, type_, key.String(),
-					record.ID().String())
-			})
+			// Verify the type and key matching
+			test.Assert(type_ == quantumfs.ObjectTypeSymlink &&
+				size == record.Size() &&
+				key.IsEqualTo(record.ID()),
+				"Error getting the link key: %v with %d, "+
+					"keys of %v-%v", err, type_, key.String(),
+				record.ID().String())
+		})
 
 		// check the special
 		sz, err = syscall.Getxattr(spName, quantumfs.XAttrTypeKey, dst)
