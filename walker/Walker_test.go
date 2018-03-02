@@ -355,6 +355,7 @@ func TestMiscWalk(t *testing.T) {
 }
 
 func TestMiscWalkWithSkipDir(t *testing.T) {
+	t.Skip("Test broken by golang 1.10 BUG249662")
 	runTest(t, func(test *testHelper) {
 
 		data := daemon.GenData(50)

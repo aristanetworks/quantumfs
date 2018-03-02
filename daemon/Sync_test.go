@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/processlocal"
@@ -427,5 +428,48 @@ func TestPublishedHardlinksToBeConsistent(t *testing.T) {
 		test.AssertNoErr(err)
 		defer file.Close()
 		test.verifyContentStartsWith(file, content)
+	})
+}
+
+func TestFlushAllSorting(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		dirs1 := workspace + "/dir1/dir2/dir3/dir4"
+		dirs2 := dirs1 + "/dir5/dir6/dir7/dir8/dir9"
+		file1 := dirs2 + "/file1"
+		file2 := workspace + "/file2"
+		file3 := workspace + "/file3"
+
+		test.AssertNoErr(utils.MkdirAll(dirs2, 0777))
+		test.AssertNoErr(testutils.PrintToFile(file1, "data"))
+		test.AssertNoErr(testutils.PrintToFile(file2, "data"))
+
+		test.SyncAllWorkspaces()
+
+		numberOfPublishes := 0
+		publishUpdates := test.workspaceWaitChan(test.RelPath(workspace))
+		go func() {
+			<-publishUpdates
+			numberOfPublishes = 1
+			test.Log("Received publish")
+
+			<-publishUpdates
+			test.T.Fatalf("Received a second publish update")
+		}()
+
+		test.AssertNoErr(syscall.Link(file2, workspace+"/link2"))
+		test.AssertNoErr(testutils.PrintToFile(file3, "data"))
+		test.AssertNoErr(testutils.PrintToFile(file1, "data2"))
+
+		test.SyncAllWorkspaces()
+
+		test.WaitFor("Workspace to publish", func() bool {
+			return numberOfPublishes == 1
+		})
+
+		// Allow time for additional publishes to occur and fail in the
+		// waiting goroutine.
+		time.Sleep(500 * time.Millisecond)
 	})
 }

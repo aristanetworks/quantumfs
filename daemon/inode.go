@@ -154,9 +154,10 @@ type Inode interface {
 	parentGetChildRecordCopy(c *ctx,
 		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
-	parentCheckLinkReparent(c *ctx, parent *Directory)
 
+	isDirty_(c *ctx) bool      // Returns true if the inode is dirty
 	dirty(c *ctx)              // Mark this Inode dirty
+	dirty_(c *ctx)             // Mark this Inode dirty
 	markClean_() *list.Element // Mark this Inode as cleaned
 	// Undo marking the inode as clean
 	markUnclean_(dirtyElement *list.Element) bool
@@ -187,6 +188,7 @@ type Inode interface {
 	RLockTree() *TreeLock
 
 	isWorkspaceRoot() bool
+	isListingType() bool
 
 	// cleanup() is called when the Inode has been uninstantiated, but before the
 	// final reference has been released. It should perform any deterministic
@@ -226,7 +228,7 @@ type InodeCommon struct {
 	parentLock utils.DeferableRwMutex
 	parentId   InodeId
 
-	lock utils.DeferableRwMutex
+	utils.DeferableRwMutex
 
 	// The treeLock is used to lock the entire workspace tree when certain
 	// tree-wide operations are being performed. Primarily this is done with all
@@ -309,7 +311,7 @@ func (inode *InodeCommon) parentUpdateSize(c *ctx,
 	defer c.funcIn("InodeCommon::parentUpdateSize").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
-	defer inode.lock.Lock().Unlock()
+	defer inode.Lock().Unlock()
 
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
@@ -473,49 +475,6 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	}
 }
 
-// Locks the parent
-func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
-	defer c.FuncIn("InodeCommon::parentCheckLinkReparent", "%d", inode.id).Out()
-
-	// Ensure we lock in the UP direction
-	defer inode.parentLock.Lock().Unlock()
-	defer parent.lock.Lock().Unlock()
-	defer parent.childRecordLock.Lock().Unlock()
-
-	// Check if this is still a child
-	record := parent.children.recordByInodeId(c, inode.id)
-	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
-		// no hardlink record here, nothing to do
-		return
-	}
-
-	link := record.(*HardlinkLeg)
-
-	// This may need to be turned back into a normal file
-	newRecord, inodeId := parent.hardlinkTable.removeHardlink(c, link.FileId())
-
-	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
-		// wsr says hardlink isn't ready for removal yet
-		return
-	}
-
-	// reparent the child to the given parent
-	inode.parentId = parent.inodeNum()
-
-	// Ensure that we update this version of the record with this instance
-	// of the hardlink's information
-	newRecord.SetFilename(link.Filename())
-	inode.setName(link.Filename())
-
-	// Here we do the opposite of makeHardlink DOWN - we re-insert it
-	parent.children.setRecord(c, inodeId, newRecord)
-
-	// Mark the inode as dirty to ensure it will flush to make itself publishable
-	inode.dirty(c)
-
-	parent.dirty(c)
-}
-
 func (inode *InodeCommon) setParent(newParent InodeId) {
 	defer inode.parentLock.Lock().Unlock()
 
@@ -559,10 +518,24 @@ func (inode *InodeCommon) inodeNum() InodeId {
 	return inode.id
 }
 
+// Returns true if the inode is dirty
+// flusher lock must be locked when calling this function
+func (inode *InodeCommon) isDirty_(c *ctx) bool {
+	defer c.funcIn("InodeCommon::isDirty_").Out()
+	return inode.dirtyElement__ != nil
+}
+
 // Add this Inode to the dirty list
 func (inode *InodeCommon) dirty(c *ctx) {
 	defer c.funcIn("InodeCommon::dirty").Out()
 	defer c.qfs.flusher.lock.Lock().Unlock()
+
+	inode.dirty_(c)
+}
+
+// Add this Inode to the dirty list
+// Must hold flusher lock
+func (inode *InodeCommon) dirty_(c *ctx) {
 	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
 		inode.dirtyElement__ = c.qfs.queueDirtyInode_(c, inode.self)
@@ -662,14 +635,6 @@ func (inode *InodeCommon) RLockTree() *TreeLock {
 	return inode.treeLock_
 }
 
-func (inode *InodeCommon) Lock() utils.NeedWriteUnlock {
-	return inode.lock.Lock()
-}
-
-func (inode *InodeCommon) RLock() utils.NeedReadUnlock {
-	return inode.lock.RLock()
-}
-
 // the inode parentLock must be locked
 func (inode *InodeCommon) absPath_(c *ctx, path string) string {
 	defer c.FuncIn("InodeCommon::absPath_", "path %s", path).Out()
@@ -735,6 +700,14 @@ func (inode *InodeCommon) isWorkspaceRoot() bool {
 	return isWsr
 }
 
+func (inode *InodeCommon) isListingType() bool {
+	switch inode.self.(type) {
+	case *TypespaceList, *NamespaceList, *WorkspaceList:
+		return true
+	}
+	return false
+}
+
 // Deleting a child may require that we orphan it, and because we *must* lock from
 // a child up to its parent outside of a DOWN function, deletion in the parent
 // must be done after the child's lock has been acquired.
@@ -744,7 +717,7 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", inode.inodeNum()).Out()
 	defer inode.parentLock.Lock().Unlock()
-	defer inode.lock.Lock().Unlock()
+	defer inode.Lock().Unlock()
 
 	// One of this inode's names is going away, reset the accessed cache to
 	// ensure any remaining names are marked correctly.

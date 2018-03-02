@@ -8,7 +8,7 @@ $Go.package("encoding");
 $Go.import("github.com/aristanetworks.com/quantumfs/encoding");
 
 # Maximum size of a block which can be stored in a datastore
-const maxBlockSize :UInt32 = 1048576;
+const maxBlockSize :UInt32 = 262144;
 
 # Maximum length of a filename
 const maxFilenameLength :UInt32 = 256;
