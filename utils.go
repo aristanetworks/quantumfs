@@ -128,13 +128,19 @@ func HumanizeBytes(size uint64) string {
 func GetWorkspaceRootID(c *quantumfs.Ctx, db quantumfs.WorkspaceDB,
 	wsname string) (quantumfs.ObjectKey, quantumfs.WorkspaceNonce, error) {
 
+	invalidNonce := quantumfs.WorkspaceNonce{
+		Id:          0,
+		PublishTime: 0}
+
 	if wsname == "" {
-		return quantumfs.ObjectKey{}, 0, fmt.Errorf("Invalid workspace name")
+		return quantumfs.ObjectKey{}, invalidNonce,
+			fmt.Errorf("Invalid workspace name")
 	}
 
 	parts := strings.Split(wsname, "/")
 	if len(parts) != 3 {
-		return quantumfs.ObjectKey{}, 0, fmt.Errorf("Invalid workspace name")
+		return quantumfs.ObjectKey{},
+			invalidNonce, fmt.Errorf("Invalid workspace name")
 	}
 
 	return db.Workspace(c, parts[0], parts[1], parts[2])
