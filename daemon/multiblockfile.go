@@ -69,9 +69,16 @@ func (fi *MultiBlockFile) expandTo(length int) {
 	fi.metadata.LastBlockBytes = 0
 }
 
-func (fi *MultiBlockFile) retrieveDataBlock(c *ctx, blockIdx int) quantumfs.Buffer {
-	defer c.FuncIn("MultiBlockFile::retrieveDataBlock", "block %d",
-		blockIdx).Out()
+func (fi *MultiBlockFile) getImmutableBlock(c *ctx, blockIdx int) ImmutableBuffer {
+	block, exists := fi.toSync[blockIdx]
+	if exists {
+		return block
+	}
+
+	return c.dataStore.Get(&c.Ctx, fi.metadata.Blocks[blockIdx])
+}
+
+func (fi *MultiBlockFile) getMutableBlock(c *ctx, blockIdx int) quantumfs.Buffer {
 	block, exists := fi.toSync[blockIdx]
 	if !exists {
 		return MutableCopy(c, c.dataStore.Get(&c.Ctx,
@@ -107,7 +114,7 @@ func (fi *MultiBlockFile) readBlock(c *ctx, blockIdx int, offset uint64,
 		return 0, nil
 	}
 
-	block := fi.retrieveDataBlock(c, blockIdx)
+	block := fi.getImmutableBlock(c, blockIdx)
 
 	// Copy only what we have, and then zero out the rest
 	copied := 0
@@ -151,7 +158,7 @@ func (fi *MultiBlockFile) writeBlock(c *ctx, blockIdx int, offset uint64,
 		fi.expandTo(blockIdx + 1)
 	}
 
-	block := fi.retrieveDataBlock(c, blockIdx)
+	block := fi.getMutableBlock(c, blockIdx)
 
 	copied := block.Write(&c.Ctx, buf, uint32(offset))
 	if copied > 0 {
@@ -269,7 +276,7 @@ func (fi *MultiBlockFile) truncate(c *ctx, newLengthBytes uint64) fuse.Status {
 	fi.metadata.Blocks = fi.metadata.Blocks[:newEndBlkIdx+1]
 
 	// Truncate the new last block
-	block := fi.retrieveDataBlock(c, int(newEndBlkIdx))
+	block := fi.getMutableBlock(c, int(newEndBlkIdx))
 	block.SetSize(int(lastBlockLen))
 	fi.metadata.LastBlockBytes = uint32(lastBlockLen)
 
