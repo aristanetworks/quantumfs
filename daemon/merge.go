@@ -172,7 +172,7 @@ func loadWorkspaceRoot(c *ctx,
 		return nil, key,
 			fmt.Errorf("Unable to Get block for key: %s", key.String())
 	}
-	workspaceRoot := buffer.AsWorkspaceRoot()
+	workspaceRoot := MutableCopy(c, buffer).AsWorkspaceRoot()
 
 	links := loadHardlinks(c, workspaceRoot.HardlinkEntry())
 
@@ -280,7 +280,7 @@ func loadRecords(c *ctx,
 			return nil, fmt.Errorf("No object for key %s", key.String())
 		}
 
-		baseLayer := buffer.AsDirectoryEntry()
+		baseLayer := MutableCopy(c, buffer).AsDirectoryEntry()
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			entry := baseLayer.Entry(i)
