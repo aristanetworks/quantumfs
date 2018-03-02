@@ -302,7 +302,7 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 			// Verify the type and key matching
 			test.Assert(type_ == quantumfs.ObjectTypeSymlink &&
 				size == record.Size() &&
-				key.IsEqualTo(record.ID()),
+				bytes.Equal(key.Value(), record.ID().Value()),
 				"Error getting the link key: %v with %d, "+
 					"keys of %v-%v", err, type_, key.String(),
 				record.ID().String())
