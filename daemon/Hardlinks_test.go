@@ -266,59 +266,6 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 	})
 }
 
-// When all hardlinks, but one, are deleted then we need to convert a hardlink back
-// into a regular file.
-func TestHardlinkConversion(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		workspace := test.NewWorkspace()
-
-		data := GenData(2000)
-
-		testFile := workspace + "/testFile"
-		err := testutils.PrintToFile(testFile, string(data[:1000]))
-		test.AssertNoErr(err)
-
-		linkFile := workspace + "/testLink"
-		err = syscall.Link(testFile, linkFile)
-		test.AssertNoErr(err)
-
-		linkInode := test.getInodeNum(linkFile)
-
-		wsr, cleanup := test.GetWorkspaceRoot(workspace)
-		defer cleanup()
-		fileId := func() quantumfs.FileId {
-			defer wsr.hardlinkTable.linkLock.Lock().Unlock()
-			return wsr.hardlinkTable.inodeToLink[linkInode]
-		}()
-
-		err = os.Remove(testFile)
-		test.AssertNoErr(err)
-
-		// Ensure it's converted by performing an operation on linkFile
-		// that would trigger checking if the hardlink needs conversion
-		test.remountFilesystem()
-
-		_, err = os.Stat(linkFile)
-		test.AssertNoErr(err)
-		test.SyncAllWorkspaces()
-
-		// ensure we can still use the file as normal
-		err = testutils.PrintToFile(linkFile, string(data[1000:]))
-		test.AssertNoErr(err)
-
-		output, err := ioutil.ReadFile(linkFile)
-		test.AssertNoErr(err)
-		test.Assert(bytes.Equal(output, data),
-			"File not working after conversion from hardlink")
-
-		wsrB, cleanup := test.GetWorkspaceRoot(workspace)
-		defer cleanup()
-		defer wsrB.hardlinkTable.linkLock.Lock().Unlock()
-		_, exists := wsrB.hardlinkTable.hardlinks[fileId]
-		test.Assert(!exists, "hardlink not converted back to file")
-	})
-}
-
 func TestHardlinkSubdirChain(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -867,5 +814,21 @@ func TestRemoveHardlinkBeforeSync(t *testing.T) {
 
 		test.Assert(len(wsr.hardlinkTable.hardlinks) == 0,
 			"Hardlink table not empty after sync")
+	})
+}
+
+func TestHardlinkNormalization(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+
+		test.createFile(workspace, name, 100)
+		test.linkFile(workspace, name, name+"_link")
+		test.removeFileSync(workspace, name)
+
+		wsr, cleanup := test.GetWorkspaceRoot(workspace)
+		defer cleanup()
+		test.Assert(len(wsr.hardlinkTable.hardlinks) == 0,
+			"Hardlink not normalized.")
 	})
 }

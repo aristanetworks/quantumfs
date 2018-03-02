@@ -140,7 +140,7 @@ func (rc *RefreshContext) setHardlinkAsMoveDst(c *ctx,
 	}
 	loadRecord := rc.fileMap[localRecord.FileId()]
 	if loadRecord.moved && !loadRecord.moveHasDst {
-		c.vlog("Setting %s as the move target", remoteRecord.Filename())
+		c.vlog("Setting %s as the move destination", remoteRecord.Filename())
 		loadRecord.moveHasDst = true
 		loadRecord.remoteRecord = remoteRecord
 		rc.fileMap[localRecord.FileId()] = loadRecord
