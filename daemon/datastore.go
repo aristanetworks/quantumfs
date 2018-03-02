@@ -134,16 +134,10 @@ func newBuffer(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
 
 // Like newBuffer(), but 'in' is copied and ownership is not assumed
 func newBufferCopy(c *ctx, in []byte, keyType quantumfs.KeyType) quantumfs.Buffer {
+	inSize := len(in)
+
 	defer c.FuncIn("newBufferCopy", "keyType %d inSize %d", keyType,
 		len(in)).Out()
-
-	return newBufferCopyDs(c.dataStore, in, keyType)
-}
-
-func newBufferCopyDs(store *dataStore, in []byte,
-	keyType quantumfs.KeyType) quantumfs.Buffer {
-
-	inSize := len(in)
 
 	var newData []byte
 	// ensure our buffer meets min capacity
@@ -158,7 +152,7 @@ func newBufferCopyDs(store *dataStore, in []byte,
 		data:      newData,
 		dirty:     true,
 		keyType:   keyType,
-		dataStore: store,
+		dataStore: c.dataStore,
 	}
 }
 
