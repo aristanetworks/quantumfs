@@ -978,7 +978,6 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 				return fuse.Status(syscall.ENOTEMPTY)
 			}
 
-			dir.children.inodeNum(name)
 			return fuse.OK
 		}()
 		if result != fuse.OK {
