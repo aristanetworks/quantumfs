@@ -235,9 +235,11 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 		return util::getError(kApiFileSeekFail, this->path);
 	}
 
+	util::AlignedMem<512> data(command.Size());
+	memcpy(*data, command.Data(), command.Size());
+
 	// We must write the whole command at once
-	int written = write(this->fd, (const char *)command.Data(),
-		command.Size());
+	int written = write(this->fd, *data , command.Size());
 
 	if (written == -1 || written != command.Size()) {
 		return util::getError(kApiFileWriteFail, this->path);
@@ -261,10 +263,10 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	// read up to 4k at a time, stopping on EOF
 	command->Reset();
 
-	byte data[4096];
+	util::AlignedMem<512> data(4096);
+
 	while(true) {
-		int num = read(this->fd, reinterpret_cast<void*>(data),
-			sizeof(data));
+		int num = read(this->fd, *data, data.Size());
 		if (num == 0) {
 			break;
 		}
@@ -274,7 +276,11 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 			return util::getError(kApiFileReadFail, this->path);
 		}
 
-		err = command->Append(data, num);
+		if (command->Size() % 512) {
+			return util::getError(kApiFileReadFail, "unaligned read");
+		}
+
+		err = command->Append(reinterpret_cast<const byte *>(*data), num);
 
 		if (err != kSuccess) {
 			return util::getError(err);

@@ -64,6 +64,31 @@ void base64_encode(const std::vector<byte> &data, std::string *b64);
 // std::vector<byte> pointed to by the data parameter.
 void base64_decode(const std::string &b64, std::vector<byte> *data);
 
+template <unsigned N>
+class AlignedMem {
+ public:
+	explicit AlignedMem(unsigned size) : _size(size) {
+		if (posix_memalign(&_buf, N, _size)) {
+			_buf = NULL;
+		}
+	}
+
+	void *operator*() {
+		return _buf;
+	}
+
+	unsigned Size() {
+	   return _size;
+	}
+
+	~AlignedMem() {
+		free(_buf);
+	}
+ private:
+	void *_buf;
+	unsigned _size;
+};
+
 }  // namespace util
 }  // namespace qfsclient
 
