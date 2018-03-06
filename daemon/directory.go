@@ -46,6 +46,7 @@ type Directory struct {
 	childRecordLock utils.DeferableMutex
 	children        *ChildContainer
 	_generation     uint64
+	clean           bool
 }
 
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
@@ -395,20 +396,19 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 
 	defer c.FuncIn("Directory::normalizeChild", "%d", inodeId).Out()
 
+	defer c.qfs.instantiationLock.Lock().Unlock()
 	inode := c.qfs.inodeNoInstantiate(c, inodeId)
 	if inode != nil {
 		defer inode.getParentLock().Lock().Unlock()
 	}
 	defer c.qfs.flusher.lock.Lock().Unlock()
 	defer dir.Lock().Unlock()
+
 	defer dir.childRecordLock.Lock().Unlock()
 
 	leg := dir.children.recordByInodeId(c, inodeId)
 	name := leg.Filename()
 
-	// We have to query again as nothing is preventing it from
-	// getting instantiated since last query.
-	inode = c.qfs.inodeNoInstantiate(c, inodeId)
 	if inode != nil && inode.isDirty_(c) {
 		c.vlog("Will not normalize dirty inode %d yet", inodeId)
 		return
@@ -417,10 +417,10 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	func() {
 		defer dir.hardlinkTable.invalidateNormalizedRecordLock(
 			record.FileId()).Unlock()
-		// We have to query again as nothing is preventing it from
-		// getting instantiated since last query.
-		inode := c.qfs.inodeNoInstantiate(c, inodeId)
+
 		if inode != nil {
+			c.vlog("Setting parent of inode %d from %d to %d",
+				inodeId, inode.parentId_(), dir.inodeNum())
 			inode.setName(name)
 			inode.setParent_(dir.inodeNum())
 		} else {
@@ -1907,7 +1907,9 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
 		dir.name_).Out()
 
-	dir.normalizeChildren(c)
+	if !dir.clean {
+		dir.normalizeChildren(c)
+	}
 	dir.parentSyncChild(c, func() (quantumfs.ObjectKey, *HardlinkDelta) {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
@@ -1915,6 +1917,11 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	})
 
 	return dir.baseLayerId
+}
+
+func (dir *Directory) cleanup(c *ctx) {
+	defer c.funcIn("Directory::cleanup").Out()
+	dir.clean = true
 }
 
 func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
