@@ -18,6 +18,7 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -190,6 +191,8 @@ func reduceGCPercent(cacheSize uint64) {
 }
 
 func main() {
+	utils.CheckForRecursiveRLock = false
+
 	processArgs()
 
 	go func() {

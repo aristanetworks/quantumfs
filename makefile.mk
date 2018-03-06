@@ -103,8 +103,10 @@ dockerWsdb: wsdbservice
 uploadDocker: dockerWsdb
 	cd cmd/wsdbservice; docker push registry.docker.sjc.aristanetworks.com:5000/qubit-tools/wsdbservice:$(version)
 
+# Disable the golang test cache with '-count 1' because not all of these tests are
+# entirely deterministic and we want to get test coverage of timing differences.
 $(PKGS_TO_TEST): encoding/metadata.capnp.go grpc/rpc/rpc.pb.go
-	sudo -E go test $(QFS_GO_TEST_ARGS) -gcflags '-e' github.com/aristanetworks/$@
+	sudo -E go test $(QFS_GO_TEST_ARGS) -gcflags '-e' -count 1 github.com/aristanetworks/$@
 
 rpm-ver:
 	@echo "version='$(version)'"
