@@ -401,10 +401,9 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	if inode != nil {
 		defer inode.getParentLock().Lock().Unlock()
 	}
-	defer c.qfs.flusher.lock.Lock().Unlock()
 	defer dir.Lock().Unlock()
-
 	defer dir.childRecordLock.Lock().Unlock()
+	defer c.qfs.flusher.lock.Lock().Unlock()
 
 	leg := dir.children.recordByInodeId(c, inodeId)
 	name := leg.Filename()
