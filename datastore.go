@@ -1358,6 +1358,12 @@ type constDataStore struct {
 	store map[string][]byte
 }
 
+var objectNotFound error
+
+func init() {
+	objectNotFound = fmt.Errorf("Object not found")
+}
+
 func (store *constDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 	if data, ok := store.store[key.String()]; ok {
 		newData := make([]byte, len(data))
@@ -1365,7 +1371,7 @@ func (store *constDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 		buf.Set(newData, key.Type())
 		return nil
 	}
-	return fmt.Errorf("Object not found")
+	return objectNotFound
 }
 
 func (store *constDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
@@ -1373,7 +1379,10 @@ func (store *constDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 }
 
 func (store *constDataStore) Freshen(c *Ctx, key ObjectKey) error {
-	return nil
+	if _, exists := store.store[key.String()]; exists {
+		return nil
+	}
+	return objectNotFound
 }
 
 var ZeroKey ObjectKey
