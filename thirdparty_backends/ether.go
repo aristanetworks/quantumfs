@@ -280,7 +280,7 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	return nil
 }
 
-func (ebt *EtherBlobStoreTranslator) blockCachedTtlGood(c *quantumfs.Ctx,
+func (ebt *EtherBlobStoreTranslator) cachedTtlGood(c *quantumfs.Ctx,
 	key string) bool {
 
 	defer ebt.ttlCacheLock.RLock().RUnlock()
@@ -314,7 +314,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 		return err
 	}
 
-	if ebt.blockCachedTtlGood(c, ks) {
+	if ebt.cachedTtlGood(c, ks) {
 		return nil
 	}
 
@@ -357,7 +357,7 @@ func (ebt *EtherBlobStoreTranslator) Freshen(c *quantumfs.Ctx,
 	defer c.FuncInName(qlog.LogDatastore,
 		"EtherBlobStoreTranslator::Freshen").Out()
 
-	if ebt.blockCachedTtlGood(c, key.String()) {
+	if ebt.cachedTtlGood(c, key.String()) {
 		c.Vlog(qlog.LogDatastore, "Freshened block found in TTL cache")
 		return nil
 	}
