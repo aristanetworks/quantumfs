@@ -60,6 +60,17 @@ func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	return store.datastore.Set(c, key, buf)
 }
 
+func (store *testDataStore) Freshen(c *quantumfs.Ctx,
+	key quantumfs.ObjectKey) error {
+
+	func() {
+		defer store.countLock.Lock().Unlock()
+		store.setCount[key.String()]++
+	}()
+
+	return store.datastore.Freshen(c, key)
+}
+
 func createBuffer(c *quantumfs.Ctx, test *testHelper, backingStore *testDataStore,
 	datastore *dataStore, keys map[int]quantumfs.ObjectKey, indx, size int) {
 	bytes := make([]byte, size*quantumfs.ObjectKeyLength)

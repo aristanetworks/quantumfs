@@ -25,6 +25,7 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
 )
 
 func init() {
@@ -279,11 +280,24 @@ func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	return nil
 }
 
+func (ebt *EtherBlobStoreTranslator) blockCachedTtlGood(c *quantumfs.Ctx,
+	key string) bool {
+
+	defer ebt.ttlCacheLock.RLock().RUnlock()
+	expiry, cached := ebt.ttlCache[key]
+	if cached && time.Now().Before(expiry) {
+		c.Vlog(qlog.LogDatastore, EtherTtlCacheHit)
+		return true
+	}
+	c.Vlog(qlog.LogDatastore, EtherTtlCacheMiss)
+	return false
+}
+
 const EtherSetLog = "EtherBlobStoreTranslator::Set"
 const EtherTtlCacheHit = "EtherBlobStoreTranslator TTL cache hit"
 const EtherTtlCacheMiss = "EtherBlobStoreTranslator TTL cache miss"
 
-// Set adpats quantumfs.DataStore's Set API to ether.BlobStore.Insert
+// Set adapts quantumfs.DataStore's Set API to ether.BlobStore.Insert
 func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	buf quantumfs.Buffer) error {
 
@@ -300,17 +314,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 		return err
 	}
 
-	cached := func() bool {
-		defer ebt.ttlCacheLock.RLock().RUnlock()
-		expiry, cached := ebt.ttlCache[ks]
-		if cached && time.Now().Before(expiry) {
-			c.Vlog(qlog.LogDatastore, EtherTtlCacheHit)
-			return true
-		}
-		c.Vlog(qlog.LogDatastore, EtherTtlCacheMiss)
-		return false
-	}()
-	if cached {
+	if ebt.blockCachedTtlGood(c, ks) {
 		return nil
 	}
 
@@ -345,6 +349,26 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 	panicMsg := fmt.Sprintf("EtherAdapter.Set code shouldn't reach here. "+
 		"Key %s error %v metadata %v\n", ks, err, metadata)
 	panic(panicMsg)
+}
+
+func (ebt *EtherBlobStoreTranslator) Freshen(c *quantumfs.Ctx,
+	key quantumfs.ObjectKey) error {
+
+	defer c.FuncInName(qlog.LogDatastore,
+		"EtherBlobStoreTranslator::Freshen").Out()
+
+	if ebt.blockCachedTtlGood(c, key.String()) {
+		c.Vlog(qlog.LogDatastore, "Freshened block found in TTL cache")
+		return nil
+	}
+
+	buf := simplebuffer.New([]byte{}, key)
+	err := ebt.Get(c, key, buf)
+	if err != nil {
+		return fmt.Errorf("Cannot freshen %s, block missing from db",
+			key.String())
+	}
+	return ebt.Set(c, key, buf)
 }
 
 type etherWsdbTranslator struct {

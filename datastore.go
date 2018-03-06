@@ -1337,6 +1337,11 @@ type Buffer interface {
 type DataStore interface {
 	Get(c *Ctx, key ObjectKey, buf Buffer) error
 	Set(c *Ctx, key ObjectKey, buf Buffer) error
+
+	// The block corresponding to this key will be in use for the short term
+	// future. Ensure the block itself remains available in the datastore for at
+	// least a few seconds.
+	Freshen(c *Ctx, key ObjectKey) error
 }
 
 // A pseudo-store which contains all the constant objects
@@ -1365,6 +1370,10 @@ func (store *constDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 
 func (store *constDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 	return fmt.Errorf("Cannot set in constant datastore")
+}
+
+func (store *constDataStore) Freshen(c *Ctx, key ObjectKey) error {
+	return nil
 }
 
 var ZeroKey ObjectKey
