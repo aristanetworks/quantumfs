@@ -244,6 +244,22 @@ type InodeCommon struct {
 	unlinkLock   utils.DeferableRwMutex
 }
 
+func (inode *InodeCommon) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer c.funcIn("InodeCommon::GetAttr").Out()
+
+	record, err := inode.parentGetChildRecordCopy(c, inode.id)
+	if err != nil {
+		c.elog("Unable to get record from parent for inode %d", inode.id)
+		return fuse.EIO
+	}
+
+	fillAttrOutCacheData(c, out)
+	fillAttrWithDirectoryRecord(c, &out.Attr, inode.id,
+		c.fuseCtx.Owner, record)
+
+	return fuse.OK
+}
+
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
 // id is used
 func (inode *InodeCommon) parentId_() InodeId {

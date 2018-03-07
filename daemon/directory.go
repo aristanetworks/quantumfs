@@ -539,22 +539,6 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 	return hasAccessPermission(c, dir, mask, uid, gid)
 }
 
-func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	defer c.funcIn("Directory::GetAttr").Out()
-
-	record, err := dir.parentGetChildRecordCopy(c, dir.InodeCommon.id)
-	if err != nil {
-		c.elog("Unable to get record from parent for inode %d", dir.id)
-		return fuse.EIO
-	}
-
-	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, dir.InodeCommon.id,
-		c.fuseCtx.Owner, record)
-
-	return fuse.OK
-}
-
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
 	defer c.funcIn("Directory::Lookup").Out()
 
