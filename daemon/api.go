@@ -7,7 +7,6 @@ package daemon
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -123,13 +122,6 @@ func (api *ApiInode) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 	c.vlog("ApiInode::Mkdir doing nothing")
 	return fuse.ENOTDIR
-}
-
-func (wsr *ApiInode) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
-
-	c.elog("Api doesn't support record fetch")
-	return nil, errors.New("Unsupported record fetch")
 }
 
 func (api *ApiInode) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,

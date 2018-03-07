@@ -803,24 +803,6 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return result
 }
 
-// All modifications to the record must be done whilst holding the parentLock.
-// If a function only wants to read, then it may suffice to grab a "snapshot" of it.
-func (dir *Directory) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
-
-	defer c.funcIn("Directory::getChildRecordCopy").Out()
-
-	defer dir.RLock().RUnlock()
-	defer dir.childRecordLock.Lock().Unlock()
-
-	record := dir.getRecordChildCall_(c, inodeNum)
-	if record != nil {
-		return record.AsImmutable(), nil
-	}
-
-	return nil, errors.New("Inode given is not a child of this directory")
-}
-
 func (dir *Directory) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 	owner fuse.Owner) {
 
