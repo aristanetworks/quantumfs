@@ -259,7 +259,7 @@ func TestNoImplicitSync(t *testing.T) {
 	})
 }
 
-func (test *testHelper) workspaceWaitChan(workspaceName string) <-chan struct{} {
+func (test *testHelper) workspaceWaitChan(workspaceName string) chan struct{} {
 	c := make(chan struct{})
 	wsdb := test.qfsInstances[0].config.WorkspaceDB
 	wsdbPl := wsdb.(*processlocal.WorkspaceDB)
@@ -271,6 +271,100 @@ func (test *testHelper) workspaceWaitChan(workspaceName string) <-chan struct{} 
 	wsdb.SubscribeTo(workspaceName)
 
 	return c
+}
+
+func TestPublishRecordsToBeConsistent(t *testing.T) {
+	runDualQuantumFsTest(t, func(test *testHelper) {
+		workspace0 := test.NewWorkspace()
+		c := test.TestCtx()
+		mnt1 := test.qfsInstances[1].config.MountPath + "/"
+		workspaceName := test.RelPath(workspace0)
+		workspace1 := mnt1 + workspaceName
+		content0 := "stale"
+		content1 := "content"
+
+		file2mnt0 := workspace0 + "/dir/testFile2"
+
+		file1mnt1 := workspace1 + "/dir/testFile1"
+		file2mnt1 := workspace1 + "/dir/testFile2"
+
+		test.markImmutable(c, workspaceName)
+		api1, err := quantumfs.NewApiWithPath(mnt1 + "api")
+		test.AssertNoErr(err)
+		defer api1.Close()
+		test.AssertNoErr(api1.EnableRootWrite(workspaceName))
+
+		test.AssertNoErr(utils.MkdirAll(workspace1+"/dir", 0777))
+		test.AssertNoErr(testutils.PrintToFile(file2mnt1, content0))
+		test.AssertNoErr(api1.SyncAll())
+
+		var stat syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(file2mnt1, &stat))
+		size0 := stat.Size
+
+		// Register for all workspace updates so we know when the first
+		// update happens after the sync above and therefore when we need to
+		// check the newly added file.
+		wait := test.workspaceWaitChan(workspaceName)
+
+		// This will create testFile1 which fills the dirty queue with:
+		// [testFile1] [dir] [WSR]
+		test.AssertNoErr(testutils.PrintToFile(file1mnt1, content1))
+
+		// Now this will modify testFile2, which creates an effective view
+		// and results in the following dirty queue:
+		// [testFile1] [dir] [WSR] [testFile2]
+		test.AssertNoErr(testutils.OverWriteFile(file2mnt1, content1))
+
+		test.AssertNoErr(syscall.Stat(file2mnt1, &stat))
+		size1 := stat.Size
+
+		waitForUpdate := func() {
+			test.Log("Waiting for update to sync")
+			select {
+			case <-wait:
+				test.Assert(false,
+					"Workspace update prior to test ready")
+			default:
+			}
+			<-wait
+		}
+
+		verifyFile := func(expectedSize int64, expectedContent string) bool {
+			test.AssertNoErr(syscall.Stat(file2mnt0, &stat))
+			if stat.Size != expectedSize {
+				test.Log("File had unexpected size %d", stat.Size)
+				return false
+			}
+
+			file, err := os.OpenFile(file2mnt0, os.O_RDONLY, 0777)
+			test.AssertNoErr(err)
+			defer file.Close()
+			test.verifyContentStartsWith(file, expectedContent)
+			return true
+		}
+
+		// The first update happens when WSR publishes. testFile2 is the only
+		// thing left on the dirty queue and the published metadata must show
+		// the old size even though the effective view has the new size.
+		//
+		// The dirty queue is: [testFile2]
+		//
+		// We haven't accessed this workspace by this instance yet, so we can
+		// check immediately.
+		waitForUpdate()
+		test.Assert(verifyFile(size0, content0),
+			"File didn't verify, see above")
+
+		// The second update happens when the WSR publishes again after
+		// testFile2 has synced. The effective dirty queue was:
+		// [testFile2] [dir] [WSR]
+		waitForUpdate()
+		close(wait) // Fail on unexpected workspace publishing
+
+		test.WaitFor("Refresh to complete and see second state",
+			func() bool { return verifyFile(size1, content1) })
+	})
 }
 
 func TestPublishedHardlinksToBeConsistent(t *testing.T) {

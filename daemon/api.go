@@ -1140,7 +1140,7 @@ func (api *ApiHandle) getBlock(c *ctx, buf []byte) int {
 			ErrorCode: quantumfs.ErrorOK,
 			Message:   "",
 		},
-		Data: buffer.Get(),
+		Data: slowCopy(buffer),
 	}
 
 	bytes, err := json.Marshal(response)

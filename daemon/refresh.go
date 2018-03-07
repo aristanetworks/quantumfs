@@ -140,7 +140,7 @@ func (rc *RefreshContext) setHardlinkAsMoveDst(c *ctx,
 	}
 	loadRecord := rc.fileMap[localRecord.FileId()]
 	if loadRecord.moved && !loadRecord.moveHasDst {
-		c.vlog("Setting %s as the move target", remoteRecord.Filename())
+		c.vlog("Setting %s as the move destination", remoteRecord.Filename())
 		loadRecord.moveHasDst = true
 		loadRecord.remoteRecord = remoteRecord
 		rc.fileMap[localRecord.FileId()] = loadRecord
@@ -192,8 +192,10 @@ func (rc *RefreshContext) buildRefreshMapWsr(c *ctx, localRootId quantumfs.Objec
 
 	defer c.funcIn("RefreshContext::buildRefreshMapWsr").Out()
 
-	localWsr := c.dataStore.Get(&c.Ctx, localRootId).AsWorkspaceRoot()
-	remoteWsr := c.dataStore.Get(&c.Ctx, remoteRootId).AsWorkspaceRoot()
+	localWsr := MutableCopy(c, c.dataStore.Get(&c.Ctx,
+		localRootId)).AsWorkspaceRoot()
+	remoteWsr := MutableCopy(c, c.dataStore.Get(&c.Ctx,
+		remoteRootId)).AsWorkspaceRoot()
 
 	rc.buildRefreshMap(c, localWsr.BaseLayer(), remoteWsr.BaseLayer(), "")
 
@@ -487,7 +489,7 @@ func (wsr *WorkspaceRoot) refreshTo_(c *ctx, rc *RefreshContext) {
 	defer c.funcIn("WorkspaceRoot::refreshTo_").Out()
 
 	buffer := c.dataStore.Get(&c.Ctx, rc.rootId)
-	workspaceRoot := buffer.AsWorkspaceRoot()
+	workspaceRoot := MutableCopy(c, buffer).AsWorkspaceRoot()
 	baseLayerId := workspaceRoot.BaseLayer()
 	hardlinkEntry := workspaceRoot.HardlinkEntry()
 

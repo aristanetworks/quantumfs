@@ -523,7 +523,6 @@ TEST_F(QfsClientApiTest, SendJsonTest) {
 	ApiContext context;
 	context.SetRequestJsonObject(request_json);
 	err = this->api->SendJson(&context);
-	json_decref(request_json);  // release the JSON object
 	ASSERT_EQ(err.code, kSuccess);
 
 	// compare what the API function actually wrote with what we expected
@@ -722,17 +721,17 @@ TEST_F(QfsClientCommandBufferTest, AppendAndCopyLotsTest) {
 
 	ASSERT_EQ(buffer.Size(), size);
 
-	const std::vector<byte> &data = buffer.data;
 	CommandBuffer other_buffer;
 
-	for(size_t j = 0; j < data.size(); j++) {
+	for(size_t j = 0; j < buffer.Size(); j++) {
 		byte datum = buffer.data[j];
 		other_buffer.Append(&datum, 1);
 	}
 
 	ASSERT_EQ(buffer.Size(), other_buffer.Size());
-	ASSERT_STREQ((const char *)buffer.Data(),
-		     (const char *)other_buffer.Data());
+	for(size_t j = 0; j < buffer.Size(); j++) {
+		ASSERT_EQ(buffer.data[j], other_buffer.data[j]);
+	}
 }
 
 TEST_F(QfsClientCommandBufferTest, AppendTest) {
