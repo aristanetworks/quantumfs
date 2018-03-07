@@ -58,11 +58,11 @@ void requote(std::string *s);
 
 // Encode a block of data (stored in a std::vector<byte> as a base64 string,
 // storing the result in the std::string pointed to by the b64 parameter.
-void base64_encode(const std::vector<byte> &data, std::string *b64);
+Error base64_encode(const std::vector<byte> &data, std::string *b64);
 
 // Decode a base64 string into a block of data that will be stored in the
 // std::vector<byte> pointed to by the data parameter.
-void base64_decode(const std::string &b64, std::vector<byte> *data);
+Error base64_decode(const std::string &b64, std::vector<byte> *data);
 
 template <unsigned N>
 class AlignedMem {
