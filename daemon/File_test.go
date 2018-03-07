@@ -717,14 +717,6 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 	test.SyncAllWorkspaces()
 	test.remountFilesystem()
 
-	if hardlinks {
-		// Force normalization
-		test.AssertNoErr(os.Remove(linkPath))
-		_, err = os.Lstat(filePath)
-		test.AssertNoErr(err)
-		test.Log("Normalized")
-	}
-
 	// Increase the file size to be a medium file. After this write we
 	// should have the state where, according to the directory, the file
 	// is still a small file with the EmptyBlockKey. Only after the file
@@ -732,28 +724,43 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 	// with the appropiate ID.
 	test.AssertNoErr(testutils.PrintToFile(filePath, string(data)))
 
-	// Confirm the directory is consistent with a small file
-	inode := test.getInode(dirName)
-	dir := inode.(*Directory)
+	// Confirm the parent is consistent with a small file
 	func() {
-		defer dir.childRecordLock.Lock().Unlock()
-		record := dir.children.publishable[fileInode][fileName]
+		var record quantumfs.ImmutableDirectoryRecord
+		if !hardlinks {
+			inode := test.getInode(dirName)
+			dir := inode.(*Directory)
+			defer dir.childRecordLock.Lock().Unlock()
+			record = dir.children.publishable[fileInode][fileName]
+		} else {
+			wsr := test.getInode(workspace).(*WorkspaceRoot)
+			_, fileId := wsr.hardlinkTable.checkHardlink(fileInode)
+			_, record = wsr.hardlinkTable.getHardlink(fileId)
+		}
 
-		test.Assert(record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
-			"ID isn't empty block: %s", record.ID().String())
 		test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
 			"File isn't small file: %d", record.Type())
+		test.Assert(record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
+			"ID isn't empty block: %s", record.ID().String())
 	}()
 
 	// Cause the file to be flushed
 	test.SyncAllWorkspaces()
 
-	// Confirm the directory is consistent with a medium file
-	inode = test.getInode(dirName)
-	dir = inode.(*Directory)
+	// Confirm the parent is consistent with a medium file
 	func() {
-		defer dir.childRecordLock.Lock().Unlock()
-		record := dir.children.publishable[fileInode][fileName]
+		var record quantumfs.ImmutableDirectoryRecord
+		if !hardlinks {
+			inode := test.getInode(dirName)
+			dir := inode.(*Directory)
+			defer dir.childRecordLock.Lock().Unlock()
+			record = dir.children.publishable[fileInode][fileName]
+		} else {
+			wsr := test.getInode(workspace).(*WorkspaceRoot)
+			_, fileId := wsr.hardlinkTable.checkHardlink(fileInode)
+			_, record = wsr.hardlinkTable.getHardlink(fileId)
+		}
+
 		test.Assert(!record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
 			"ID is empty block: %s", record.ID().String())
 		test.Assert(record.Type() == quantumfs.ObjectTypeMediumFile,
