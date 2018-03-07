@@ -165,8 +165,9 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	}
 }
 
-// Internal use only method
-func (container *ChildContainer) _mutableRecordByName(c *ctx,
+// Internal use only method - returns the bare record from the effective map,
+// otherwise returns a copy from the publishable map or nil
+func (container *ChildContainer) _mutableCopyByName(c *ctx,
 	name string) (rtn quantumfs.DirectoryRecord) {
 
 	inodeId := container.inodeNum(name)
@@ -217,10 +218,10 @@ func (container *ChildContainer) recordByName(c *ctx,
 }
 
 // Internal use only
-func (container *ChildContainer) _mutableRecordByInodeId(c *ctx,
+func (container *ChildContainer) _mutableCopyByInodeId(c *ctx,
 	inodeId InodeId) (rtn quantumfs.DirectoryRecord) {
 
-	defer c.FuncIn("ChildContainer::_mutableRecordByInodeId", "inodeId %d",
+	defer c.FuncIn("ChildContainer::_mutableCopyByInodeId", "inodeId %d",
 		inodeId).Out()
 
 	records := container.effective[inodeId]
@@ -312,7 +313,7 @@ func (container *ChildContainer) deleteChild(c *ctx,
 		return nil
 	}
 
-	record := container._mutableRecordByName(c, name)
+	record := container._mutableCopyByName(c, name)
 
 	removeFromImmMap(container.publishable, inodeId, name)
 	removeFromMap(container.effective, inodeId, name)
@@ -358,22 +359,15 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 
 	defer c.funcIn("ChildContainer::modifyChildWithFunc").Out()
 
-	record := container._mutableRecordByInodeId(c, inodeId)
+	record := container._mutableCopyByInodeId(c, inodeId)
 	if record == nil {
 		return
 	}
 
-	_, hasEffective := container.effective[inodeId]
-
-	if !hasEffective && record.Type() != quantumfs.ObjectTypeHardlink {
-		// We do not modify publishable records in this method. If we don't
-		// have an effective entry we must create one. Hardlinks are always
-		// publishable, so do not create an effective entry for those types.
-		record = record.Clone()
-		container.setRecord(c, inodeId, record)
-	}
-
 	modify(record)
+
+	// We must always re-set the copy into the map
+	container.setRecord(c, inodeId, record)
 }
 
 func (container *ChildContainer) directInodes() []InodeId {
@@ -460,9 +454,13 @@ func (container *ChildContainer) setID(c *ctx, name string,
 	defer c.FuncIn("ChildContainer::setID", "name %s key %s", name,
 		key.String()).Out()
 
-	record := container._mutableRecordByName(c, name)
+	record := container._mutableCopyByName(c, name)
 	utils.Assert(record != nil, "Child '%s' not found in setID", name)
 
 	record.SetID(key)
+	// use the new copy in our map
+	inodeId := container.inodeNum(name)
+	container.setRecord(c, inodeId, record)
+
 	container.makePublishable(c, name)
 }
