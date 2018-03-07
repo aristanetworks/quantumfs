@@ -78,7 +78,7 @@ class AlignedMem {
 	}
 
 	unsigned Size() {
-	   return _size;
+		return _size;
 	}
 
 	~AlignedMem() {
