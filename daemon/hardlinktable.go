@@ -26,7 +26,9 @@ type HardlinkTableEntry struct {
 }
 
 type HardlinkTable interface {
-	getHardlinkByInode(inodeId InodeId) (bool, quantumfs.DirectoryRecord)
+	getHardlinkByInode(inodeId InodeId) (bool, quantumfs.ImmutableDirectoryRecord)
+	modifyChildWithFunc(c *ctx, inodeId InodeId,
+		modify func(record quantumfs.DirectoryRecord))
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
 	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
 	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
@@ -263,7 +265,7 @@ func (ht *HardlinkTableImpl) findHardlinkInodeId(c *ctx,
 // Ensure we don't return the vanilla record, enclose it in a hardlink wrapper so
 // that the wrapper can correctly pick and choose attributes like nlink
 func (ht *HardlinkTableImpl) getHardlinkByInode(inodeId InodeId) (valid bool,
-	record quantumfs.DirectoryRecord) {
+	record quantumfs.ImmutableDirectoryRecord) {
 
 	defer ht.linkLock.RLock().RUnlock()
 
@@ -326,6 +328,26 @@ func (ht *HardlinkTableImpl) setHardlink(fileId quantumfs.FileId,
 
 	// It's critical that our lock covers both the fetch and this change
 	fnSetter(link.record)
+}
+
+func (ht *HardlinkTableImpl) modifyChildWithFunc(c *ctx, inodeId InodeId,
+	modify func(record quantumfs.DirectoryRecord)) {
+
+	defer c.FuncIn("HardlinkTableImpl::modifyChildWithFunc", "inode %d",
+		inodeId).Out()
+
+	defer ht.linkLock.Lock().Unlock()
+
+	fileId, exists := ht.inodeToLink[inodeId]
+	if !exists {
+		return
+	}
+
+	link, exists := ht.hardlinks[fileId]
+	utils.Assert(exists, "Hardlink is in inodeToLink but not hardlinks %d %d",
+		inodeId, fileId)
+
+	modify(link.record)
 }
 
 func (hte *HardlinkTableEntry) effectiveNlink() uint32 {
