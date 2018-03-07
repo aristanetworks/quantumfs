@@ -239,7 +239,7 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 	memcpy(*data, command.Data(), command.Size());
 
 	// We must write the whole command at once
-	int written = write(this->fd, *data , command.Size());
+	int written = write(this->fd, *data, command.Size());
 
 	if (written == -1 || written != command.Size()) {
 		return util::getError(kApiFileWriteFail, this->path);
