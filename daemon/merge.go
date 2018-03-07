@@ -172,7 +172,7 @@ func loadWorkspaceRoot(c *ctx,
 		return nil, key,
 			fmt.Errorf("Unable to Get block for key: %s", key.String())
 	}
-	workspaceRoot := buffer.AsWorkspaceRoot()
+	workspaceRoot := MutableCopy(c, buffer).AsWorkspaceRoot()
 
 	links := loadHardlinks(c, workspaceRoot.HardlinkEntry())
 
@@ -183,7 +183,7 @@ type mergeSkipPaths struct {
 	paths map[string]struct{}
 }
 
-func mergeUploader(c *ctx, buffers chan quantumfs.Buffer, rtnErr *error,
+func mergeUploader(c *ctx, buffers chan ImmutableBuffer, rtnErr *error,
 	wg *sync.WaitGroup) {
 
 	defer c.funcIn("mergeUploader").Out()
@@ -211,9 +211,9 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d wsr %s", prefer,
 		len(skipPaths.paths), breadcrumb).Out()
 
-	toSet := make(chan quantumfs.Buffer, maxUploadBacklog)
+	toSet := make(chan ImmutableBuffer, maxUploadBacklog)
 	merge := newMerger(c, prefer, func(c *ctx,
-		buf quantumfs.Buffer) (quantumfs.ObjectKey, error) {
+		buf ImmutableBuffer) (quantumfs.ObjectKey, error) {
 
 		if len(toSet) == maxUploadBacklog-1 {
 			c.elog("Merge uploading bandwidth maxed.")
@@ -228,6 +228,13 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go mergeUploader(c, toSet, &uploadErr, &wg)
+	defer func() {
+		// Ensure everything is uploaded before we return. Defer this close
+		// to ensure that the mergeUploader thread ends even if we panic
+		close(toSet)
+		c.vlog("Waiting for last merge blocks to finish uploading")
+		wg.Wait()
+	}()
 
 	baseHardlinks, baseDirectory, err := loadWorkspaceRoot(c, base)
 	if err != nil {
@@ -257,9 +264,6 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	rtn := publishWorkspaceRoot(c, localDirectory, tracker.merged,
 		merge.pubFn)
 
-	// Ensure everything is uploaded before we continue
-	close(toSet)
-	wg.Wait()
 	return rtn, uploadErr
 }
 
@@ -276,7 +280,7 @@ func loadRecords(c *ctx,
 			return nil, fmt.Errorf("No object for key %s", key.String())
 		}
 
-		baseLayer := buffer.AsDirectoryEntry()
+		baseLayer := MutableCopy(c, buffer).AsDirectoryEntry()
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
 			entry := baseLayer.Entry(i)

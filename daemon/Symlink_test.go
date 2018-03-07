@@ -227,7 +227,6 @@ func TestSymlinkBeforeSync(t *testing.T) {
 			test.Assert(record.Type() == quantumfs.ObjectTypeSymlink,
 				"File isn't symlink: %s",
 				quantumfs.ObjectType2String(record.Type()))
-
 		}()
 
 		test.SyncAllWorkspaces()
@@ -244,8 +243,8 @@ func TestSymlinkBeforeSync(t *testing.T) {
 			test.Assert(data != nil, "No data for symlink")
 			linkPath, err := os.Readlink(symlink)
 			test.AssertNoErr(err)
-			test.Assert(bytes.Equal(data.Get(), []byte(linkPath)),
-				"Symlink corrupt: %s", data.Get())
+			test.Assert(bytes.Equal(slowCopy(data), []byte(linkPath)),
+				"Symlink corrupt: %s", slowCopy(data))
 		}()
 	})
 }

@@ -153,8 +153,8 @@ type Inode interface {
 	parentGetChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 		owner fuse.Owner)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
-	parentCheckLinkReparent(c *ctx, parent *Directory)
 
+	isDirty_(c *ctx) bool      // Returns true if the inode is dirty
 	dirty(c *ctx)              // Mark this Inode dirty
 	dirty_(c *ctx)             // Mark this Inode dirty
 	markClean_() *list.Element // Mark this Inode as cleaned
@@ -483,49 +483,6 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	}
 }
 
-// Locks the parent
-func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
-	defer c.FuncIn("InodeCommon::parentCheckLinkReparent", "%d", inode.id).Out()
-
-	// Ensure we lock in the UP direction
-	defer inode.parentLock.Lock().Unlock()
-	defer parent.Lock().Unlock()
-	defer parent.childRecordLock.Lock().Unlock()
-
-	// Check if this is still a child
-	record := parent.children.recordByInodeId(c, inode.id)
-	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
-		// no hardlink record here, nothing to do
-		return
-	}
-
-	link := record.(*HardlinkLeg)
-
-	// This may need to be turned back into a normal file
-	newRecord, inodeId := parent.hardlinkTable.removeHardlink(c, link.FileId())
-
-	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
-		// wsr says hardlink isn't ready for removal yet
-		return
-	}
-
-	// reparent the child to the given parent
-	inode.parentId = parent.inodeNum()
-
-	// Ensure that we update this version of the record with this instance
-	// of the hardlink's information
-	newRecord.SetFilename(link.Filename())
-	inode.setName(link.Filename())
-
-	// Here we do the opposite of makeHardlink DOWN - we re-insert it
-	parent.children.setRecord(c, inodeId, newRecord)
-
-	// Mark the inode as dirty to ensure it will flush to make itself publishable
-	inode.dirty(c)
-
-	parent.dirty(c)
-}
-
 func (inode *InodeCommon) setParent(newParent InodeId) {
 	defer inode.parentLock.Lock().Unlock()
 
@@ -567,6 +524,13 @@ func (inode *InodeCommon) isOrphaned_() bool {
 
 func (inode *InodeCommon) inodeNum() InodeId {
 	return inode.id
+}
+
+// Returns true if the inode is dirty
+// flusher lock must be locked when calling this function
+func (inode *InodeCommon) isDirty_(c *ctx) bool {
+	defer c.funcIn("InodeCommon::isDirty_").Out()
+	return inode.dirtyElement__ != nil
 }
 
 // Add this Inode to the dirty list
