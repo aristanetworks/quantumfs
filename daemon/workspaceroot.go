@@ -65,7 +65,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	c.vlog("Workspace Loading %s %s", workspaceName, rootId.String())
 
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
-	workspaceRoot := buffer.AsWorkspaceRoot()
+	workspaceRoot := MutableCopy(c, buffer).AsWorkspaceRoot()
 
 	defer wsr.Lock().Unlock()
 
@@ -182,7 +182,7 @@ func foreachHardlink(c *ctx, entry quantumfs.HardlinkEntry,
 			if buffer == nil {
 				panic("Missing next HardlinkEntry object")
 			}
-			entry = buffer.AsHardlinkEntry()
+			entry = MutableCopy(c, buffer).AsHardlinkEntry()
 		} else {
 			break
 		}

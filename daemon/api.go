@@ -7,7 +7,6 @@ package daemon
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -125,11 +124,10 @@ func (api *ApiInode) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.ENOTDIR
 }
 
-func (wsr *ApiInode) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
+func (api *ApiInode) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
 
-	c.elog("Api doesn't support record fetch")
-	return nil, errors.New("Unsupported record fetch")
+	panic("Api doesn't support record fetch")
 }
 
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
@@ -1134,7 +1132,7 @@ func (api *ApiHandle) getBlock(c *ctx, buf []byte) int {
 			ErrorCode: quantumfs.ErrorOK,
 			Message:   "",
 		},
-		Data: buffer.Get(),
+		Data: slowCopy(buffer),
 	}
 
 	bytes, err := json.Marshal(response)

@@ -73,8 +73,7 @@ type Inode interface {
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
 
-	getChildRecordCopy(c *ctx,
-		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
+	getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr, owner fuse.Owner)
 
 	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey,
@@ -151,11 +150,11 @@ type Inode interface {
 	parentSetChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		data []byte) fuse.Status
 	parentRemoveChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
-	parentGetChildRecordCopy(c *ctx,
-		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
+	parentGetChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+		owner fuse.Owner)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
-	parentCheckLinkReparent(c *ctx, parent *Directory)
 
+	isDirty_(c *ctx) bool      // Returns true if the inode is dirty
 	dirty(c *ctx)              // Mark this Inode dirty
 	dirty_(c *ctx)             // Mark this Inode dirty
 	markClean_() *list.Element // Mark this Inode as cleaned
@@ -242,6 +241,15 @@ type InodeCommon struct {
 	unlinkRecord quantumfs.DirectoryRecord
 	unlinkXAttr  map[string][]byte
 	unlinkLock   utils.DeferableRwMutex
+}
+
+func (inode *InodeCommon) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer c.funcIn("InodeCommon::GetAttr").Out()
+
+	inode.parentGetChildAttr(c, inode.id, &out.Attr, c.fuseCtx.Owner)
+	fillAttrOutCacheData(c, out)
+
+	return fuse.OK
 }
 
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
@@ -427,17 +435,17 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 	}
 }
 
-func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
+func (inode *InodeCommon) parentGetChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.Attr, owner fuse.Owner) {
 
-	defer c.funcIn("InodeCommon::parentGetChildRecordCopy").Out()
+	defer c.funcIn("InodeCommon::parentGetChildAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 
 	if !inode.isOrphaned_() {
-		return inode.parent_(c).getChildRecordCopy(c, inodeNum)
+		inode.parent_(c).getChildAttr(c, inodeNum, out, owner)
 	} else if inode.id == inodeNum {
-		return inode.getOrphanChildRecordCopy(c, inodeNum)
+		inode.getOrphanChildAttr(c, inodeNum, out, owner)
 	} else {
 		panic("Request for non-self while orphaned")
 	}
@@ -473,49 +481,6 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 
 		toCheck = toCheck.parent_(c)
 	}
-}
-
-// Locks the parent
-func (inode *InodeCommon) parentCheckLinkReparent(c *ctx, parent *Directory) {
-	defer c.FuncIn("InodeCommon::parentCheckLinkReparent", "%d", inode.id).Out()
-
-	// Ensure we lock in the UP direction
-	defer inode.parentLock.Lock().Unlock()
-	defer parent.Lock().Unlock()
-	defer parent.childRecordLock.Lock().Unlock()
-
-	// Check if this is still a child
-	record := parent.children.recordByInodeId(c, inode.id)
-	if record == nil || record.Type() != quantumfs.ObjectTypeHardlink {
-		// no hardlink record here, nothing to do
-		return
-	}
-
-	link := record.(*HardlinkLeg)
-
-	// This may need to be turned back into a normal file
-	newRecord, inodeId := parent.hardlinkTable.removeHardlink(c, link.FileId())
-
-	if newRecord == nil && inodeId == quantumfs.InodeIdInvalid {
-		// wsr says hardlink isn't ready for removal yet
-		return
-	}
-
-	// reparent the child to the given parent
-	inode.parentId = parent.inodeNum()
-
-	// Ensure that we update this version of the record with this instance
-	// of the hardlink's information
-	newRecord.SetFilename(link.Filename())
-	inode.setName(link.Filename())
-
-	// Here we do the opposite of makeHardlink DOWN - we re-insert it
-	parent.children.setRecord(c, inodeId, newRecord)
-
-	// Mark the inode as dirty to ensure it will flush to make itself publishable
-	inode.dirty(c)
-
-	parent.dirty(c)
 }
 
 func (inode *InodeCommon) setParent(newParent InodeId) {
@@ -559,6 +524,13 @@ func (inode *InodeCommon) isOrphaned_() bool {
 
 func (inode *InodeCommon) inodeNum() InodeId {
 	return inode.id
+}
+
+// Returns true if the inode is dirty
+// flusher lock must be locked when calling this function
+func (inode *InodeCommon) isDirty_(c *ctx) bool {
+	defer c.funcIn("InodeCommon::isDirty_").Out()
+	return inode.dirtyElement__ != nil
 }
 
 // Add this Inode to the dirty list

@@ -212,14 +212,15 @@ func matchXAttrExtendedKey(path string, extendedKey []byte,
 	test.Assert(err == nil, "Error stat'ing test type %d: %v", Type, err)
 	var id InodeId
 	id = InodeId(stat.Ino)
-	inode := test.qfs.inodes[id]
-	record, err := inode.parentGetChildRecordCopy(&test.qfs.c, id)
 
-	// Verify the type and key matching
-	test.Assert(type_ == Type && size == record.Size() &&
-		bytes.Equal(key.Value(), record.ID().Value()),
-		"Error getting the key: %v with size of %d-%d, keys of %v-%v",
-		err, Type, type_, key.Value(), record.ID().Value())
+	test.withInodeRecord(id, func(record quantumfs.ImmutableDirectoryRecord) {
+		// Verify the type and key matching
+		test.Assert(type_ == Type && size == record.Size() &&
+			bytes.Equal(key.Value(), record.ID().Value()),
+			"Error getting the key: %v with size of %d-%d, "+
+				"keys of %s-%s", err, Type, type_, key.String(),
+			record.ID().String())
+	})
 }
 
 // Verify the get XAttr function for the self-defined extended key
@@ -294,15 +295,18 @@ func TestXAttrExtendedKeyGet(t *testing.T) {
 		err = syscall.Lstat(linkName, &stat)
 		test.Assert(err == nil, "Error stat'ing symlink: %v", err)
 		id := InodeId(stat.Ino)
-		inode := test.qfs.inode(&test.qfs.c, id)
-		record, err := inode.parentGetChildRecordCopy(&test.qfs.c, id)
 
-		// Verify the type and key matching
-		test.Assert(type_ == quantumfs.ObjectTypeSymlink &&
-			size == record.Size() &&
-			bytes.Equal(key.Value(), record.ID().Value()),
-			"Error getting the link key: %v with %d, keys of %v-%v",
-			err, type_, key.Value(), record.ID().Value())
+		test.withInodeRecord(id, func(
+			record quantumfs.ImmutableDirectoryRecord) {
+
+			// Verify the type and key matching
+			test.Assert(type_ == quantumfs.ObjectTypeSymlink &&
+				size == record.Size() &&
+				bytes.Equal(key.Value(), record.ID().Value()),
+				"Error getting the link key: %v with %d, "+
+					"keys of %v-%v", err, type_, key.String(),
+				record.ID().String())
+		})
 
 		// check the special
 		sz, err = syscall.Getxattr(spName, quantumfs.XAttrTypeKey, dst)
