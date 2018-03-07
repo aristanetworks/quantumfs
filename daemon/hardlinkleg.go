@@ -49,7 +49,7 @@ func newHardlinkLegFromRecord(record quantumfs.DirectoryRecord,
 }
 
 func (link *HardlinkLeg) get() quantumfs.ImmutableDirectoryRecord {
-	valid, link_ := link.hardlinkTable.getHardlink(link.FileId())
+	valid, link_ := link.hardlinkTable.getHardlinkByFileId(link.FileId())
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
@@ -195,7 +195,7 @@ func (link *HardlinkLeg) Nlinks() uint32 {
 }
 
 func (link *HardlinkLeg) EncodeExtendedKey() []byte {
-	valid, realRecord := link.hardlinkTable.getHardlink(link.FileId())
+	valid, realRecord := link.hardlinkTable.getHardlinkByFileId(link.FileId())
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
@@ -210,7 +210,7 @@ func (l *HardlinkLeg) AsImmutable() quantumfs.ImmutableDirectoryRecord {
 	// Sorry, this seems to be the only way to get the signature under 85
 	// characters per line and appease gofmt.
 	link := l
-	valid, realRecord := link.hardlinkTable.getHardlink(link.FileId())
+	valid, realRecord := link.hardlinkTable.getHardlinkByFileId(link.FileId())
 	if !valid {
 		// This object shouldn't even exist if the hardlink's invalid
 		panic(fmt.Sprintf("Unable to get record for existing link %d",
