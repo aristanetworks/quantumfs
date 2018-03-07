@@ -26,7 +26,10 @@ type HardlinkTableEntry struct {
 }
 
 type HardlinkTable interface {
-	getHardlinkByInode(inodeId InodeId) (bool, quantumfs.DirectoryRecord)
+	getHardlinkByInodeId(c *ctx, inodeId InodeId) (bool,
+		quantumfs.DirectoryRecord)
+	getHardlinkByFileId(fileId quantumfs.FileId) (valid bool,
+		record quantumfs.ImmutableDirectoryRecord)
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
 	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
 	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
@@ -35,8 +38,6 @@ type HardlinkTable interface {
 	hardlinkInc(fileId quantumfs.FileId)
 	newHardlink(c *ctx, inodeId InodeId,
 		record quantumfs.DirectoryRecord) *HardlinkLeg
-	getHardlink(fileId quantumfs.FileId) (valid bool,
-		record quantumfs.ImmutableDirectoryRecord)
 	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
 	setHardlink(fileId quantumfs.FileId,
 		fnSetter func(dir quantumfs.DirectoryRecord))
@@ -262,8 +263,8 @@ func (ht *HardlinkTableImpl) findHardlinkInodeId(c *ctx,
 
 // Ensure we don't return the vanilla record, enclose it in a hardlink wrapper so
 // that the wrapper can correctly pick and choose attributes like nlink
-func (ht *HardlinkTableImpl) getHardlinkByInode(inodeId InodeId) (valid bool,
-	record quantumfs.DirectoryRecord) {
+func (ht *HardlinkTableImpl) getHardlinkByInodeId(c *ctx, inodeId InodeId) (
+	valid bool, record quantumfs.DirectoryRecord) {
 
 	defer ht.linkLock.RLock().RUnlock()
 
@@ -281,8 +282,8 @@ func (ht *HardlinkTableImpl) getHardlinkByInode(inodeId InodeId) (valid bool,
 		quantumfs.Time(0), ht)
 }
 
-func (ht *HardlinkTableImpl) getHardlink(fileId quantumfs.FileId) (valid bool,
-	record quantumfs.ImmutableDirectoryRecord) {
+func (ht *HardlinkTableImpl) getHardlinkByFileId(fileId quantumfs.FileId) (
+	valid bool, record quantumfs.ImmutableDirectoryRecord) {
 
 	defer ht.linkLock.RLock().RUnlock()
 
