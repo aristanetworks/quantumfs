@@ -72,22 +72,6 @@ func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 	return hasAccessPermission(c, special, mask, uid, gid)
 }
 
-func (special *Special) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	defer c.funcIn("Special::GetAttr").Out()
-
-	record, err := special.parentGetChildRecordCopy(c, special.InodeCommon.id)
-	if err != nil {
-		c.elog("Unable to get record from parent for inode %d", special.id)
-		return fuse.EIO
-	}
-
-	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, special.InodeCommon.id,
-		c.fuseCtx.Owner, record)
-
-	return fuse.OK
-}
-
 func (special *Special) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
 	c.elog("Invalid Lookup call on Special")
 	return fuse.ENOSYS
@@ -227,7 +211,7 @@ func specialOverrideAttr(entry quantumfs.ImmutableDirectoryRecord,
 	attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
 	attr.Nlink = entry.Nlinks()
 
-	filetype, dev, err := quantumfs.DecodeSpecialKey(entry.ID())
+	filetype, dev, err := quantumfs.DecodeSpecialKey(underlyingID(entry))
 	if err != nil {
 		panic(fmt.Sprintf("Decoding special file failed: %v",
 			err))

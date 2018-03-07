@@ -5,10 +5,10 @@ package daemon
 
 import (
 	"bytes"
-	"errors"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -169,17 +169,16 @@ func (inode *InodeCommon) removeOrphanChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.OK
 }
 
-func (inode *InodeCommon) getOrphanChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
+func (inode *InodeCommon) getOrphanChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.Attr, owner fuse.Owner) {
 
-	defer c.funcIn("InodeCommon::getOrphanChildRecordCopy").Out()
+	defer c.funcIn("InodeCommon::getOrphanChildAttr").Out()
 	defer inode.unlinkLock.Lock().Unlock()
 
-	if inode.unlinkRecord == nil {
-		panic("getChildRecord on self file before unlinking")
-	}
+	utils.Assert(inode.unlinkRecord != nil,
+		"getOrphanChildAttr on self before unlinking")
 
-	return inode.unlinkRecord.AsImmutable(), nil
+	fillAttrWithDirectoryRecord(c, out, inodeNum, owner, inode.unlinkRecord)
 }
 
 func (inode *InodeCommon) setChildRecord(c *ctx, record quantumfs.DirectoryRecord) {
@@ -267,14 +266,14 @@ func (inode *InodeCommon) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return inode.removeOrphanChildXAttr(c, inodeNum, attr)
 }
 
-func (inode *InodeCommon) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
+func (inode *InodeCommon) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
 
-	defer c.funcIn("InodeCommon::getChildRecordCopy").Out()
+	defer c.funcIn("InodeCommon::getChildAttr").Out()
 
 	if !inode.isOrphaned() || inode.id != inodeNum {
-		c.elog("Unsupported record fetch on file")
-		return nil, errors.New("Unsupported record fetch")
+		panic("Unsupported record fetch on file")
+
 	}
-	return inode.getOrphanChildRecordCopy(c, inodeNum)
+	inode.getOrphanChildAttr(c, inodeNum, out, owner)
 }

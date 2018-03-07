@@ -73,8 +73,7 @@ type Inode interface {
 		attr *fuse.SetAttrIn, out *fuse.AttrOut,
 		updateMtime bool) fuse.Status
 
-	getChildRecordCopy(c *ctx,
-		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
+	getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr, owner fuse.Owner)
 
 	// Update the key for only this child
 	syncChild(c *ctx, inodeNum InodeId, newKey quantumfs.ObjectKey,
@@ -151,8 +150,8 @@ type Inode interface {
 	parentSetChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		data []byte) fuse.Status
 	parentRemoveChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
-	parentGetChildRecordCopy(c *ctx,
-		inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error)
+	parentGetChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+		owner fuse.Owner)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
 
 	isDirty_(c *ctx) bool      // Returns true if the inode is dirty
@@ -242,6 +241,15 @@ type InodeCommon struct {
 	unlinkRecord quantumfs.DirectoryRecord
 	unlinkXAttr  map[string][]byte
 	unlinkLock   utils.DeferableRwMutex
+}
+
+func (inode *InodeCommon) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
+	defer c.funcIn("InodeCommon::GetAttr").Out()
+
+	inode.parentGetChildAttr(c, inode.id, &out.Attr, c.fuseCtx.Owner)
+	fillAttrOutCacheData(c, out)
+
+	return fuse.OK
 }
 
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
@@ -427,17 +435,17 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 	}
 }
 
-func (inode *InodeCommon) parentGetChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
+func (inode *InodeCommon) parentGetChildAttr(c *ctx, inodeNum InodeId,
+	out *fuse.Attr, owner fuse.Owner) {
 
-	defer c.funcIn("InodeCommon::parentGetChildRecordCopy").Out()
+	defer c.funcIn("InodeCommon::parentGetChildAttr").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
 
 	if !inode.isOrphaned_() {
-		return inode.parent_(c).getChildRecordCopy(c, inodeNum)
+		inode.parent_(c).getChildAttr(c, inodeNum, out, owner)
 	} else if inode.id == inodeNum {
-		return inode.getOrphanChildRecordCopy(c, inodeNum)
+		inode.getOrphanChildAttr(c, inodeNum, out, owner)
 	} else {
 		panic("Request for non-self while orphaned")
 	}
