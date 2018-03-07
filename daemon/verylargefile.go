@@ -26,7 +26,7 @@ func newVeryLargeAccessor(c *ctx, key quantumfs.ObjectKey) *VeryLargeFile {
 		panic("Unable to fetch metadata for new vl file creation")
 	}
 
-	store := buffer.AsVeryLargeFile()
+	store := MutableCopy(c, buffer).AsVeryLargeFile()
 
 	c.vlog("Loading VeryLargeFile of %d parts", store.NumberOfParts())
 	rtn.parts = make([]LargeFile, store.NumberOfParts())
@@ -186,7 +186,7 @@ func (fi *VeryLargeFile) reload(c *ctx, key quantumfs.ObjectKey) {
 		panic("Unable to fetch metadata for reload")
 	}
 
-	store := buffer.AsVeryLargeFile()
+	store := MutableCopy(c, buffer).AsVeryLargeFile()
 
 	c.vlog("Reloading VeryLargeFile of %d parts", store.NumberOfParts())
 	fi.parts = make([]LargeFile, store.NumberOfParts())
