@@ -48,11 +48,32 @@ type Directory struct {
 	_generation     uint64
 }
 
+func foreachImmutableDentry(c *ctx, key quantumfs.ObjectKey,
+	visitor func(quantumfs.ImmutableDirectoryRecord)) {
+
+	for {
+		buffer := c.dataStore.Get(&c.Ctx, key)
+		if buffer == nil {
+			panic("No baseLayer object")
+		}
+		baseLayer := buffer.AsImmutableDirectoryEntry()
+
+		for i := 0; i < baseLayer.NumEntries(); i++ {
+			visitor(baseLayer.ImmutableEntry(i))
+		}
+
+		if baseLayer.HasNext() {
+			key = baseLayer.Next()
+		} else {
+			break
+		}
+	}
+}
+
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 	visitor func(quantumfs.DirectoryRecord)) {
 
 	for {
-		c.vlog("Fetching baselayer %s", key.String())
 		buffer := c.dataStore.Get(&c.Ctx, key)
 		if buffer == nil {
 			panic("No baseLayer object")

@@ -294,6 +294,13 @@ func EncodeSpecialKey(fileType uint32, device uint32) ObjectKey {
 	return NewObjectKey(KeyTypeEmbedded, hash)
 }
 
+type ImmutableDirectoryEntry interface {
+	NumEntries() int
+	ImmutableEntry(int) ImmutableDirectoryRecord
+	Next() ObjectKey
+	HasNext() bool
+}
+
 type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
@@ -356,6 +363,10 @@ func (dir *DirectoryEntry) NumEntries() int {
 
 func (dir *DirectoryEntry) SetNumEntries(n int) {
 	dir.dir.SetNumEntries(uint32(n))
+}
+
+func (dir *DirectoryEntry) ImmutableEntry(i int) ImmutableDirectoryRecord {
+	return dir.Entry(i)
 }
 
 func (dir *DirectoryEntry) Entry(i int) *EncodedDirectoryRecord {
@@ -928,6 +939,7 @@ type ImmutableDirectoryRecord interface {
 	Nlinks() uint32
 	EncodeExtendedKey() []byte
 	AsImmutable() ImmutableDirectoryRecord
+	Clone() DirectoryRecord
 }
 
 func NewDirectoryRecord() *EncodedDirectoryRecord {
@@ -1327,6 +1339,7 @@ type Buffer interface {
 
 	// These methods interpret the Buffer as various metadata types
 	AsWorkspaceRoot() WorkspaceRoot
+	AsImmutableDirectoryEntry() ImmutableDirectoryEntry
 	AsDirectoryEntry() DirectoryEntry
 	AsMultiBlockFile() MultiBlockFile
 	AsVeryLargeFile() VeryLargeFile
@@ -1583,4 +1596,21 @@ func (ir *ImmutableRecord) EncodeExtendedKey() []byte {
 
 func (ir *ImmutableRecord) AsImmutable() ImmutableDirectoryRecord {
 	return ir
+}
+
+func (ir *ImmutableRecord) Clone() DirectoryRecord {
+	rtn := NewDirectoryRecord()
+	rtn.SetFilename(ir.filename)
+	rtn.SetID(ir.id)
+	rtn.SetType(ir.filetype)
+	rtn.SetPermissions(ir.permissions)
+	rtn.SetOwner(ir.owner)
+	rtn.SetGroup(ir.group)
+	rtn.SetSize(ir.size)
+	rtn.SetExtendedAttributes(ir.xattr)
+	rtn.SetContentTime(ir.ctime)
+	rtn.SetModificationTime(ir.mtime)
+	// Nlinks isn't stored in DirectoryRecord so don't set it
+	rtn.SetFileId(ir.fileId)
+	return rtn
 }
