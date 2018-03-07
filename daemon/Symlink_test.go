@@ -214,27 +214,37 @@ func TestSymlinkBeforeSync(t *testing.T) {
 
 		inode := test.getInode(workspace)
 		dir := inode.(*WorkspaceRoot)
-		record, err := dir.getChildRecordCopy(test.TestCtx(),
-			linkInode)
-		test.AssertNoErr(err)
 
-		test.Assert(record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
-			"ID isn't empty block: %s", record.ID().String())
-		test.Assert(record.Type() == quantumfs.ObjectTypeSymlink,
-			"File isn't symlink: %s",
-			quantumfs.ObjectType2String(record.Type()))
+		func() {
+			defer dir.RLock().RUnlock()
+			defer dir.childRecordLock.Lock().Unlock()
+
+			record := dir.getRecordChildCall_(test.TestCtx(), linkInode)
+			test.Assert(record != nil, "Record not found")
+
+			test.Assert(record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
+				"ID isn't empty block: %s", record.ID().String())
+			test.Assert(record.Type() == quantumfs.ObjectTypeSymlink,
+				"File isn't symlink: %s",
+				quantumfs.ObjectType2String(record.Type()))
+		}()
 
 		test.SyncAllWorkspaces()
 
-		record, err = dir.getChildRecordCopy(test.TestCtx(),
-			linkInode)
-		test.AssertNoErr(err)
+		func() {
+			defer dir.RLock().RUnlock()
+			defer dir.childRecordLock.Lock().Unlock()
 
-		data := test.qfs.c.dataStore.Get(&test.qfs.c.Ctx, record.ID())
-		test.Assert(data != nil, "No data for symlink")
-		linkPath, err := os.Readlink(symlink)
-		test.AssertNoErr(err)
-		test.Assert(bytes.Equal(slowCopy(data), []byte(linkPath)),
-			"Symlink corrupt: %s", slowCopy(data))
+			record := dir.getRecordChildCall_(test.TestCtx(), linkInode)
+			test.Assert(record != nil, "Record not found")
+
+			data := test.qfs.c.dataStore.Get(&test.qfs.c.Ctx,
+				record.ID())
+			test.Assert(data != nil, "No data for symlink")
+			linkPath, err := os.Readlink(symlink)
+			test.AssertNoErr(err)
+			test.Assert(bytes.Equal(slowCopy(data), []byte(linkPath)),
+				"Symlink corrupt: %s", slowCopy(data))
+		}()
 	})
 }
