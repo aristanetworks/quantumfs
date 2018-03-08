@@ -56,10 +56,6 @@ func (link *HardlinkLeg) get() quantumfs.ImmutableDirectoryRecord {
 	return link_
 }
 
-func (link *HardlinkLeg) set(fnSetter func(dir quantumfs.DirectoryRecord)) {
-	link.hardlinkTable.setHardlink(link.FileId(), fnSetter)
-}
-
 func (link *HardlinkLeg) Filename() string {
 	return link.record.Filename()
 }
@@ -85,13 +81,7 @@ func (link *HardlinkLeg) Type() quantumfs.ObjectType {
 }
 
 func (link *HardlinkLeg) SetType(v quantumfs.ObjectType) {
-	if v == quantumfs.ObjectTypeHardlink {
-		panic("SetType called making hardlink")
-	}
-
-	link.set(func(dir quantumfs.DirectoryRecord) {
-		dir.SetType(v)
-	})
+	panic("Cannot set on HardlinkLeg")
 }
 
 func (link *HardlinkLeg) Permissions() uint32 {
@@ -99,9 +89,7 @@ func (link *HardlinkLeg) Permissions() uint32 {
 }
 
 func (link *HardlinkLeg) SetPermissions(v uint32) {
-	link.set(func(dir quantumfs.DirectoryRecord) {
-		dir.SetPermissions(v)
-	})
+	panic("Cannot set on HardlinkLeg")
 }
 
 func (link *HardlinkLeg) Owner() quantumfs.UID {
@@ -109,9 +97,7 @@ func (link *HardlinkLeg) Owner() quantumfs.UID {
 }
 
 func (link *HardlinkLeg) SetOwner(v quantumfs.UID) {
-	link.set(func(dir quantumfs.DirectoryRecord) {
-		dir.SetOwner(v)
-	})
+	panic("Cannot set on HardlinkLeg")
 }
 
 func (link *HardlinkLeg) Group() quantumfs.GID {
@@ -119,9 +105,7 @@ func (link *HardlinkLeg) Group() quantumfs.GID {
 }
 
 func (link *HardlinkLeg) SetGroup(v quantumfs.GID) {
-	link.set(func(dir quantumfs.DirectoryRecord) {
-		dir.SetGroup(v)
-	})
+	panic("Cannot set on HardlinkLeg")
 }
 
 func (link *HardlinkLeg) Size() uint64 {
@@ -129,9 +113,7 @@ func (link *HardlinkLeg) Size() uint64 {
 }
 
 func (link *HardlinkLeg) SetSize(v uint64) {
-	link.set(func(dir quantumfs.DirectoryRecord) {
-		dir.SetSize(v)
-	})
+	panic("Cannot set on HardlinkLeg")
 }
 
 func (link *HardlinkLeg) ExtendedAttributes() quantumfs.ObjectKey {
@@ -139,9 +121,7 @@ func (link *HardlinkLeg) ExtendedAttributes() quantumfs.ObjectKey {
 }
 
 func (link *HardlinkLeg) SetExtendedAttributes(v quantumfs.ObjectKey) {
-	link.set(func(dir quantumfs.DirectoryRecord) {
-		dir.SetExtendedAttributes(v)
-	})
+	panic("Cannot set on HardlinkLeg")
 }
 
 // The creationTime of a hardlink is used for merging and persists
@@ -159,9 +139,7 @@ func (link *HardlinkLeg) ContentTime() quantumfs.Time {
 }
 
 func (link *HardlinkLeg) SetContentTime(v quantumfs.Time) {
-	link.set(func(dir quantumfs.DirectoryRecord) {
-		dir.SetContentTime(v)
-	})
+	panic("Cannot set on HardlinkLeg")
 }
 
 func (link *HardlinkLeg) ModificationTime() quantumfs.Time {
@@ -169,9 +147,7 @@ func (link *HardlinkLeg) ModificationTime() quantumfs.Time {
 }
 
 func (link *HardlinkLeg) SetModificationTime(v quantumfs.Time) {
-	link.set(func(dir quantumfs.DirectoryRecord) {
-		dir.SetModificationTime(v)
-	})
+	panic("Cannot set on HardlinkLeg")
 }
 
 func (link *HardlinkLeg) FileId() quantumfs.FileId {
