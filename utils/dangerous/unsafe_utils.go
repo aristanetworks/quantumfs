@@ -1,7 +1,10 @@
 // Copyright (c) 2018 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package utils
+// Utilities which are dangerous and must be used with caution.
+package dangerous
+
+// NOTE: This entire package does not have go vet run against it.
 
 import (
 	"unsafe"
