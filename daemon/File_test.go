@@ -725,17 +725,16 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 	test.AssertNoErr(testutils.PrintToFile(filePath, string(data)))
 
 	// Confirm the parent is consistent with a small file
+	inode := test.getInode(dirName)
+	dir := inode.(*Directory)
 	func() {
 		var record quantumfs.ImmutableDirectoryRecord
 		if !hardlinks {
-			inode := test.getInode(dirName)
-			dir := inode.(*Directory)
 			defer dir.childRecordLock.Lock().Unlock()
 			record = dir.children.publishable[fileInode][fileName]
 		} else {
-			wsr := test.getInode(workspace).(*WorkspaceRoot)
-			_, fileId := wsr.hardlinkTable.checkHardlink(fileInode)
-			record = wsr.hardlinkTable.recordByFileId(fileId)
+			_, fileId := dir.hardlinkTable.checkHardlink(fileInode)
+			record = dir.hardlinkTable.recordByFileId(fileId)
 		}
 
 		test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
@@ -748,17 +747,16 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 	test.SyncAllWorkspaces()
 
 	// Confirm the parent is consistent with a medium file
+	inode = test.getInode(dirName)
+	dir = inode.(*Directory)
 	func() {
 		var record quantumfs.ImmutableDirectoryRecord
 		if !hardlinks {
-			inode := test.getInode(dirName)
-			dir := inode.(*Directory)
 			defer dir.childRecordLock.Lock().Unlock()
 			record = dir.children.publishable[fileInode][fileName]
 		} else {
-			wsr := test.getInode(workspace).(*WorkspaceRoot)
-			_, fileId := wsr.hardlinkTable.checkHardlink(fileInode)
-			record = wsr.hardlinkTable.recordByFileId(fileId)
+			_, fileId := dir.hardlinkTable.checkHardlink(fileInode)
+			record = dir.hardlinkTable.recordByFileId(fileId)
 		}
 
 		test.Assert(!record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
