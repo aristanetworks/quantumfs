@@ -155,8 +155,7 @@ func (link *HardlinkLeg) FileId() quantumfs.FileId {
 }
 
 func (link *HardlinkLeg) SetFileId(fileId quantumfs.FileId) {
-	utils.Assert(fileId == link.FileId(),
-		"attempt to change fileId %d -> %d", fileId, link.FileId())
+	panic("Cannot set on HardlinkLeg")
 }
 
 func (link *HardlinkLeg) Publishable() quantumfs.PublishableRecord {
