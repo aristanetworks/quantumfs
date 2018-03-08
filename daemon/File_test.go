@@ -735,7 +735,7 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 		} else {
 			wsr := test.getInode(workspace).(*WorkspaceRoot)
 			_, fileId := wsr.hardlinkTable.checkHardlink(fileInode)
-			_, record = wsr.hardlinkTable.getHardlink(fileId)
+			record = wsr.hardlinkTable.recordByFileId(fileId)
 		}
 
 		test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
@@ -758,7 +758,7 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 		} else {
 			wsr := test.getInode(workspace).(*WorkspaceRoot)
 			_, fileId := wsr.hardlinkTable.checkHardlink(fileInode)
-			_, record = wsr.hardlinkTable.getHardlink(fileId)
+			record = wsr.hardlinkTable.recordByFileId(fileId)
 		}
 
 		test.Assert(!record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
