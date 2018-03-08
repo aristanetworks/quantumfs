@@ -4,8 +4,6 @@
 package daemon
 
 import (
-	"fmt"
-
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
 )
@@ -49,12 +47,11 @@ func newHardlinkLegFromRecord(record quantumfs.DirectoryRecord,
 }
 
 func (link *HardlinkLeg) get() quantumfs.ImmutableDirectoryRecord {
-	valid, link_ := link.hardlinkTable.getHardlink(link.FileId())
-	if !valid {
-		// This object shouldn't even exist if the hardlink's invalid
-		panic(fmt.Sprintf("Unable to get record for existing link %d",
-			link.FileId()))
-	}
+	link_ := link.hardlinkTable.recordByFileId(link.FileId())
+
+	// This object shouldn't even exist if the hardlink's invalid
+	utils.Assert(link_ != nil, "Unable to get record for existing link %d",
+		link.FileId())
 
 	return link_
 }
@@ -195,12 +192,11 @@ func (link *HardlinkLeg) Nlinks() uint32 {
 }
 
 func (link *HardlinkLeg) EncodeExtendedKey() []byte {
-	valid, realRecord := link.hardlinkTable.getHardlink(link.FileId())
-	if !valid {
-		// This object shouldn't even exist if the hardlink's invalid
-		panic(fmt.Sprintf("Unable to get record for existing link %d",
-			link.FileId()))
-	}
+	realRecord := link.hardlinkTable.recordByFileId(link.FileId())
+
+	// This object shouldn't even exist if the hardlink's invalid
+	utils.Assert(realRecord != nil, "Unable to get record for existing link %d",
+		link.FileId())
 
 	return quantumfs.EncodeExtendedKey(realRecord.ID(), realRecord.Type(),
 		realRecord.Size())
@@ -210,12 +206,12 @@ func (l *HardlinkLeg) AsImmutable() quantumfs.ImmutableDirectoryRecord {
 	// Sorry, this seems to be the only way to get the signature under 85
 	// characters per line and appease gofmt.
 	link := l
-	valid, realRecord := link.hardlinkTable.getHardlink(link.FileId())
-	if !valid {
-		// This object shouldn't even exist if the hardlink's invalid
-		panic(fmt.Sprintf("Unable to get record for existing link %d",
-			link.FileId()))
-	}
+
+	realRecord := link.hardlinkTable.recordByFileId(link.FileId())
+
+	// This object shouldn't even exist if the hardlink's invalid
+	utils.Assert(realRecord != nil, "Unable to get record for existing link %d",
+		link.FileId())
 
 	return quantumfs.NewImmutableRecord(
 		link.Filename(),
