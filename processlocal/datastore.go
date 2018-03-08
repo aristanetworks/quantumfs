@@ -91,3 +91,15 @@ func (store *dataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 	return nil
 }
+
+func (store *dataStore) Freshen(c *quantumfs.Ctx, key quantumfs.ObjectKey) error {
+	defer c.FuncIn(qlog.LogDatastore, "processlocal::Freshen", "key %s",
+		key.String()).Out()
+
+	store.mutex.RLock()
+	defer store.mutex.RUnlock()
+	if _, exists := store.data[key.String()]; !exists {
+		return fmt.Errorf("Key does not exist")
+	}
+	return nil
+}
