@@ -295,14 +295,13 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 		return fuse.OK
 	}
 
-	record, err := inode.parentGetChildRecordCopy(c, inode.inodeNum())
-	if err != nil {
-		c.wlog("Failed to find record in parent")
-		return fuse.ENOENT
-	}
-	inodeOwner := quantumfs.SystemUid(record.Owner(), checkUid)
-	inodeGroup := quantumfs.SystemGid(record.Group(), checkGid)
-	permission := record.Permissions()
+	var attr fuse.Attr
+	owner := fuse.Owner{Uid: checkUid, Gid: checkGid}
+	inode.parentGetChildAttr(c, inode.inodeNum(), &attr, owner)
+	inodeOwner := attr.Owner.Uid
+	inodeGroup := attr.Owner.Gid
+	permission := attr.Mode
+	isDir := utils.BitFlagsSet(uint(attr.Mode), fuse.S_IFDIR)
 
 	if checkUid == 0 {
 		var permMask uint32
@@ -311,8 +310,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 			quantumfs.PermExecGroup |
 			quantumfs.PermExecOther
 
-		if checkFlags&permMask == 0 ||
-			record.Type() == quantumfs.ObjectTypeDirectory {
+		if checkFlags&permMask == 0 || isDir {
 			// The root user has 'rw' access to regular files and 'rwx'
 			// access to directories irrespective of their permissions.
 			c.vlog("User is root: OK")
@@ -332,7 +330,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 		stickyUid := quantumfs.SystemUid(quantumfs.UID(stickyAltOwner),
 			checkUid)
 
-		if record.Type() == quantumfs.ObjectTypeDirectory &&
+		if isDir &&
 			utils.BitFlagsSet(uint(permission), quantumfs.PermSticky) &&
 			checkUid != inodeOwner && checkUid != stickyUid {
 
