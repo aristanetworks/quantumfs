@@ -40,8 +40,6 @@ type HardlinkTable interface {
 	newHardlink(c *ctx, inodeId InodeId,
 		record quantumfs.DirectoryRecord) *HardlinkLeg
 	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
-	setHardlink(fileId quantumfs.FileId,
-		fnSetter func(dir quantumfs.DirectoryRecord))
 	nlinks(fileId quantumfs.FileId) uint32
 	claimAsChild_(inode Inode)
 	claimAsChild(inode Inode)
@@ -315,19 +313,6 @@ func (ht *HardlinkTableImpl) updateHardlinkInodeId(c *ctx, fileId quantumfs.File
 	hardlink.inodeId = inodeId
 	ht.hardlinks[fileId] = hardlink
 	ht.inodeToLink[inodeId] = fileId
-}
-
-// We need the hardlink table linklock to cover setting safely
-func (ht *HardlinkTableImpl) setHardlink(fileId quantumfs.FileId,
-	fnSetter func(dir quantumfs.DirectoryRecord)) {
-
-	defer ht.linkLock.Lock().Unlock()
-
-	link, exists := ht.hardlinks[fileId]
-	utils.Assert(exists, fmt.Sprintf("Hardlink fetch on invalid ID %d", fileId))
-
-	// It's critical that our lock covers both the fetch and this change
-	fnSetter(link.record)
 }
 
 func (ht *HardlinkTableImpl) modifyChildWithFunc(c *ctx, inodeId InodeId,
