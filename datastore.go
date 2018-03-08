@@ -927,7 +927,6 @@ type ImmutableDirectoryRecord interface {
 	FileId() FileId
 	Nlinks() uint32
 	EncodeExtendedKey() []byte
-	AsImmutable() ImmutableDirectoryRecord
 }
 
 func NewDirectoryRecord() *EncodedDirectoryRecord {
@@ -1597,8 +1596,4 @@ func (ir *ImmutableRecord) Nlinks() uint32 {
 
 func (ir *ImmutableRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(ir.ID(), ir.Type(), ir.Size())
-}
-
-func (ir *ImmutableRecord) AsImmutable() ImmutableDirectoryRecord {
-	return ir
 }

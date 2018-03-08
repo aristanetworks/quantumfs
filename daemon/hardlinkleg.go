@@ -237,3 +237,21 @@ func (link *HardlinkLeg) Clone() quantumfs.DirectoryRecord {
 	return newHardlinkLeg(link.Filename(), link.FileId(), link.creationTime(),
 		link.hardlinkTable)
 }
+
+func underlyingType(r quantumfs.ImmutableDirectoryRecord) quantumfs.ObjectType {
+	record := r
+
+	if hll, ok := record.(*HardlinkLeg); ok {
+		return hll.get().Type()
+	}
+	return record.Type()
+}
+
+func underlyingID(r quantumfs.ImmutableDirectoryRecord) quantumfs.ObjectKey {
+	record := r
+
+	if hll, ok := record.(*HardlinkLeg); ok {
+		return hll.get().ID()
+	}
+	return record.ID()
+}
