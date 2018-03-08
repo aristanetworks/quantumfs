@@ -5,7 +5,7 @@ package quantumfs
 
 import (
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/utils/dangerous"
 )
 
 // Generic request context object
@@ -85,7 +85,7 @@ func (c *Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 	index += copy(format[index:], funcName)
 	index += copy(format[index:], " ")
 	index += copy(format[index:], extraFmtStr)
-	formatStr := utils.MoveByteSliceToString(format[:index])
+	formatStr := dangerous.MoveByteSliceToString(format[:index])
 
 	c.Qlog.Log(subsystem, c.RequestId, 3, formatStr, args...)
 	return ExitFuncLog{
@@ -105,7 +105,7 @@ func (e ExitFuncLog) Out() {
 	}
 	index += copy(format[index:], qlog.FnExitStr)
 	index += copy(format[index:], e.funcName)
-	formatStr := utils.MoveByteSliceToString(format[:index])
+	formatStr := dangerous.MoveByteSliceToString(format[:index])
 
 	e.c.Qlog.Log(e.subsystem, e.c.RequestId, 3, formatStr)
 }
