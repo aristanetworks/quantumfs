@@ -500,8 +500,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 			// if we don't have the child, maybe we're wsr and it's a
 			// hardlink
 			c.vlog("Checking hardlink table")
-			linkRecord :=
-				dir.hardlinkTable.getHardlinkByInodeId(c, inodeNum)
+			linkRecord := dir.hardlinkTable.recordByInodeId(c, inodeNum)
 			if linkRecord != nil {
 				c.vlog("Hardlink found")
 				modifyEntryWithAttr(c, newType, attr, linkRecord,
@@ -835,8 +834,7 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	// if we don't have the child, maybe we're wsr and it's a hardlink
 	if dir.self.isWorkspaceRoot() {
 		c.vlog("Checking hardlink table")
-		linkRecord :=
-			dir.hardlinkTable.getHardlinkByInodeId(c, inodeNum)
+		linkRecord := dir.hardlinkTable.recordByInodeId(c, inodeNum)
 		if linkRecord != nil {
 			c.vlog("Hardlink found")
 			return linkRecord
@@ -1565,8 +1563,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 			// if we don't have the child, maybe we're wsr and it's a
 			// hardlink
 			c.vlog("Checking hardlink table")
-			linkRecord :=
-				dir.hardlinkTable.getHardlinkByInodeId(c, inodeNum)
+			linkRecord := dir.hardlinkTable.recordByInodeId(c, inodeNum)
 			if linkRecord != nil {
 				c.vlog("Hardlink found")
 				linkRecord.SetExtendedAttributes(key)
@@ -1648,7 +1645,7 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 			// hardlink
 			c.vlog("Checking hardlink table")
 			linkRecord :=
-				dir.hardlinkTable.getHardlinkByInodeId(c, inodeNum)
+				dir.hardlinkTable.recordByInodeId(c, inodeNum)
 			if linkRecord != nil {
 				c.vlog("Hardlink found")
 				linkRecord.SetExtendedAttributes(key)

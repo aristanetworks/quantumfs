@@ -412,7 +412,7 @@ func underlyingTypeOf(hardlinkTable HardlinkTable,
 		return record.Type()
 	}
 	fileId := record.FileId()
-	hardlinkRecord := hardlinkTable.getHardlinkByFileId(fileId)
+	hardlinkRecord := hardlinkTable.recordByFileId(fileId)
 	utils.Assert(hardlinkTable != nil, "hardlink %d not found", fileId)
 	utils.Assert(hardlinkRecord.Type() != quantumfs.ObjectTypeHardlink,
 		"The underlying type cannot be hardlink")

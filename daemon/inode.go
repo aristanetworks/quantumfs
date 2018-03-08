@@ -766,7 +766,7 @@ func reload(c *ctx, hardlinkTable HardlinkTable, rc *RefreshContext, inode Inode
 		subdir.refresh_DOWN(c, rc, remoteRecord.ID())
 	case quantumfs.ObjectTypeHardlink:
 		fileId := remoteRecord.FileId()
-		hardlinkRecord := hardlinkTable.getHardlinkByFileId(fileId)
+		hardlinkRecord := hardlinkTable.recordByFileId(fileId)
 		utils.Assert(hardlinkTable != nil, "hardlink %d not found", fileId)
 		remoteRecord = hardlinkRecord
 		fallthrough

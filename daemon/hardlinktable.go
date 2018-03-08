@@ -26,8 +26,8 @@ type HardlinkTableEntry struct {
 }
 
 type HardlinkTable interface {
-	getHardlinkByInodeId(c *ctx, inodeId InodeId) quantumfs.DirectoryRecord
-	getHardlinkByFileId(fileId quantumfs.FileId) (
+	recordByInodeId(c *ctx, inodeId InodeId) quantumfs.DirectoryRecord
+	recordByFileId(fileId quantumfs.FileId) (
 		record quantumfs.ImmutableDirectoryRecord)
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
 	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
@@ -262,7 +262,7 @@ func (ht *HardlinkTableImpl) findHardlinkInodeId(c *ctx,
 
 // Ensure we don't return the vanilla record, enclose it in a hardlink wrapper so
 // that the wrapper can correctly pick and choose attributes like nlink
-func (ht *HardlinkTableImpl) getHardlinkByInodeId(c *ctx, inodeId InodeId) (
+func (ht *HardlinkTableImpl) recordByInodeId(c *ctx, inodeId InodeId) (
 	record quantumfs.DirectoryRecord) {
 
 	defer ht.linkLock.RLock().RUnlock()
@@ -281,7 +281,7 @@ func (ht *HardlinkTableImpl) getHardlinkByInodeId(c *ctx, inodeId InodeId) (
 		quantumfs.Time(0), ht)
 }
 
-func (ht *HardlinkTableImpl) getHardlinkByFileId(fileId quantumfs.FileId) (
+func (ht *HardlinkTableImpl) recordByFileId(fileId quantumfs.FileId) (
 	record quantumfs.ImmutableDirectoryRecord) {
 
 	defer ht.linkLock.RLock().RUnlock()
