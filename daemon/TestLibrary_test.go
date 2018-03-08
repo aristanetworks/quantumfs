@@ -797,6 +797,24 @@ func (test *testHelper) waitForPropagate(file string, data []byte) {
 	})
 }
 
+func (test *testHelper) withInodeRecord(inodeId InodeId,
+	verify func(record quantumfs.ImmutableDirectoryRecord)) {
+
+	inode := test.qfs.inode(&test.qfs.c, inodeId)
+	test.Assert(inode != nil, "No Inode found for inode %d", inodeId)
+
+	defer inode.getParentLock().RLock().RUnlock()
+	parent := asDirectory(inode.parent_(&test.qfs.c))
+
+	defer parent.RLock().RUnlock()
+	defer parent.childRecordLock.Lock().Unlock()
+
+	record := parent.getRecordChildCall_(&test.qfs.c, inodeId)
+	test.Assert(record != nil, "Child record not found")
+
+	verify(record)
+}
+
 func createSparseFile(name string, size int64) error {
 	fd, err := syscall.Creat(name, 0124)
 	if err != nil {

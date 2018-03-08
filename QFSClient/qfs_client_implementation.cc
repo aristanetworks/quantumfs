@@ -235,9 +235,11 @@ Error ApiImpl::WriteCommand(const CommandBuffer &command) {
 		return util::getError(kApiFileSeekFail, this->path);
 	}
 
+	util::AlignedMem<512> data(command.Size());
+	memcpy(*data, command.Data(), command.Size());
+
 	// We must write the whole command at once
-	int written = write(this->fd, (const char *)command.Data(),
-		command.Size());
+	int written = write(this->fd, *data, command.Size());
 
 	if (written == -1 || written != command.Size()) {
 		return util::getError(kApiFileWriteFail, this->path);
@@ -261,10 +263,10 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	// read up to 4k at a time, stopping on EOF
 	command->Reset();
 
-	byte data[4096];
+	util::AlignedMem<512> data(4096);
+
 	while(true) {
-		int num = read(this->fd, reinterpret_cast<void*>(data),
-			sizeof(data));
+		int num = read(this->fd, *data, data.Size());
 		if (num == 0) {
 			break;
 		}
@@ -274,7 +276,11 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 			return util::getError(kApiFileReadFail, this->path);
 		}
 
-		err = command->Append(data, num);
+		if (command->Size() % 512) {
+			return util::getError(kApiFileReadFail, "unaligned read");
+		}
+
+		err = command->Append(reinterpret_cast<const byte *>(*data), num);
 
 		if (err != kSuccess) {
 			return util::getError(err);
@@ -618,8 +624,16 @@ Error ApiImpl::SetBlock(const std::vector<byte> &key,
 	// convert key and data to base64 before stuffing into JSON
 	std::string base64_key;
 	std::string base64_data;
-	util::base64_encode(key, &base64_key);
-	util::base64_encode(data, &base64_data);
+	Error err;
+
+	err = util::base64_encode(key, &base64_key);
+	if (err.code != kSuccess) {
+		return err;
+	}
+	err = util::base64_encode(data, &base64_data);
+	if (err.code != kSuccess) {
+		return err;
+	}
 
 	// create JSON with:
 	//    CommandId = kCmdSetBlock and
@@ -638,7 +652,7 @@ Error ApiImpl::SetBlock(const std::vector<byte> &key,
 	ApiContext context;
 	context.SetRequestJsonObject(request_json);
 
-	Error err = this->SendJson(&context);
+	err = this->SendJson(&context);
 	if (err.code != kSuccess) {
 		return err;
 	}
@@ -649,7 +663,13 @@ Error ApiImpl::SetBlock(const std::vector<byte> &key,
 Error ApiImpl::GetBlock(const std::vector<byte> &key, std::vector<byte> *data) {
 	// convert key to base64 before stuffing into JSON
 	std::string base64_key;
-	util::base64_encode(key, &base64_key);
+	Error err;
+
+	err = util::base64_encode(key, &base64_key);
+
+	if (err.code != kSuccess) {
+		return err;
+	}
 
 	// create JSON with:
 	//    CommandId = kCmdGetBlock and
@@ -666,7 +686,7 @@ Error ApiImpl::GetBlock(const std::vector<byte> &key, std::vector<byte> *data) {
 	ApiContext context;
 	context.SetRequestJsonObject(request_json);
 
-	Error err = this->SendJson(&context);
+	err = this->SendJson(&context);
 	if (err.code != kSuccess) {
 		return err;
 	}
@@ -685,7 +705,10 @@ Error ApiImpl::GetBlock(const std::vector<byte> &key, std::vector<byte> *data) {
 	const char *data_base64 = json_string_value(data_json_obj);
 
 	// convert data_base64 from base64 to binary before setting value in data
-	util::base64_decode(data_base64, data);
+	err = util::base64_decode(data_base64, data);
+	if (err.code != kSuccess) {
+		return err;
+	}
 
 	return util::getError(kSuccess);
 }

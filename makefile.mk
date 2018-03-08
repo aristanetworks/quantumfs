@@ -119,8 +119,10 @@ check-fpm:
 		sudo gem install --no-ri --no-rdoc fpm \
 	)
 
+RPM_BASENAME_QUPLOAD := QuantumFS-qupload
+RPM_FILE_QUPLOAD := $(RPM_BASENAME_QUPLOAD)-$(RPM_VERSION)-$(RPM_RELEASE)
 quploadRPM: check-fpm $(COMMANDS)
-	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS-upload --no-depends \
+	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n $(RPM_BASENAME_QUPLOAD) --no-depends \
 		--license='Arista Proprietary' \
 		--vendor='Arista Networks' \
 		--url http://gut/repos/quantumfs \
@@ -183,6 +185,7 @@ RPM_FILE_PREFIX_CLIENT_DEVEL := $(RPM_BASENAME_CLIENT_DEVEL)-$(RPM_VERSION)-$(RP
 
 RPM_FILES_TOOLSV2_I686 += $(RPM_FILE_PREFIX_CLIENT).i686.rpm $(RPM_FILE_PREFIX_CLIENT_DEVEL).i686.rpm
 RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_PREFIX_CLIENT).x86_64.rpm $(RPM_FILE_PREFIX_CLIENT_DEVEL).x86_64.rpm
+RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_QUPLOAD).x86_64.rpm
 
 clientRPM: check-fpm qfsclient
 	fpm --force -s dir -t rpm -n $(RPM_BASENAME_CLIENT) \

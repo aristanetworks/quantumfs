@@ -158,14 +158,14 @@ void requote(std::string *s) {
 	std::replace(s->begin(), s->end(), '\'', '"');
 }
 
-void base64_encode(const std::vector<byte> &data, std::string *b64) {
+Error base64_encode(const std::vector<byte> &data, std::string *b64) {
 	b64->clear();
 
 	BIO *bio = BIO_new(BIO_f_base64());
 	BIO *bio_mem = BIO_new(BIO_s_mem());
 
-	if(!bio || !bio_mem) {
-		return;
+	if (!bio || !bio_mem) {
+		return getError(kJsonEncodingError, "BIO_new");
 	}
 
 	// we have no need for linebreaks in the generated base64 text
@@ -174,16 +174,22 @@ void base64_encode(const std::vector<byte> &data, std::string *b64) {
 	bio = BIO_push(bio, bio_mem);
 
 	if (BIO_write(bio, data.data(), data.size()) == data.size()) {
-		BIO_flush(bio);
+		if (BIO_flush(bio) != 1) {
+			return getError(kJsonEncodingError, "BIO_flush");
+		}
 		BUF_MEM *result;
 		BIO_get_mem_ptr(bio, &result);
 		b64->assign((const char *)result->data, (size_t)result->length);
+	} else {
+		return getError(kJsonEncodingError, "BIO_write");
 	}
 
 	BIO_free_all(bio);
+
+	return getError(kSuccess);
 }
 
-void base64_decode(const std::string &b64, std::vector<byte> *data) {
+Error base64_decode(const std::string &b64, std::vector<byte> *data) {
 	data->clear();
 
 	int max_result_size = ((b64.length() * 6) + 7) / 8;
@@ -193,7 +199,7 @@ void base64_decode(const std::string &b64, std::vector<byte> *data) {
 	BIO *bio_mem = BIO_new_mem_buf(const_cast<char*>(b64.c_str()),
 	                               b64.length() + 1);
 	if(!bio || !bio_mem) {
-		return;
+		return getError(kJsonDecodingError, "BIO_new");
 	}
 
 	// if we don't set this flag, the decoder will expect at least a
@@ -203,9 +209,14 @@ void base64_decode(const std::string &b64, std::vector<byte> *data) {
 	bio = BIO_push(bio, bio_mem);
 
 	int actual_result_size = BIO_read(bio, data->data(), max_result_size);
+	if (actual_result_size <= 0) {
+		return getError(kJsonDecodingError, "BIO_read");
+	}
 	data->resize(actual_result_size);
 
 	BIO_free_all(bio);
+
+	return getError(kSuccess);
 }
 
 }  // namespace util
