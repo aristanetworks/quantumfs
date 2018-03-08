@@ -26,7 +26,9 @@ type HardlinkTableEntry struct {
 }
 
 type HardlinkTable interface {
-	getHardlinkByInode(inodeId InodeId) (bool, quantumfs.ImmutableDirectoryRecord)
+	recordByInodeId(c *ctx, inodeId InodeId) quantumfs.ImmutableDirectoryRecord
+	recordByFileId(fileId quantumfs.FileId) (
+		record quantumfs.ImmutableDirectoryRecord)
 	modifyChildWithFunc(c *ctx, inodeId InodeId,
 		modify func(record quantumfs.DirectoryRecord))
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
@@ -37,8 +39,6 @@ type HardlinkTable interface {
 	hardlinkInc(fileId quantumfs.FileId)
 	newHardlink(c *ctx, inodeId InodeId,
 		record quantumfs.DirectoryRecord) *HardlinkLeg
-	getHardlink(fileId quantumfs.FileId) (valid bool,
-		record quantumfs.ImmutableDirectoryRecord)
 	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
 	setHardlink(fileId quantumfs.FileId,
 		fnSetter func(dir quantumfs.DirectoryRecord))
@@ -264,36 +264,36 @@ func (ht *HardlinkTableImpl) findHardlinkInodeId(c *ctx,
 
 // Ensure we don't return the vanilla record, enclose it in a hardlink wrapper so
 // that the wrapper can correctly pick and choose attributes like nlink
-func (ht *HardlinkTableImpl) getHardlinkByInode(inodeId InodeId) (valid bool,
+func (ht *HardlinkTableImpl) recordByInodeId(c *ctx, inodeId InodeId) (
 	record quantumfs.ImmutableDirectoryRecord) {
 
 	defer ht.linkLock.RLock().RUnlock()
 
 	fileId, exists := ht.inodeToLink[inodeId]
 	if !exists {
-		return false, nil
+		return nil
 	}
 
 	link, exists := ht.hardlinks[fileId]
 	if !exists {
-		return false, nil
+		return nil
 	}
 
-	return true, newHardlinkLeg(link.record.Filename(), fileId,
+	return newHardlinkLeg(link.record.Filename(), fileId,
 		quantumfs.Time(0), ht)
 }
 
-func (ht *HardlinkTableImpl) getHardlink(fileId quantumfs.FileId) (valid bool,
+func (ht *HardlinkTableImpl) recordByFileId(fileId quantumfs.FileId) (
 	record quantumfs.ImmutableDirectoryRecord) {
 
 	defer ht.linkLock.RLock().RUnlock()
 
 	link, exists := ht.hardlinks[fileId]
 	if exists {
-		return true, link.record
+		return link.record
 	}
 
-	return false, nil
+	return nil
 }
 
 func (ht *HardlinkTableImpl) updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId,

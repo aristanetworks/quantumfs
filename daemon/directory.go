@@ -502,7 +502,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 			// hardlink
 			c.vlog("Checking hardlink table")
 			dir.hardlinkTable.modifyChildWithFunc(c, inodeNum, modify)
-			_, entry = dir.hardlinkTable.getHardlinkByInode(inodeNum)
+			entry = dir.hardlinkTable.recordByInodeId(c, inodeNum)
 		}
 
 		if entry == nil {
@@ -830,9 +830,8 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	// if we don't have the child, maybe we're wsr and it's a hardlink
 	if dir.self.isWorkspaceRoot() {
 		c.vlog("Checking hardlink table")
-		valid, linkRecord :=
-			dir.hardlinkTable.getHardlinkByInode(inodeNum)
-		if valid {
+		linkRecord := dir.hardlinkTable.recordByInodeId(c, inodeNum)
+		if linkRecord != nil {
 			c.vlog("Hardlink found")
 			return linkRecord
 		}
