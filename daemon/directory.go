@@ -497,6 +497,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		entry := dir.children.recordByInodeId(c, inodeNum)
 		if entry != nil && entry.Type() != quantumfs.ObjectTypeHardlink {
 			dir.children.modifyChildWithFunc(c, inodeNum, modify)
+			entry = dir.children.recordByInodeId(c, inodeNum)
 		} else {
 			// If we don't have the child, maybe we're the WSR and it's a
 			// hardlink. If we aren't the WSR, then it must be a
