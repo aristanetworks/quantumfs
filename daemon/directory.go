@@ -494,12 +494,13 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 				updateMtime)
 		}
 
-		dir.children.modifyChildWithFunc(c, inodeNum, modify)
 		entry := dir.children.recordByInodeId(c, inodeNum)
-
-		if entry == nil && dir.self.isWorkspaceRoot() {
-			// if we don't have the child, maybe we're wsr and it's a
-			// hardlink
+		if entry != nil && entry.Type() != quantumfs.ObjectTypeHardlink {
+			dir.children.modifyChildWithFunc(c, inodeNum, modify)
+		} else {
+			// If we don't have the child, maybe we're the WSR and it's a
+			// hardlink. If we aren't the WSR, then it must be a
+			// hardlink.
 			c.vlog("Checking hardlink table")
 			dir.hardlinkTable.modifyChildWithFunc(c, inodeNum, modify)
 			entry = dir.hardlinkTable.recordByInodeId(c, inodeNum)
@@ -1553,11 +1554,12 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 			record.SetContentTime(now)
 		}
 
-		if record != nil {
+		if record != nil && record.Type() != quantumfs.ObjectTypeHardlink {
 			dir.children.modifyChildWithFunc(c, inodeNum, modify)
-		} else if dir.self.isWorkspaceRoot() {
-			// if we don't have the child, maybe we're wsr and it's a
-			// hardlink
+		} else {
+			// If we don't have the child, maybe we're the WSR and it's a
+			// hardlink. If we aren't the WSR, then it must be a
+			// hardlink.
 			c.vlog("Checking hardlink table")
 			dir.hardlinkTable.modifyChildWithFunc(c, inodeNum, modify)
 		}
