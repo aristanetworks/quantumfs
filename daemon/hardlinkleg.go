@@ -71,8 +71,7 @@ func (link *HardlinkLeg) ID() quantumfs.ObjectKey {
 }
 
 func (link *HardlinkLeg) SetID(v quantumfs.ObjectKey) {
-	utils.Assert(v.Type() == quantumfs.KeyTypeEmbedded,
-		"invalid key type %d", v.Type())
+	panic("Cannot set on HardlinkLeg")
 }
 
 func (link *HardlinkLeg) Type() quantumfs.ObjectType {
