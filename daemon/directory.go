@@ -1255,7 +1255,11 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	} else {
 		c.vlog("Updating hardlink creation time")
 		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
-		newEntry.SetContentTime(hardlink.creationTime())
+		dst.hardlinkTable.modifyChildWithFunc(c, childInodeId,
+			func(record quantumfs.DirectoryRecord) {
+
+				record.SetContentTime(hardlink.creationTime())
+			})
 	}
 
 	// Add to destination, possibly removing the overwritten inode
