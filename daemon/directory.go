@@ -1273,7 +1273,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// Update the inode to point to the new name and
 		// mark as accessed in both parents.
 		if childInode != nil {
-			c.vlog("Updating name and parent")
+			utils.Assert(dst.inodeNum() != childInode.inodeNum(),
+				"artificial orphan from MvChild %s %d",
+				newName, dst.inodeNum())
 			childInode.setParent_(dst.inodeNum())
 			childInode.setName(newName)
 			childInode.clearAccessedCache()

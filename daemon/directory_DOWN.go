@@ -377,8 +377,9 @@ func updateMapDescend_DOWN(c *ctx, rc *RefreshContext,
 }
 
 // The caller must hold the childRecordLock
-func (dir *Directory) hideEntry_DOWN_(c *ctx, childId InodeId,
-	localRecord quantumfs.ImmutableDirectoryRecord) string {
+func (dir *Directory) hideEntry_DOWN_(c *ctx,
+	localRecord quantumfs.ImmutableDirectoryRecord,
+	childId InodeId) (newLocal quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.funcIn("Directory::hideEntry_DOWN_").Out()
 
@@ -394,8 +395,9 @@ func (dir *Directory) hideEntry_DOWN_(c *ctx, childId InodeId,
 	}
 	dir.children.renameChild(c, oldName, hiddenName)
 	c.qfs.noteDeletedInode(c, dir.inodeNum(), childId, oldName)
-
-	return hiddenName
+	rtn := dir.children.recordByName(c, hiddenName)
+	utils.Assert(rtn != nil, "Rename failed during hideEntry")
+	return rtn
 }
 
 func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
@@ -423,8 +425,8 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 		if rc.isLocalRecordUsable(c, localRecord, remoteRecord) {
 			if shouldHideLocalRecord(localRecord, remoteRecord) {
-				childname = dir.hideEntry_DOWN_(c, childId,
-					localRecord)
+				localRecord = dir.hideEntry_DOWN_(c, localRecord,
+					childId)
 			}
 			moved := remoteRecord == nil ||
 				remoteRecord.FileId() != localRecord.FileId()

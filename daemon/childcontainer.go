@@ -77,10 +77,10 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 	foreachImmutableDentry(c, baseLayerId,
 		func(record quantumfs.ImmutableDirectoryRecord) {
 
-		childInodeNum := container.loadChild(c, record)
-		c.vlog("loaded child %d", childInodeNum)
-		uninstantiated = append(uninstantiated, childInodeNum)
-	})
+			childInodeNum := container.loadChild(c, record)
+			c.vlog("loaded child %d", childInodeNum)
+			uninstantiated = append(uninstantiated, childInodeNum)
+		})
 
 	return uninstantiated
 }
