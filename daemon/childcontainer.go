@@ -61,10 +61,43 @@ func removeFromMap(m map[InodeId]map[string]quantumfs.DirectoryRecord,
 	inodeId InodeId, name string) {
 
 	if len(m[inodeId]) == 1 {
+		for k, _ := range m[inodeId] {
+			utils.Assert(k == name, "deleting %s instead of %s", k, name)
+		}
 		delete(m, inodeId)
 	} else {
 		delete(m[inodeId], name)
 	}
+}
+
+func addToImmMap(m map[InodeId]map[string]quantumfs.ImmutableDirectoryRecord,
+	inodeId InodeId, record quantumfs.ImmutableDirectoryRecord) {
+
+	names, exists := m[inodeId]
+	if !exists {
+		names = make(map[string]quantumfs.ImmutableDirectoryRecord)
+	}
+	if _, exists := names[record.Filename()]; exists {
+		utils.Assert(false, "name %s already exists in map",
+			record.Filename())
+	}
+	names[record.Filename()] = record
+	m[inodeId] = names
+}
+
+func addToMap(m map[InodeId]map[string]quantumfs.DirectoryRecord,
+	inodeId InodeId, record quantumfs.DirectoryRecord) {
+
+	names, exists := m[inodeId]
+	if !exists {
+		names = make(map[string]quantumfs.DirectoryRecord)
+	}
+	if _, exists := names[record.Filename()]; exists {
+		utils.Assert(false, "name %s already exists in map",
+			record.Filename())
+	}
+	names[record.Filename()] = record
+	m[inodeId] = names
 }
 
 func (container *ChildContainer) loadAllChildren(c *ctx,
@@ -109,15 +142,7 @@ func (container *ChildContainer) loadChild(c *ctx,
 		inodeId = c.qfs.newInodeId()
 	}
 
-	names, exists := container.publishable[inodeId]
-	if !exists {
-		names = make(map[string]quantumfs.ImmutableDirectoryRecord)
-	}
-
-	names[record.Filename()] = record
-
-	container.publishable[inodeId] = names
-
+	addToImmMap(container.publishable, inodeId, record)
 	container.children[record.Filename()] = inodeId
 
 	return inodeId
@@ -142,16 +167,7 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
 	utils.Assert(record.Type() != quantumfs.ObjectTypeHardlink || isHardlinkLeg,
 		"setRecord with naked hardlink record")
 
-	names, exists := container.effective[inodeId]
-	if !exists {
-		c.vlog("New effective child")
-		names = make(map[string]quantumfs.DirectoryRecord)
-		container.children[record.Filename()] = inodeId
-	}
-
-	names[record.Filename()] = record
-
-	container.effective[inodeId] = names
+	addToMap(container.effective, inodeId, record)
 	container.children[record.Filename()] = inodeId
 
 	// Build the hardlink path list if we just set a hardlink record

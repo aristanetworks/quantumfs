@@ -938,7 +938,6 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 
 		defer dir.Lock().Unlock()
 
-		var inode InodeId
 		result := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
 			record := dir.children.recordByName(c, name)
@@ -961,7 +960,6 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 				return fuse.Status(syscall.ENOTEMPTY)
 			}
 
-			inode = dir.children.inodeNum(name)
 			return fuse.OK
 		}()
 		if result != fuse.OK {
