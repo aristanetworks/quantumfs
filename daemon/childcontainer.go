@@ -77,10 +77,7 @@ func addToImmMap(m map[InodeId]map[string]quantumfs.ImmutableDirectoryRecord,
 	if !exists {
 		names = make(map[string]quantumfs.ImmutableDirectoryRecord)
 	}
-	if _, exists := names[record.Filename()]; exists {
-		utils.Assert(false, "name %s already exists in map",
-			record.Filename())
-	}
+
 	names[record.Filename()] = record
 	m[inodeId] = names
 }
@@ -92,10 +89,7 @@ func addToMap(m map[InodeId]map[string]quantumfs.DirectoryRecord,
 	if !exists {
 		names = make(map[string]quantumfs.DirectoryRecord)
 	}
-	if _, exists := names[record.Filename()]; exists {
-		utils.Assert(false, "name %s already exists in map",
-			record.Filename())
-	}
+
 	names[record.Filename()] = record
 	m[inodeId] = names
 }
