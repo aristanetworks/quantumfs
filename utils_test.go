@@ -188,7 +188,7 @@ func (s *setupTests) TestSingleHostPolicyHostDown() {
 	nextHost = nextHostFunc()
 	s.Require().NotNil(nextHost, "nextHost is nil even when host was added")
 
-	policy.RemoveHost("any hostname")
+	policy.RemoveHost(host)
 	nextHostFunc = policy.Pick(query)
 	nextHost = nextHostFunc()
 	s.Require().Nil(nextHost, "nextHost is non-nil after removing the host")
@@ -198,7 +198,7 @@ func (s *setupTests) TestSingleHostPolicyHostDown() {
 	nextHost = nextHostFunc()
 	s.Require().NotNil(nextHost, "nextHost is nil after host Up")
 
-	policy.HostDown("any hostname")
+	policy.HostDown(host)
 	nextHostFunc = policy.Pick(query)
 	nextHost = nextHostFunc()
 	s.Require().Nil(nextHost, "nextHost is non-nil host Down")

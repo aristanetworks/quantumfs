@@ -36,14 +36,14 @@ func (s *singleHostPolicy) AddHost(h *gocql.HostInfo) {
 	s.host = h
 	s.hostUp = true
 }
-func (s *singleHostPolicy) RemoveHost(h string) {
+func (s *singleHostPolicy) RemoveHost(h *gocql.HostInfo) {
 	s.host = nil
 	s.hostUp = false
 }
 func (s *singleHostPolicy) HostUp(h *gocql.HostInfo) {
 	s.AddHost(h)
 }
-func (s *singleHostPolicy) HostDown(h string) {
+func (s *singleHostPolicy) HostDown(h *gocql.HostInfo) {
 	s.RemoveHost(h)
 }
 
