@@ -203,7 +203,7 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 		}
 		return nil
 	}
-	err = filepath.Walk(workspace, readFile)
+	err = utils.Pathwalk(workspace, readFile)
 	th.Assert(err == nil, "Normal walk failed (%s): %s", workspace, err)
 
 	// Save the keys intercepted during filePath walk.
