@@ -688,7 +688,23 @@ func (r *HardlinkRecord) Record() *EncodedDirectoryRecord {
 }
 
 func (r *HardlinkRecord) SetRecord(record DirectoryRecord) {
-	r.record.SetRecord(record.(*EncodedDirectoryRecord).record)
+	newRecord := EncodedDirectoryRecord{
+		record: encoding.NewDirectoryRecord(r.record.Segment),
+	}
+
+	newRecord.SetFilename(record.Filename())
+	newRecord.SetID(record.ID())
+	newRecord.SetType(record.Type())
+	newRecord.SetPermissions(record.Permissions())
+	newRecord.SetOwner(record.Owner())
+	newRecord.SetGroup(record.Group())
+	newRecord.SetSize(record.Size())
+	newRecord.SetExtendedAttributes(record.ExtendedAttributes())
+	newRecord.SetContentTime(record.ContentTime())
+	newRecord.SetModificationTime(record.ModificationTime())
+	newRecord.SetFileId(record.FileId())
+
+	r.record.SetRecord(newRecord.record)
 }
 
 func (r *HardlinkRecord) Nlinks() uint32 {
