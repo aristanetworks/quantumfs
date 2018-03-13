@@ -38,8 +38,11 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 
 	// Create the null workspace
 	nullWorkspace := WorkspaceInfo{
-		key:       quantumfs.EmptyWorkspaceKey,
-		nonce:     quantumfs.WorkspaceNonce{0, 0},
+		key: quantumfs.EmptyWorkspaceKey,
+		nonce: quantumfs.WorkspaceNonce{
+			Id:          0,
+			PublishTime: 0,
+		},
 		immutable: true,
 	}
 	wsdb.InsertMap_(type_, name_, work_, &nullWorkspace)
@@ -250,8 +253,8 @@ func (wsdb *WorkspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	newInfo := WorkspaceInfo{
 		key: info.key,
 		nonce: quantumfs.WorkspaceNonce{
-			uint64(time.Now().UnixNano()),
-			uint64(time.Now().UnixNano()),
+			Id:          uint64(time.Now().UnixNano()),
+			PublishTime: uint64(time.Now().UnixNano()),
 		},
 		immutable: false,
 	}

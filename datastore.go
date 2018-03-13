@@ -927,7 +927,6 @@ type ImmutableDirectoryRecord interface {
 	FileId() FileId
 	Nlinks() uint32
 	EncodeExtendedKey() []byte
-	AsImmutable() ImmutableDirectoryRecord
 }
 
 func NewDirectoryRecord() *EncodedDirectoryRecord {
@@ -1337,6 +1336,11 @@ type Buffer interface {
 type DataStore interface {
 	Get(c *Ctx, key ObjectKey, buf Buffer) error
 	Set(c *Ctx, key ObjectKey, buf Buffer) error
+
+	// The block corresponding to this key will be in use for the short term
+	// future. Ensure the block itself remains available in the datastore for at
+	// least a few seconds.
+	Freshen(c *Ctx, key ObjectKey) error
 }
 
 // A pseudo-store which contains all the constant objects
@@ -1353,6 +1357,12 @@ type constDataStore struct {
 	store map[string][]byte
 }
 
+var objectNotFound error
+
+func init() {
+	objectNotFound = fmt.Errorf("Object not found")
+}
+
 func (store *constDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 	if data, ok := store.store[key.String()]; ok {
 		newData := make([]byte, len(data))
@@ -1360,11 +1370,18 @@ func (store *constDataStore) Get(c *Ctx, key ObjectKey, buf Buffer) error {
 		buf.Set(newData, key.Type())
 		return nil
 	}
-	return fmt.Errorf("Object not found")
+	return objectNotFound
 }
 
 func (store *constDataStore) Set(c *Ctx, key ObjectKey, buf Buffer) error {
 	return fmt.Errorf("Cannot set in constant datastore")
+}
+
+func (store *constDataStore) Freshen(c *Ctx, key ObjectKey) error {
+	if _, exists := store.store[key.String()]; exists {
+		return nil
+	}
+	return objectNotFound
 }
 
 var ZeroKey ObjectKey
@@ -1579,8 +1596,4 @@ func (ir *ImmutableRecord) Nlinks() uint32 {
 
 func (ir *ImmutableRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(ir.ID(), ir.Type(), ir.Size())
-}
-
-func (ir *ImmutableRecord) AsImmutable() ImmutableDirectoryRecord {
-	return ir
 }
