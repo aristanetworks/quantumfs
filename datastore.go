@@ -339,10 +339,24 @@ func OverlayDirectoryEntry(edir encoding.DirectoryEntry) DirectoryEntry {
 func SortDirectoryRecordsByName(records []DirectoryRecord) {
 	sort.Slice(records,
 		func(i, j int) bool {
-			// Note that we cannot use the fileId for sorting the entries
-			// as there might be more than one dentry with the same
-			// fileId in a directory which results in unpredictable order
-			return records[i].Filename() < records[j].Filename()
+			// The only metadata which is truly unique within a directory
+			// is the filename of the children, but that is relatively
+			// expensive to access. First try a couple of mostly unique
+			// data fields. We only require a consistent sorting order
+			// for the precise set of metadata contained within this
+			// directory to ensure block deduplication.
+			ri := records[i]
+			rj := records[j]
+			switch {
+			case ri.FileId() != rj.FileId():
+				return ri.FileId() < rj.FileId()
+
+			case ri.ContentTime() != rj.ContentTime():
+				return ri.ContentTime() < rj.ContentTime()
+
+			default:
+				return ri.Filename() < rj.Filename()
+			}
 		})
 }
 
