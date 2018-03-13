@@ -336,7 +336,7 @@ func OverlayDirectoryEntry(edir encoding.DirectoryEntry) DirectoryEntry {
 	return dir
 }
 
-func SortDirectoryRecordsByName(records []DirectoryRecord) {
+func SortDirectoryRecords(records []DirectoryRecord) {
 	sort.Slice(records,
 		func(i, j int) bool {
 			// The only metadata which is truly unique within a directory
