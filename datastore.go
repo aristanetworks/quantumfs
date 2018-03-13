@@ -760,6 +760,14 @@ func (dir *HardlinkEntry) SetEntry(i int, record *HardlinkRecord) {
 	dir.entry.Entries().Set(i, record.record)
 }
 
+func (dir *HardlinkEntry) NewEntry() *HardlinkRecord {
+	record := HardlinkRecord{
+		record: encoding.NewRootHardlinkRecord(dir.entry.Segment),
+	}
+
+	return &record
+}
+
 func (dir *HardlinkEntry) Next() ObjectKey {
 	return overlayObjectKey(dir.entry.Next())
 }
