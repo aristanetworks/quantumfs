@@ -381,23 +381,10 @@ func (dir *DirectoryEntry) Entry(i int) *EncodedDirectoryRecord {
 }
 
 func (dir *DirectoryEntry) SetEntry(i int, record PublishableRecord) {
-	newRecord := EncodedDirectoryRecord{
-		record: encoding.NewDirectoryRecord(dir.dir.Segment),
-	}
+	newER := copyDirectoryRecordIntoSegment(dir.dir.Segment,
+		record.EncodedDirectoryRecord)
 
-	newRecord.SetFilename(record.Filename())
-	newRecord.SetID(record.ID())
-	newRecord.SetType(record.Type())
-	newRecord.SetPermissions(record.Permissions())
-	newRecord.SetOwner(record.Owner())
-	newRecord.SetGroup(record.Group())
-	newRecord.SetSize(record.Size())
-	newRecord.SetExtendedAttributes(record.ExtendedAttributes())
-	newRecord.SetContentTime(record.ContentTime())
-	newRecord.SetModificationTime(record.ModificationTime())
-	newRecord.SetFileId(record.FileId())
-
-	dir.dir.Entries().Set(i, newRecord.record)
+	dir.dir.Entries().Set(i, newER)
 }
 
 func (dir *DirectoryEntry) Next() ObjectKey {
