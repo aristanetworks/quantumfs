@@ -612,6 +612,37 @@ func createEmptyDirectory() ObjectKey {
 // The key of the datablock with zero length
 var EmptyBlockKey ObjectKey
 
+func copyDirectoryRecordIntoSegment(s *capn.Segment,
+	record DirectoryRecord) encoding.DirectoryRecord {
+
+	newRecord := EncodedDirectoryRecord{
+		record: encoding.NewDirectoryRecord(s),
+	}
+
+	newRecord.SetFilename(record.Filename())
+
+	newID := encoding.NewObjectKey(s)
+	fillKeyFromBytes(record.ID().Value(), newID)
+	newRecord.record.SetId(newID)
+
+	newRecord.SetType(record.Type())
+	newRecord.SetPermissions(record.Permissions())
+	newRecord.SetOwner(record.Owner())
+	newRecord.SetGroup(record.Group())
+	newRecord.SetSize(record.Size())
+
+	newEA := encoding.NewObjectKey(s)
+	fillKeyFromBytes(record.ExtendedAttributes().Value(),
+		newEA)
+	newRecord.record.SetExtendedAttributes(newEA)
+
+	newRecord.SetContentTime(record.ContentTime())
+	newRecord.SetModificationTime(record.ModificationTime())
+	newRecord.SetFileId(record.FileId())
+
+	return newRecord.record
+}
+
 func createEmptyBlock() ObjectKey {
 	var bytes []byte
 
@@ -692,23 +723,9 @@ func (r *HardlinkRecord) Record() *EncodedDirectoryRecord {
 }
 
 func (r *HardlinkRecord) SetRecord(record DirectoryRecord) {
-	newRecord := EncodedDirectoryRecord{
-		record: encoding.NewDirectoryRecord(r.record.Segment),
-	}
+	newER := copyDirectoryRecordIntoSegment(r.record.Segment, record)
 
-	newRecord.SetFilename(record.Filename())
-	newRecord.SetID(record.ID())
-	newRecord.SetType(record.Type())
-	newRecord.SetPermissions(record.Permissions())
-	newRecord.SetOwner(record.Owner())
-	newRecord.SetGroup(record.Group())
-	newRecord.SetSize(record.Size())
-	newRecord.SetExtendedAttributes(record.ExtendedAttributes())
-	newRecord.SetContentTime(record.ContentTime())
-	newRecord.SetModificationTime(record.ModificationTime())
-	newRecord.SetFileId(record.FileId())
-
-	r.record.SetRecord(newRecord.record)
+	r.record.SetRecord(newER)
 }
 
 func (r *HardlinkRecord) Nlinks() uint32 {
