@@ -30,7 +30,7 @@ func TestDirectoryRecordSort(t *testing.T) {
 		dr3.SetFilename("anothername")
 		drs = append(drs, dr3)
 
-		SortDirectoryRecordsByName(drs)
+		SortDirectoryRecords(drs)
 
 		test.Assert(drs[0].Filename() == "anothername",
 			"Wrong sort. Found %s expects \"anothername\"",

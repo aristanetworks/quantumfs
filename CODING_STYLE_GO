@@ -151,67 +151,17 @@ the function describing the minimum lock(s) which must be held.
 Locking and Critical Sections
 #############################
 
-Consider the following code:
+Use utils.DeferableMutex and utils.DeferableRwMutex as in:
 
-> func (obj *Obj) a() {
->       obj.doSomethingExpensive1()
->
->       obj.lock.Lock()
->       obj.doSomethingImportant()
->       obj.lock.Unlock()
->
->       obj.doSomethingExpensive2()
-> }
-
-On the face of it this code seems simple, safe and efficient; both the expensive
-operations are done without the lock held and the lock is released after the minimal
-critical code is executed. Unfortunately this code is not panic safe and should
-doSomethingImportant() panic, perhaps because of a coding error or other unavoidable
-error, then obj.lock will never be unlocked. The next time this code comes around it
-will deadlock.
-
-In order to make this code safe we need to defer the Unlock() to ensure that, should
-a panic happen while we are holding the lock that it is released. Employing this
-advice literally we would end up with code as such:
-
-> func (obj *Obj) a() {
->       obj.doSomethingExpensive1()
->
->       obj.lock.Lock()
->       defer obj.lock.Unlock()
->       obj.doSomethingImportant()
->
->       obj.doSomethingExpensive2()
-> }
-
-Unfortunately while this code is now safe from panics and will not leak the lock, it
-also holds the lock during an expensive operation, doSomethingExpensive2(). This is
-because, in the case without panics, deferred functions are only called at function
-exit. Therefore all critical sections need to be their own separate function to
-ensure the locks are always released and cover a minimal amount of execution. The
-final and correct style for a critical section would thus be:
-
-> func (obj *Obj) a() {
+> func (obj *Obj a() {
 >       obj.doSomethingExpensive1()
 >
 >       func() {
->               obj.lock.Lock()
->               defer obj.lock.Unlock()
+>               defer obj.mutex.Lock().Unlock()
 >               obj.doSomethingImportant()
 >       }()
 >
 >       obj.doSomethingExpensive2()
 > }
 
-For convenience InodeCommon has a helper method which allows locking of the form:
-
-> func (file *File a() {
->       file.doSomethingExpensive1()
->
->       func() {
->               defer file.Lock().Unlock()
->               file.doSomethingImportant()
->       }()
->
->       file.doSomethingExpensive2()
-> }
+See LOCKING for an explanation as well as a description of the locking rules.

@@ -756,3 +756,22 @@ func TestAccessListHardLinkRename(t *testing.T) {
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
 	})
 }
+
+func TestAccessListNormalizedHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+
+		test.createFile(workspace, name, 100)
+		test.linkFile(workspace, name, name+"_link")
+		test.removeFileSync(workspace, name)
+
+		expectedAccessList := quantumfs.NewPathsAccessed()
+		expectedAccessList.Paths["/testFile_link"] = quantumfs.PathCreated |
+			quantumfs.PathRead
+
+		ioutil.ReadFile(workspace + "/" + name + "_link")
+
+		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+	})
+}

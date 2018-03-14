@@ -24,7 +24,7 @@ func WriteDirectory(qctx *quantumfs.Ctx, path string, info os.FileInfo,
 	// childRecords, even in the presence of parallelism,
 	// the DirectoryEntry object will be same.
 	// Note: This is not same as source directory but thats ok.
-	quantumfs.SortDirectoryRecordsByName(childRecords)
+	quantumfs.SortDirectoryRecords(childRecords)
 
 	entryNum := len(childRecords)
 	entryNum, dirEntry := quantumfs.NewDirectoryEntry(entryNum)
