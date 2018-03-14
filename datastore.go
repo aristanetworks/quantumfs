@@ -347,12 +347,11 @@ func SortDirectoryRecords(records []DirectoryRecord) {
 			// block deduplication.
 			ri := records[i]
 			rj := records[j]
-
-			if ri.FileId() != rj.FileId() {
-				return ri.FileId() < rj.FileId()
+			if ri.FileId() == rj.FileId() {
+				return ri.Filename() < rj.Filename()
 			}
 
-			return ri.Filename() < rj.Filename()
+			return ri.FileId() < rj.FileId()
 		})
 }
 
