@@ -607,7 +607,7 @@ func (th *TestHelper) HardlinkKeyExists(workspace string,
 
 	defer wsr.hardlinkTable.linkLock.RLock().RUnlock()
 	for _, hardkey := range wsr.hardlinkTable.hardlinks {
-		if key.IsEqualTo(hardkey.record.ID()) {
+		if key.IsEqualTo(hardkey.record().ID()) {
 			return true
 		}
 	}

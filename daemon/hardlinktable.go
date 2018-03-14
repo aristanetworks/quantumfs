@@ -12,10 +12,11 @@ import (
 )
 
 type HardlinkTableEntry struct {
-	record  quantumfs.DirectoryRecord
-	nlink   uint32
-	inodeId InodeId
-	paths   []string
+	publishableRecord quantumfs.DirectoryRecord
+	effectiveRecord   quantumfs.DirectoryRecord
+	nlink             uint32
+	inodeId           InodeId
+	paths             []string
 
 	// delta shows the changes made to the nlink in the tree that
 	// have not been published yet.
@@ -25,17 +26,39 @@ type HardlinkTableEntry struct {
 	delta int
 }
 
+func (hte HardlinkTableEntry) record() quantumfs.DirectoryRecord {
+	if hte.effectiveRecord != nil {
+		return hte.effectiveRecord
+	}
+	return hte.publishableRecord
+}
+
+func (hte *HardlinkTableEntry) setID(c *ctx, key quantumfs.ObjectKey) {
+	defer c.FuncIn("HardlinkTableEntry::setID", "inode %d newKey %s",
+		hte.inodeId, key.String())
+
+	record := hte.record()
+	record.SetID(key)
+
+	if hte.effectiveRecord != nil {
+		hte.publishableRecord = hte.effectiveRecord
+		hte.effectiveRecord = nil
+	}
+}
+
 type HardlinkTable interface {
 	recordByInodeId(c *ctx, inodeId InodeId) quantumfs.ImmutableDirectoryRecord
 	recordByFileId(fileId quantumfs.FileId) (
 		record quantumfs.ImmutableDirectoryRecord)
 	modifyChildWithFunc(c *ctx, inodeId InodeId,
 		modify func(record quantumfs.DirectoryRecord))
+	setID(c *ctx, fileId quantumfs.FileId, key quantumfs.ObjectKey)
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
 	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
 	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
 	findHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId) InodeId
-	hardlinkDec(fileId quantumfs.FileId) quantumfs.DirectoryRecord
+	hardlinkDec(fileId quantumfs.FileId) (publishable quantumfs.DirectoryRecord,
+		effective quantumfs.DirectoryRecord)
 	hardlinkInc(fileId quantumfs.FileId)
 	newHardlink(c *ctx, inodeId InodeId,
 		record quantumfs.DirectoryRecord) *HardlinkLeg
@@ -45,7 +68,9 @@ type HardlinkTable interface {
 	claimAsChild(inode Inode)
 	getWorkspaceRoot() *WorkspaceRoot
 	apply(c *ctx, hardlinkDelta *HardlinkDelta)
-	getNormalized(fileId quantumfs.FileId) quantumfs.DirectoryRecord
+	getNormalized(fileId quantumfs.FileId) (
+		publishable quantumfs.DirectoryRecord,
+		effective quantumfs.DirectoryRecord)
 	invalidateNormalizedRecordLock(fileId quantumfs.FileId) utils.NeedWriteUnlock
 }
 
@@ -59,10 +84,10 @@ type HardlinkTableImpl struct {
 
 func newLinkEntry(record_ quantumfs.DirectoryRecord) HardlinkTableEntry {
 	return HardlinkTableEntry{
-		record:  record_,
-		nlink:   1,
-		inodeId: quantumfs.InodeIdInvalid,
-		delta:   0,
+		publishableRecord: record_,
+		nlink:             1,
+		inodeId:           quantumfs.InodeIdInvalid,
+		delta:             0,
 	}
 }
 
@@ -123,14 +148,15 @@ func (ht *HardlinkTableImpl) hardlinkInc(fileId quantumfs.FileId) {
 	}
 
 	// Linking updates ctime
-	entry.record.SetContentTime(quantumfs.NewTime(time.Now()))
+	entry.record().SetContentTime(quantumfs.NewTime(time.Now()))
 
 	entry.delta++
 	ht.hardlinks[fileId] = entry
 }
 
 func (ht *HardlinkTableImpl) hardlinkDec(
-	fileId quantumfs.FileId) quantumfs.DirectoryRecord {
+	fileId quantumfs.FileId) (publishable quantumfs.DirectoryRecord,
+	effective quantumfs.DirectoryRecord) {
 
 	defer ht.linkLock.Lock().Unlock()
 
@@ -146,15 +172,15 @@ func (ht *HardlinkTableImpl) hardlinkDec(
 	}
 
 	// Unlinking updates ctime
-	entry.record.SetContentTime(quantumfs.NewTime(time.Now()))
+	entry.record().SetContentTime(quantumfs.NewTime(time.Now()))
 
 	if entry.effectiveNlink() > 0 {
 		ht.hardlinks[fileId] = entry
-		return nil
+		return nil, nil
 	}
 
 	// all references to this hardlink are gone and we must remove it
-	return entry.record
+	return entry.publishableRecord, entry.effectiveRecord
 }
 
 // Must hold the linkLock for writing
@@ -182,8 +208,8 @@ func (ht *HardlinkTableImpl) newHardlink(c *ctx, inodeId InodeId,
 	newEntry := newLinkEntry(record)
 	newEntry.inodeId = inodeId
 	// Linking updates ctime
-	newEntry.record.SetContentTime(quantumfs.NewTime(time.Now()))
-	newEntry.record.SetFilename("")
+	newEntry.record().SetContentTime(quantumfs.NewTime(time.Now()))
+	newEntry.record().SetFilename("")
 
 	fileId := record.FileId()
 	utils.Assert(fileId != quantumfs.InvalidFileId, "invalid fileId")
@@ -211,7 +237,7 @@ func (ht *HardlinkTableImpl) instantiateHardlink(c *ctx, inodeId InodeId) Inode 
 		}
 
 		c.dlog("Instantiating hardlink %d", id)
-		return ht.hardlinks[id].record
+		return ht.hardlinks[id].record()
 	}()
 	if hardlinkRecord == nil {
 		return nil
@@ -277,7 +303,7 @@ func (ht *HardlinkTableImpl) recordByInodeId(c *ctx, inodeId InodeId) (
 		return nil
 	}
 
-	return newHardlinkLeg(link.record.Filename(), fileId,
+	return newHardlinkLeg(link.record().Filename(), fileId,
 		quantumfs.Time(0), ht)
 }
 
@@ -288,7 +314,7 @@ func (ht *HardlinkTableImpl) recordByFileId(fileId quantumfs.FileId) (
 
 	link, exists := ht.hardlinks[fileId]
 	if exists {
-		return link.record
+		return link.record()
 	}
 
 	return nil
@@ -332,7 +358,23 @@ func (ht *HardlinkTableImpl) modifyChildWithFunc(c *ctx, inodeId InodeId,
 	utils.Assert(exists, "Hardlink is in inodeToLink but not hardlinks %d %d",
 		inodeId, fileId)
 
-	modify(link.record)
+	if link.effectiveRecord == nil {
+		link.effectiveRecord = link.publishableRecord.Clone()
+	}
+	modify(link.effectiveRecord)
+	ht.hardlinks[fileId] = link
+}
+
+func (ht *HardlinkTableImpl) setID(c *ctx, fileId quantumfs.FileId,
+	key quantumfs.ObjectKey) {
+
+	defer c.FuncIn("HardlinkTableImpl::setID", "fileId %d key %s", fileId,
+		key.String()).Out()
+
+	defer ht.linkLock.Lock().Unlock()
+	entry := ht.hardlinks[fileId]
+	entry.setID(c, key)
+	ht.hardlinks[fileId] = entry
 }
 
 func (hte *HardlinkTableEntry) effectiveNlink() uint32 {
@@ -407,18 +449,19 @@ func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
 }
 
 func (ht *HardlinkTableImpl) getNormalized(
-	fileId quantumfs.FileId) quantumfs.DirectoryRecord {
+	fileId quantumfs.FileId) (publishable quantumfs.DirectoryRecord,
+	effective quantumfs.DirectoryRecord) {
 
 	defer ht.linkLock.RLock().RUnlock()
 
 	link, exists := ht.hardlinks[fileId]
 	if !exists {
-		return nil
+		return nil, nil
 	}
 	if link.effectiveNlink() != 1 {
-		return nil
+		return nil, nil
 	}
-	return link.record
+	return link.publishableRecord, link.effectiveRecord
 }
 
 // Invalidate the inode of the normalizing child in the hardlink table
