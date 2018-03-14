@@ -363,7 +363,7 @@ func publishDirectoryRecords(c *ctx,
 
 	numEntries, baseLayer := quantumfs.NewDirectoryEntry(numEntries)
 	entryIdx := 0
-	quantumfs.SortDirectoryRecordsByName(records)
+	quantumfs.SortDirectoryRecords(records)
 
 	for _, child := range records {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
