@@ -374,6 +374,7 @@ func (ht *HardlinkTableImpl) setID(c *ctx, fileId quantumfs.FileId,
 	defer ht.linkLock.Lock().Unlock()
 	entry := ht.hardlinks[fileId]
 	entry.setID(c, key)
+	ht.hardlinks[fileId] = entry
 }
 
 func (hte *HardlinkTableEntry) effectiveNlink() uint32 {
