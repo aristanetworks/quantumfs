@@ -1338,7 +1338,6 @@ type Buffer interface {
 
 	// These methods interpret the Buffer as various metadata types
 	AsWorkspaceRoot() WorkspaceRoot
-	AsImmutableDirectoryEntry() ImmutableDirectoryEntry
 	AsDirectoryEntry() DirectoryEntry
 	AsMultiBlockFile() MultiBlockFile
 	AsVeryLargeFile() VeryLargeFile

@@ -335,11 +335,6 @@ func (buf *buffer) Size() int {
 	return len(buf.data)
 }
 
-func (buf *buffer) AsImmutableDirectoryEntry() quantumfs.ImmutableDirectoryEntry {
-	rtn := buf.AsDirectoryEntry()
-	return &rtn
-}
-
 func (buf *buffer) AsDirectoryEntry() quantumfs.DirectoryEntry {
 	segment := capn.NewBuffer(buf.data)
 	return quantumfs.OverlayDirectoryEntry(
@@ -542,8 +537,6 @@ type ImmutableBuffer interface {
 	ContentHash() [quantumfs.ObjectKeyLength - 1]byte
 	Key(c *quantumfs.Ctx) (quantumfs.ObjectKey, error)
 	Size() int
-
-	AsImmutableDirectoryEntry() quantumfs.ImmutableDirectoryEntry
 }
 
 func MutableCopy(c *ctx, buf ImmutableBuffer) quantumfs.Buffer {
