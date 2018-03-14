@@ -409,10 +409,10 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 	remoteEntries := make(map[string]quantumfs.DirectoryRecord, 0)
 	if baseLayerId != nil {
-		foreachDentry(c, *baseLayerId,
-			func(record quantumfs.DirectoryRecord) {
+		foreachImmutableDentry(c, *baseLayerId,
+			func(record quantumfs.ImmutableDirectoryRecord) {
 
-				remoteEntries[record.Filename()] = record
+				remoteEntries[record.Filename()] = record.Clone()
 			})
 	}
 
@@ -440,7 +440,8 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 						record.SetFileId(fileId)
 					})
-				dir.children.makePublishable(c, childname)
+				dir.children.makePublishable(c,
+					localRecord.Filename())
 			}
 		} else {
 			rc.addStaleEntry(c, dir.inodeNum(), childId, localRecord)
@@ -483,25 +484,28 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	dir.children.foreachChild(c, func(childname string, childId InodeId) {
 		localEntries[childname] = childId
 	})
-	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
-		localRecord, inodeId, missingDentry :=
-			dir.findLocalMatch_DOWN_(c, rc, record, localEntries)
-		if localRecord == nil {
-			uninstantiated = append(uninstantiated,
-				dir.loadNewChild_DOWN_(c, record, inodeId))
-			return
-		}
-		if missingDentry {
-			if record.Type() != quantumfs.ObjectTypeHardlink {
-				// Will be handled in the later moveDentries stage
+	foreachImmutableDentry(c, baseLayerId,
+		func(immrecord quantumfs.ImmutableDirectoryRecord) {
+
+			record := immrecord.Clone()
+			localRecord, inodeId, missingDentry :=
+				dir.findLocalMatch_DOWN_(c, rc, record, localEntries)
+			if localRecord == nil {
+				uninstantiated = append(uninstantiated,
+					dir.loadNewChild_DOWN_(c, record, inodeId))
 				return
 			}
-			if !rc.setHardlinkAsMoveDst(c, localRecord, record) {
-				dir.loadNewChild_DOWN_(c, record, inodeId)
+			if missingDentry {
+				if record.Type() != quantumfs.ObjectTypeHardlink {
+					// Will be handled in the moveDentries stage
+					return
+				}
+				if !rc.setHardlinkAsMoveDst(c, localRecord, record) {
+					dir.loadNewChild_DOWN_(c, record, inodeId)
+				}
+				return
 			}
-			return
-		}
-		dir.refreshChild_DOWN_(c, rc, localRecord, inodeId, record)
-	})
+			dir.refreshChild_DOWN_(c, rc, localRecord, inodeId, record)
+		})
 	c.qfs.addUninstantiated(c, uninstantiated, dir.inodeNum())
 }

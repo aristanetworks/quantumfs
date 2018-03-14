@@ -57,28 +57,6 @@ func foreachImmutableDentry(c *ctx, key quantumfs.ObjectKey,
 		if buffer == nil {
 			panic("No baseLayer object")
 		}
-		baseLayer := buffer.AsImmutableDirectoryEntry()
-
-		for i := 0; i < baseLayer.NumEntries(); i++ {
-			visitor(baseLayer.ImmutableEntry(i))
-		}
-
-		if baseLayer.HasNext() {
-			key = baseLayer.Next()
-		} else {
-			break
-		}
-	}
-}
-
-func foreachDentry(c *ctx, key quantumfs.ObjectKey,
-	visitor func(quantumfs.DirectoryRecord)) {
-
-	for {
-		buffer := c.dataStore.Get(&c.Ctx, key)
-		if buffer == nil {
-			panic("No baseLayer object")
-		}
 		baseLayer := MutableCopy(c, buffer).AsDirectoryEntry()
 
 		for i := 0; i < baseLayer.NumEntries(); i++ {
