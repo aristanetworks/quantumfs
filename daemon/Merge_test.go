@@ -365,10 +365,10 @@ func TestMergeDeletions(t *testing.T) {
 		fileA := "/fileA"
 		fileB := "/fileB"
 
-		var dataA, dataB []byte
+		var dataB []byte
 
 		MergeTester(test, func(baseWorkspace string) {
-			dataA = test.MakeFile(baseWorkspace + dirA + fileA)
+			test.MakeFile(baseWorkspace + dirA + fileA)
 			dataB = test.MakeFile(baseWorkspace + dirB + fileB)
 		}, func(branchA string,
 			branchB string) mergeTestCheck {

@@ -388,8 +388,8 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 		newInfo := workspaceInfo{
 			Key: srcInfo.Key,
 			Nonce: quantumfs.WorkspaceNonce{
-				uint64(time.Now().UnixNano()),
-				uint64(time.Now().UnixNano()),
+				Id:          uint64(time.Now().UnixNano()),
+				PublishTime: uint64(time.Now().UnixNano()),
 			},
 			Immutable: false,
 		}
