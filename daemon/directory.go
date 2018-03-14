@@ -1279,11 +1279,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		dst.self.dirty(c)
 	}()
 
-	func() {
-		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.deleteChild(c, oldName)
-	}()
-
 	// This is the same entry just moved, so we can use the same
 	// record for both the old and new paths.
 	dir.self.markAccessed(c, oldName,
