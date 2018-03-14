@@ -727,6 +727,20 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 	// Confirm the parent is consistent with a small file
 	inode := test.getInode(dirName)
 	dir := inode.(*Directory)
+
+	getPublishableRecord := func(dir *Directory, fileId quantumfs.FileId) (
+		record quantumfs.ImmutableDirectoryRecord) {
+
+		ht := dir.hardlinkTable.(*HardlinkTableImpl)
+
+		defer ht.linkLock.RLock().RUnlock()
+		link, exists := ht.hardlinks[fileId]
+		if exists {
+			return link.publishableRecord
+		}
+		return nil
+	}
+
 	func() {
 		var record quantumfs.ImmutableDirectoryRecord
 		if !hardlinks {
@@ -734,7 +748,7 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 			record = dir.children.publishable[fileInode][fileName]
 		} else {
 			_, fileId := dir.hardlinkTable.checkHardlink(fileInode)
-			record = dir.hardlinkTable.recordByFileId(fileId)
+			record = getPublishableRecord(dir, fileId)
 		}
 
 		test.Assert(record.Type() == quantumfs.ObjectTypeSmallFile,
@@ -756,7 +770,7 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 			record = dir.children.publishable[fileInode][fileName]
 		} else {
 			_, fileId := dir.hardlinkTable.checkHardlink(fileInode)
-			record = dir.hardlinkTable.recordByFileId(fileId)
+			record = getPublishableRecord(dir, fileId)
 		}
 
 		test.Assert(!record.ID().IsEqualTo(quantumfs.EmptyBlockKey),
