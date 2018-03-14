@@ -362,6 +362,7 @@ func (ht *HardlinkTableImpl) modifyChildWithFunc(c *ctx, inodeId InodeId,
 		link.effectiveRecord = link.publishableRecord.Clone()
 	}
 	modify(link.effectiveRecord)
+	ht.hardlinks[fileId] = link
 }
 
 func (ht *HardlinkTableImpl) setID(c *ctx, fileId quantumfs.FileId,
