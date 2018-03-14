@@ -329,6 +329,19 @@ func copyDirStayOnFs(src string, dst string) error {
 	})
 }
 
+func mountTmpfsAt(dst string, permissions os.FileMode) error {
+	if err := utils.MkdirAll(dst, permissions); err != nil {
+		return fmt.Errorf("Creating directory %s error: %s", dst,
+			err.Error())
+	}
+
+	if err := syscall.Mount("tmpfs", dst, "tmpfs", 0, ""); err != nil {
+		return fmt.Errorf("Mounting %s error: %s", dst, err.Error())
+	}
+
+	return nil
+}
+
 func nonPersistentChroot(username string, rootdir string, workingdir string,
 	cmd []string) error {
 
@@ -406,25 +419,17 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 			}
 		}
 
-		dst = rootdir + "/var/run"
-		if err := utils.MkdirAll(dst, 0666); err != nil {
-			return fmt.Errorf("Creating directory %s error: %s",
-				dst, err.Error())
+		if err := mountTmpfsAt(rootdir+"/var/run", 0666); err != nil {
+			return err
 		}
 
-		if err := syscall.Mount("tmpfs", dst, "tmpfs", 0, ""); err != nil {
-			return fmt.Errorf("Mounting %s error: %s", dst, err.Error())
+		stickyAll := os.ModeSticky | 0777
+		if err := mountTmpfsAt(rootdir+"/tmp", stickyAll); err != nil {
+			return err
 		}
 
-		dst = rootdir + "/tmp"
-		if err := utils.MkdirAll(dst, os.ModeSticky|0777); err != nil {
-
-			return fmt.Errorf("Mounting /tmp as tmpfs error: %s",
-				err.Error())
-		}
-		if err := syscall.Mount("tmpfs", dst, "tmpfs", 0, ""); err != nil {
-			return fmt.Errorf("Mounting tmp as tmpfs error: %s",
-				err.Error())
+		if err := mountTmpfsAt(rootdir+"/var/shmem", 0777); err != nil {
+			return err
 		}
 
 		if err := setupBindMounts(rootdir, quantumFsMount); err != nil {
