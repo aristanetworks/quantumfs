@@ -276,9 +276,6 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		// When wf returns SkipEntry for a DirectoryEntry, we can skip the
 		// DirectoryRecords in that DirectoryEntry
 		if err := wf(c, path, key, uint64(buf.Size()), true); err != nil {
-			// TODO(sid): See how this works with chain DirectoryEntries.
-			//            Since we check only the first of the many
-			//            chained DiretoryEntries.
 			if err == SkipEntry {
 				return nil
 			}

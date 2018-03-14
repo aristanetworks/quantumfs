@@ -7,7 +7,6 @@ package daemon
 // the directory hierarchy.
 
 import (
-	"errors"
 	"sync"
 	"syscall"
 	"time"
@@ -400,11 +399,10 @@ func (tsl *TypespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (tsl *TypespaceList) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
+func (tsl *TypespaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
 
-	c.elog("Unsupported record fetch on TypespaceList")
-	return nil, errors.New("Unsupported record fetch on TypespaceList")
+	panic("TypespaceList doesn't support record fetch")
 }
 
 func (tsl *TypespaceList) Unlink(c *ctx, name string) fuse.Status {
@@ -725,11 +723,10 @@ func (nsl *NamespaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (nsl *NamespaceList) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
+func (nsl *NamespaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
 
-	c.elog("Unsupported record fetch on NamespaceList")
-	return nil, errors.New("Unsupported record fetch on NamespaceList")
+	panic("NamespaceList doesn't support record fetch")
 }
 
 func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
@@ -1115,11 +1112,10 @@ func (wsl *WorkspaceList) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return fuse.EPERM
 }
 
-func (wsl *WorkspaceList) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
+func (wsl *WorkspaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
 
-	c.elog("Unsupported record fetch on WorkspaceList")
-	return nil, errors.New("Unsupported record fetch on WorkspaceList")
+	panic("WorkspaceList doesn't support record fetch")
 }
 
 func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {

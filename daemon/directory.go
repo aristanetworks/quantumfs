@@ -46,6 +46,7 @@ type Directory struct {
 	childRecordLock utils.DeferableMutex
 	children        *ChildContainer
 	_generation     uint64
+	uninstantiating bool
 }
 
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
@@ -199,19 +200,15 @@ func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
 }
 
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
-	owner fuse.Owner, entry_ quantumfs.ImmutableDirectoryRecord) {
-
-	// Ensure we have a flattened DirectoryRecord to ensure the type is the
-	// underlying type for Hardlinks. This is required in order for
-	// objectTypeToFileType() to have access to the correct type to report.
-	entry := entry_.AsImmutable()
+	owner fuse.Owner, entry quantumfs.ImmutableDirectoryRecord) {
 
 	attr.Ino = uint64(inodeNum)
 
-	fileType := _objectTypeToFileType(c, entry.Type())
+	entryType := underlyingType(entry)
+	fileType := _objectTypeToFileType(c, entryType)
 
 	c.vlog("filling attr inode %d type %d/%x perms %o links %d",
-		inodeNum, entry.Type(), fileType, entry.Permissions(), attr.Nlink)
+		inodeNum, entryType, fileType, entry.Permissions(), attr.Nlink)
 
 	switch fileType {
 	case fuse.S_IFDIR:
@@ -366,7 +363,7 @@ func publishDirectoryRecords(c *ctx,
 
 	numEntries, baseLayer := quantumfs.NewDirectoryEntry(numEntries)
 	entryIdx := 0
-	quantumfs.SortDirectoryRecordsByName(records)
+	quantumfs.SortDirectoryRecords(records)
 
 	for _, child := range records {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
@@ -395,20 +392,18 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 
 	defer c.FuncIn("Directory::normalizeChild", "%d", inodeId).Out()
 
+	defer c.qfs.instantiationLock.Lock().Unlock()
 	inode := c.qfs.inodeNoInstantiate(c, inodeId)
 	if inode != nil {
 		defer inode.getParentLock().Lock().Unlock()
 	}
-	defer c.qfs.flusher.lock.Lock().Unlock()
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
+	defer c.qfs.flusher.lock.Lock().Unlock()
 
 	leg := dir.children.recordByInodeId(c, inodeId)
 	name := leg.Filename()
 
-	// We have to query again as nothing is preventing it from
-	// getting instantiated since last query.
-	inode = c.qfs.inodeNoInstantiate(c, inodeId)
 	if inode != nil && inode.isDirty_(c) {
 		c.vlog("Will not normalize dirty inode %d yet", inodeId)
 		return
@@ -417,10 +412,10 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	func() {
 		defer dir.hardlinkTable.invalidateNormalizedRecordLock(
 			record.FileId()).Unlock()
-		// We have to query again as nothing is preventing it from
-		// getting instantiated since last query.
-		inode := c.qfs.inodeNoInstantiate(c, inodeId)
+
 		if inode != nil {
+			c.vlog("Setting parent of inode %d from %d to %d",
+				inodeId, inode.parentId_(), dir.inodeNum())
 			inode.setName(name)
 			inode.setParent_(dir.inodeNum())
 		} else {
@@ -543,22 +538,6 @@ func (dir *Directory) Access(c *ctx, mask uint32, uid uint32,
 	return hasAccessPermission(c, dir, mask, uid, gid)
 }
 
-func (dir *Directory) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
-	defer c.funcIn("Directory::GetAttr").Out()
-
-	record, err := dir.parentGetChildRecordCopy(c, dir.InodeCommon.id)
-	if err != nil {
-		c.elog("Unable to get record from parent for inode %d", dir.id)
-		return fuse.EIO
-	}
-
-	fillAttrOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, dir.InodeCommon.id,
-		c.fuseCtx.Owner, record)
-
-	return fuse.OK
-}
-
 func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
 	defer c.funcIn("Directory::Lookup").Out()
 
@@ -631,12 +610,8 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	// WorkspaceRoot.getChildSnapShot() will overwrite the first two entries with
 	// the correct data.
 	if !dir.self.isWorkspaceRoot() {
-		entry, err := dir.parentGetChildRecordCopy(c, dir.inodeNum())
-		utils.Assert(err == nil, "Failed to get record for inode %d %s",
-			dir.inodeNum(), err)
-
-		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
-			dir.inodeNum(), c.fuseCtx.Owner, entry)
+		dir.parentGetChildAttr(c, dir.inodeNum(), &entryInfo.attr,
+			c.fuseCtx.Owner)
 		entryInfo.fuseType = entryInfo.attr.Mode
 	}
 	children = append(children, entryInfo)
@@ -655,15 +630,9 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 				wsr := parent.(*WorkspaceRoot)
 				wsr.fillWorkspaceAttrReal(c, &entryInfo.attr)
 			} else {
-				entry, err := parent.parentGetChildRecordCopy(c,
-					parent.inodeNum())
-				utils.Assert(err == nil,
-					"Failed to get record for inode %d %s",
-					parent.inodeNum(), err)
-
 				c.vlog("Got record from grandparent")
-				fillAttrWithDirectoryRecord(c, &entryInfo.attr,
-					parent.inodeNum(), c.fuseCtx.Owner, entry)
+				parent.parentGetChildAttr(c, parent.inodeNum(),
+					&entryInfo.attr, c.fuseCtx.Owner)
 			}
 			entryInfo.fuseType = entryInfo.attr.Mode
 		}()
@@ -833,22 +802,19 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	return result
 }
 
-// All modifications to the record must be done whilst holding the parentLock.
-// If a function only wants to read, then it may suffice to grab a "snapshot" of it.
-func (dir *Directory) getChildRecordCopy(c *ctx,
-	inodeNum InodeId) (quantumfs.ImmutableDirectoryRecord, error) {
+func (dir *Directory) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
+	owner fuse.Owner) {
 
-	defer c.funcIn("Directory::getChildRecordCopy").Out()
+	defer c.funcIn("Directory::getChildAttr").Out()
 
 	defer dir.RLock().RUnlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
 	record := dir.getRecordChildCall_(c, inodeNum)
-	if record != nil {
-		return record.AsImmutable(), nil
-	}
+	utils.Assert(record != nil, "Failed to get record for inode %d of %d",
+		inodeNum, dir.inodeNum())
 
-	return nil, errors.New("Inode given is not a child of this directory")
+	fillAttrWithDirectoryRecord(c, out, inodeNum, owner, record)
 }
 
 // must have childRecordLock, fetches the child for calls that come UP from a child.
@@ -917,8 +883,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 			return nil, err
 		}
 
-		recordCopy := record.AsImmutable()
-		type_ := objectTypeToFileType(c, recordCopy.Type())
+		type_ := objectTypeToFileType(c, underlyingType(record))
 
 		if type_ == fuse.S_IFDIR {
 			c.vlog("Directory::Unlink directory")
@@ -952,24 +917,19 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 
 		defer dir.Lock().Unlock()
 
-		var inode InodeId
 		result := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
-			record_ := dir.children.recordByName(c, name)
-			if record_ == nil {
+			record := dir.children.recordByName(c, name)
+			if record == nil {
 				return fuse.ENOENT
 			}
-
-			// Use a shallow copy of record to ensure the right type for
-			// objectTypeToFileType
-			record := record_.AsImmutable()
 
 			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
 			if err != fuse.OK {
 				return err
 			}
 
-			type_ := objectTypeToFileType(c, record.Type())
+			type_ := objectTypeToFileType(c, underlyingType(record))
 			if type_ != fuse.S_IFDIR {
 				return fuse.ENOTDIR
 			}
@@ -979,7 +939,6 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 				return fuse.Status(syscall.ENOTEMPTY)
 			}
 
-			inode = dir.children.inodeNum(name)
 			return fuse.OK
 		}()
 		if result != fuse.OK {
@@ -1318,11 +1277,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dst.children.makePublishable(c, newName)
 		}
 		dst.self.dirty(c)
-	}()
-
-	func() {
-		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.deleteChild(c, oldName)
 	}()
 
 	// This is the same entry just moved, so we can use the same
@@ -1907,7 +1861,9 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
 		dir.name_).Out()
 
-	dir.normalizeChildren(c)
+	if !dir.uninstantiating {
+		dir.normalizeChildren(c)
+	}
 	dir.parentSyncChild(c, func() (quantumfs.ObjectKey, *HardlinkDelta) {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
@@ -1915,6 +1871,11 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	})
 
 	return dir.baseLayerId
+}
+
+func (dir *Directory) cleanup(c *ctx) {
+	defer c.funcIn("Directory::cleanup").Out()
+	dir.uninstantiating = true
 }
 
 func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {

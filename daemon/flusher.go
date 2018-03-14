@@ -419,7 +419,8 @@ func (dq *DirtyQueue) sortTopologically_(c *ctx) {
 		di := e.Value.(*dirtyInode)
 		inodeNum := di.inode.inodeNum()
 
-		if di.inode.isOrphaned() {
+		// We do not have the parent lock, see the comment in requeue_()
+		if di.inode.isOrphaned_() {
 			c.vlog("Skipping orphaned inode %d", inodeNum)
 			continue
 		}

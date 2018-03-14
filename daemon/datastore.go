@@ -43,15 +43,12 @@ const CacheHitLog = "Found key in readcache"
 const CacheMissLog = "Cache miss"
 
 func (store *dataStore) Freshen(c *ctx, key quantumfs.ObjectKey) error {
-	// TODO: Make this function part of the quantumfs datastore interface
-	buf := store.Get(&c.Ctx, key)
-	if buf == nil {
-		return fmt.Errorf("Cannot freshen %s, "+
-			"block missing from db", key.String())
+	err := quantumfs.ConstantStore.Freshen(&c.Ctx, key)
+	if err == nil {
+		return nil
 	}
 
-	err := store.durableStore.Set(&c.Ctx, key, buf.(*buffer))
-	return err
+	return store.durableStore.Freshen(&c.Ctx, key)
 }
 
 func (store *dataStore) Get(c *quantumfs.Ctx,
