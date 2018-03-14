@@ -110,6 +110,13 @@ func (store *testDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	return store.datastore.Set(c, key, buf)
 }
 
+func (store *testDataStore) Freshen(c *quantumfs.Ctx,
+	key quantumfs.ObjectKey) error {
+
+	defer store.lock.Lock().Unlock()
+	return store.datastore.Freshen(c, key)
+}
+
 // checks that keys for the small files provided in hardlink paths are
 // present in WSR's hardlink map
 func (th *testHelper) checkSmallFileHardlinkKey(workspace string,
@@ -196,7 +203,7 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 		}
 		return nil
 	}
-	err = filepath.Walk(workspace, readFile)
+	err = utils.Pathwalk(workspace, readFile)
 	th.Assert(err == nil, "Normal walk failed (%s): %s", workspace, err)
 
 	// Save the keys intercepted during filePath walk.
