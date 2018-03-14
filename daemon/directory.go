@@ -159,12 +159,17 @@ func (dir *Directory) prepareForOrphaning(c *ctx, name string,
 	if record.Type() != quantumfs.ObjectTypeHardlink {
 		return record
 	}
-	newRecord := dir.hardlinkDec(record.FileId())
-	if newRecord != nil {
+	publishable, effective := dir.hardlinkDec(record.FileId())
+	if publishable != nil {
 		// This was the last leg of the hardlink
-		newRecord.SetFilename(name)
+		orphanRecord := publishable
+		if effective != nil {
+			orphanRecord = effective
+		}
+		orphanRecord.SetFilename(name)
+		return orphanRecord
 	}
-	return newRecord
+	return nil
 }
 
 // Needs inode lock for write
@@ -388,7 +393,7 @@ func publishDirectoryRecords(c *ctx,
 }
 
 func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
-	record quantumfs.DirectoryRecord) {
+	records [2]quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("Directory::normalizeChild", "%d", inodeId).Out()
 
@@ -409,9 +414,10 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 		return
 	}
 
+	fileId := records[0].FileId()
 	func() {
 		defer dir.hardlinkTable.invalidateNormalizedRecordLock(
-			record.FileId()).Unlock()
+			fileId).Unlock()
 
 		if inode != nil {
 			c.vlog("Setting parent of inode %d from %d to %d",
@@ -428,32 +434,38 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 
 	// Bubble up the -1 as we are inheriting the hardlink
 	// from the root now.
-	dir.hardlinkDec(record.FileId())
+	dir.hardlinkDec(fileId)
 	dir.children.deleteChild(c, name)
 
-	record.SetFilename(name)
-	dir.children.setRecord(c, inodeId, record)
+	records[0].SetFilename(name)
+	dir.children.setRecord(c, inodeId, records[0])
 	dir.children.makePublishable(c, name)
+	if records[1] != nil {
+		records[1].SetFilename(name)
+		dir.children.setRecord(c, inodeId, records[1])
+	}
 }
 
 func (dir *Directory) getNormalizationCandidates(c *ctx) (
-	result map[InodeId]quantumfs.DirectoryRecord) {
+	result map[InodeId][2]quantumfs.DirectoryRecord) {
 
 	defer c.funcIn("Directory::getNormalizationCandidates").Out()
 
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	result = make(map[InodeId]quantumfs.DirectoryRecord)
+	result = make(map[InodeId][2]quantumfs.DirectoryRecord)
 	records := dir.children.publishableRecords(c)
 	for _, record := range records {
 		if record.Type() != quantumfs.ObjectTypeHardlink {
 			continue
 		}
-		newRecord := dir.hardlinkTable.getNormalized(record.FileId())
-		if newRecord != nil {
+		publishable, effective := dir.hardlinkTable.getNormalized(
+			record.FileId())
+		if publishable != nil {
 			inodeId := dir.children.inodeNum(record.Filename())
-			result[inodeId] = newRecord
+			result[inodeId] = [2]quantumfs.DirectoryRecord{
+				publishable, effective}
 		}
 	}
 	return
@@ -1841,8 +1853,8 @@ func (dir *Directory) normalizeChildren(c *ctx) {
 	//    from the hardlinktable.
 
 	normalRecords := dir.getNormalizationCandidates(c)
-	for inodeId, record := range normalRecords {
-		dir.normalizeChild(c, inodeId, record)
+	for inodeId, records := range normalRecords {
+		dir.normalizeChild(c, inodeId, records)
 	}
 }
 
@@ -1873,7 +1885,8 @@ func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
 }
 
 func (dir *Directory) hardlinkDec(
-	fileId quantumfs.FileId) quantumfs.DirectoryRecord {
+	fileId quantumfs.FileId) (publishable quantumfs.DirectoryRecord,
+	effective quantumfs.DirectoryRecord) {
 
 	dir.hardlinkDelta.dec(fileId)
 	return dir.hardlinkTable.hardlinkDec(fileId)
