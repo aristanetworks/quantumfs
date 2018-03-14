@@ -41,14 +41,6 @@
   version = "=v0.15"
 
 [[constraint]]
-  name = "github.com/gocql/gocql"
-  revision = "ffae44103aa14ada9e2b342329f44ce354f399fd"
-
-[[override]]
-  name = "github.com/gocql/gocql"
-  revision = "ffae44103aa14ada9e2b342329f44ce354f399fd"
-
-[[constraint]]
   name = "github.com/boltdb/bolt"
   version = "~1.3.0"
 

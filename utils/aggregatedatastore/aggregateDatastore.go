@@ -46,3 +46,9 @@ func (store *aggregateDataStore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 	return store.durableDS.Set(c, key, buf)
 }
+
+func (store *aggregateDataStore) Freshen(c *quantumfs.Ctx,
+	key quantumfs.ObjectKey) error {
+
+	return store.durableDS.Freshen(c, key)
+}

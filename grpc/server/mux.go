@@ -600,8 +600,8 @@ func (m *mux) AdvanceWorkspace(ctx context.Context,
 	currentKey := quantumfs.NewObjectKeyFromBytes(request.CurrentRootId.Data)
 	newKey := quantumfs.NewObjectKeyFromBytes(request.NewRootId.Data)
 	nonce := quantumfs.WorkspaceNonce{
-		request.Nonce.Id,
-		request.Nonce.PublishTime,
+		Id:          request.Nonce.Id,
+		PublishTime: request.Nonce.PublishTime,
 	}
 
 	c := m.newCtx(request.RequestId.Id, ctx)

@@ -363,7 +363,7 @@ func publishDirectoryRecords(c *ctx,
 
 	numEntries, baseLayer := quantumfs.NewDirectoryEntry(numEntries)
 	entryIdx := 0
-	quantumfs.SortDirectoryRecordsByName(records)
+	quantumfs.SortDirectoryRecords(records)
 
 	for _, child := range records {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
@@ -913,7 +913,6 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 
 		defer dir.Lock().Unlock()
 
-		var inode InodeId
 		result := func() fuse.Status {
 			defer dir.childRecordLock.Lock().Unlock()
 			record := dir.children.recordByName(c, name)
@@ -936,7 +935,6 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 				return fuse.Status(syscall.ENOTEMPTY)
 			}
 
-			inode = dir.children.inodeNum(name)
 			return fuse.OK
 		}()
 		if result != fuse.OK {
@@ -1275,11 +1273,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			dst.children.makePublishable(c, newName)
 		}
 		dst.self.dirty(c)
-	}()
-
-	func() {
-		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.deleteChild(c, oldName)
 	}()
 
 	// This is the same entry just moved, so we can use the same

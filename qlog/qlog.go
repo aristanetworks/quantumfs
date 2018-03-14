@@ -16,6 +16,7 @@ import (
 	"unsafe"
 
 	"github.com/aristanetworks/quantumfs/utils"
+	"github.com/aristanetworks/quantumfs/utils/dangerous"
 )
 
 type LogSubsystem uint8
@@ -363,7 +364,7 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	if q.getLogLevel(idx, level) {
 		argsCopy := make([]interface{}, 0, len(args))
 		for _, arg := range args {
-			argsCopy = append(argsCopy, utils.NoescapeInterface(arg))
+			argsCopy = append(argsCopy, dangerous.NoescapeInterface(arg))
 		}
 		q.Write(formatString(idx, reqId, t, format), argsCopy...)
 	}
