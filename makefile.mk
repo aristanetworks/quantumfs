@@ -61,9 +61,7 @@ update: check-dep-installed
 	@echo "Please review and commit any changes to Gopkg.toml and Gopkg.lock"
 
 vet: $(PKGS_TO_TEST) $(COMMANDS)
-	#go vet -n ./... | while read -r line; do if  [[ ! "$$line" =~ .*encoding.* ]] && \
-	[[ ! "$$line" =~ .*unsafe.* ]] ; then eval $$line || exit 1; fi; done
-	true
+	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./cmd -true -o -type d -print`
 
 lockcheck:
 	./lockcheck.sh

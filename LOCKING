@@ -1,0 +1,177 @@
+Panic safe Locking
+##################
+
+Consider the following code:
+
+> func (obj *Obj) a() {
+>       obj.doSomethingExpensive1()
+>
+>       obj.lock.Lock()
+>       obj.doSomethingImportant()
+>       obj.lock.Unlock()
+>
+>       obj.doSomethingExpensive2()
+> }
+
+On the face of it this code seems simple, safe and efficient; both the expensive
+operations are done without the lock held and the lock is released after the minimal
+critical code is executed. Unfortunately this code is not panic safe and should
+doSomethingImportant() panic, perhaps because of a coding error or other unavoidable
+error, then obj.lock will never be unlocked. The next time this code comes around it
+will deadlock.
+
+In order to make this code safe we need to defer the Unlock() to ensure that, should
+a panic happen while we are holding the lock that it is released. Employing this
+advice literally we would end up with code as such:
+
+> func (obj *Obj) a() {
+>       obj.doSomethingExpensive1()
+>
+>       obj.lock.Lock()
+>       defer obj.lock.Unlock()
+>       obj.doSomethingImportant()
+>
+>       obj.doSomethingExpensive2()
+> }
+
+Unfortunately while this code is now safe from panics and will not leak the lock, it
+also holds the lock during an expensive operation, doSomethingExpensive2(). This is
+because, in the case without panics, deferred functions are only called at function
+exit. Therefore all critical sections need to be their own separate function to
+ensure the locks are always released and cover a minimal amount of execution. The
+final and correct style for a critical section would thus be:
+
+> func (obj *Obj) a() {
+>       obj.doSomethingExpensive1()
+>
+>       func() {
+>               obj.lock.Lock()
+>               defer obj.lock.Unlock()
+>               obj.doSomethingImportant()
+>       }()
+>
+>       obj.doSomethingExpensive2()
+> }
+
+For convenience we have utils.DeferableMutex and utils.DeferableRwMutex which make
+this idiom easier. InodeCommon alsohas a helper method which allows locking of the
+form:
+
+> func (file *File a() {
+>       file.doSomethingExpensive1()
+>
+>       func() {
+>               defer file.Lock().Unlock()
+>               file.doSomethingImportant()
+>       }()
+>
+>       file.doSomethingExpensive2()
+> }
+
+or
+
+> func (obj *Obj a() {
+>       obj.doSomethingExpensive1()
+>
+>       func() {
+>               defer obj.mutex.RLock().RUnlock()
+>               obj.doSomethingImportant()
+>       }()
+>
+>       obj.doSomethingExpensive2()
+> }
+
+Locking Modes: Down versus Up
+#############################
+
+The QuantumFS daemon, inside the daemon package, has two high level locking modes.
+The first and most common is the "Up" mode. This mode is indicated by grabbing the
+workspace tree lock shared (RLock). This allows multiple concurrent operations on the
+workspace and allows a child to lock its parent. That is, locking is allowed to be
+upwards in the tree towards the root.
+
+The less common mode is the "Down" mode. This mode is indicated by grabbing the tree
+lock exclusively (Lock). This mode excludes multiple concurrent workspace operations,
+but does allow a parent to lock its children. That is, locking is allowed to be
+downwards in the tree towards the leaves.
+
+Lock mode only refers to the Inode locks. For all other locks the same rules apply in
+both modes.
+
+Lock Descriptions
+#################
+
+Glossary:
+
+Leaf Lock - A lock which must be the last one grabbed. It is illegal to grab another
+            lock while holding a leaf lock.
+
+Treelock
+    The Treelock is a per-workspace lock which indicates and enforces the locking
+    mode.
+
+mapMutex (Leaf lock)
+    The mux inode map protects the instantiated inode table and the unistantiated
+    inode table.
+
+metaInodeMutex (Leaf lock)
+    This lock protects the list of listing inodes for which the kernel must be
+    notified.
+
+instantiationLock
+    This lock serializes inode instantiation and uninstantiation.
+
+lookupCountLock
+    Protects the lookupCounts map.
+
+mutabilityLock (Leaf lock)
+    Protects the worskpaceMutability map.
+
+parentLock
+    Protects an inode from being reparented during the operations. Reparenting can
+    occur if the inode is moved or deleted (orphaned).
+
+flusherLock
+    Protects all the per-workspace dirty queues from modification.
+
+InodeLock
+    Protects each inode from concurrent operations.
+
+childRecordLock
+    Used in Directory to serialize accesses to the ChildContainer. Note that the
+    childRecordLock is used during instantiation without the Directory inode lock.
+
+linkLock
+    A per-workspace lock which protects the per-workspace hardlink table.
+
+accesslist Lock (Leaf lock)
+    Per-workspace lock which protects the accessed file list
+
+combining cache lock (Leaf lock)
+    Serialize access to the LRU cache and map internal to combiningCache.
+
+nameLock (Leaf lock)
+    Protects the per-Inode name member
+
+unlinkLock (Leaf lock)
+    Protects the record for orphaned inodes
+
+Lock Order
+##########
+
+Leaf locks are not documented here. Locks must always be grabbed in descending order.
+That is, locks higher in this list must be grabbed before locks lower down in this
+list and it is illegal to grab a lock higher in the list while holding a lock lower
+in the list.
+
+Treelock
+instantiationLock
+{                            InodeLock and parentLock are per-Inode locks. The
+  parentLock                 relative ordering of these locks between Inodes
+  InodeLock                  depends on the locking mode described above.
+}
+childRecordLock
+linkLock
+flusherLock
+lookupCountLock
+
