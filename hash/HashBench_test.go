@@ -49,7 +49,7 @@ func BenchmarkCity128Short(test *testing.B) {
 	data := genData(shortLength)
 
 	for i := 0; i < test.N; i++ {
-		CityHash128(data)
+		cityHash128(data)
 	}
 }
 
@@ -57,7 +57,7 @@ func BenchmarkCity128Medium(test *testing.B) {
 	data := genData(mediumLength)
 
 	for i := 0; i < test.N; i++ {
-		CityHash128(data)
+		cityHash128(data)
 	}
 }
 
@@ -65,7 +65,7 @@ func BenchmarkCity128Long(test *testing.B) {
 	data := genData(longLength)
 
 	for i := 0; i < test.N; i++ {
-		CityHash128(data)
+		cityHash128(data)
 	}
 }
 
@@ -73,7 +73,7 @@ func BenchmarkCity256CrcShort(test *testing.B) {
 	data := genData(shortLength)
 
 	for i := 0; i < test.N; i++ {
-		CityHash256(data)
+		cityHash256(data)
 	}
 }
 
@@ -81,7 +81,7 @@ func BenchmarkCity256CrcMedium(test *testing.B) {
 	data := genData(mediumLength)
 
 	for i := 0; i < test.N; i++ {
-		CityHash256(data)
+		cityHash256(data)
 	}
 }
 
@@ -89,7 +89,7 @@ func BenchmarkCity256CrcLong(test *testing.B) {
 	data := genData(longLength)
 
 	for i := 0; i < test.N; i++ {
-		CityHash256(data)
+		cityHash256(data)
 	}
 }
 
