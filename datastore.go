@@ -376,7 +376,10 @@ func (dir *DirectoryEntry) Entry(i int) *EncodedDirectoryRecord {
 }
 
 func (dir *DirectoryEntry) SetEntry(i int, record PublishableRecord) {
-	dir.dir.Entries().Set(i, record.Record())
+	newER := copyDirectoryRecordIntoSegment(dir.dir.Segment,
+		record.EncodedDirectoryRecord)
+
+	dir.dir.Entries().Set(i, newER)
 }
 
 func (dir *DirectoryEntry) Next() ObjectKey {
