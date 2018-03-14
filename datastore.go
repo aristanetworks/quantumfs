@@ -191,12 +191,16 @@ func NewObjectKeyFromBytes(bytes []byte) ObjectKey {
 	key := ObjectKey{
 		key: encoding.NewRootObjectKey(segment),
 	}
+	fillKeyFromBytes(bytes, key.key)
 
-	key.key.SetKeyType(byte(bytes[0]))
-	key.key.SetPart2(binary.LittleEndian.Uint64(bytes[1:9]))
-	key.key.SetPart3(binary.LittleEndian.Uint64(bytes[9:17]))
-	key.key.SetPart4(binary.LittleEndian.Uint32(bytes[17:]))
 	return key
+}
+
+func fillKeyFromBytes(bytes []byte, key encoding.ObjectKey) {
+	key.SetKeyType(byte(bytes[0]))
+	key.SetPart2(binary.LittleEndian.Uint64(bytes[1:9]))
+	key.SetPart3(binary.LittleEndian.Uint64(bytes[9:17]))
+	key.SetPart4(binary.LittleEndian.Uint32(bytes[17:]))
 }
 
 func overlayObjectKey(k encoding.ObjectKey) ObjectKey {
@@ -603,6 +607,37 @@ func createEmptyDirectory() ObjectKey {
 // The key of the datablock with zero length
 var EmptyBlockKey ObjectKey
 
+func copyDirectoryRecordIntoSegment(s *capn.Segment,
+	record DirectoryRecord) encoding.DirectoryRecord {
+
+	newRecord := EncodedDirectoryRecord{
+		record: encoding.NewDirectoryRecord(s),
+	}
+
+	newRecord.SetFilename(record.Filename())
+
+	newID := encoding.NewObjectKey(s)
+	fillKeyFromBytes(record.ID().Value(), newID)
+	newRecord.record.SetId(newID)
+
+	newRecord.SetType(record.Type())
+	newRecord.SetPermissions(record.Permissions())
+	newRecord.SetOwner(record.Owner())
+	newRecord.SetGroup(record.Group())
+	newRecord.SetSize(record.Size())
+
+	newEA := encoding.NewObjectKey(s)
+	fillKeyFromBytes(record.ExtendedAttributes().Value(),
+		newEA)
+	newRecord.record.SetExtendedAttributes(newEA)
+
+	newRecord.SetContentTime(record.ContentTime())
+	newRecord.SetModificationTime(record.ModificationTime())
+	newRecord.SetFileId(record.FileId())
+
+	return newRecord.record
+}
+
 func createEmptyBlock() ObjectKey {
 	var bytes []byte
 
@@ -683,7 +718,9 @@ func (r *HardlinkRecord) Record() *EncodedDirectoryRecord {
 }
 
 func (r *HardlinkRecord) SetRecord(record DirectoryRecord) {
-	r.record.SetRecord(record.(*EncodedDirectoryRecord).record)
+	newER := copyDirectoryRecordIntoSegment(r.record.Segment, record)
+
+	r.record.SetRecord(newER)
 }
 
 func (r *HardlinkRecord) Nlinks() uint32 {
@@ -753,6 +790,14 @@ func (dir *HardlinkEntry) Entry(i int) *HardlinkRecord {
 
 func (dir *HardlinkEntry) SetEntry(i int, record *HardlinkRecord) {
 	dir.entry.Entries().Set(i, record.record)
+}
+
+func (dir *HardlinkEntry) NewEntry() *HardlinkRecord {
+	record := HardlinkRecord{
+		record: encoding.NewRootHardlinkRecord(dir.entry.Segment),
+	}
+
+	return &record
 }
 
 func (dir *HardlinkEntry) Next() ObjectKey {
