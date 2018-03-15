@@ -26,7 +26,8 @@ type hardlinkTracker struct {
 	merged map[quantumfs.FileId]*HardlinkTableEntry
 }
 
-func (merge *merger) newHardlinkTracker(base map[quantumfs.FileId]*HardlinkTableEntry,
+func (merge *merger) newHardlinkTracker(
+	base map[quantumfs.FileId]*HardlinkTableEntry,
 	remote map[quantumfs.FileId]*HardlinkTableEntry,
 	local map[quantumfs.FileId]*HardlinkTableEntry) *hardlinkTracker {
 
