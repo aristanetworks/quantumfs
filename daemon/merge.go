@@ -115,8 +115,6 @@ func (ht *hardlinkTracker) checkLinkChanged(c *ctx, local quantumfs.DirectoryRec
 func (ht *hardlinkTracker) increment(id quantumfs.FileId) {
 	link := ht.newestEntry(id)
 	link.nlink++
-
-	ht.merged[id] = link
 }
 
 func (ht *hardlinkTracker) decrement(id quantumfs.FileId) {
@@ -128,7 +126,6 @@ func (ht *hardlinkTracker) decrement(id quantumfs.FileId) {
 	}
 
 	link.nlink--
-	ht.merged[id] = link
 }
 
 // Returns the newest HardlinkTableEntry version available, while

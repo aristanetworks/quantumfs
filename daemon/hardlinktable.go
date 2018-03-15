@@ -151,7 +151,6 @@ func (ht *HardlinkTableImpl) hardlinkInc(fileId quantumfs.FileId) {
 	entry.record().SetContentTime(quantumfs.NewTime(time.Now()))
 
 	entry.delta++
-	ht.hardlinks[fileId] = entry
 }
 
 func (ht *HardlinkTableImpl) hardlinkDec(
@@ -175,7 +174,6 @@ func (ht *HardlinkTableImpl) hardlinkDec(
 	entry.record().SetContentTime(quantumfs.NewTime(time.Now()))
 
 	if entry.effectiveNlink() > 0 {
-		ht.hardlinks[fileId] = entry
 		return nil, nil
 	}
 
@@ -279,7 +277,6 @@ func (ht *HardlinkTableImpl) findHardlinkInodeId(c *ctx,
 
 	inodeId = c.qfs.newInodeId()
 	hardlink.inodeId = inodeId
-	ht.hardlinks[fileId] = hardlink
 	ht.inodeToLink[inodeId] = fileId
 
 	c.vlog("Allocated new inode %d for hardlink", inodeId)
@@ -337,7 +334,6 @@ func (ht *HardlinkTableImpl) updateHardlinkInodeId(c *ctx, fileId quantumfs.File
 		"Hardlink id %d already has associated inodeid %d",
 		fileId, hardlink.inodeId)
 	hardlink.inodeId = inodeId
-	ht.hardlinks[fileId] = hardlink
 	ht.inodeToLink[inodeId] = fileId
 }
 
@@ -362,7 +358,6 @@ func (ht *HardlinkTableImpl) modifyChildWithFunc(c *ctx, inodeId InodeId,
 		link.effectiveRecord = link.publishableRecord.Clone()
 	}
 	modify(link.effectiveRecord)
-	ht.hardlinks[fileId] = link
 }
 
 func (ht *HardlinkTableImpl) setID(c *ctx, fileId quantumfs.FileId,
@@ -374,7 +369,6 @@ func (ht *HardlinkTableImpl) setID(c *ctx, fileId quantumfs.FileId,
 	defer ht.linkLock.Lock().Unlock()
 	entry := ht.hardlinks[fileId]
 	entry.setID(c, key)
-	ht.hardlinks[fileId] = entry
 }
 
 func (hte *HardlinkTableEntry) effectiveNlink() uint32 {
@@ -420,7 +414,6 @@ func (ht *HardlinkTableImpl) markHardlinkPath(c *ctx, path string,
 	}
 
 	link.paths = append(link.paths, path)
-	ht.hardlinks[fileId] = link
 }
 
 func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
@@ -441,8 +434,6 @@ func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
 		entry.delta -= delta
 		if entry.nlink == 0 {
 			ht.removeHardlink_(fileId, entry.inodeId)
-		} else {
-			ht.hardlinks[fileId] = entry
 		}
 	})
 	hardlinkDelta.reset()
@@ -476,6 +467,5 @@ func (ht *HardlinkTableImpl) invalidateNormalizedRecordLock(
 
 	delete(ht.inodeToLink, link.inodeId)
 	link.inodeId = quantumfs.InodeIdInvalid
-	ht.hardlinks[fileId] = link
 	return
 }
