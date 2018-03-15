@@ -440,10 +440,10 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	records[0].SetFilename(name)
 	dir.children.setRecord(c, inodeId, records[0])
 	dir.children.makePublishable(c, name)
-	if records[1] != nil {
-		records[1].SetFilename(name)
-		dir.children.setRecord(c, inodeId, records[1])
-	}
+
+	// We don't normalize dirty children above, so there should be no unpublished
+	// effective changes here.
+	utils.Assert(records[1] == nil, "Child with unpublished changes")
 }
 
 func (dir *Directory) getNormalizationCandidates(c *ctx) (
