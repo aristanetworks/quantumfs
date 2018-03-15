@@ -159,17 +159,12 @@ func (dir *Directory) prepareForOrphaning(c *ctx, name string,
 	if record.Type() != quantumfs.ObjectTypeHardlink {
 		return record
 	}
-	publishable, effective := dir.hardlinkDec(record.FileId())
-	if publishable != nil {
+	newRecord := dir.hardlinkDec(record.FileId())
+	if newRecord != nil {
 		// This was the last leg of the hardlink
-		orphanRecord := publishable
-		if effective != nil {
-			orphanRecord = effective
-		}
-		orphanRecord.SetFilename(name)
-		return orphanRecord
+		newRecord.SetFilename(name)
 	}
-	return nil
+	return newRecord
 }
 
 // Needs inode lock for write
@@ -1885,8 +1880,7 @@ func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
 }
 
 func (dir *Directory) hardlinkDec(
-	fileId quantumfs.FileId) (publishable quantumfs.DirectoryRecord,
-	effective quantumfs.DirectoryRecord) {
+	fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord) {
 
 	dir.hardlinkDelta.dec(fileId)
 	return dir.hardlinkTable.hardlinkDec(fileId)

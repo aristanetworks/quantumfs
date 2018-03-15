@@ -57,8 +57,7 @@ type HardlinkTable interface {
 	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
 	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
 	findHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId) InodeId
-	hardlinkDec(fileId quantumfs.FileId) (publishable quantumfs.DirectoryRecord,
-		effective quantumfs.DirectoryRecord)
+	hardlinkDec(fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord)
 	hardlinkInc(fileId quantumfs.FileId)
 	newHardlink(c *ctx, inodeId InodeId,
 		record quantumfs.DirectoryRecord) *HardlinkLeg
@@ -155,8 +154,7 @@ func (ht *HardlinkTableImpl) hardlinkInc(fileId quantumfs.FileId) {
 }
 
 func (ht *HardlinkTableImpl) hardlinkDec(
-	fileId quantumfs.FileId) (publishable quantumfs.DirectoryRecord,
-	effective quantumfs.DirectoryRecord) {
+	fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord) {
 
 	defer ht.linkLock.Lock().Unlock()
 
@@ -176,11 +174,15 @@ func (ht *HardlinkTableImpl) hardlinkDec(
 
 	if entry.effectiveNlink() > 0 {
 		ht.hardlinks[fileId] = entry
-		return nil, nil
+		return nil
 	}
 
 	// all references to this hardlink are gone and we must remove it
-	return entry.publishableRecord, entry.effectiveRecord
+	if entry.effectiveRecord != nil {
+		return entry.effectiveRecord
+	} else {
+		return entry.publishableRecord
+	}
 }
 
 // Must hold the linkLock for writing
