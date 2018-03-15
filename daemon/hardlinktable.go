@@ -26,7 +26,7 @@ type HardlinkTableEntry struct {
 	delta int
 }
 
-func (hte HardlinkTableEntry) record() quantumfs.DirectoryRecord {
+func (hte *HardlinkTableEntry) record() quantumfs.DirectoryRecord {
 	if hte.effectiveRecord != nil {
 		return hte.effectiveRecord
 	}
@@ -78,12 +78,12 @@ type HardlinkTableImpl struct {
 	wsr *WorkspaceRoot
 
 	linkLock    utils.DeferableRwMutex
-	hardlinks   map[quantumfs.FileId]HardlinkTableEntry
+	hardlinks   map[quantumfs.FileId]*HardlinkTableEntry
 	inodeToLink map[InodeId]quantumfs.FileId
 }
 
-func newLinkEntry(record_ quantumfs.DirectoryRecord) HardlinkTableEntry {
-	return HardlinkTableEntry{
+func newLinkEntry(record_ quantumfs.DirectoryRecord) *HardlinkTableEntry {
+	return &HardlinkTableEntry{
 		publishableRecord: record_,
 		nlink:             1,
 		inodeId:           quantumfs.InodeIdInvalid,
@@ -382,11 +382,11 @@ func (hte *HardlinkTableEntry) effectiveNlink() uint32 {
 }
 
 func loadHardlinks(c *ctx,
-	entry quantumfs.HardlinkEntry) map[quantumfs.FileId]HardlinkTableEntry {
+	entry quantumfs.HardlinkEntry) map[quantumfs.FileId]*HardlinkTableEntry {
 
 	defer c.funcIn("loadHardlinks").Out()
 
-	hardlinks := make(map[quantumfs.FileId]HardlinkTableEntry)
+	hardlinks := make(map[quantumfs.FileId]*HardlinkTableEntry)
 
 	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
 		newLink := newLinkEntry(hardlink.Record())
