@@ -921,3 +921,48 @@ func TestMergeOmitIdentical(t *testing.T) {
 		})
 	})
 }
+
+func TestMergeOverDecrement(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(bws string) {
+			test.AssertNoErr(utils.MkdirAll(bws+"/dirA/dirB/dirC", 0777))
+			test.AssertNoErr(utils.MkdirAll(bws+"/dirA2/dirB2/dirC2",
+				0777))
+
+			test.AssertNoErr(testutils.PrintToFile(bws+"/file", "data"))
+			test.AssertNoErr(syscall.Link(bws+"/file", bws+"/link"))
+			test.AssertNoErr(syscall.Link(bws+"/file",
+				bws+"/dirA/dirB/dirC/linkA"))
+			test.AssertNoErr(syscall.Link(bws+"/file",
+				bws+"/dirA/dirB/dirC/linkB"))
+			test.AssertNoErr(syscall.Link(bws+"/file",
+				bws+"/dirA/dirB/dirC/linkC"))
+		}, func(branchA string,
+			branchB string) mergeTestCheck {
+
+			test.AssertNoErr(os.Remove(branchB+"/dirA/dirB/dirC/linkA"))
+			test.AssertNoErr(os.Remove(branchB+"/dirA/dirB/dirC/linkB"))
+			test.AssertNoErr(os.Remove(branchB+"/dirA/dirB/dirC/linkC"))
+			test.AssertNoErr(syscall.Link(branchB+"/file",
+				branchB+"/dirA2/dirB2/dirC2/linkA"))
+			test.AssertNoErr(syscall.Link(branchB+"/file",
+				branchB+"/dirA2/dirB2/dirC2/linkB"))
+			test.AssertNoErr(syscall.Link(branchB+"/file",
+				branchB+"/dirA2/dirB2/dirC2/linkC"))
+
+			return func(merged string) {
+				wsr, cleanup := test.GetWorkspaceRoot(merged)
+				defer cleanup()
+
+				// make sure link is instantiated
+				linkInodeNum := test.getInodeNum(merged+"/link")
+				test.qfs.inode(&test.qfs.c, linkInodeNum)
+
+				linkRecord := test.GetRecord(merged+"/link")
+				nl := wsr.hardlinkTable.nlinks(linkRecord.FileId())
+				test.Assert(nl == 5,
+					"nlink count not merged correct %d", nl)
+			}
+		})
+	})
+}
