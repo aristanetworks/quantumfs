@@ -940,9 +940,12 @@ func TestMergeOverDecrement(t *testing.T) {
 		}, func(branchA string,
 			branchB string) mergeTestCheck {
 
-			test.AssertNoErr(os.Remove(branchB+"/dirA/dirB/dirC/linkA"))
-			test.AssertNoErr(os.Remove(branchB+"/dirA/dirB/dirC/linkB"))
-			test.AssertNoErr(os.Remove(branchB+"/dirA/dirB/dirC/linkC"))
+			test.AssertNoErr(os.Remove(branchB +
+				"/dirA/dirB/dirC/linkA"))
+			test.AssertNoErr(os.Remove(branchB +
+				"/dirA/dirB/dirC/linkB"))
+			test.AssertNoErr(os.Remove(branchB +
+				"/dirA/dirB/dirC/linkC"))
 			test.AssertNoErr(syscall.Link(branchB+"/file",
 				branchB+"/dirA2/dirB2/dirC2/linkA"))
 			test.AssertNoErr(syscall.Link(branchB+"/file",
@@ -955,10 +958,10 @@ func TestMergeOverDecrement(t *testing.T) {
 				defer cleanup()
 
 				// make sure link is instantiated
-				linkInodeNum := test.getInodeNum(merged+"/link")
+				linkInodeNum := test.getInodeNum(merged + "/link")
 				test.qfs.inode(&test.qfs.c, linkInodeNum)
 
-				linkRecord := test.GetRecord(merged+"/link")
+				linkRecord := test.GetRecord(merged + "/link")
 				nl := wsr.hardlinkTable.nlinks(linkRecord.FileId())
 				test.Assert(nl == 5,
 					"nlink count not merged correct %d", nl)

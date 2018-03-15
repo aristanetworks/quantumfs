@@ -102,6 +102,7 @@ func traverseSubtree(c *ctx, dirKey quantumfs.ObjectKey,
 }
 
 type hardlinkTableEntries map[quantumfs.FileId]HardlinkTableEntry
+
 func (ht *hardlinkTracker) filterDeadEntries() hardlinkTableEntries {
 	for fileId, record := range ht.merged {
 		if record.nlink <= 0 {
