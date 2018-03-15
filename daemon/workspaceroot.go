@@ -159,7 +159,7 @@ func publishHardlinkMap(c *ctx, pub publishFn,
 		newRecord := quantumfs.NewHardlinkRecord()
 		newRecord.SetFileId(uint64(fileId))
 		newRecord.SetRecord(record)
-		newRecord.SetNlinks(entry.nlink)
+		newRecord.SetNlinks(uint32(entry.nlink))
 		baseLayer.SetEntry(entryIdx, newRecord)
 
 		entryIdx++
