@@ -336,8 +336,8 @@ func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 
 func (qfs *QuantumFs) verifyNoLeaks() {
 	defer qfs.c.funcIn("QuantumFs::verifyNoLeaks").Out()
-	defer qfs.lookupCountLock.Lock().Unlock()
 	defer qfs.instantiationLock.Lock().Unlock()
+	defer qfs.lookupCountLock.Lock().Unlock()
 	defer qfs.mapMutex.Lock().Unlock()
 
 	for id, parent := range qfs.parentOfUninstantiated {
