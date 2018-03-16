@@ -301,30 +301,56 @@ func (qfs *QuantumFs) fuseNotifier() {
 }
 
 func (qfs *QuantumFs) waitForSignals() {
-	sigUsr1Chan := make(chan os.Signal, 1)
-	signal.Notify(sigUsr1Chan, syscall.SIGUSR1)
-	go qfs.signalHandler(sigUsr1Chan)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGUSR1, syscall.SIGUSR2)
+	go qfs.signalHandler(sigChan)
 }
 
 // If we receive the signal SIGUSR1, then we will enter a low memory mode where we,
 // among other things, prevent further writes to the cache and drop the contents of
 // the cache. The intended use is as a way to free the bulk of the memory used by
 // quantumfsd when it is being gracefully shutdown by lazily unmounting it.
-func (qfs *QuantumFs) signalHandler(sigUsr1Chan chan os.Signal) {
+func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 	for {
 		select {
-		case <-sigUsr1Chan:
-			qfs.c.wlog("Entering low memory mode")
-			qfs.inLowMemoryMode = true
-			qfs.c.dataStore.shutdown()
+		case sig := <-sigChan:
+			switch sig {
+			case syscall.SIGUSR1:
+				qfs.c.wlog("Entering low memory mode")
+				qfs.inLowMemoryMode = true
+				qfs.c.dataStore.shutdown()
 
-			// Release the memory
-			debug.FreeOSMemory()
+				// Release the memory
+				debug.FreeOSMemory()
+			case syscall.SIGUSR2:
+				qfs.verifyNoLeaks()
+			}
 
 		case <-qfs.stopWaitingForSignals:
-			signal.Stop(sigUsr1Chan)
-			close(sigUsr1Chan)
+			signal.Stop(sigChan)
+			close(sigChan)
 			return
+		}
+	}
+}
+
+func (qfs *QuantumFs) verifyNoLeaks() {
+	defer qfs.c.funcIn("QuantumFs::verifyNoLeaks").Out()
+	defer qfs.lookupCountLock.Lock().Unlock()
+	defer qfs.instantiationLock.Lock().Unlock()
+	defer qfs.mapMutex.Lock().Unlock()
+
+	for id, parent := range qfs.parentOfUninstantiated {
+		if parent != quantumfs.InodeIdRoot {
+			qfs.c.elog("leaked inode %d parent inode %d", id, parent)
+		}
+	}
+
+	for inodeId, count := range qfs.lookupCounts {
+		if inodeId != quantumfs.InodeIdRoot &&
+			inodeId != quantumfs.InodeIdApi {
+
+			qfs.c.elog("leaked inode %d lookupCount %d", inodeId, count)
 		}
 	}
 }
