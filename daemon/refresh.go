@@ -234,40 +234,40 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 		})
 
 	c.vlog("Loading remote records")
-	foreachDentry(c, remoteDir,
-		func(record quantumfs.ImmutableDirectoryRecord) {
+	foreachDentry(c, remoteDir, func(
+		record quantumfs.ImmutableDirectoryRecord) {
 
-			c.vlog("Added filemap entry for %s: %x", record.Filename(),
-				record.FileId())
+		c.vlog("Added filemap entry for %s: %x", record.Filename(),
+			record.FileId())
 
-			rc.fileMap[record.FileId()] = &FileLoadRecord{
-				remoteRecord:  record.Clone(),
-				inodeId:       quantumfs.InodeIdInvalid,
-				parentId:      quantumfs.InodeIdInvalid,
-				newParentPath: path,
-				moved:         false,
-			}
+		rc.fileMap[record.FileId()] = &FileLoadRecord{
+			remoteRecord:  record.Clone(),
+			inodeId:       quantumfs.InodeIdInvalid,
+			parentId:      quantumfs.InodeIdInvalid,
+			newParentPath: path,
+			moved:         false,
+		}
 
-			if record.Type() == quantumfs.ObjectTypeDirectory {
-				localKey := quantumfs.EmptyDirKey
+		if record.Type() == quantumfs.ObjectTypeDirectory {
+			localKey := quantumfs.EmptyDirKey
 
-				// don't recurse into any directories that
-				// haven't changed
-				localRecord, exists := localRecords[record.FileId()]
-				if exists {
-					if skipDir(localRecord, record) {
-						c.vlog("Skipping %s since no change",
-							localRecord.Filename())
-						return
-					}
-
-					localKey = localRecord.ID()
+			// don't recurse into any directories that
+			// haven't changed
+			localRecord, exists := localRecords[record.FileId()]
+			if exists {
+				if skipDir(localRecord, record) {
+					c.vlog("Skipping %s since no change",
+						localRecord.Filename())
+					return
 				}
 
-				rc.buildRefreshMap(c, localKey, record.ID(),
-					path+"/"+record.Filename())
+				localKey = localRecord.ID()
 			}
-		})
+
+			rc.buildRefreshMap(c, localKey, record.ID(),
+				path+"/"+record.Filename())
+		}
+	})
 }
 
 func skipDir(local quantumfs.ImmutableDirectoryRecord,
