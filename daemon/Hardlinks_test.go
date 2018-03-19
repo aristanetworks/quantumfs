@@ -102,8 +102,8 @@ func TestHardlinkReload(t *testing.T) {
 			test.Assert(l.nlink == linkBPtr.nlink,
 				"link reference count not preserved")
 
-			linkB := linkBPtr.record
-			v := l.record
+			linkB := linkBPtr.record()
+			v := l.record()
 			test.Assert(exists, "link not reloaded in new wsr")
 			test.Assert(v.Filename() == linkB.Filename(),
 				"Filename not preserved")
