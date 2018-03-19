@@ -166,12 +166,7 @@ func (link *HardlinkLeg) Nlinks() uint32 {
 }
 
 func (link *HardlinkLeg) EncodeExtendedKey() []byte {
-	realRecord := link.hardlinkTable.recordByFileId(link.FileId())
-
-	// This object shouldn't even exist if the hardlink's invalid
-	utils.Assert(realRecord != nil, "Unable to get record for existing link %d",
-		link.FileId())
-
+	realRecord := link.get()
 	return quantumfs.EncodeExtendedKey(realRecord.ID(), realRecord.Type(),
 		realRecord.Size())
 }
@@ -181,11 +176,7 @@ func (l *HardlinkLeg) AsImmutable() quantumfs.ImmutableDirectoryRecord {
 	// characters per line and appease gofmt.
 	link := l
 
-	realRecord := link.hardlinkTable.recordByFileId(link.FileId())
-
-	// This object shouldn't even exist if the hardlink's invalid
-	utils.Assert(realRecord != nil, "Unable to get record for existing link %d",
-		link.FileId())
+	realRecord := link.get()
 
 	return quantumfs.NewImmutableRecord(
 		link.Filename(),
