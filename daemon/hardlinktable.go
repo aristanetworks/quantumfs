@@ -26,9 +26,8 @@ type HardlinkTableEntry struct {
 }
 
 type HardlinkTable interface {
-	recordByInodeId(c *ctx, inodeId InodeId) (bool,
-		quantumfs.DirectoryRecord)
-	recordByFileId(fileId quantumfs.FileId) (valid bool,
+	recordByInodeId(c *ctx, inodeId InodeId) quantumfs.DirectoryRecord
+	recordByFileId(fileId quantumfs.FileId) (
 		record quantumfs.ImmutableDirectoryRecord)
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
 	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
@@ -264,35 +263,35 @@ func (ht *HardlinkTableImpl) findHardlinkInodeId(c *ctx,
 // Ensure we don't return the vanilla record, enclose it in a hardlink wrapper so
 // that the wrapper can correctly pick and choose attributes like nlink
 func (ht *HardlinkTableImpl) recordByInodeId(c *ctx, inodeId InodeId) (
-	valid bool, record quantumfs.DirectoryRecord) {
+	record quantumfs.DirectoryRecord) {
 
 	defer ht.linkLock.RLock().RUnlock()
 
 	fileId, exists := ht.inodeToLink[inodeId]
 	if !exists {
-		return false, nil
+		return nil
 	}
 
 	link, exists := ht.hardlinks[fileId]
 	if !exists {
-		return false, nil
+		return nil
 	}
 
-	return true, newHardlinkLeg(link.record.Filename(), fileId,
+	return newHardlinkLeg(link.record.Filename(), fileId,
 		quantumfs.Time(0), ht)
 }
 
 func (ht *HardlinkTableImpl) recordByFileId(fileId quantumfs.FileId) (
-	valid bool, record quantumfs.ImmutableDirectoryRecord) {
+	record quantumfs.ImmutableDirectoryRecord) {
 
 	defer ht.linkLock.RLock().RUnlock()
 
 	link, exists := ht.hardlinks[fileId]
 	if exists {
-		return true, link.record
+		return link.record
 	}
 
-	return false, nil
+	return nil
 }
 
 func (ht *HardlinkTableImpl) updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId,

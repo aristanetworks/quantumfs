@@ -398,8 +398,8 @@ func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
 	isHardlink, fileId := wsr.hardlinkTable.checkHardlink(inode.inodeNum())
 	test.Assert(isHardlink, "Expected hardlink isn't one.")
 
-	valid, record := wsr.hardlinkTable.recordByFileId(fileId)
-	test.Assert(valid, "Unable to get hardlink from wsr")
+	record := wsr.hardlinkTable.recordByFileId(fileId)
+	test.Assert(record != nil, "Unable to get hardlink from wsr")
 
 	// Verify the type and key matching
 	test.Assert(type_ == Type && size == record.Size() &&
