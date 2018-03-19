@@ -262,8 +262,8 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		localHardlinks)
 
 	localDirectory, err = merge.mergeDirectory("/", baseDirectory,
-		remoteDirectory, localDirectory, true, tracker, skipPaths,
-		breadcrumb)
+		remoteDirectory, localDirectory, quantumfs.ZeroKey, true, tracker,
+		skipPaths, breadcrumb)
 
 	if err != nil {
 		return local, err
@@ -332,13 +332,45 @@ func childSkipPaths(c *ctx, parentSkipPaths *mergeSkipPaths,
 // records with the same name. We handle these cases like mostly normal conflicts.
 func (merge *merger) mergeDirectory(dirName string, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey,
-	baseExists bool, ht *hardlinkTracker,
+	premergedID quantumfs.ObjectKey, baseExists bool, ht *hardlinkTracker,
 	skipPaths *mergeSkipPaths, breadcrumb string) (quantumfs.ObjectKey, error) {
 
 	breadcrumb += "/" + dirName
 	defer merge.c.FuncIn("mergeDirectory", "%s skipPaths len %d mergeTime %s",
 		breadcrumb, len(skipPaths.paths),
 		time.Since(merge.start).String()).Out()
+
+	if !premergedID.IsEqualTo(quantumfs.ZeroKey) &&
+		!needDeeperMergeID(base, remote, local) {
+
+		// if we shortcut and take remote, we have to accommodate its
+		// hardlinks in the hardlink tracker
+		if premergedID.IsEqualTo(remote) &&
+			!remote.IsEqualTo(local) {
+
+			// Add new links
+			err := traverseSubtree(merge.c, remote,
+				func(v quantumfs.DirectoryRecord) {
+
+					ht.checkLinkChanged(merge.c, nil, v)
+				})
+			if err != nil {
+				return premergedID, err
+			}
+
+			// Remove old links
+			err = traverseSubtree(merge.c, local,
+				func(v quantumfs.DirectoryRecord) {
+
+					ht.checkLinkChanged(merge.c, v, nil)
+				})
+			if err != nil {
+				return premergedID, err
+			}
+		}
+
+		return premergedID, nil
+	}
 
 	var err error
 	baseRecords := make(map[string]quantumfs.DirectoryRecord)
@@ -623,10 +655,27 @@ func (merge *merger) mergeAttributes(base quantumfs.DirectoryRecord,
 	}
 }
 
-func needDeeperMerge(remote quantumfs.DirectoryRecord,
-	local quantumfs.DirectoryRecord) bool {
+func needDeeperMergeID(base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
+	local quantumfs.ObjectKey) bool {
 
-	return !local.ID().IsEqualTo(remote.ID())
+	localRemoteDiff := !local.IsEqualTo(remote)
+	baseLocalDiff := base.IsEqualTo(quantumfs.ZeroKey) ||
+		!local.IsEqualTo(base)
+	baseRemoteDiff := base.IsEqualTo(quantumfs.ZeroKey) ||
+		!remote.IsEqualTo(base)
+
+	return localRemoteDiff && baseLocalDiff && baseRemoteDiff
+}
+
+func needDeeperMerge(base quantumfs.DirectoryRecord,
+	remote quantumfs.DirectoryRecord, local quantumfs.DirectoryRecord) bool {
+
+	var baseId quantumfs.ObjectKey
+	if base != nil {
+		baseId = base.ID()
+	}
+
+	return needDeeperMergeID(baseId, remote.ID(), local.ID())
 }
 
 func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
@@ -649,9 +698,11 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 
 	switch local.Type() {
 	case quantumfs.ObjectTypeDirectory:
-		if needDeeperMerge(remote, local) &&
-			((!localTypeChanged && !remoteTypeChanged) ||
-				(base == nil && bothSameType)) {
+		// Attempt to deep merge if:
+		// 1) all three base, local, and remote are directories OR
+		// 2) there is no base, but local and remote are still directories
+		if ((!localTypeChanged && !remoteTypeChanged) ||
+			(base == nil && bothSameType)) {
 
 			var baseId quantumfs.ObjectKey
 			if base != nil {
@@ -659,8 +710,8 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 			}
 
 			mergedKey, err := merge.mergeDirectory(local.Filename(),
-				baseId, remote.ID(), local.ID(), (base != nil), ht,
-				skipPaths, breadcrumb)
+				baseId, remote.ID(), local.ID(), rtnRecord.ID(),
+				(base != nil), ht, skipPaths, breadcrumb)
 			if err != nil {
 				return local, err
 			}
@@ -721,33 +772,6 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 		return hardlink, nil
 	}
 
-	// if we took remote for a directory, we have to accommodate its
-	// hardlinks in the hardlink tracker
-	if rtnRecord.ID().IsEqualTo(remote.ID()) &&
-		!remote.ID().IsEqualTo(local.ID()) &&
-		remote.Type() == quantumfs.ObjectTypeDirectory {
-
-		// Add new links
-		err = traverseSubtree(merge.c, remote.ID(),
-			func(v quantumfs.DirectoryRecord) {
-
-				ht.checkLinkChanged(merge.c, nil, v)
-			})
-		if err != nil {
-			return nil, err
-		}
-
-		// Remove old links
-		err = traverseSubtree(merge.c, local.ID(),
-			func(v quantumfs.DirectoryRecord) {
-
-				ht.checkLinkChanged(merge.c, v, nil)
-			})
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return rtnRecord, nil
 }
 
@@ -795,7 +819,7 @@ func (merge *merger) mergeFile(base quantumfs.DirectoryRecord,
 
 	defer merge.c.FuncIn("mergeFile", "%s", local.Filename()).Out()
 
-	if !needDeeperMerge(remote, local) {
+	if !needDeeperMerge(base, remote, local) {
 		return nil
 	}
 
