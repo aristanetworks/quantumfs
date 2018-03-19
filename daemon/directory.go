@@ -50,10 +50,9 @@ type Directory struct {
 }
 
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
-	visitor func(quantumfs.DirectoryRecord)) {
+	visitor func(quantumfs.ImmutableDirectoryRecord)) {
 
 	for {
-		c.vlog("Fetching baselayer %s", key.String())
 		buffer := c.dataStore.Get(&c.Ctx, key)
 		if buffer == nil {
 			panic("No baseLayer object")
@@ -1247,6 +1246,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// mark as accessed in both parents.
 		if childInode != nil {
 			c.vlog("Updating name and parent")
+			utils.Assert(dst.inodeNum() != childInode.inodeNum(),
+				"Cannot orphan child by renaming %s %d",
+				newName, dst.inodeNum())
 			childInode.setParent_(dst.inodeNum())
 			childInode.setName(newName)
 			childInode.clearAccessedCache()
@@ -1942,7 +1944,9 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		}
 
 		details.NodeId = child.attr.Ino
-		c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
+		if child.filename != "." && child.filename != ".." {
+			c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
+		}
 		if ds._generation == ds.src.generation() {
 			fillEntryOutCacheData(c, details)
 		} else {
