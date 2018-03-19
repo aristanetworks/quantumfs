@@ -36,7 +36,7 @@ func newHardlinkLeg(name string, fileId quantumfs.FileId,
 	return &newLink
 }
 
-func newHardlinkLegFromRecord(record quantumfs.DirectoryRecord,
+func newHardlinkLegFromRecord(record quantumfs.ImmutableDirectoryRecord,
 	hardlinkTable HardlinkTable) quantumfs.DirectoryRecord {
 
 	_, isHardlinkLeg := record.(*HardlinkLeg)
