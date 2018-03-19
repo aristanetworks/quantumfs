@@ -1251,7 +1251,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		if childInode != nil {
 			c.vlog("Updating name and parent")
 			utils.Assert(dst.inodeNum() != childInode.inodeNum(),
-				"artificial orphan from MvChild %s %d",
+				"Cannot orphan child by renaming %s %d",
 				newName, dst.inodeNum())
 			childInode.setParent_(dst.inodeNum())
 			childInode.setName(newName)

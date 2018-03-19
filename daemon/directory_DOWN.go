@@ -484,28 +484,28 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	dir.children.foreachChild(c, func(childname string, childId InodeId) {
 		localEntries[childname] = childId
 	})
-	foreachDentry(c, baseLayerId,
-		func(immrecord quantumfs.ImmutableDirectoryRecord) {
+	foreachDentry(c, baseLayerId, func(
+		immrecord quantumfs.ImmutableDirectoryRecord) {
 
-			record := immrecord.Clone()
-			localRecord, inodeId, missingDentry :=
-				dir.findLocalMatch_DOWN_(c, rc, record, localEntries)
-			if localRecord == nil {
-				uninstantiated = append(uninstantiated,
-					dir.loadNewChild_DOWN_(c, record, inodeId))
+		record := immrecord.Clone()
+		localRecord, inodeId, missingDentry :=
+			dir.findLocalMatch_DOWN_(c, rc, record, localEntries)
+		if localRecord == nil {
+			uninstantiated = append(uninstantiated,
+				dir.loadNewChild_DOWN_(c, record, inodeId))
+			return
+		}
+		if missingDentry {
+			if record.Type() != quantumfs.ObjectTypeHardlink {
+				// Will be handled in the moveDentries stage
 				return
 			}
-			if missingDentry {
-				if record.Type() != quantumfs.ObjectTypeHardlink {
-					// Will be handled in the moveDentries stage
-					return
-				}
-				if !rc.setHardlinkAsMoveDst(c, localRecord, record) {
-					dir.loadNewChild_DOWN_(c, record, inodeId)
-				}
-				return
+			if !rc.setHardlinkAsMoveDst(c, localRecord, record) {
+				dir.loadNewChild_DOWN_(c, record, inodeId)
 			}
-			dir.refreshChild_DOWN_(c, rc, localRecord, inodeId, record)
-		})
+			return
+		}
+		dir.refreshChild_DOWN_(c, rc, localRecord, inodeId, record)
+	})
 	c.qfs.addUninstantiated(c, uninstantiated, dir.inodeNum())
 }
