@@ -13,7 +13,7 @@ import (
 
 type HardlinkTableEntry struct {
 	record  quantumfs.DirectoryRecord
-	nlink   uint32
+	nlink   int64
 	inodeId InodeId
 	paths   []string
 
@@ -363,7 +363,7 @@ func loadHardlinks(c *ctx,
 
 	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
 		newLink := newLinkEntry(hardlink.Record())
-		newLink.nlink = hardlink.Nlinks()
+		newLink.nlink = int64(hardlink.Nlinks())
 		id := quantumfs.FileId(hardlink.FileId())
 		hardlinks[id] = newLink
 	})
@@ -410,7 +410,7 @@ func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
 		c.vlog("Updating nlink of %d: %d+%d (delta %d)", fileId,
 			entry.nlink, delta, entry.delta)
 
-		entry.nlink = uint32(int(entry.nlink) + delta)
+		entry.nlink = int64(int(entry.nlink) + delta)
 		entry.delta -= delta
 		if entry.nlink == 0 {
 			ht.removeHardlink_(fileId, entry.inodeId)

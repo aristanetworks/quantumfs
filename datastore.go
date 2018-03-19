@@ -984,6 +984,7 @@ type ImmutableDirectoryRecord interface {
 	FileId() FileId
 	Nlinks() uint32
 	EncodeExtendedKey() []byte
+	Clone() DirectoryRecord
 }
 
 func NewDirectoryRecord() *EncodedDirectoryRecord {
@@ -1653,4 +1654,21 @@ func (ir *ImmutableRecord) Nlinks() uint32 {
 
 func (ir *ImmutableRecord) EncodeExtendedKey() []byte {
 	return EncodeExtendedKey(ir.ID(), ir.Type(), ir.Size())
+}
+
+func (ir *ImmutableRecord) Clone() DirectoryRecord {
+	rtn := NewDirectoryRecord()
+	rtn.SetFilename(ir.filename)
+	rtn.SetID(ir.id)
+	rtn.SetType(ir.filetype)
+	rtn.SetPermissions(ir.permissions)
+	rtn.SetOwner(ir.owner)
+	rtn.SetGroup(ir.group)
+	rtn.SetSize(ir.size)
+	rtn.SetExtendedAttributes(ir.xattr)
+	rtn.SetContentTime(ir.ctime)
+	rtn.SetModificationTime(ir.mtime)
+	// Nlinks isn't stored in DirectoryRecord so don't set it
+	rtn.SetFileId(ir.fileId)
+	return rtn
 }
