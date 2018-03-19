@@ -362,7 +362,7 @@ func publishDirectoryRecords(c *ctx,
 
 	numEntries, baseLayer := quantumfs.NewDirectoryEntry(numEntries)
 	entryIdx := 0
-	quantumfs.SortDirectoryRecordsByName(records)
+	quantumfs.SortDirectoryRecords(records)
 
 	for _, child := range records {
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
@@ -1281,11 +1281,6 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		dst.self.dirty(c)
 	}()
 
-	func() {
-		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.deleteChild(c, oldName)
-	}()
-
 	// This is the same entry just moved, so we can use the same
 	// record for both the old and new paths.
 	dir.self.markAccessed(c, oldName,
@@ -1964,7 +1959,9 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		}
 
 		details.NodeId = child.attr.Ino
-		c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
+		if child.filename != "." && child.filename != ".." {
+			c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
+		}
 		if ds._generation == ds.src.generation() {
 			fillEntryOutCacheData(c, details)
 		} else {
