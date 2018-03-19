@@ -1521,7 +1521,13 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 		logInodeWorkspace(c, inode)
 		inode.queueToForget(c)
 	} else {
-		qfs.removeUninstantiated(c, []InodeId{inodeId})
+		c.dlog("Forgetting uninstantiated Inode %d", inodeId)
+		parentId := func() InodeId {
+			defer qfs.mapMutex.Lock().Unlock()
+			parentId, _ := qfs.parentOfUninstantiated[inodeId]
+			return parentId
+		}()
+		qfs.uninstantiateInode_(c, parentId)
 	}
 }
 
