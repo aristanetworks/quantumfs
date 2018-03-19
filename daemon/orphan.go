@@ -179,6 +179,9 @@ func (inode *InodeCommon) getOrphanChildAttr(c *ctx, inodeNum InodeId,
 		"getOrphanChildAttr on self before unlinking")
 
 	fillAttrWithDirectoryRecord(c, out, inodeNum, owner, inode.unlinkRecord)
+
+	// The nlink of an orphaned inode is always zero.
+	out.Nlink = 0
 }
 
 func (inode *InodeCommon) setChildRecord(c *ctx, record quantumfs.DirectoryRecord) {
