@@ -191,12 +191,16 @@ func NewObjectKeyFromBytes(bytes []byte) ObjectKey {
 	key := ObjectKey{
 		key: encoding.NewRootObjectKey(segment),
 	}
+	fillKeyFromBytes(bytes, key.key)
 
-	key.key.SetKeyType(byte(bytes[0]))
-	key.key.SetPart2(binary.LittleEndian.Uint64(bytes[1:9]))
-	key.key.SetPart3(binary.LittleEndian.Uint64(bytes[9:17]))
-	key.key.SetPart4(binary.LittleEndian.Uint32(bytes[17:]))
 	return key
+}
+
+func fillKeyFromBytes(bytes []byte, key encoding.ObjectKey) {
+	key.SetKeyType(byte(bytes[0]))
+	key.SetPart2(binary.LittleEndian.Uint64(bytes[1:9]))
+	key.SetPart3(binary.LittleEndian.Uint64(bytes[9:17]))
+	key.SetPart4(binary.LittleEndian.Uint32(bytes[17:]))
 }
 
 func overlayObjectKey(k encoding.ObjectKey) ObjectKey {
@@ -336,13 +340,22 @@ func OverlayDirectoryEntry(edir encoding.DirectoryEntry) DirectoryEntry {
 	return dir
 }
 
-func SortDirectoryRecordsByName(records []DirectoryRecord) {
+func SortDirectoryRecords(records []DirectoryRecord) {
 	sort.Slice(records,
 		func(i, j int) bool {
-			// Note that we cannot use the fileId for sorting the entries
-			// as there might be more than one dentry with the same
-			// fileId in a directory which results in unpredictable order
-			return records[i].Filename() < records[j].Filename()
+			// The only metadata which is truly unique within a directory
+			// is the filename of the children, but that is relatively
+			// expensive to access. First try the mostly unique fileID.
+			// We only require a consistent sorting order for the precise
+			// set of metadata contained within this directory to ensure
+			// block deduplication.
+			ri := records[i]
+			rj := records[j]
+			if ri.FileId() == rj.FileId() {
+				return ri.Filename() < rj.Filename()
+			}
+
+			return ri.FileId() < rj.FileId()
 		})
 }
 
@@ -363,7 +376,10 @@ func (dir *DirectoryEntry) Entry(i int) *EncodedDirectoryRecord {
 }
 
 func (dir *DirectoryEntry) SetEntry(i int, record PublishableRecord) {
-	dir.dir.Entries().Set(i, record.Record())
+	newER := copyDirectoryRecordIntoSegment(dir.dir.Segment,
+		record.EncodedDirectoryRecord)
+
+	dir.dir.Entries().Set(i, newER)
 }
 
 func (dir *DirectoryEntry) Next() ObjectKey {
@@ -594,6 +610,37 @@ func createEmptyDirectory() ObjectKey {
 // The key of the datablock with zero length
 var EmptyBlockKey ObjectKey
 
+func copyDirectoryRecordIntoSegment(s *capn.Segment,
+	record DirectoryRecord) encoding.DirectoryRecord {
+
+	newRecord := EncodedDirectoryRecord{
+		record: encoding.NewDirectoryRecord(s),
+	}
+
+	newRecord.SetFilename(record.Filename())
+
+	newID := encoding.NewObjectKey(s)
+	fillKeyFromBytes(record.ID().Value(), newID)
+	newRecord.record.SetId(newID)
+
+	newRecord.SetType(record.Type())
+	newRecord.SetPermissions(record.Permissions())
+	newRecord.SetOwner(record.Owner())
+	newRecord.SetGroup(record.Group())
+	newRecord.SetSize(record.Size())
+
+	newEA := encoding.NewObjectKey(s)
+	fillKeyFromBytes(record.ExtendedAttributes().Value(),
+		newEA)
+	newRecord.record.SetExtendedAttributes(newEA)
+
+	newRecord.SetContentTime(record.ContentTime())
+	newRecord.SetModificationTime(record.ModificationTime())
+	newRecord.SetFileId(record.FileId())
+
+	return newRecord.record
+}
+
 func createEmptyBlock() ObjectKey {
 	var bytes []byte
 
@@ -674,7 +721,9 @@ func (r *HardlinkRecord) Record() *EncodedDirectoryRecord {
 }
 
 func (r *HardlinkRecord) SetRecord(record DirectoryRecord) {
-	r.record.SetRecord(record.(*EncodedDirectoryRecord).record)
+	newER := copyDirectoryRecordIntoSegment(r.record.Segment, record)
+
+	r.record.SetRecord(newER)
 }
 
 func (r *HardlinkRecord) Nlinks() uint32 {
@@ -744,6 +793,14 @@ func (dir *HardlinkEntry) Entry(i int) *HardlinkRecord {
 
 func (dir *HardlinkEntry) SetEntry(i int, record *HardlinkRecord) {
 	dir.entry.Entries().Set(i, record.record)
+}
+
+func (dir *HardlinkEntry) NewEntry() *HardlinkRecord {
+	record := HardlinkRecord{
+		record: encoding.NewRootHardlinkRecord(dir.entry.Segment),
+	}
+
+	return &record
 }
 
 func (dir *HardlinkEntry) Next() ObjectKey {
