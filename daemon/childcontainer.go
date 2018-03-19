@@ -81,12 +81,13 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 
 	uninstantiated := make([]InodeId, 0, 200) // 200 arbitrarily chosen
 
-	foreachDentry(c, baseLayerId, func(record quantumfs.DirectoryRecord) {
-		c.vlog("Loading child %s", record.Filename())
-		childInodeNum := container.loadChild(c, record)
-		c.vlog("loaded child %d", childInodeNum)
-		uninstantiated = append(uninstantiated, childInodeNum)
-	})
+	foreachDentry(c, baseLayerId,
+		func(record quantumfs.ImmutableDirectoryRecord) {
+
+			childInodeNum := container.loadChild(c, record.Clone())
+			c.vlog("loaded child %d", childInodeNum)
+			uninstantiated = append(uninstantiated, childInodeNum)
+		})
 
 	return uninstantiated
 }
