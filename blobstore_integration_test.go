@@ -10,6 +10,7 @@ package cql
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"testing"
 
@@ -46,6 +47,21 @@ func (s *storeIntegrationTests) SetupSuite() {
 
 func (s *storeIntegrationTests) SetupTest() {
 	checkSetupInteg(s)
+}
+
+func (s *storeIntegrationTests) TestSchemaCheckFailed() {
+	confFile, err := EtherConfFile()
+	s.Require().NoError(err, "error in getting ether configuration file")
+
+	// setup a dummy CFNAME_PREFIX so that the session
+	// establishment fails since no such table exists
+	oldCfName := os.Getenv("CFNAME_PREFIX")
+	os.Setenv("CFNAME_PREFIX", "dummyPrefix")
+	_, err = NewCqlBlobStore(confFile)
+
+	s.Require().Error(err, "NewCqlBlobStore should have failed")
+	s.Require().Contains(err.Error(), "dummyPrefix")
+	os.Setenv("CFNAME_PREFIX", oldCfName)
 }
 
 func (s *storeIntegrationTests) TestInsert() {

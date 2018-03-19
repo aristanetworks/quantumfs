@@ -88,7 +88,7 @@ func DoTestSchemaOp(confFile string, op SchemaOp) error {
 		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
 	}
 
-	c := NewRealCluster(cfg.Cluster)
+	c := NewRealCluster(&cfg.Cluster)
 	realc := c.(*RealCluster)
 	sess, serr := realc.cluster.CreateSession()
 	if serr != nil {
@@ -110,7 +110,7 @@ func SetupIntegTestKeyspace(confFile string) error {
 		return fmt.Errorf("error in reading cqlConfigFile: %s", err.Error())
 	}
 
-	c := NewRealCluster(cfg.Cluster)
+	c := NewRealCluster(&cfg.Cluster)
 	realc := c.(*RealCluster)
 	sess, serr := realc.cluster.CreateSession()
 	if serr != nil {

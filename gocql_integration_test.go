@@ -37,7 +37,7 @@ func init() {
 	gcpWsdb = fmt.Sprintf("%sworkspacedb", prefix)
 }
 
-func setupCluster(cfg ClusterConfig) *gocql.ClusterConfig {
+func setupCluster(cfg *ClusterConfig) *gocql.ClusterConfig {
 	c := NewRealCluster(cfg)
 	rc, _ := c.(*RealCluster)
 
@@ -283,7 +283,7 @@ func BenchmarkGoCQL(b *testing.B) {
 		b.Fatalf("Reading ether config file failed: %s", err1)
 	}
 	gcpKeyspace = cfg.Cluster.KeySpace
-	cluster := setupCluster(cfg.Cluster)
+	cluster := setupCluster(&cfg.Cluster)
 
 	// The benchmarks themselves aren't dependent
 	// on each other but the benchmark report looks more readable

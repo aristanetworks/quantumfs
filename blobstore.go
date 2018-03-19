@@ -66,7 +66,7 @@ func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
 			"error in reading cql config file %s", err.Error())
 	}
 
-	cluster := NewRealCluster(cfg.Cluster)
+	cluster := NewRealCluster(&cfg.Cluster)
 
 	return newCqlBS(cluster, cfg)
 }

@@ -18,7 +18,7 @@ type RealCluster struct {
 }
 
 // NewRealCluster returns a default Cluster struct with the given hosts
-func NewRealCluster(clusterCfg ClusterConfig) Cluster {
+func NewRealCluster(clusterCfg *ClusterConfig) Cluster {
 
 	var err error
 	nodes := clusterCfg.Nodes

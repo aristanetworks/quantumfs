@@ -23,8 +23,7 @@ func NewWorkspaceDB(confName string) wsdb.WorkspaceDB {
 		fmt.Println("Error reading CQL config: ", err)
 		panic(err.Error())
 	}
-	cluster := NewRealCluster(cfg.Cluster)
-
+	cluster := NewRealCluster(&cfg.Cluster)
 	var wsdb wsdb.WorkspaceDB
 	if wsdb, err = newNoCacheWsdb(cluster, cfg); err != nil {
 		panic(fmt.Sprintf("Error %q during NewNoCacheWsdb", err))

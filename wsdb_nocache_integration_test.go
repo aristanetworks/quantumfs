@@ -29,7 +29,7 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	suite.Require().NoError(err, "DoTestSchemaOp SchemaCreate returned an error")
 
 	var wsdb qwsdb.WorkspaceDB
-	cluster := NewRealCluster(cfg.Cluster)
+	cluster := NewRealCluster(&cfg.Cluster)
 	wsdb, err = newNoCacheWsdb(cluster, cfg)
 	suite.Require().NoError(err, "Error during configuration read")
 
