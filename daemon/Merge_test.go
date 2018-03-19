@@ -1017,10 +1017,10 @@ func TestMergeDeepMergeHardlink(t *testing.T) {
 				bws+"/dirA/linkC"))
 		}, func(localWs string, remoteWs string) mergeTestCheck {
 			// Make some remote only removals so we mergeDirectory
-			test.AssertNoErr(os.Remove(remoteWs+"/dirA/file"))
-			test.AssertNoErr(os.Remove(remoteWs+"/dirA/link"))
-			test.AssertNoErr(os.Remove(remoteWs+"/dirA/linkB"))
-			test.AssertNoErr(os.Remove(remoteWs+"/dirA/linkC"))
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/file"))
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/link"))
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/linkB"))
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/linkC"))
 
 			return func(merged string) {
 				// Nothing to check explicitly - we are just looking
@@ -1044,8 +1044,8 @@ func TestMergeDeepMergeHardlinkPartial(t *testing.T) {
 				bws+"/dirA/linkC"))
 		}, func(localWs string, remoteWs string) mergeTestCheck {
 			// Make some remote only removals so we mergeDirectory
-			test.AssertNoErr(os.Remove(remoteWs+"/dirA/linkB"))
-			test.AssertNoErr(os.Remove(remoteWs+"/dirA/linkC"))
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/linkB"))
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/linkC"))
 
 			return func(merged string) {
 				test.CheckLink(merged+"/dirA/link",
@@ -1054,4 +1054,3 @@ func TestMergeDeepMergeHardlinkPartial(t *testing.T) {
 		})
 	})
 }
-

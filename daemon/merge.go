@@ -701,8 +701,8 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 		// Attempt to deep merge if:
 		// 1) all three base, local, and remote are directories OR
 		// 2) there is no base, but local and remote are still directories
-		if ((!localTypeChanged && !remoteTypeChanged) ||
-			(base == nil && bothSameType)) {
+		if (!localTypeChanged && !remoteTypeChanged) ||
+			(base == nil && bothSameType) {
 
 			var baseId quantumfs.ObjectKey
 			if base != nil {
