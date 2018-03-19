@@ -50,10 +50,9 @@ type Directory struct {
 }
 
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
-	visitor func(quantumfs.DirectoryRecord)) {
+	visitor func(quantumfs.ImmutableDirectoryRecord)) {
 
 	for {
-		c.vlog("Fetching baselayer %s", key.String())
 		buffer := c.dataStore.Get(&c.Ctx, key)
 		if buffer == nil {
 			panic("No baseLayer object")
@@ -159,17 +158,12 @@ func (dir *Directory) prepareForOrphaning(c *ctx, name string,
 	if record.Type() != quantumfs.ObjectTypeHardlink {
 		return record
 	}
-	publishable, effective := dir.hardlinkDec(record.FileId())
-	if publishable != nil {
+	newRecord := dir.hardlinkDec(record.FileId())
+	if newRecord != nil {
 		// This was the last leg of the hardlink
-		orphanRecord := publishable
-		if effective != nil {
-			orphanRecord = effective
-		}
-		orphanRecord.SetFilename(name)
-		return orphanRecord
+		newRecord.SetFilename(name)
 	}
-	return nil
+	return newRecord
 }
 
 // Needs inode lock for write
@@ -440,10 +434,10 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	records[0].SetFilename(name)
 	dir.children.setRecord(c, inodeId, records[0])
 	dir.children.makePublishable(c, name)
-	if records[1] != nil {
-		records[1].SetFilename(name)
-		dir.children.setRecord(c, inodeId, records[1])
-	}
+
+	// We don't normalize dirty children above, so there should be no unpublished
+	// effective changes here.
+	utils.Assert(records[1] == nil, "Child with unpublished changes")
 }
 
 func (dir *Directory) getNormalizationCandidates(c *ctx) (
@@ -1259,6 +1253,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// mark as accessed in both parents.
 		if childInode != nil {
 			c.vlog("Updating name and parent")
+			utils.Assert(dst.inodeNum() != childInode.inodeNum(),
+				"Cannot orphan child by renaming %s %d",
+				newName, dst.inodeNum())
 			childInode.setParent_(dst.inodeNum())
 			childInode.setName(newName)
 			childInode.clearAccessedCache()
@@ -1885,8 +1882,7 @@ func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
 }
 
 func (dir *Directory) hardlinkDec(
-	fileId quantumfs.FileId) (publishable quantumfs.DirectoryRecord,
-	effective quantumfs.DirectoryRecord) {
+	fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord) {
 
 	dir.hardlinkDelta.dec(fileId)
 	return dir.hardlinkTable.hardlinkDec(fileId)
@@ -1959,7 +1955,9 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		}
 
 		details.NodeId = child.attr.Ino
-		c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
+		if child.filename != "." && child.filename != ".." {
+			c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
+		}
 		if ds._generation == ds.src.generation() {
 			fillEntryOutCacheData(c, details)
 		} else {
