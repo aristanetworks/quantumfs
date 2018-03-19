@@ -329,14 +329,14 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 	if entry, exists := wsr.hardlinkTable.hardlinks[id]; !exists {
 		c.vlog("Adding new hardlink entry with id %d", id)
 		newLink := newLinkEntry(hardlink.Record())
-		newLink.nlink = hardlink.Nlinks()
+		newLink.nlink = int64(hardlink.Nlinks())
 		wsr.hardlinkTable.hardlinks[id] = newLink
 	} else {
 		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
 			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
 		oldRecord := entry.record
 
-		entry.nlink = hardlink.Nlinks()
+		entry.nlink = int64(hardlink.Nlinks())
 		entry.record = hardlink.Record()
 		wsr.hardlinkTable.hardlinks[id] = entry
 
