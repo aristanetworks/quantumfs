@@ -49,7 +49,7 @@ type Directory struct {
 	uninstantiating bool
 }
 
-func foreachImmutableDentry(c *ctx, key quantumfs.ObjectKey,
+func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 	visitor func(quantumfs.ImmutableDirectoryRecord)) {
 
 	for {
@@ -1249,6 +1249,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// Update the inode to point to the new name and
 		// mark as accessed in both parents.
 		if childInode != nil {
+			c.vlog("Updating name and parent")
 			utils.Assert(dst.inodeNum() != childInode.inodeNum(),
 				"artificial orphan from MvChild %s %d",
 				newName, dst.inodeNum())
