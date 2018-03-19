@@ -81,7 +81,7 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 
 	uninstantiated := make([]InodeId, 0, 200) // 200 arbitrarily chosen
 
-	foreachImmutableDentry(c, baseLayerId,
+	foreachDentry(c, baseLayerId,
 		func(record quantumfs.ImmutableDirectoryRecord) {
 
 			childInodeNum := container.loadChild(c, record.Clone())

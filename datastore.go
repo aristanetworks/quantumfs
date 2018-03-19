@@ -294,13 +294,6 @@ func EncodeSpecialKey(fileType uint32, device uint32) ObjectKey {
 	return NewObjectKey(KeyTypeEmbedded, hash)
 }
 
-type ImmutableDirectoryEntry interface {
-	NumEntries() int
-	ImmutableEntry(int) ImmutableDirectoryRecord
-	Next() ObjectKey
-	HasNext() bool
-}
-
 type DirectoryEntry struct {
 	dir encoding.DirectoryEntry
 }
@@ -363,10 +356,6 @@ func (dir *DirectoryEntry) NumEntries() int {
 
 func (dir *DirectoryEntry) SetNumEntries(n int) {
 	dir.dir.SetNumEntries(uint32(n))
-}
-
-func (dir *DirectoryEntry) ImmutableEntry(i int) ImmutableDirectoryRecord {
-	return dir.Entry(i)
 }
 
 func (dir *DirectoryEntry) Entry(i int) *EncodedDirectoryRecord {

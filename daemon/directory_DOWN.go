@@ -409,7 +409,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 	remoteEntries := make(map[string]quantumfs.DirectoryRecord, 0)
 	if baseLayerId != nil {
-		foreachImmutableDentry(c, *baseLayerId,
+		foreachDentry(c, *baseLayerId,
 			func(record quantumfs.ImmutableDirectoryRecord) {
 
 				remoteEntries[record.Filename()] = record.Clone()
@@ -484,7 +484,7 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	dir.children.foreachChild(c, func(childname string, childId InodeId) {
 		localEntries[childname] = childId
 	})
-	foreachImmutableDentry(c, baseLayerId,
+	foreachDentry(c, baseLayerId,
 		func(immrecord quantumfs.ImmutableDirectoryRecord) {
 
 			record := immrecord.Clone()

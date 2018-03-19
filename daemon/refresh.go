@@ -227,14 +227,14 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 
 	c.vlog("Loading local records")
 	localRecords := make(map[quantumfs.FileId]quantumfs.DirectoryRecord)
-	foreachImmutableDentry(c, localDir,
+	foreachDentry(c, localDir,
 		func(record quantumfs.ImmutableDirectoryRecord) {
 
 			localRecords[record.FileId()] = record.Clone()
 		})
 
 	c.vlog("Loading remote records")
-	foreachImmutableDentry(c, remoteDir,
+	foreachDentry(c, remoteDir,
 		func(record quantumfs.ImmutableDirectoryRecord) {
 
 			c.vlog("Added filemap entry for %s: %x", record.Filename(),
