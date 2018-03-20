@@ -171,8 +171,9 @@ func (fi *VeryLargeFile) blockIdxInfo(c *ctx, absOffset uint64) (int, uint64) {
 	for i := len(fi.parts); ; i++ {
 		if maxLengthFile > absOffset {
 			tmpLargeFile := newLargeShell()
-			blockIdx, offset := tmpLargeFile.blockIdxInfo(c, absOffset)
+			blockIdx, _ := tmpLargeFile.blockIdxInfo(c, absOffset)
 			blockIdx += i * quantumfs.MaxBlocksLargeFile()
+			offset := absOffset % quantumfs.MaxLargeFileSize()
 			return blockIdx, offset
 		}
 		absOffset -= maxLengthFile
