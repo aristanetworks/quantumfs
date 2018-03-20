@@ -14,7 +14,7 @@ import (
 type HardlinkTableEntry struct {
 	publishableRecord quantumfs.DirectoryRecord
 	effectiveRecord   quantumfs.DirectoryRecord
-	nlink             uint32
+	nlink             int64
 	inodeId           InodeId
 	paths             []string
 
@@ -57,8 +57,7 @@ type HardlinkTable interface {
 	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
 	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
 	findHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId) InodeId
-	hardlinkDec(fileId quantumfs.FileId) (publishable quantumfs.DirectoryRecord,
-		effective quantumfs.DirectoryRecord)
+	hardlinkDec(fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord)
 	hardlinkInc(fileId quantumfs.FileId)
 	newHardlink(c *ctx, inodeId InodeId,
 		record quantumfs.DirectoryRecord) *HardlinkLeg
@@ -154,8 +153,7 @@ func (ht *HardlinkTableImpl) hardlinkInc(fileId quantumfs.FileId) {
 }
 
 func (ht *HardlinkTableImpl) hardlinkDec(
-	fileId quantumfs.FileId) (publishable quantumfs.DirectoryRecord,
-	effective quantumfs.DirectoryRecord) {
+	fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord) {
 
 	defer ht.linkLock.Lock().Unlock()
 
@@ -174,11 +172,16 @@ func (ht *HardlinkTableImpl) hardlinkDec(
 	entry.record().SetContentTime(quantumfs.NewTime(time.Now()))
 
 	if entry.effectiveNlink() > 0 {
-		return nil, nil
+		ht.hardlinks[fileId] = entry
+		return nil
 	}
 
 	// all references to this hardlink are gone and we must remove it
-	return entry.publishableRecord, entry.effectiveRecord
+	if entry.effectiveRecord != nil {
+		return entry.effectiveRecord
+	} else {
+		return entry.publishableRecord
+	}
 }
 
 // Must hold the linkLock for writing
@@ -384,7 +387,7 @@ func loadHardlinks(c *ctx,
 
 	foreachHardlink(c, entry, func(hardlink *quantumfs.HardlinkRecord) {
 		newLink := newLinkEntry(hardlink.Record())
-		newLink.nlink = hardlink.Nlinks()
+		newLink.nlink = int64(hardlink.Nlinks())
 		id := quantumfs.FileId(hardlink.FileId())
 		hardlinks[id] = newLink
 	})
@@ -430,7 +433,7 @@ func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
 		c.vlog("Updating nlink of %d: %d+%d (delta %d)", fileId,
 			entry.nlink, delta, entry.delta)
 
-		entry.nlink = uint32(int(entry.nlink) + delta)
+		entry.nlink = int64(int(entry.nlink) + delta)
 		entry.delta -= delta
 		if entry.nlink == 0 {
 			ht.removeHardlink_(fileId, entry.inodeId)

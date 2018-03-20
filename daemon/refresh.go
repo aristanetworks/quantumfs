@@ -227,17 +227,21 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 
 	c.vlog("Loading local records")
 	localRecords := make(map[quantumfs.FileId]quantumfs.DirectoryRecord)
-	foreachDentry(c, localDir, func(record quantumfs.DirectoryRecord) {
-		localRecords[record.FileId()] = record
-	})
+	foreachDentry(c, localDir,
+		func(record quantumfs.ImmutableDirectoryRecord) {
+
+			localRecords[record.FileId()] = record.Clone()
+		})
 
 	c.vlog("Loading remote records")
-	foreachDentry(c, remoteDir, func(record quantumfs.DirectoryRecord) {
+	foreachDentry(c, remoteDir, func(
+		record quantumfs.ImmutableDirectoryRecord) {
+
 		c.vlog("Added filemap entry for %s: %x", record.Filename(),
 			record.FileId())
 
 		rc.fileMap[record.FileId()] = &FileLoadRecord{
-			remoteRecord:  record,
+			remoteRecord:  record.Clone(),
 			inodeId:       quantumfs.InodeIdInvalid,
 			parentId:      quantumfs.InodeIdInvalid,
 			newParentPath: path,
@@ -247,7 +251,8 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 		if record.Type() == quantumfs.ObjectTypeDirectory {
 			localKey := quantumfs.EmptyDirKey
 
-			// don't recurse into any directories that haven't changed
+			// don't recurse into any directories that
+			// haven't changed
 			localRecord, exists := localRecords[record.FileId()]
 			if exists {
 				if skipDir(localRecord, record) {
@@ -266,7 +271,7 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 }
 
 func skipDir(local quantumfs.ImmutableDirectoryRecord,
-	remote quantumfs.DirectoryRecord) bool {
+	remote quantumfs.ImmutableDirectoryRecord) bool {
 
 	if local == nil || remote == nil {
 		return false
@@ -324,14 +329,14 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 	if entry, exists := wsr.hardlinkTable.hardlinks[id]; !exists {
 		c.vlog("Adding new hardlink entry with id %d", id)
 		newLink := newLinkEntry(hardlink.Record())
-		newLink.nlink = hardlink.Nlinks()
+		newLink.nlink = int64(hardlink.Nlinks())
 		wsr.hardlinkTable.hardlinks[id] = newLink
 	} else {
 		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
 			entry.record().Filename(), hardlink.Nlinks(), entry.nlink)
 		oldRecord := entry.record()
 
-		entry.nlink = hardlink.Nlinks()
+		entry.nlink = int64(hardlink.Nlinks())
 		entry.publishableRecord = hardlink.Record()
 		wsr.hardlinkTable.hardlinks[id] = entry
 
