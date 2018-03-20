@@ -21,6 +21,16 @@ type wsdbCommonUnitTest struct {
 	req      *require.Assertions
 	wsdb     wsdb.WorkspaceDB
 	mockSess *MockSession
+	cfg      *Config
+}
+
+func setupMockConfig() *Config {
+	return &Config{
+		Cluster: ClusterConfig{
+			KeySpace: tstKeyspace,
+			Username: tstUsername,
+		},
+	}
 }
 
 func (s *wsdbCommonUnitTest) TestEmptyDB() {

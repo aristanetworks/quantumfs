@@ -20,6 +20,8 @@ var testKey2Metadata = map[string]string{}
 var unitTestEtherCtx = ether.DefaultCtx
 var integTestEtherCtx = ether.DefaultCtx
 
+var tstUsername = scyllaUsername
+var tstKeyspace = "ether"
 var etherConfFile string
 
 // EtherConfFile returns the full path to the ether's configuration file

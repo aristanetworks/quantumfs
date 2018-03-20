@@ -51,16 +51,17 @@ func NewRealCluster(clusterCfg *ClusterConfig) Cluster {
 	}
 	c.Events.DisableSchemaEvents = true
 
-	if clusterCfg.Username != "" && clusterCfg.Password != "" {
-		c.Authenticator = gocql.PasswordAuthenticator{
-			Username: clusterCfg.Username,
-			Password: clusterCfg.Password,
-		}
-	} else {
-		c.Authenticator = gocql.PasswordAuthenticator{
-			Username: scyllaUsername,
-			Password: scyllaPassword,
-		}
+	if clusterCfg.Username == "" {
+		clusterCfg.Username = scyllaUsername
+	}
+
+	if clusterCfg.Password == "" {
+		clusterCfg.Password = scyllaPassword
+	}
+
+	c.Authenticator = gocql.PasswordAuthenticator{
+		Username: clusterCfg.Username,
+		Password: clusterCfg.Password,
 	}
 
 	if clusterCfg.QueryNumRetries == 0 {

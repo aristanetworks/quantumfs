@@ -10,6 +10,7 @@ package cql
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/aristanetworks/ether/qubit/wsdb"
 	mock "github.com/stretchr/testify/mock"
@@ -473,11 +474,35 @@ func newMockQueryScanByteSlice(err error,
 	}
 }
 
+func newMockQueryScanList(err error,
+	vals []interface{}) func(dest ...interface{}) error {
+
+	return func(dest ...interface{}) error {
+		if err == nil {
+			assignValToDest(vals[0], dest[0])
+		}
+		return err
+	}
+}
+
 func newMockQueryScanStrings(err error,
 	vals []interface{}) func(dest ...interface{}) error {
 
 	return func(dest ...interface{}) error {
 
+		if err == nil {
+			for i := range vals {
+				assignValToDest(vals[i], dest[i])
+			}
+		}
+		return err
+	}
+}
+
+func newMockQueryScanInts(err error,
+	vals []interface{}) func(dest ...interface{}) error {
+
+	return func(dest ...interface{}) error {
 		if err == nil {
 			for i := range vals {
 				assignValToDest(vals[i], dest[i])
@@ -636,15 +661,44 @@ func mockBranchWorkspace(sess *MockSession, srcTypespace string,
 		srcKey, wsdb.WorkspaceNonceInvalid, nil)
 }
 
-const isTablePresentQuery = `SELECT * FROM ether.%s LIMIT 1`
+func mockSchemaOk(sess *MockSession, tableName string, err error) {
+	mockSchemaCheckV2(sess, tableName, 1, []string{"SELECT", "MODIFY"}, nil)
+}
 
-func mockIsTablePresent(sess *MockSession, tableName string, err error) {
+func mockSchemaCheckV2(sess *MockSession, tableName string,
+	count int, perms []string, err error) {
+
+	mockSchemaCheckV2Table(sess, tableName, count, err)
+	mockSchemaCheckV2Perms(sess, tableName, perms, err)
+}
+
+func mockSchemaCheckV2Table(sess *MockSession, tableName string, count int, err error) {
+
 	mockquery := &MockQuery{}
-	qstr := fmt.Sprintf(isTablePresentQuery, tableName)
-	sess.On("Query", qstr).Return(mockquery)
+	checkTableQuery := fmt.Sprintf("SELECT count(*) FROM system.schema_columns "+
+		"WHERE keyspace_name='%s' AND columnfamily_name='%s'",
+		strings.ToLower(tstKeyspace), strings.ToLower(tableName))
+	sess.On("Query", checkTableQuery).Return(mockquery)
 	if err != nil {
-		mockquery.On("Exec").Return(err)
+		mockquery.On("Scan", mock.AnythingOfType("*int")).Return(err)
 	} else {
-		mockquery.On("Exec").Return(nil)
+		scanFunc := newMockQueryScanInts(err, []interface{}{count})
+		mockquery.On("Scan", mock.AnythingOfType("*int")).Return(scanFunc)
+	}
+}
+
+func mockSchemaCheckV2Perms(sess *MockSession, tableName string, perms []string, err error) {
+
+	mockquery := &MockQuery{}
+	checkPermsQuery := fmt.Sprintf("SELECT permissions FROM system_auth.permissions "+
+		"WHERE username='%s' AND resource='data/%s'",
+		strings.ToLower(tstUsername),
+		strings.ToLower(tstKeyspace))
+	sess.On("Query", checkPermsQuery).Return(mockquery)
+	if err != nil {
+		mockquery.On("Scan", mock.AnythingOfType("*[]string")).Return(err)
+	} else {
+		scanFunc := newMockQueryScanList(err, []interface{}{perms})
+		mockquery.On("Scan", mock.AnythingOfType("*[]string")).Return(scanFunc)
 	}
 }

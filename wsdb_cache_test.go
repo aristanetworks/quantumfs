@@ -22,6 +22,7 @@ type wsdbCacheTestSuite struct {
 	suite.Suite
 	common *wsdbCommonUnitTest
 	cache  *entityCache
+	cfg    *Config
 }
 
 func (suite *wsdbCacheTestSuite) SetupSuite() {
@@ -35,14 +36,9 @@ func (suite *wsdbCacheTestSuite) SetupTest() {
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
 
-	mockIsTablePresent(mockSession, "workspacedb", nil)
+	mockSchemaOk(mockSession, "workspacedb", nil)
 
-	mockCfg := &Config{
-		Cluster: ClusterConfig{
-			KeySpace: "ether",
-		},
-	}
-
+	mockCfg := setupMockConfig()
 	noCacheWsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
 	suite.Require().NoError(err, "Failed %q newNoCacheWsdb", err)
 	wsdb := newCacheWsdb(noCacheWsdb, mockCfg.WsDB)
@@ -50,20 +46,19 @@ func (suite *wsdbCacheTestSuite) SetupTest() {
 	suite.Require().True(ok, "Incorrect type from newCacheWsdb")
 
 	suite.cache = cwsdb.cache
-
 	suite.common = &wsdbCommonUnitTest{
 		req:      suite.Require(),
 		wsdb:     wsdb,
 		mockSess: mockSession,
+		cfg:      mockCfg,
 	}
 }
 
 func (suite *wsdbCacheTestSuite) TestWsdbConfigDefault() {
-	var config Config
 	var config2 *Config
 
+	config := *suite.common.cfg
 	config.Cluster.Nodes = []string{"node1", "node2"}
-	config.Cluster.KeySpace = "ether"
 	// no wsdb configuration
 
 	file, err := ioutil.TempFile(os.TempDir(), "ether")
@@ -95,17 +90,11 @@ func (suite *wsdbCacheTestSuite) TestWsdbConfigDefault() {
 func (suite *wsdbCacheTestSuite) TestCacheBadConfig() {
 	timeout := -100
 
-	mockCfg := &Config{
-		Cluster: ClusterConfig{
-			KeySpace: "ether",
-		},
-		WsDB: WsDBConfig{
-			CacheTimeoutSecs: timeout,
-		},
-	}
+	mockCfg := *suite.common.cfg
+	mockCfg.WsDB.CacheTimeoutSecs = timeout
 
 	mockCluster := new(MockCluster)
-	noCacheWsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
+	noCacheWsdb, err := newNoCacheWsdb(mockCluster, &mockCfg)
 	suite.Require().NoError(err, "Failed %q newNoCacheWsdb", err)
 
 	suite.Require().Panics(func() {
@@ -119,16 +108,10 @@ func (suite *wsdbCacheTestSuite) TestCacheWithoutExpiry() {
 	mockCluster := new(MockCluster)
 	mockCluster.On("CreateSession").Return(suite.common.mockSess, nil)
 
-	mockCfg := &Config{
-		Cluster: ClusterConfig{
-			KeySpace: "ether",
-		},
-		WsDB: WsDBConfig{
-			CacheTimeoutSecs: timeout,
-		},
-	}
+	mockCfg := *suite.common.cfg
+	mockCfg.WsDB.CacheTimeoutSecs = timeout
 
-	noCacheWsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
+	noCacheWsdb, err := newNoCacheWsdb(mockCluster, &mockCfg)
 	suite.Require().NoError(err, "Failed %q newNoCacheWsdb", err)
 
 	wdb := newCacheWsdb(noCacheWsdb, mockCfg.WsDB)
@@ -190,16 +173,10 @@ func (suite *wsdbCacheTestSuite) TestCacheTimeout() {
 	mockWsdbCacheTypespaceFetch(suite.common.mockSess, tsRows, tsVals,
 		tsIter, nil)
 
-	mockCfg := &Config{
-		Cluster: ClusterConfig{
-			KeySpace: "ether",
-		},
-		WsDB: WsDBConfig{
-			CacheTimeoutSecs: timeout,
-		},
-	}
+	mockCfg := *suite.common.cfg
+	mockCfg.WsDB.CacheTimeoutSecs = timeout
 
-	noCacheWsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
+	noCacheWsdb, err := newNoCacheWsdb(mockCluster, &mockCfg)
 	suite.Require().NoError(err, "Failed %q newNoCacheWsdb", err)
 
 	wdb := newCacheWsdb(noCacheWsdb, mockCfg.WsDB)

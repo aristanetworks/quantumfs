@@ -24,14 +24,9 @@ func (suite *wsdbNoCacheTestSuite) SetupTest() {
 	mockSession := new(MockSession)
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
-	mockIsTablePresent(mockSession, "workspacedb", nil)
+	mockSchemaOk(mockSession, "workspacedb", nil)
 
-	mockCfg := &Config{
-		Cluster: ClusterConfig{
-			KeySpace: "ether",
-		},
-	}
-
+	mockCfg := setupMockConfig()
 	wsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
 	suite.Require().NoError(err, "Failed %q workspaceDB initialization", err)
 
@@ -39,6 +34,7 @@ func (suite *wsdbNoCacheTestSuite) SetupTest() {
 		req:      suite.Require(),
 		wsdb:     wsdb,
 		mockSess: mockSession,
+		cfg:      mockCfg,
 	}
 }
 
