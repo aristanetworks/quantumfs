@@ -39,7 +39,11 @@ func (merge *merger) newHardlinkTracker(base map[quantumfs.FileId]HardlinkTableE
 
 	// Merge all records together and do intra-file merges
 	for k, remoteEntry := range remote {
-		rtn.allRecords[k] = remoteEntry.record
+		// We'll count these ourselves when we are merging
+		remoteEntry.nlink = 0
+		rtn.merged[k] = remoteEntry
+
+		rtn.allRecords[k] = remoteEntry.record()
 	}
 
 	// make sure merged has the newest available record versions based off local
@@ -48,27 +52,28 @@ func (merge *merger) newHardlinkTracker(base map[quantumfs.FileId]HardlinkTableE
 			var baseRecord quantumfs.DirectoryRecord
 			baseEntry, baseExists := base[k]
 			if baseExists {
-				baseRecord = baseEntry.record
+				baseRecord = baseEntry.record()
 			}
 
 			mergedRecord, err := merge.mergeAttributes(baseRecord,
-				remoteEntry.record, localEntry.record)
+				remoteEntry.record(), localEntry.record())
 			if err != nil {
 				panic(err)
 			}
 
 			err = merge.mergeFile(baseRecord,
-				remoteEntry.record, localEntry.record, &mergedRecord)
+				remoteEntry.record(), localEntry.record(),
+				&mergedRecord)
 			if err != nil {
 				panic(err)
 			}
 
 			rtn.allRecords[k] = mergedRecord.(quantumfs.DirectoryRecord)
 		} else {
-			rtn.allRecords[k] = localEntry.record
+			rtn.allRecords[k] = localEntry.record()
 		}
 
-		localEntry.record = rtn.allRecords[k]
+		localEntry.publishableRecord = rtn.allRecords[k]
 		rtn.merged[k] = localEntry
 	}
 
@@ -97,6 +102,21 @@ func traverseSubtree(c *ctx, dirKey quantumfs.ObjectKey,
 	return nil
 }
 
+type hardlinkTableEntries map[quantumfs.FileId]HardlinkTableEntry
+
+func (ht *hardlinkTracker) filterDeadEntries() hardlinkTableEntries {
+	for fileId, record := range ht.merged {
+		if record.nlink <= 0 {
+			utils.Assert(record.nlink == 0,
+				"More hardlink leg removals than possible: %d",
+				record.nlink)
+			delete(ht.merged, fileId)
+		}
+	}
+
+	return ht.merged
+}
+
 // Compares the local record against merge product and tracks any changes
 func (ht *hardlinkTracker) checkLinkChanged(c *ctx, local quantumfs.DirectoryRecord,
 	final quantumfs.DirectoryRecord) {
@@ -121,11 +141,6 @@ func (ht *hardlinkTracker) increment(id quantumfs.FileId) {
 func (ht *hardlinkTracker) decrement(id quantumfs.FileId) {
 	link := ht.newestEntry(id)
 
-	if link.nlink <= 1 {
-		delete(ht.merged, id)
-		return
-	}
-
 	link.nlink--
 	ht.merged[id] = link
 }
@@ -133,14 +148,8 @@ func (ht *hardlinkTracker) decrement(id quantumfs.FileId) {
 // Returns the newest HardlinkTableEntry version available, while
 // preserving nlink from merged
 func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) HardlinkTableEntry {
-	link, _ := ht.merged[id]
-
-	// Use the latest record, but preserve the nlink count from merged
-	record, exists := ht.allRecords[id]
-
+	link, exists := ht.merged[id]
 	utils.Assert(exists, "Unable to find entry for fileId %d", id)
-
-	link.record = record
 
 	return link
 }
@@ -261,7 +270,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		return local, err
 	}
 
-	rtn := publishWorkspaceRoot(c, localDirectory, tracker.merged,
+	rtn := publishWorkspaceRoot(c, localDirectory, tracker.filterDeadEntries(),
 		merge.pubFn)
 
 	return rtn, uploadErr

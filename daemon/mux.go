@@ -1487,21 +1487,28 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
 
-	if !qfs.shouldForget(c, InodeId(nodeID), nlookup) {
+	inodeId := InodeId(nodeID)
+
+	if !qfs.shouldForget(c, inodeId, nlookup) {
 		// The kernel hasn't completely forgotten this Inode. Keep it around
 		// a while longer.
-		c.dlog("inode %d lookup not zero yet", nodeID)
+		c.dlog("inode %d lookup not zero yet", inodeId)
 		return
 	}
 
 	defer qfs.instantiationLock.Lock().Unlock()
 
-	if inode := qfs.inodeNoInstantiate(c, InodeId(nodeID)); inode != nil {
+	if inode := qfs.inodeNoInstantiate(c, inodeId); inode != nil {
 		logInodeWorkspace(c, inode)
 		inode.queueToForget(c)
 	} else {
-		c.dlog("Forgetting uninstantiated Inode %d", nodeID)
-		qfs.uninstantiateInode_(c, InodeId(nodeID))
+		c.dlog("Forgetting uninstantiated Inode %d", inodeId)
+		parentId := func() InodeId {
+			defer qfs.mapMutex.Lock().Unlock()
+			parentId, _ := qfs.parentOfUninstantiated[inodeId]
+			return parentId
+		}()
+		qfs.uninstantiateInode_(c, parentId)
 	}
 }
 
