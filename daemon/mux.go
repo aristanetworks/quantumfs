@@ -128,9 +128,6 @@ type QuantumFs struct {
 
 	fileHandles sync.Map // map[FileHandleId]FileHandle
 
-	metaInodeMutex           utils.DeferableMutex
-	metaInodeDeletionRecords []MetaInodeDeletionRecord
-
 	flusher *Flusher
 
 	// We must prevent instantiation of Inodes while we are uninstantiating an
@@ -416,14 +413,7 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	// This function might have been called as a result of a lookup.
 	// Therefore, it is not safe to call back into the kernel, telling it
 	// about the deletion. Schedule this call for later.
-	func() {
-		defer qfs.metaInodeMutex.Lock().Unlock()
-		qfs.metaInodeDeletionRecords = append(qfs.metaInodeDeletionRecords,
-			MetaInodeDeletionRecord{
-				inodeId:  id,
-				name:     name,
-				parentId: parentId})
-	}()
+	qfs.noteDeletedInode(c, parentId, id, name)
 
 	// This is a no-op if the inode is instantiated. This check should happen
 	// before checking whether id is instantiated to avoid racing with someone
@@ -467,15 +457,6 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	// other required actions
 	_, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	cleanup()
-
-	defer qfs.metaInodeMutex.Lock().Unlock()
-	for _, record := range c.qfs.metaInodeDeletionRecords {
-		c.vlog("Noting deletion of %s inode %d (parent %d)",
-			record.name, record.inodeId, record.parentId)
-		c.qfs.noteDeletedInode(c, record.parentId, record.inodeId,
-			record.name)
-	}
-	c.qfs.metaInodeDeletionRecords = nil
 }
 
 func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
@@ -1535,21 +1516,28 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
 
-	if !qfs.shouldForget(c, InodeId(nodeID), nlookup) {
+	inodeId := InodeId(nodeID)
+
+	if !qfs.shouldForget(c, inodeId, nlookup) {
 		// The kernel hasn't completely forgotten this Inode. Keep it around
 		// a while longer.
-		c.dlog("inode %d lookup not zero yet", nodeID)
+		c.dlog("inode %d lookup not zero yet", inodeId)
 		return
 	}
 
 	defer qfs.instantiationLock.Lock().Unlock()
 
-	if inode := qfs.inodeNoInstantiate(c, InodeId(nodeID)); inode != nil {
+	if inode := qfs.inodeNoInstantiate(c, inodeId); inode != nil {
 		logInodeWorkspace(c, inode)
 		inode.queueToForget(c)
 	} else {
-		c.dlog("Forgetting uninstantiated Inode %d", nodeID)
-		qfs.uninstantiateInode_(c, InodeId(nodeID))
+		c.dlog("Forgetting uninstantiated Inode %d", inodeId)
+		parentId := func() InodeId {
+			defer qfs.mapMutex.Lock().Unlock()
+			parentId, _ := qfs.parentOfUninstantiated[inodeId]
+			return parentId
+		}()
+		qfs.uninstantiateInode_(c, parentId)
 	}
 }
 
