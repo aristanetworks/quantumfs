@@ -96,3 +96,5 @@ Sending SIGUSR1 to quantumfsd will cause the read cache to be dropped and furthe
 additions disallowed. This puts QuantumFS into a lower memory mode. This is useful,
 for example, when attempting to gracefully upgrade QuantumFS to a newer version
 without forcefully terminating existing users.
+Sending SIGUSR2 to quantumfsd will result in it printing debug information to its
+qlog. This information can be used for testing and debugging purposes.
