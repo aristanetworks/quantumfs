@@ -310,6 +310,9 @@ func (qfs *QuantumFs) waitForSignals() {
 // among other things, prevent further writes to the cache and drop the contents of
 // the cache. The intended use is as a way to free the bulk of the memory used by
 // quantumfsd when it is being gracefully shutdown by lazily unmounting it.
+// If we receive the signal SIGUSR2, then we will print some information about the
+// internal state of the daemon. This signal is only used for debugging and testing
+// purposes.
 func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 	for {
 		select {
