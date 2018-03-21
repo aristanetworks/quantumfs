@@ -23,18 +23,19 @@ type hardlinkTracker struct {
 	// contains all local and remote records, with their contents merged
 	allRecords map[quantumfs.FileId]quantumfs.DirectoryRecord
 
-	merged map[quantumfs.FileId]HardlinkTableEntry
+	merged map[quantumfs.FileId]*HardlinkTableEntry
 }
 
-func (merge *merger) newHardlinkTracker(base map[quantumfs.FileId]HardlinkTableEntry,
-	remote map[quantumfs.FileId]HardlinkTableEntry,
-	local map[quantumfs.FileId]HardlinkTableEntry) *hardlinkTracker {
+func (merge *merger) newHardlinkTracker(
+	base map[quantumfs.FileId]*HardlinkTableEntry,
+	remote map[quantumfs.FileId]*HardlinkTableEntry,
+	local map[quantumfs.FileId]*HardlinkTableEntry) *hardlinkTracker {
 
 	defer merge.c.funcIn("newHardlinkTracker").Out()
 
 	rtn := hardlinkTracker{
 		allRecords: make(map[quantumfs.FileId]quantumfs.DirectoryRecord),
-		merged:     make(map[quantumfs.FileId]HardlinkTableEntry),
+		merged:     make(map[quantumfs.FileId]*HardlinkTableEntry),
 	}
 
 	// Merge all records together and do intra-file merges
@@ -102,7 +103,7 @@ func traverseSubtree(c *ctx, dirKey quantumfs.ObjectKey,
 	return nil
 }
 
-type hardlinkTableEntries map[quantumfs.FileId]HardlinkTableEntry
+type hardlinkTableEntries map[quantumfs.FileId]*HardlinkTableEntry
 
 func (ht *hardlinkTracker) filterDeadEntries() hardlinkTableEntries {
 	for fileId, record := range ht.merged {
@@ -134,20 +135,17 @@ func (ht *hardlinkTracker) checkLinkChanged(c *ctx, local quantumfs.DirectoryRec
 func (ht *hardlinkTracker) increment(id quantumfs.FileId) {
 	link := ht.newestEntry(id)
 	link.nlink++
-
-	ht.merged[id] = link
 }
 
 func (ht *hardlinkTracker) decrement(id quantumfs.FileId) {
 	link := ht.newestEntry(id)
 
 	link.nlink--
-	ht.merged[id] = link
 }
 
 // Returns the newest HardlinkTableEntry version available, while
 // preserving nlink from merged
-func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) HardlinkTableEntry {
+func (ht *hardlinkTracker) newestEntry(id quantumfs.FileId) *HardlinkTableEntry {
 	link, exists := ht.merged[id]
 	utils.Assert(exists, "Unable to find entry for fileId %d", id)
 
@@ -171,7 +169,7 @@ func newMerger(c *ctx, prefer mergePreference, pub publishFn) *merger {
 }
 
 func loadWorkspaceRoot(c *ctx,
-	key quantumfs.ObjectKey) (hardlinks map[quantumfs.FileId]HardlinkTableEntry,
+	key quantumfs.ObjectKey) (hardlinks map[quantumfs.FileId]*HardlinkTableEntry,
 	directory quantumfs.ObjectKey, err error) {
 
 	defer c.funcIn("loadWorkspaceRoot").Out()
