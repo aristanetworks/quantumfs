@@ -21,7 +21,6 @@ import (
 	"github.com/aristanetworks/quantumfs/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
-	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -160,15 +159,9 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 	th.CreateTestDirs()
 	defer th.EndTest()
 
-	var startChan chan struct{}
-	var alt utils.AlternatingLocker
-	func() {
-		defer alt.ALock().AUnlock()
-		startChan = startQuantumFsInstances(numDefaultQfs, configModifier,
-			th)
-	}()
+	startChan := startQuantumFsInstances(numDefaultQfs, configModifier,
+		th)
 
-	defer alt.RLock().RUnlock()
 	th.RunDaemonTestCommonEpilog(testName, th.testHelperUpcast(test),
 		startChan, th.AbortFuse)
 }
@@ -176,6 +169,8 @@ func runTestCommon(t *testing.T, test quantumFsTest, numDefaultQfs int,
 func startQuantumFsInstances(numDefaultQfs int, configModifier configModifierFunc,
 	th *testHelper) (startChan chan struct{}) {
 
+	// Wait for the running tests to finish before starting a new instance
+	testutils.AlternatingLocker().ALock().AUnlock()
 	// Allow tests to run for up to 1 seconds before considering them timed out.
 	// If we are going to start a standard QuantumFS instance we can start the
 	// timer before the test proper and therefore avoid false positive test
