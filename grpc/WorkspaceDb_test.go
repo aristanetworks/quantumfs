@@ -7,6 +7,7 @@ package grpc
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/grpc/rpc"
 )
 
@@ -66,6 +68,7 @@ func (st *testStream) CloseSend() error {
 
 type testWorkspaceDbClient struct {
 	commandDelay	time.Duration
+	stream		*testStream
 }
 
 func (ws *testWorkspaceDbClient) NumTypespaces(ctx context.Context,
@@ -113,7 +116,9 @@ func (ws *testWorkspaceDbClient) WorkspaceTable(ctx context.Context,
 func (ws *testWorkspaceDbClient) SubscribeTo(ctx context.Context,
 	in *rpc.WorkspaceName, opts ...grpc.CallOption) (*rpc.Response, error) {
 
-	panic("Not supported")
+	// do nothing
+	var rtn rpc.Response
+	return &rtn, nil
 }
 
 func (ws *testWorkspaceDbClient) UnsubscribeFrom(ctx context.Context,
@@ -125,7 +130,7 @@ func (ws *testWorkspaceDbClient) UnsubscribeFrom(ctx context.Context,
 func (ws *testWorkspaceDbClient) ListenForUpdates(ctx context.Context, in *rpc.Void,
 	opts ...grpc.CallOption) (rpc.WorkspaceDb_ListenForUpdatesClient, error) {
 
-	return newTestStream(), nil
+	return ws.stream, nil
 }
 
 func (ws *testWorkspaceDbClient) FetchWorkspace(ctx context.Context,
@@ -184,15 +189,22 @@ func newTestWorkspaceDbClient(*grpc.ClientConn, string) (*grpc.ClientConn,
 
 	return nil, &testWorkspaceDbClient{
 		commandDelay:	time.Millisecond * 1,
+		stream:		newTestStream(),
 	}
+}
+
+func setupWsdb(test *testHelper) (quantumfs.WorkspaceDB, *quantumfs.Ctx) {
+	wsdb := newWorkspaceDB_("", newTestWorkspaceDbClient)
+	ctx := &quantumfs.Ctx {
+		Qlog:	test.Logger,
+	}
+
+	return wsdb, ctx
 }
 
 func TestFetchWorkspace(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		wsdb := newWorkspaceDB_("", newTestWorkspaceDbClient)
-		ctx := &quantumfs.Ctx {
-			Qlog:	test.Logger,
-		}
+		wsdb, ctx := setupWsdb(test)
 
 		key, nonce, err := wsdb.Workspace(ctx, "a", "b", "c")
 		test.Assert(key.IsEqualTo(quantumfs.EmptyWorkspaceKey),
@@ -200,5 +212,61 @@ func TestFetchWorkspace(t *testing.T) {
 			quantumfs.EmptyWorkspaceKey.String())
 		test.Assert(nonce.Id == 12345, "Wrong nonce %d", nonce.Id)
 		test.AssertNoErr(err)
+	})
+}
+
+func TestUpdateWorkspace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb, _ := setupWsdb(test)
+
+		numWorkspaces := 15000
+		var workspaceLock utils.DeferableMutex
+		workspaces := make(map[string]int)
+		// Add some subscriptions
+		for i := 0; i < numWorkspaces; i++ {
+			newWorkspace := "test/test/" + strconv.Itoa(i)
+			workspaces[newWorkspace] = 0
+			wsdb.SubscribeTo(newWorkspace)
+		}
+
+		wsdb.SetCallback(func (updates map[string]quantumfs.WorkspaceState) {
+			defer workspaceLock.Lock().Unlock()
+			for wsrStr, _ := range updates {
+				workspaces[wsrStr]++
+			}
+		})
+
+		wsrStrs := make([]string, len(workspaces))
+		for wsrStr, _ := range workspaces {
+			wsrStrs = append(wsrStrs, wsrStr)
+		}
+
+		// Send in updates for every workspace
+		grpcWsdb := wsdb.(*workspaceDB)
+		rawWsdb := grpcWsdb.server.(*testWorkspaceDbClient)
+		for _, wsrStr := range wsrStrs {
+			var newNotification rpc.WorkspaceUpdate
+			newNotification.Name = wsrStr
+			newNotification.RootId = &rpc.ObjectKey {
+				Data:	quantumfs.EmptyWorkspaceKey.Value(),
+			}
+			newNotification.Nonce =  &rpc.WorkspaceNonce {
+				Id:	12345,
+			}
+			newNotification.Immutable = false
+
+			rawWsdb.stream.data <- &newNotification
+		}
+
+		test.WaitFor("All workspaces to get notifications", func () bool {
+			defer workspaceLock.Lock().Unlock()
+			for _, count := range workspaces {
+				if count == 0 {
+					return false
+				}
+			}
+
+			return true
+		})
 	})
 }
