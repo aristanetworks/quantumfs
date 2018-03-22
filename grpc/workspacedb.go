@@ -208,11 +208,18 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 		// haven't missed any notifications while we were disconnected.
 		defer wsdb.lock.Lock().Unlock()
 
-		logger, err := qlog.NewQlog("")
-		if err != nil {
-			fmt.Printf("Error creating qlog file %s", err.Error())
-			return true
+		// Share the qlog if this is a test run
+		var logger *qlog.Qlog
+		if testWsdb, isTest := wsdb.server.(*testWorkspaceDbClient); isTest {
+			logger = testWsdb.logger
+		} else {
+			logger, err = qlog.NewQlog("")
+			if err != nil {
+				fmt.Printf("Error creating qlog file %s", err.Error())
+				return true
+			}
 		}
+
 		ctx := quantumfs.Ctx{
 			Qlog:      logger,
 			RequestId: uint64(rpc.ReservedRequestIds_RESYNC),
