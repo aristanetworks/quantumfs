@@ -182,20 +182,15 @@ func (wsdb *workspaceDB) reconnect(badConnIdx uint32) {
 // An always running, singular goroutine to update listeners when workspacedb updates
 func (wsdb *workspaceDB) updater() {
 	for {
-		server, serverConnIdx := wsdb.server.Snapshot()
+		err := wsdb._update()
 
-		err := wsdb._update(server, serverConnIdx)
 		// we must have gotten an error for _update to return, so output it
 		fmt.Fprintf(os.Stderr, "grpc::workspaceDB connection error: %s", err)
-
-		wsdb.reconnect(serverConnIdx)
 	}
 }
 
 // This function would only ever return due to an error
-func (wsdb *workspaceDB) _update(server *rpc.WorkspaceDbClient,
-	serverConnIdx uint32) (rtnErr error) {
-
+func (wsdb *workspaceDB) _update() (rtnErr error) {
 	defer func() {
 		exception := recover()
 		if exception != nil {
@@ -205,11 +200,6 @@ func (wsdb *workspaceDB) _update(server *rpc.WorkspaceDbClient,
 				"Updates:\n%s\n", utils.BytesToString(stackTrace))
 		}
 	}()
-
-	stream, err := (*server).ListenForUpdates(context.TODO(), &rpc.Void{})
-	if err != nil {
-		return err
-	}
 
 	var initialUpdates []*rpc.WorkspaceUpdate
 	hitError := func() error {
@@ -250,14 +240,10 @@ func (wsdb *workspaceDB) _update(server *rpc.WorkspaceDbClient,
 
 			switch err := err.(type) {
 			default:
-				// Unknown error
-				wsdb.reconnect(serverConnIdx)
 				return err
 			case quantumfs.WorkspaceDbErr:
 				switch err.Code {
 				default:
-					// Unhandled error
-					wsdb.reconnect(serverConnIdx)
 					return err
 				case quantumfs.WSDB_WORKSPACE_NOT_FOUND:
 					// Workspace may have been deleted
@@ -282,6 +268,14 @@ func (wsdb *workspaceDB) _update(server *rpc.WorkspaceDbClient,
 		return hitError
 	}
 
+	server, serverConnIdx := wsdb.server.Snapshot()
+	defer wsdb.reconnect(serverConnIdx)
+
+	stream, err := (*server).ListenForUpdates(context.TODO(), &rpc.Void{})
+	if err != nil {
+		return err
+	}
+
 	for {
 		var update *rpc.WorkspaceUpdate
 		var err error
@@ -289,7 +283,6 @@ func (wsdb *workspaceDB) _update(server *rpc.WorkspaceDbClient,
 		if initialUpdates == nil {
 			update, err = stream.Recv()
 			if err != nil {
-				wsdb.reconnect(serverConnIdx)
 				return err
 			}
 		} else {
