@@ -1167,6 +1167,8 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		}
 		initial = false
 
+		lookupCountDel := make([]InodeId, 0)
+
 		if dir, isDir := inode.(inodeHolder); isDir {
 			children := dir.directChildInodes()
 
@@ -1174,7 +1176,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 				// To be fully unloaded, the child must have lookup
 				// count of zero (no kernel refs) *and*
 				// be uninstantiated
-				lookupCount, _ = qfs.lookupCount(c, i)
+				lookupCount, exists = qfs.lookupCount(c, i)
 				if lookupCount != 0 ||
 					qfs.inodeNoInstantiate(c, i) != nil {
 
@@ -1184,6 +1186,9 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 					return
 				}
 				c.dlog("Child %d of %d not loaded", i, inodeNum)
+				if exists {
+					lookupCountDel = append(lookupCountDel, i)
+				}
 			}
 
 			inodeChildren = append(inodeChildren, children...)
@@ -1203,6 +1208,9 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 			if exists && count == 0 {
 				qfs.setInode(c, inodeNum, nil)
 				delete(qfs.lookupCounts, inodeNum)
+				for _, childId := range lookupCountDel {
+					delete(qfs.lookupCounts, childId)
+				}
 				qfs.removeUninstantiated(c, inodeChildren)
 				return true
 			} else {
