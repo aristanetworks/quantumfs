@@ -132,7 +132,7 @@ func (ws *testWorkspaceDbClient) FetchWorkspace(ctx context.Context,
 	in *rpc.WorkspaceName, opts ...grpc.CallOption) (*rpc.FetchWorkspaceResponse,
 	error) {
 
-	var rtn rpc.FetchWorkspaceResponse
+	rtn := new(rpc.FetchWorkspaceResponse)
 	requestId := &rpc.RequestId {
 		Id: 12345,
 	}
@@ -141,7 +141,7 @@ func (ws *testWorkspaceDbClient) FetchWorkspace(ctx context.Context,
 	}
 
 	rtn.Key = &rpc.ObjectKey {
-		Data:	quantumfs.EmptyWorkspaceKey.Bytes(),
+		Data:	quantumfs.EmptyWorkspaceKey.Value(),
 	}
 
 	rtn.Nonce = &rpc.WorkspaceNonce {
@@ -150,7 +150,7 @@ func (ws *testWorkspaceDbClient) FetchWorkspace(ctx context.Context,
 
 	rtn.Immutable = false
 
-	return &rtn, nil
+	return rtn, nil
 }
 
 func (ws *testWorkspaceDbClient) BranchWorkspace(ctx context.Context,
@@ -193,6 +193,12 @@ func TestFetchWorkspace(t *testing.T) {
 		ctx := &quantumfs.Ctx {
 			Qlog:	test.Logger,
 		}
-		wsdb.Workspace(ctx, "a", "b", "c")
+
+		key, nonce, err := wsdb.Workspace(ctx, "a", "b", "c")
+		test.Assert(key.IsEqualTo(quantumfs.EmptyWorkspaceKey),
+			"incorrect wsr: %s vs %s", key.String(),
+			quantumfs.EmptyWorkspaceKey.String())
+		test.Assert(nonce.Id == 12345, "Wrong nonce %d", nonce.Id)
+		test.AssertNoErr(err)
 	})
 }
