@@ -8,13 +8,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 
 	"github.com/aristanetworks/quantumfs/grpc/rpc"
 	"github.com/aristanetworks/quantumfs/grpc/server"
 	"github.com/aristanetworks/quantumfs/qlog"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 const (
@@ -50,9 +49,7 @@ func processArgs() {
 func main() {
 	processArgs()
 
-	go func() {
-		fmt.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	utils.ServePprof()
 
 	var logger *qlog.Qlog
 	var err error
