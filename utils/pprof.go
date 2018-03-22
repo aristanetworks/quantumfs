@@ -8,11 +8,35 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"syscall"
 )
 
 // Start an http pprof instance on an available port.
 func ServePprof() {
 	go servePprof()
+}
+
+func retryAfterError(err error) bool {
+	prolog := "Unable to serve pprof: "
+	oe, ok := err.(*net.OpError)
+	if !ok {
+		fmt.Printf(prolog+"Unknown error %#v\n", err)
+		return false
+	}
+
+	se, ok := oe.Err.(*os.SyscallError)
+	if !ok {
+		fmt.Printf(prolog+"Unknown OpError %#v %#v\n", err, oe.Err)
+		return false
+	}
+
+	if se.Err != syscall.EADDRINUSE {
+		fmt.Printf(prolog+"Syscall error %#v %#v\n", err, se)
+		return false
+	}
+
+	return true
 }
 
 func servePprof() {
@@ -23,12 +47,19 @@ func servePprof() {
 		addr := fmt.Sprintf("localhost:%d", port)
 		l, err := net.Listen("tcp", addr)
 
-		if err == nil {
-			fmt.Printf("Serving pprof on port %d\n", port)
-			listener = l
-			break
+		if err != nil {
+			if retryAfterError(err) {
+				port++
+				continue
+			} else {
+				// retryAfterError() will have output a diagnostic
+				return
+			}
 		}
-		port++
+
+		fmt.Printf("Serving pprof on port %d\n", port)
+		listener = l
+		break
 	}
 
 	err := http.Serve(listener, nil)
