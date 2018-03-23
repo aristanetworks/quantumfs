@@ -5,7 +5,6 @@ package grpc
 
 import (
 	"fmt"
-	"os"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -220,7 +219,12 @@ func (wsdb *workspaceDB) updater() {
 		err := wsdb._update()
 
 		// we must have gotten an error for _update to return, so output it
-		fmt.Fprintf(os.Stderr, "grpc::workspaceDB connection error: %s", err)
+		wsdb.qlog.Log(qlog.LogWorkspaceDb,
+			uint64(rpc.ReservedRequestIds_RESYNC), 0,
+			"grpc::workspaceDB connection error: %s", err.Error())
+
+		// Prevent busy looping when we try to reconnect
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
