@@ -2011,6 +2011,7 @@ func TestDirectoryNlink(t *testing.T) {
 		test.AssertNoErr(utils.MkdirAll(dir+"/subdir2", 0124))
 		test.createFile(workspace, "dir/file1", 1000)
 		test.createFile(workspace, "dir/file2", 1000)
+		test.createFile(workspace, "dir/file3", 1000)
 
 		var stat syscall.Stat_t
 		test.AssertNoErr(syscall.Stat(dir, &stat))
