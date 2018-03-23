@@ -224,6 +224,8 @@ func (wsdb *workspaceDB) updater() {
 	}
 }
 
+const updateLog = "_update attempting to connect to workspaceDB"
+
 // This function would only ever return due to an error
 func (wsdb *workspaceDB) _update() (rtnErr error) {
 	defer func() {
@@ -235,6 +237,9 @@ func (wsdb *workspaceDB) _update() (rtnErr error) {
 				"Updates:\n%s\n", utils.BytesToString(stackTrace))
 		}
 	}()
+
+	wsdb.qlog.Log(qlog.LogWorkspaceDb, uint64(rpc.ReservedRequestIds_RESYNC), 2,
+		updateLog)
 
 	var initialUpdates []*rpc.WorkspaceUpdate
 	hitError := func() error {
