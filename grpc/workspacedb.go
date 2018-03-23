@@ -129,8 +129,8 @@ type badConnectionInfo struct {
 
 type workspaceDB struct {
 	// This is our connection function, which allows us to stub during tests
-	connectFn     func(*grpc.ClientConn, string) (*grpc.ClientConn,
-			rpc.WorkspaceDbClient)
+	connectFn func(*grpc.ClientConn, string) (*grpc.ClientConn,
+		rpc.WorkspaceDbClient)
 
 	config        string
 	lock          utils.DeferableMutex
