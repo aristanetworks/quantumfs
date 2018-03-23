@@ -199,3 +199,27 @@ func TestVeryLargeFileTooBigWrite(t *testing.T) {
 			err.Error())
 	})
 }
+
+func TestExpansionRounding(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := workspace + "/file"
+
+		file, err := os.Create(filename)
+		test.AssertNoErr(err)
+		defer file.Close()
+
+		fileLength := quantumfs.MaxLargeFileSize() +
+			uint64(quantumfs.MaxBlockSize) + 600
+		err = file.Truncate(int64(fileLength))
+		test.AssertNoErr(err)
+
+		expectedRead := quantumfs.MaxBlockSize + 600 - 1
+		buf := make([]byte, expectedRead)
+		bytesRead, err := file.ReadAt(buf,
+			int64(quantumfs.MaxLargeFileSize()))
+		test.AssertNoErr(err)
+		test.Assert(bytesRead == expectedRead, "Read too few bytes %d",
+			bytesRead)
+	})
+}

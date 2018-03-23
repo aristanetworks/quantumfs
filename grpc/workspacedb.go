@@ -241,6 +241,14 @@ func (wsdb *workspaceDB) _update() (rtnErr error) {
 	wsdb.qlog.Log(qlog.LogWorkspaceDb, uint64(rpc.ReservedRequestIds_RESYNC), 2,
 		updateLog)
 
+	server, serverConnIdx := wsdb.server.Snapshot()
+	defer wsdb.reconnect(serverConnIdx)
+
+	stream, err := (*server).ListenForUpdates(context.TODO(), &rpc.Void{})
+	if err != nil {
+		return err
+	}
+
 	var initialUpdates []*rpc.WorkspaceUpdate
 	hitError := func() error {
 		// Replay the current state for all subscribed updates to ensure we
@@ -304,14 +312,6 @@ func (wsdb *workspaceDB) _update() (rtnErr error) {
 	}()
 	if hitError != nil {
 		return hitError
-	}
-
-	server, serverConnIdx := wsdb.server.Snapshot()
-	defer wsdb.reconnect(serverConnIdx)
-
-	stream, err := (*server).ListenForUpdates(context.TODO(), &rpc.Void{})
-	if err != nil {
-		return err
 	}
 
 	for {
