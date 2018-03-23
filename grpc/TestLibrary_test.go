@@ -20,7 +20,7 @@ type qfsTest func(*testHelper)
 
 func runTest(t *testing.T, test qfsTest) {
 	t.Parallel()
-	runTestCommon(t, test, 1500 * time.Millisecond)
+	runTestCommon(t, test, 1500*time.Millisecond)
 }
 
 func runTestCommon(t *testing.T, test qfsTest, timeout time.Duration) {

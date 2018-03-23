@@ -87,8 +87,8 @@ func newWorkspaceDB_(conf string, connectFn func(*grpc.ClientConn,
 
 type workspaceDB struct {
 	// This is our connection function, which allows us to stub during tests
-	connectFn     func(*grpc.ClientConn, string) (*grpc.ClientConn,
-			rpc.WorkspaceDbClient)
+	connectFn func(*grpc.ClientConn, string) (*grpc.ClientConn,
+		rpc.WorkspaceDbClient)
 
 	config        string
 	lock          utils.DeferableMutex
@@ -215,7 +215,8 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 		} else {
 			logger, err = qlog.NewQlog("")
 			if err != nil {
-				fmt.Printf("Error creating qlog file %s", err.Error())
+				fmt.Printf("Error creating qlog file %s",
+					err.Error())
 				return true
 			}
 		}
