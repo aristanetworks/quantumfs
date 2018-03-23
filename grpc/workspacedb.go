@@ -75,16 +75,20 @@ func newWorkspaceDB_(conf string, connectFn func(*grpc.ClientConn,
 		connectFn:        connectFn,
 		config:           conf,
 		subscriptions:    map[string]bool{},
+		server:           newServerContainer(nil),
 		// There is no need to block on triggering a reconnect. Making this
 		// a buffered channel will ensure that concurrent grpcs users
 		// aren't occasionally blocked on reconnect contention
 		triggerReconnect: make(chan badConnectionInfo, 1000),
 	}
 
-	go wsdb.reconnector()
-	go wsdb.updater()
-
+	connected := make(chan struct{})
+	go wsdb.reconnector(connected)
 	wsdb.reconnect(0)
+	// wait for the server to be connected before we start the updater
+	<- connected
+
+	go wsdb.updater()
 
 	return wsdb
 }
@@ -167,9 +171,10 @@ func grpcConnect(old *grpc.ClientConn, config string) (newConn *grpc.ClientConn,
 }
 
 // Run in a separate goroutine to trigger reconnection when the connection has failed
-func (wsdb *workspaceDB) reconnector() {
+func (wsdb *workspaceDB) reconnector(started chan struct{}) {
 	var conn *grpc.ClientConn
 
+	initialized := false
 	for {
 		// Wait for a notification
 		badConnection := <-wsdb.triggerReconnect
@@ -185,10 +190,15 @@ func (wsdb *workspaceDB) reconnector() {
 			serverConnIdx)
 
 		// Reconnect
-		var newServer *rpc.WorkspaceDbClient
+		var newServer rpc.WorkspaceDbClient
 		conn, newServer = wsdb.connectFn(conn, wsdb.config)
 
 		wsdb.server.ReplaceServer(&newServer)
+
+		if !initialized {
+			started <- struct{}{}
+			initialized = true
+		}
 	}
 }
 
@@ -228,7 +238,10 @@ func (wsdb *workspaceDB) _update() (rtnErr error) {
 
 		// Share the qlog if this is a test run
 		var logger *qlog.Qlog
-		if testWsdb, isTest := wsdb.server.(*testWorkspaceDbClient); isTest {
+		var err error
+
+		server, _ := wsdb.server.Snapshot()
+		if testWsdb, isTest := (*server).(*testWorkspaceDbClient); isTest {
 			logger = testWsdb.logger
 		} else {
 			logger, err = qlog.NewQlog("")

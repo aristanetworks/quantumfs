@@ -290,7 +290,8 @@ func TestUpdateWorkspace(t *testing.T) {
 
 		// Send in updates for every workspace
 		grpcWsdb := wsdb.(*workspaceDB)
-		rawWsdb := grpcWsdb.server.(*testWorkspaceDbClient)
+		server, _ := grpcWsdb.server.Snapshot()
+		rawWsdb := (*server).(*testWorkspaceDbClient)
 		for _, wsrStr := range wsrStrs {
 			var newNotification rpc.WorkspaceUpdate
 			newNotification.Name = wsrStr
@@ -345,7 +346,8 @@ func TestDisconnectedWorkspaceDB(t *testing.T) {
 		atomic.StoreUint32(serverDown, 1)
 
 		grpcWsdb := wsdb.(*workspaceDB)
-		rawWsdb := grpcWsdb.server.(*testWorkspaceDbClient)
+		server, _ := grpcWsdb.server.Snapshot()
+		rawWsdb := (*server).(*testWorkspaceDbClient)
 
 		// Cause the current stream to error out, indicating connection prob
 		rawWsdb.stream.data <- nil
