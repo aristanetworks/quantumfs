@@ -280,6 +280,14 @@ func (th *TestHelper) StartEtherFileQuantumFs(startChan chan struct{}) {
 	th.startQuantumFs(th.etherFilesystemConfig(), startChan, false)
 }
 
+func (th *TestHelper) StartQuantumFsWithWsdb(wsdb quantumfs.WorkspaceDB,
+	startChan chan struct{}) {
+
+	config := th.defaultConfig()
+	config.WorkspaceDB = wsdb
+	th.startQuantumFs(config, startChan, false)
+}
+
 // If the filesystem panics, abort it and unmount it to prevent the test binary from
 // hanging.
 func (th *TestHelper) serveSafely(qfs *QuantumFs, startChan chan<- struct{}) {
