@@ -248,7 +248,9 @@ func (wsdb *workspaceDB) _update() (rtnErr error) {
 		}
 		for workspace, _ := range wsdb.subscriptions {
 			wsdb.subscribeTo(workspace)
-			key, nonce, immutable, err := wsdb.fetchWorkspace(&ctx,
+			// Make sure not to allow retries. If this call fails we
+			// need to discard our stream and start again
+			key, nonce, immutable, err := wsdb._fetchWorkspace(&ctx,
 				workspace)
 
 			if err == nil {
