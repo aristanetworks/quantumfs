@@ -169,3 +169,29 @@ func TestDisconnectedWorkspaceDB(t *testing.T) {
 		wsdb.SubscribeTo("post/test/wsrC")
 	})
 }
+
+func TestRetries(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb, ctx, serverDown := setupWsdb(test)
+
+		// Break the connection hard, so all requests just fail
+		atomic.StoreUint32(serverDown, 2)
+
+		// Issue a fetch in parallel, which should retry loop
+		fetchFinished := make(chan error)
+		go func() {
+			_, _, err := wsdb.Workspace(ctx, "a", "b", "c")
+			fetchFinished <- err
+		}()
+
+		test.WaitForNLogStrings("failed, retrying", 5,
+			"fetch to attempt retry a few times")
+
+		// Unbreak the connection
+		atomic.StoreUint32(serverDown, 0)
+
+		// Ensure we check that the fetch eventually succeeds
+		err := <-fetchFinished
+		test.AssertNoErr(err)
+	})
+}
