@@ -7,8 +7,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -195,9 +193,7 @@ func main() {
 
 	processArgs()
 
-	go func() {
-		fmt.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	utils.ServePprof()
 
 	go reduceGCPercent(config.CacheSize)
 

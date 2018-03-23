@@ -280,6 +280,14 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 
 	defer inode.parentLock.RLock().RUnlock()
 
+	if inode.isOrphaned_() {
+		utils.Assert(path == inode.name(),
+			"Directory %s containing path %s is orphaned",
+			inode.name(), path)
+		c.vlog("file %s is orphaned, not marking", inode.name())
+		return
+	}
+
 	parent := inode.parent_(c)
 	if wsr, isWorkspaceRoot := parent.(*WorkspaceRoot); isWorkspaceRoot {
 		isHardlink, fileId := wsr.hardlinkTable.checkHardlink(inode.id)
@@ -673,10 +681,6 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, op quantumfs.PathFla
 		op).Out()
 	if inode.isWorkspaceRoot() {
 		panic("Workspaceroot didn't call .self")
-	}
-
-	if inode.isOrphaned() {
-		panic("Orphaned file")
 	}
 
 	if path == "" {
