@@ -254,6 +254,9 @@ func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) fuse.Status {
 	lastBlockIdx, lastBlockRem := fi.blockIdxInfo(c, newLengthBytes-1)
 
 	lastPartIdx := lastBlockIdx / quantumfs.MaxBlocksLargeFile()
+	lastPartRemIdx := lastBlockIdx % quantumfs.MaxBlocksLargeFile()
+	lastPartRem := lastBlockRem + uint64(lastPartRemIdx*quantumfs.MaxBlockSize)
+
 	newNumParts := lastPartIdx + 1
 
 	if newNumParts > quantumfs.MaxPartsVeryLargeFile() {
@@ -266,5 +269,5 @@ func (fi *VeryLargeFile) truncate(c *ctx, newLengthBytes uint64) fuse.Status {
 		fi.parts = fi.parts[:newNumParts]
 	}
 
-	return fi.parts[lastPartIdx].truncate(c, lastBlockRem)
+	return fi.parts[lastPartIdx].truncate(c, lastPartRem)
 }

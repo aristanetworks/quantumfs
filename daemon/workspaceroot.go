@@ -116,7 +116,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) (Inode,
 }
 
 func publishHardlinkMap(c *ctx, pub publishFn,
-	records map[quantumfs.FileId]HardlinkTableEntry) *quantumfs.HardlinkEntry {
+	records map[quantumfs.FileId]*HardlinkTableEntry) *quantumfs.HardlinkEntry {
 
 	defer c.funcIn("publishHardlinkMap").Out()
 
@@ -139,7 +139,7 @@ func publishHardlinkMap(c *ctx, pub publishFn,
 		})
 	for _, fileId := range keys {
 		entry := records[fileId]
-		record := entry.record
+		record := entry.record()
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			baseLayer.SetNumEntries(entryIdx)
@@ -226,7 +226,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 }
 
 func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
-	hardlinks map[quantumfs.FileId]HardlinkTableEntry,
+	hardlinks map[quantumfs.FileId]*HardlinkTableEntry,
 	pub publishFn) quantumfs.ObjectKey {
 
 	defer c.funcIn("publishWorkspaceRoot").Out()
@@ -396,14 +396,7 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 		func() {
 			defer wsr.Lock().Unlock()
 			wsr.self.dirty(c)
-
-			defer wsr.hardlinkTable.linkLock.Lock().Unlock()
-			entry := wsr.hardlinkTable.hardlinks[fileId].record
-			if entry == nil {
-				panic("isHardlink but hardlink not set")
-			}
-
-			entry.SetID(newKey)
+			wsr.hardlinkTable.setID(c, fileId, newKey)
 		}()
 	} else {
 		wsr.Directory.syncChild(c, inodeNum, newKey, nil)

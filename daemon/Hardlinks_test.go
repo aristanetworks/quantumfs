@@ -102,8 +102,8 @@ func TestHardlinkReload(t *testing.T) {
 			test.Assert(l.nlink == linkBPtr.nlink,
 				"link reference count not preserved")
 
-			linkB := linkBPtr.record
-			v := l.record
+			linkB := linkBPtr.record()
+			v := l.record()
 			test.Assert(exists, "link not reloaded in new wsr")
 			test.Assert(v.Filename() == linkB.Filename(),
 				"Filename not preserved")
@@ -398,8 +398,8 @@ func matchXAttrHardlinkExtendedKey(path string, extendedKey []byte,
 	isHardlink, fileId := wsr.hardlinkTable.checkHardlink(inode.inodeNum())
 	test.Assert(isHardlink, "Expected hardlink isn't one.")
 
-	valid, record := wsr.hardlinkTable.getHardlink(fileId)
-	test.Assert(valid, "Unable to get hardlink from wsr")
+	record := wsr.hardlinkTable.recordByFileId(fileId)
+	test.Assert(record != nil, "Unable to get hardlink from wsr")
 
 	// Verify the type and key matching
 	test.Assert(type_ == Type && size == record.Size() &&

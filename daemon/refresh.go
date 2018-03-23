@@ -208,7 +208,7 @@ func (rc *RefreshContext) buildRefreshMapWsr(c *ctx, localRootId quantumfs.Objec
 			continue
 		}
 
-		record := newHardlinkLegFromRecord(linkEntry.record, nil)
+		record := newHardlinkLegFromRecord(linkEntry.record(), nil)
 
 		rc.fileMap[fileId] = &FileLoadRecord{
 			remoteRecord:  record,
@@ -333,11 +333,11 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 		wsr.hardlinkTable.hardlinks[id] = newLink
 	} else {
 		c.vlog("found mapping %d -> %s (nlink %d vs. %d)", id,
-			entry.record.Filename(), hardlink.Nlinks(), entry.nlink)
-		oldRecord := entry.record
+			entry.record().Filename(), hardlink.Nlinks(), entry.nlink)
+		oldRecord := entry.record()
 
 		entry.nlink = int64(hardlink.Nlinks())
-		entry.record = hardlink.Record()
+		entry.publishableRecord = hardlink.Record()
 		wsr.hardlinkTable.hardlinks[id] = entry
 
 		if !oldRecord.ID().IsEqualTo(hardlink.Record().ID()) {
@@ -477,7 +477,7 @@ func (wsr *WorkspaceRoot) unlinkStaleHardlinks(c *ctx,
 			if inode := c.qfs.inodeNoInstantiate(c,
 				entry.inodeId); inode != nil {
 
-				inode.orphan(c, entry.record)
+				inode.orphan(c, entry.record())
 			}
 			wsr.hardlinkTable.removeHardlink_(fileId, entry.inodeId)
 		} else if loadRecord.remoteRecord.Type() !=

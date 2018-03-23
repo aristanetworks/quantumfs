@@ -221,7 +221,6 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 	dir.children.setRecord(c, childId, linkSrcCopy)
 
 	newLink.setCreationTime(quantumfs.NewTime(time.Now()))
-	newLink.SetContentTime(newLink.creationTime())
 	return newLink, true, fuse.OK
 }
 

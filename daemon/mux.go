@@ -128,9 +128,6 @@ type QuantumFs struct {
 
 	fileHandles sync.Map // map[FileHandleId]FileHandle
 
-	metaInodeMutex           utils.DeferableMutex
-	metaInodeDeletionRecords []MetaInodeDeletionRecord
-
 	flusher *Flusher
 
 	// We must prevent instantiation of Inodes while we are uninstantiating an
@@ -301,30 +298,59 @@ func (qfs *QuantumFs) fuseNotifier() {
 }
 
 func (qfs *QuantumFs) waitForSignals() {
-	sigUsr1Chan := make(chan os.Signal, 1)
-	signal.Notify(sigUsr1Chan, syscall.SIGUSR1)
-	go qfs.signalHandler(sigUsr1Chan)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGUSR1, syscall.SIGUSR2)
+	go qfs.signalHandler(sigChan)
 }
 
 // If we receive the signal SIGUSR1, then we will enter a low memory mode where we,
 // among other things, prevent further writes to the cache and drop the contents of
 // the cache. The intended use is as a way to free the bulk of the memory used by
 // quantumfsd when it is being gracefully shutdown by lazily unmounting it.
-func (qfs *QuantumFs) signalHandler(sigUsr1Chan chan os.Signal) {
+// If we receive the signal SIGUSR2, then we will print some information about the
+// internal state of the daemon. This signal is only used for debugging and testing
+// purposes.
+func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 	for {
 		select {
-		case <-sigUsr1Chan:
-			qfs.c.wlog("Entering low memory mode")
-			qfs.inLowMemoryMode = true
-			qfs.c.dataStore.shutdown()
+		case sig := <-sigChan:
+			switch sig {
+			case syscall.SIGUSR1:
+				qfs.c.wlog("Entering low memory mode")
+				qfs.inLowMemoryMode = true
+				qfs.c.dataStore.shutdown()
 
-			// Release the memory
-			debug.FreeOSMemory()
+				// Release the memory
+				debug.FreeOSMemory()
+			case syscall.SIGUSR2:
+				qfs.verifyNoLeaks()
+			}
 
 		case <-qfs.stopWaitingForSignals:
-			signal.Stop(sigUsr1Chan)
-			close(sigUsr1Chan)
+			signal.Stop(sigChan)
+			close(sigChan)
 			return
+		}
+	}
+}
+
+func (qfs *QuantumFs) verifyNoLeaks() {
+	defer qfs.c.funcIn("QuantumFs::verifyNoLeaks").Out()
+	defer qfs.instantiationLock.Lock().Unlock()
+	defer qfs.lookupCountLock.Lock().Unlock()
+	defer qfs.mapMutex.Lock().Unlock()
+
+	for id, parent := range qfs.parentOfUninstantiated {
+		if parent != quantumfs.InodeIdRoot {
+			qfs.c.elog("leaked inode %d parent inode %d", id, parent)
+		}
+	}
+
+	for inodeId, count := range qfs.lookupCounts {
+		if inodeId != quantumfs.InodeIdRoot &&
+			inodeId != quantumfs.InodeIdApi {
+
+			qfs.c.elog("leaked inode %d lookupCount %d", inodeId, count)
 		}
 	}
 }
@@ -387,14 +413,7 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	// This function might have been called as a result of a lookup.
 	// Therefore, it is not safe to call back into the kernel, telling it
 	// about the deletion. Schedule this call for later.
-	func() {
-		defer qfs.metaInodeMutex.Lock().Unlock()
-		qfs.metaInodeDeletionRecords = append(qfs.metaInodeDeletionRecords,
-			MetaInodeDeletionRecord{
-				inodeId:  id,
-				name:     name,
-				parentId: parentId})
-	}()
+	qfs.noteDeletedInode(c, parentId, id, name)
 
 	// This is a no-op if the inode is instantiated. This check should happen
 	// before checking whether id is instantiated to avoid racing with someone
@@ -438,15 +457,6 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	// other required actions
 	_, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	cleanup()
-
-	defer qfs.metaInodeMutex.Lock().Unlock()
-	for _, record := range c.qfs.metaInodeDeletionRecords {
-		c.vlog("Noting deletion of %s inode %d (parent %d)",
-			record.name, record.inodeId, record.parentId)
-		c.qfs.noteDeletedInode(c, record.parentId, record.inodeId,
-			record.name)
-	}
-	c.qfs.metaInodeDeletionRecords = nil
 }
 
 func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
@@ -1157,6 +1167,8 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		}
 		initial = false
 
+		lookupCountDel := make([]InodeId, 0)
+
 		if dir, isDir := inode.(inodeHolder); isDir {
 			children := dir.directChildInodes()
 
@@ -1164,7 +1176,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 				// To be fully unloaded, the child must have lookup
 				// count of zero (no kernel refs) *and*
 				// be uninstantiated
-				lookupCount, _ = qfs.lookupCount(c, i)
+				lookupCount, exists = qfs.lookupCount(c, i)
 				if lookupCount != 0 ||
 					qfs.inodeNoInstantiate(c, i) != nil {
 
@@ -1174,6 +1186,9 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 					return
 				}
 				c.dlog("Child %d of %d not loaded", i, inodeNum)
+				if exists {
+					lookupCountDel = append(lookupCountDel, i)
+				}
 			}
 
 			inodeChildren = append(inodeChildren, children...)
@@ -1193,6 +1208,9 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 			if exists && count == 0 {
 				qfs.setInode(c, inodeNum, nil)
 				delete(qfs.lookupCounts, inodeNum)
+				for _, childId := range lookupCountDel {
+					delete(qfs.lookupCounts, childId)
+				}
 				qfs.removeUninstantiated(c, inodeChildren)
 				return true
 			} else {
@@ -1506,21 +1524,28 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
 
-	if !qfs.shouldForget(c, InodeId(nodeID), nlookup) {
+	inodeId := InodeId(nodeID)
+
+	if !qfs.shouldForget(c, inodeId, nlookup) {
 		// The kernel hasn't completely forgotten this Inode. Keep it around
 		// a while longer.
-		c.dlog("inode %d lookup not zero yet", nodeID)
+		c.dlog("inode %d lookup not zero yet", inodeId)
 		return
 	}
 
 	defer qfs.instantiationLock.Lock().Unlock()
 
-	if inode := qfs.inodeNoInstantiate(c, InodeId(nodeID)); inode != nil {
+	if inode := qfs.inodeNoInstantiate(c, inodeId); inode != nil {
 		logInodeWorkspace(c, inode)
 		inode.queueToForget(c)
 	} else {
-		c.dlog("Forgetting uninstantiated Inode %d", nodeID)
-		qfs.uninstantiateInode_(c, InodeId(nodeID))
+		c.dlog("Forgetting uninstantiated Inode %d", inodeId)
+		parentId := func() InodeId {
+			defer qfs.mapMutex.Lock().Unlock()
+			parentId, _ := qfs.parentOfUninstantiated[inodeId]
+			return parentId
+		}()
+		qfs.uninstantiateInode_(c, parentId)
 	}
 }
 

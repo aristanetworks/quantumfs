@@ -127,6 +127,8 @@ func (dir *Directory) generation() uint64 {
 	return atomic.LoadUint64(&dir._generation)
 }
 
+var NON_EMPTY_DIR_MARKER = uint64(1) << 32
+
 func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	defer c.funcIn("Directory::updateSize").Out()
 
@@ -146,8 +148,26 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	}
 
 	dir.parentUpdateSize(c, func() uint64 {
+		// The size of a directory represents:
+		// 1. The number of its children of type directory represented
+		//    by the first 32 bits.
+		// 2. If it has any children of any type by the NON_EMPTY_DIR_MARKER.
+		//
+		// Only the first 32 bits should be used when computing the nlink of
+		// the directory from its size.
+
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.count()
+
+		ndirs := uint64(0)
+		for _, record := range dir.children.records() {
+			if record.Type() == quantumfs.ObjectTypeDirectory {
+				ndirs++
+			}
+		}
+		if dir.children.count() != 0 {
+			ndirs |= NON_EMPTY_DIR_MARKER
+		}
+		return ndirs
 	})
 }
 
@@ -218,7 +238,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 		// sizes, even though the real encoding is variable length.
 		attr.Size = 25 + 331*entry.Size()
 		attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
-		attr.Nlink = uint32(entry.Size()) + 2
+		attr.Nlink = uint32(entry.Size()&^NON_EMPTY_DIR_MARKER) + 2
 	case fuse.S_IFIFO:
 		fileType = specialOverrideAttr(entry, attr)
 	default:
@@ -387,7 +407,7 @@ func publishDirectoryRecords(c *ctx,
 }
 
 func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
-	record quantumfs.DirectoryRecord) {
+	records [2]quantumfs.DirectoryRecord) {
 
 	defer c.FuncIn("Directory::normalizeChild", "%d", inodeId).Out()
 
@@ -408,9 +428,10 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 		return
 	}
 
+	fileId := records[0].FileId()
 	func() {
 		defer dir.hardlinkTable.invalidateNormalizedRecordLock(
-			record.FileId()).Unlock()
+			fileId).Unlock()
 
 		if inode != nil {
 			c.vlog("Setting parent of inode %d from %d to %d",
@@ -427,32 +448,38 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 
 	// Bubble up the -1 as we are inheriting the hardlink
 	// from the root now.
-	dir.hardlinkDec(record.FileId())
+	dir.hardlinkDec(fileId)
 	dir.children.deleteChild(c, name)
 
-	record.SetFilename(name)
-	dir.children.setRecord(c, inodeId, record)
+	records[0].SetFilename(name)
+	dir.children.setRecord(c, inodeId, records[0])
 	dir.children.makePublishable(c, name)
+
+	// We don't normalize dirty children above, so there should be no unpublished
+	// effective changes here.
+	utils.Assert(records[1] == nil, "Child with unpublished changes")
 }
 
 func (dir *Directory) getNormalizationCandidates(c *ctx) (
-	result map[InodeId]quantumfs.DirectoryRecord) {
+	result map[InodeId][2]quantumfs.DirectoryRecord) {
 
 	defer c.funcIn("Directory::getNormalizationCandidates").Out()
 
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	result = make(map[InodeId]quantumfs.DirectoryRecord)
+	result = make(map[InodeId][2]quantumfs.DirectoryRecord)
 	records := dir.children.publishableRecords(c)
 	for _, record := range records {
 		if record.Type() != quantumfs.ObjectTypeHardlink {
 			continue
 		}
-		newRecord := dir.hardlinkTable.getNormalized(record.FileId())
-		if newRecord != nil {
+		publishable, effective := dir.hardlinkTable.getNormalized(
+			record.FileId())
+		if publishable != nil {
 			inodeId := dir.children.inodeNum(record.Filename())
-			result[inodeId] = newRecord
+			result[inodeId] = [2]quantumfs.DirectoryRecord{
+				publishable, effective}
 		}
 	}
 	return
@@ -488,25 +515,22 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 
-		dir.children.modifyChildWithFunc(c, inodeNum,
-			func(record quantumfs.DirectoryRecord) {
-				modifyEntryWithAttr(c, newType, attr, record,
-					updateMtime)
-			})
-		entry := dir.children.recordByInodeId(c, inodeNum)
+		modify := func(record quantumfs.DirectoryRecord) {
+			modifyEntryWithAttr(c, newType, attr, record,
+				updateMtime)
+		}
 
-		if entry == nil && dir.self.isWorkspaceRoot() {
-			// if we don't have the child, maybe we're wsr and it's a
-			// hardlink
+		entry := dir.children.recordByInodeId(c, inodeNum)
+		if entry != nil && entry.Type() != quantumfs.ObjectTypeHardlink {
+			dir.children.modifyChildWithFunc(c, inodeNum, modify)
+			entry = dir.children.recordByInodeId(c, inodeNum)
+		} else {
+			// If we don't have the child, maybe we're the WSR and it's a
+			// hardlink. If we aren't the WSR, then it must be a
+			// hardlink.
 			c.vlog("Checking hardlink table")
-			valid, linkRecord :=
-				dir.hardlinkTable.getHardlinkByInode(inodeNum)
-			if valid {
-				c.vlog("Hardlink found")
-				modifyEntryWithAttr(c, newType, attr, linkRecord,
-					updateMtime)
-				entry = linkRecord
-			}
+			dir.hardlinkTable.modifyChildWithFunc(c, inodeNum, modify)
+			entry = dir.hardlinkTable.recordByInodeId(c, inodeNum)
 		}
 
 		if entry == nil {
@@ -834,9 +858,8 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	// if we don't have the child, maybe we're wsr and it's a hardlink
 	if dir.self.isWorkspaceRoot() {
 		c.vlog("Checking hardlink table")
-		valid, linkRecord :=
-			dir.hardlinkTable.getHardlinkByInode(inodeNum)
-		if valid {
+		linkRecord := dir.hardlinkTable.recordByInodeId(c, inodeNum)
+		if linkRecord != nil {
 			c.vlog("Hardlink found")
 			return linkRecord
 		}
@@ -1260,7 +1283,11 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	} else {
 		c.vlog("Updating hardlink creation time")
 		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
-		newEntry.SetContentTime(hardlink.creationTime())
+		dst.hardlinkTable.modifyChildWithFunc(c, childInodeId,
+			func(record quantumfs.DirectoryRecord) {
+
+				record.SetContentTime(hardlink.creationTime())
+			})
 	}
 
 	// Add to destination, possibly removing the overwritten inode
@@ -1549,24 +1576,19 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 		record := dir.children.recordByInodeId(c, inodeNum)
 
 		now := quantumfs.NewTime(time.Now())
-		if record != nil {
-			dir.children.modifyChildWithFunc(c, inodeNum,
-				func(record quantumfs.DirectoryRecord) {
+		modify := func(record quantumfs.DirectoryRecord) {
+			record.SetExtendedAttributes(key)
+			record.SetContentTime(now)
+		}
 
-					record.SetExtendedAttributes(key)
-					record.SetContentTime(now)
-				})
-		} else if dir.self.isWorkspaceRoot() {
-			// if we don't have the child, maybe we're wsr and it's a
-			// hardlink
+		if record != nil && record.Type() != quantumfs.ObjectTypeHardlink {
+			dir.children.modifyChildWithFunc(c, inodeNum, modify)
+		} else {
+			// If we don't have the child, maybe we're the WSR and it's a
+			// hardlink. If we aren't the WSR, then it must be a
+			// hardlink.
 			c.vlog("Checking hardlink table")
-			valid, linkRecord :=
-				dir.hardlinkTable.getHardlinkByInode(inodeNum)
-			if valid {
-				c.vlog("Hardlink found")
-				linkRecord.SetExtendedAttributes(key)
-				linkRecord.SetContentTime(now)
-			}
+			dir.hardlinkTable.modifyChildWithFunc(c, inodeNum, modify)
 		}
 	}()
 	dir.self.dirty(c)
@@ -1631,24 +1653,18 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 		record := dir.children.recordByInodeId(c, inodeNum)
 
 		now := quantumfs.NewTime(time.Now())
-		if record != nil {
-			dir.children.modifyChildWithFunc(c, inodeNum,
-				func(record quantumfs.DirectoryRecord) {
+		modify := func(record quantumfs.DirectoryRecord) {
+			record.SetExtendedAttributes(key)
+			record.SetContentTime(now)
+		}
 
-					record.SetExtendedAttributes(key)
-					record.SetContentTime(now)
-				})
+		if record != nil {
+			dir.children.modifyChildWithFunc(c, inodeNum, modify)
 		} else if dir.self.isWorkspaceRoot() {
 			// if we don't have the child, maybe we're wsr and it's a
 			// hardlink
 			c.vlog("Checking hardlink table")
-			valid, linkRecord :=
-				dir.hardlinkTable.getHardlinkByInode(inodeNum)
-			if valid {
-				c.vlog("Hardlink found")
-				linkRecord.SetExtendedAttributes(key)
-				linkRecord.SetContentTime(now)
-			}
+			dir.hardlinkTable.modifyChildWithFunc(c, inodeNum, modify)
 		}
 	}()
 	dir.self.dirty(c)
@@ -1854,8 +1870,8 @@ func (dir *Directory) normalizeChildren(c *ctx) {
 	//    from the hardlinktable.
 
 	normalRecords := dir.getNormalizationCandidates(c)
-	for inodeId, record := range normalRecords {
-		dir.normalizeChild(c, inodeId, record)
+	for inodeId, records := range normalRecords {
+		dir.normalizeChild(c, inodeId, records)
 	}
 }
 
@@ -1886,7 +1902,7 @@ func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
 }
 
 func (dir *Directory) hardlinkDec(
-	fileId quantumfs.FileId) quantumfs.DirectoryRecord {
+	fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord) {
 
 	dir.hardlinkDelta.dec(fileId)
 	return dir.hardlinkTable.hardlinkDec(fileId)
