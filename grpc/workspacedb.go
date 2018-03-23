@@ -63,9 +63,16 @@ func maybeAddPort(conf string) string {
 }
 
 func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
+	return newWorkspaceDB_(conf, grpcConnect)
+}
+
+func newWorkspaceDB_(conf string, connectFn func(*grpc.ClientConn,
+	string) (*grpc.ClientConn, rpc.WorkspaceDbClient)) quantumfs.WorkspaceDB {
+
 	conf = maybeAddPort(conf)
 
 	wsdb := &workspaceDB{
+		connectFn:        connectFn,
 		config:           conf,
 		subscriptions:    map[string]bool{},
 		// There is no need to block on triggering a reconnect. Making this
@@ -117,6 +124,10 @@ type badConnectionInfo struct {
 }
 
 type workspaceDB struct {
+	// This is our connection function, which allows us to stub during tests
+	connectFn     func(*grpc.ClientConn, string) (*grpc.ClientConn,
+			rpc.WorkspaceDbClient)
+
 	config        string
 	lock          utils.DeferableMutex
 	callback      quantumfs.SubscriptionCallback
@@ -126,6 +137,33 @@ type workspaceDB struct {
 	server        serverSnapshots
 
 	triggerReconnect chan badConnectionInfo
+}
+
+func grpcConnect(old *grpc.ClientConn, config string) (newConn *grpc.ClientConn,
+	newClient rpc.WorkspaceDbClient) {
+
+	connOptions := []grpc.DialOption{
+		grpc.WithInsecure(),
+		grpc.WithBackoffMaxDelay(100 * time.Millisecond),
+		grpc.WithBlock(),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                5 * time.Second,
+			Timeout:             1 * time.Second,
+			PermitWithoutStream: true,
+		}),
+	}
+
+	if old != nil {
+		old.Close()
+	}
+
+	var rtn *grpc.ClientConn
+	err := fmt.Errorf("Not an error")
+	for err != nil {
+		rtn, err = grpc.Dial(config, connOptions...)
+	}
+
+	return rtn, rpc.NewWorkspaceDbClient(rtn)
 }
 
 // Run in a separate goroutine to trigger reconnection when the connection has failed
@@ -147,28 +185,9 @@ func (wsdb *workspaceDB) reconnector() {
 			serverConnIdx)
 
 		// Reconnect
-		connOptions := []grpc.DialOption{
-			grpc.WithInsecure(),
-			grpc.WithBackoffMaxDelay(100 * time.Millisecond),
-			grpc.WithBlock(),
-			grpc.WithKeepaliveParams(keepalive.ClientParameters{
-				Time:                5 * time.Second,
-				Timeout:             1 * time.Second,
-				PermitWithoutStream: true,
-			}),
-		}
+		var newServer *rpc.WorkspaceDbClient
+		conn, newServer = wsdb.connectFn(conn, wsdb.config)
 
-		if conn != nil {
-			conn.Close()
-			conn = nil
-		}
-
-		err := fmt.Errorf("Not an error")
-		for err != nil {
-			conn, err = grpc.Dial(wsdb.config, connOptions...)
-		}
-
-		newServer := rpc.NewWorkspaceDbClient(conn)
 		wsdb.server.ReplaceServer(&newServer)
 	}
 }
@@ -207,10 +226,18 @@ func (wsdb *workspaceDB) _update() (rtnErr error) {
 		// haven't missed any notifications while we were disconnected.
 		defer wsdb.lock.Lock().Unlock()
 
-		logger, err := qlog.NewQlog("")
-		if err != nil {
-			return fmt.Errorf("Error creating qlog file %s", err.Error())
+		// Share the qlog if this is a test run
+		var logger *qlog.Qlog
+		if testWsdb, isTest := wsdb.server.(*testWorkspaceDbClient); isTest {
+			logger = testWsdb.logger
+		} else {
+			logger, err = qlog.NewQlog("")
+			if err != nil {
+				return fmt.Errorf("Error creating qlog file %s",
+					err.Error())
+			}
 		}
+
 		ctx := quantumfs.Ctx{
 			Qlog:      logger,
 			RequestId: uint64(rpc.ReservedRequestIds_RESYNC),
