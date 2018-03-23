@@ -23,11 +23,6 @@ func runTest(t *testing.T, test qfsTest) {
 	runTestCommon(t, test, 1500 * time.Millisecond)
 }
 
-func runTestSlow(t *testing.T, timeout time.Duration, test qfsTest) {
-	t.Parallel()
-	runTestCommon(t, test, timeout)
-}
-
 func runTestCommon(t *testing.T, test qfsTest, timeout time.Duration) {
 	// call-stack until test should be
 	// 2 <testname>

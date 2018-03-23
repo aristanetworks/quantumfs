@@ -165,6 +165,20 @@ func (ws *testWorkspaceDbClient) FetchWorkspace(ctx context.Context,
 
 	serverDown := atomic.LoadUint32(ws.serverDown)
 	if serverDown == 1 {
+		// Cause other functions to return an error instead of hanging
+		atomic.StoreUint32(ws.serverDown, 2)
+
+		// This function is chosen to hang indefinitely
+		for {
+			serverDown := atomic.LoadUint32(ws.serverDown)
+			if serverDown == 0 {
+				break
+			}
+
+			time.Sleep(10 * time.Millisecond)
+		}
+	} else if serverDown >= 2 {
+		// This function is chosen to return an error
 		return nil, fmt.Errorf("Server down in test")
 	}
 
@@ -305,11 +319,11 @@ func TestUpdateWorkspace(t *testing.T) {
 }
 
 func TestDisconnectedWorkspaceDB(t *testing.T) {
-	runTestSlow(t, 10 * time.Second, func(test *testHelper) {
+	runTest(t, func(test *testHelper) {
 		
 		wsdb, ctx, serverDown := setupWsdb(test)
 
-		numWorkspaces := 100
+		numWorkspaces := 1000
 		var workspaceLock utils.DeferableMutex
 		workspaces := make(map[string]int)
 		// Add some subscriptions
@@ -336,25 +350,31 @@ func TestDisconnectedWorkspaceDB(t *testing.T) {
 		// Cause the current stream to error out, indicating connection prob
 		rawWsdb.stream.data <- nil
 
+		// Queue up >1000 commands which should now fail with errors
+		for i := 0; i < 1100; i++ {
+			go func () {
+				defer func () {
+					// suppress any panics due to reconnect()
+					recover()
+				}()
+
+				_, _, err := wsdb.Workspace(ctx, "a", "b", "c")
+				test.AssertErr(err)
+			}()
+		}
+
 		// Wait for many failures to happen and potentially clog things
 		// when fetchWorkspace repeatedly fails
-		test.WaitForNLogStrings("Received grpc error", 15000,
-			"Waiting for errors to accumulate")
+		test.WaitForNLogStrings("Received grpc error", 1000,
+			"fetch errors to accumulate")
 
 		// Bring the connection back
 		atomic.StoreUint32(serverDown, 0)
 
-		before := time.Now()
-		// See how long it takes to do some basic operations
-		_, _, err := wsdb.Workspace(ctx, "a", "b", "c")
-		test.AssertNoErr(err)
-		_, _, err = wsdb.Workspace(ctx, "a2", "b2", "c2")
-		test.AssertNoErr(err)
-		_, err = wsdb.NumTypespaces(ctx)
-		test.AssertNoErr(err)
-		_, err = wsdb.NumNamespaces(ctx, "test")
-		test.AssertNoErr(err)
-		duration := time.Since(before)
-		test.Assert(duration < time.Second, "WorkspaceDB hung up")
+		// Perform some basic operations which need the wsdb.lock -
+		// if the lock is hung, then this test will timeout
+		wsdb.SubscribeTo("post/test/wsrA")
+		wsdb.SubscribeTo("post/test/wsrB")
+		wsdb.SubscribeTo("post/test/wsrC")
 	})
 }
