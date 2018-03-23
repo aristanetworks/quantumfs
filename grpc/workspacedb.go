@@ -72,10 +72,10 @@ func newWorkspaceDB_(conf string, connectFn func(*grpc.ClientConn,
 	conf = maybeAddPort(conf)
 
 	wsdb := &workspaceDB{
-		connectFn:        connectFn,
-		config:           conf,
-		subscriptions:    map[string]bool{},
-		server:           newServerContainer(nil),
+		connectFn:     connectFn,
+		config:        conf,
+		subscriptions: map[string]bool{},
+		server:        newServerContainer(nil),
 		// There is no need to block on triggering a reconnect. Making this
 		// a buffered channel will ensure that concurrent grpcs users
 		// aren't occasionally blocked on reconnect contention
@@ -86,7 +86,7 @@ func newWorkspaceDB_(conf string, connectFn func(*grpc.ClientConn,
 	go wsdb.reconnector(connected)
 	wsdb.reconnect(0)
 	// wait for the server to be connected before we start the updater
-	<- connected
+	<-connected
 
 	go wsdb.updater()
 
@@ -99,14 +99,14 @@ type serverSnapshots interface {
 }
 
 type serverContainer struct {
-	lock    utils.DeferableMutex
+	lock          utils.DeferableMutex
 	server        *rpc.WorkspaceDbClient
 	serverConnIdx uint32
 }
 
 func newServerContainer(server *rpc.WorkspaceDbClient) serverSnapshots {
-	return &serverContainer {
-		server:	server,
+	return &serverContainer{
+		server: server,
 	}
 }
 
@@ -124,7 +124,7 @@ func (srv *serverContainer) ReplaceServer(server *rpc.WorkspaceDbClient) {
 }
 
 type badConnectionInfo struct {
-	idx	uint32
+	idx uint32
 }
 
 type workspaceDB struct {
@@ -138,7 +138,7 @@ type workspaceDB struct {
 	subscriptions map[string]bool
 	updates       map[string]quantumfs.WorkspaceState
 
-	server        serverSnapshots
+	server serverSnapshots
 
 	triggerReconnect chan badConnectionInfo
 }
@@ -203,8 +203,8 @@ func (wsdb *workspaceDB) reconnector(started chan struct{}) {
 }
 
 func (wsdb *workspaceDB) reconnect(badConnIdx uint32) {
-	wsdb.triggerReconnect <- badConnectionInfo {
-		idx:	badConnIdx,
+	wsdb.triggerReconnect <- badConnectionInfo{
+		idx: badConnIdx,
 	}
 }
 

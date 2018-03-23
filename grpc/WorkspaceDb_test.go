@@ -109,8 +109,6 @@ func TestUpdateWorkspace(t *testing.T) {
 }
 
 func TestDisconnectedWorkspaceDB(t *testing.T) {
-	// BUG 252988
-	t.Skip()
 	runTest(t, func(test *testHelper) {
 
 		wsdb, ctx, serverDown := setupWsdb(test)
