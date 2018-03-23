@@ -8,8 +8,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -20,6 +18,7 @@ import (
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/qlogstats"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
+	"github.com/aristanetworks/quantumfs/utils"
 )
 
 var database string
@@ -201,9 +200,7 @@ func main() {
 		return
 	}
 
-	go func() {
-		fmt.Println(http.ListenAndServe("localhost:6061", nil))
-	}()
+	utils.ServePprof()
 
 	db := loadTimeSeriesDB()
 
