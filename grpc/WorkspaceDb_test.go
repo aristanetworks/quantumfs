@@ -179,7 +179,7 @@ func TestRetries(t *testing.T) {
 
 		// Issue a fetch in parallel, which should retry loop
 		fetchFinished := make(chan error)
-		go func () {
+		go func() {
 			_, _, err := wsdb.Workspace(ctx, "a", "b", "c")
 			fetchFinished <- err
 		}()
@@ -191,7 +191,7 @@ func TestRetries(t *testing.T) {
 		atomic.StoreUint32(serverDown, 0)
 
 		// Ensure we check that the fetch eventually succeeds
-		err := <- fetchFinished
+		err := <-fetchFinished
 		test.AssertNoErr(err)
 	})
 }

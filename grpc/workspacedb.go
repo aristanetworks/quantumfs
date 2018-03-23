@@ -142,7 +142,7 @@ type workspaceDB struct {
 	subscriptions map[string]bool
 	updates       map[string]quantumfs.WorkspaceState
 
-	qlog          *qlog.Qlog
+	qlog *qlog.Qlog
 
 	server serverSnapshots
 
