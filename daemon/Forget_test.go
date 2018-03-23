@@ -417,3 +417,43 @@ func TestForgetLookupRace(t *testing.T) {
 		// "lookupCount less than zero" if the race happened.
 	})
 }
+
+func TestForgetUnlinkedInstantiated(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "fileA"
+		fullname := workspace + "/" + name
+
+		test.createFile(workspace, name, 1000)
+		var inodeId InodeId
+		func() {
+			file, err := os.OpenFile(fullname, os.O_RDONLY, 0777)
+			test.AssertNoErr(err)
+			defer file.Close()
+
+			inodeId = test.getInodeNum(fullname)
+			test.AssertNoErr(syscall.Unlink(fullname))
+		}()
+		test.SyncAllWorkspaces()
+		_, exists := test.qfs.lookupCount(test.TestCtx(), inodeId)
+
+		utils.Assert(!exists, "file %s still exists in the lookup map", name)
+	})
+}
+
+func TestForgetUnlinkedUninstantiated(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "fileA"
+		fullname := workspace + "/" + name
+
+		test.createFile(workspace, name, 1000)
+		inodeId := test.getInodeNum(fullname)
+		test.remountFilesystem()
+		test.AssertNoErr(syscall.Unlink(fullname))
+		test.SyncAllWorkspaces()
+		_, exists := test.qfs.lookupCount(test.TestCtx(), inodeId)
+
+		utils.Assert(!exists, "file %s still exists in the lookup map", name)
+	})
+}

@@ -105,6 +105,12 @@ func NewTestHelper(testName string, testRunDir string,
 	}
 }
 
+var singleton utils.AlternatingLocker
+
+func AlternatingLocker() *utils.AlternatingLocker {
+	return &singleton
+}
+
 func (th *TestHelper) RunTestCommonEpilog(testName string, testArg QuantumFsTest) {
 	th.RunDaemonTestCommonEpilog(testName, testArg, nil, nil)
 }
@@ -112,7 +118,10 @@ func (th *TestHelper) RunTestCommonEpilog(testName string, testArg QuantumFsTest
 func (th *TestHelper) RunDaemonTestCommonEpilog(testName string,
 	testArg QuantumFsTest, startChan <-chan struct{}, cleanup func()) {
 
+	// Wait for any new tests starting a new server to finish starting up
+	defer AlternatingLocker().RLock().RUnlock()
 	th.Log("Finished test preamble, starting test proper")
+
 	beforeTest := time.Now()
 
 	go th.Execute(testArg)
