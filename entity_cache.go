@@ -564,19 +564,16 @@ const (
 )
 
 func (g *entityGroup) refreshNeeded(c ether.Ctx) (action refreshAction) {
-	defer c.FuncIn("cache::refreshNeeded",
-		"p:%s c:%d e:%s now:%s d:%t",
-		g.parentEntity, g.entityCount,
-		g.expiresAt.Format(time.RFC3339Nano),
-		time.Now().Format(time.RFC3339Nano),
-		g.detached).Out()
-
 	if g.cache.neverExpires {
 		return refreshIgnore
 	}
 
 	duration := time.Now().Sub(g.expiresAt)
 	if duration >= 0 {
+		c.Vlog("Refresh needed p:%s c:%d e:%s now:%s d:%t", g.parentEntity,
+			g.entityCount, g.expiresAt.Format(time.RFC3339Nano),
+			time.Now().Format(time.RFC3339Nano), g.detached)
+
 		// pick a winning caller (out of multiple read-locked) to refresh the group
 		// Its normal to have multiple refreshes for different entityGroups to be
 		// active at the same time. In rare scenarios, its possible to have multiple refreshes
