@@ -70,10 +70,14 @@ func newWorkspaceDB_(conf string, connectFn func(*grpc.ClientConn,
 
 	conf = maybeAddPort(conf)
 
+	qlog, err := qlog.NewQlog("")
+	utils.Assert(err == nil, "Unable to create empty Qlog")
+
 	wsdb := &workspaceDB{
 		connectFn:        connectFn,
 		config:           conf,
 		subscriptions:    map[string]bool{},
+		qlog:             qlog,
 		triggerReconnect: make(chan struct{}),
 		waitForReconnect: make(chan struct{}),
 	}
@@ -96,6 +100,8 @@ type workspaceDB struct {
 	callback      quantumfs.SubscriptionCallback
 	subscriptions map[string]bool
 	updates       map[string]quantumfs.WorkspaceState
+
+	qlog          *qlog.Qlog
 
 	// In order to avoid deadlocks, infinite recursions and a thundering herd of
 	// reconnections there exists a single goroutine which performs the
@@ -208,21 +214,8 @@ func (wsdb *workspaceDB) waitForWorkspaceUpdates() {
 		// haven't missed any notifications while we were disconnected.
 		defer wsdb.lock.Lock().Unlock()
 
-		// Share the qlog if this is a test run
-		var logger *qlog.Qlog
-		if testWsdb, isTest := wsdb.server.(*testWorkspaceDbClient); isTest {
-			logger = testWsdb.logger
-		} else {
-			logger, err = qlog.NewQlog("")
-			if err != nil {
-				fmt.Printf("Error creating qlog file %s",
-					err.Error())
-				return true
-			}
-		}
-
 		ctx := quantumfs.Ctx{
-			Qlog:      logger,
+			Qlog:      wsdb.qlog,
 			RequestId: uint64(rpc.ReservedRequestIds_RESYNC),
 		}
 		for workspace, _ := range wsdb.subscriptions {
@@ -397,6 +390,7 @@ const NumTypespaceLog = "grpc::NumTypespaces"
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
 	defer c.FuncInName(qlog.LogWorkspaceDb, NumTypespaceLog).Out()
 
+	wsdb.qlog = c.Qlog
 	var result int
 
 	err := retry(c, "NumTypespaces", func(c *quantumfs.Ctx) error {
@@ -431,6 +425,7 @@ const TypespaceListLog = "grpc::TypespaceList"
 func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
 	defer c.FuncInName(qlog.LogWorkspaceDb, TypespaceListLog).Out()
 
+	wsdb.qlog = c.Qlog
 	var result []string
 
 	err := retry(c, "TypespaceList", func(c *quantumfs.Ctx) error {
@@ -466,6 +461,7 @@ func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, NumNamespacesLog).Out()
+	wsdb.qlog = c.Qlog
 
 	var result int
 
@@ -507,6 +503,7 @@ func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]st
 	error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, NamespaceListLog).Out()
+	wsdb.qlog = c.Qlog
 
 	var result []string
 
@@ -548,6 +545,7 @@ func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	namespace string) (int, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, NumWorkspacesLog).Out()
+	wsdb.qlog = c.Qlog
 
 	var result int
 
@@ -590,6 +588,7 @@ func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	namespace string) (map[string]quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, WorkspaceListLog).Out()
+	wsdb.qlog = c.Qlog
 
 	var result map[string]quantumfs.WorkspaceNonce
 
@@ -642,6 +641,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, BranchWorkspaceLog).Out()
+	wsdb.qlog = c.Qlog
 
 	err := retry(c, "BranchWorkspace", func(c *quantumfs.Ctx) error {
 		return wsdb.branchWorkspace(c, srcTypespace, srcNamespace,
@@ -682,6 +682,7 @@ func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, DeleteWorkspaceLog).Out()
+	wsdb.qlog = c.Qlog
 
 	err := retry(c, "DeleteWorkspace", func(c *quantumfs.Ctx) error {
 		return wsdb.deleteWorkspace(c, typespace, namespace, workspace)
@@ -772,6 +773,7 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, WorkspaceLog).Out()
+	wsdb.qlog = c.Qlog
 
 	var resKey quantumfs.ObjectKey
 	var resNonce quantumfs.WorkspaceNonce
@@ -800,6 +802,7 @@ func (wsdb *workspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 	typespace string, namespace string, workspace string) (
 	quantumfs.ObjectKey, quantumfs.WorkspaceNonce, error) {
 
+	wsdb.qlog = c.Qlog
 	err := wsdb.SubscribeTo(typespace + "/" + namespace + "/" + workspace)
 	if err != nil {
 		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{}, err
@@ -822,6 +825,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		AdvanceWorkspaceDebug, workspaceName, currentRootId.String(),
 		newRootId.String()).Out()
 
+	wsdb.qlog = c.Qlog
 	var result quantumfs.ObjectKey
 
 	err := retry(c, "AdvanceWorkspace", func(c *quantumfs.Ctx) error {
@@ -874,6 +878,7 @@ func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string
 	namespace string, workspace string) (bool, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb, WorkspaceIsImmutableLog).Out()
+	wsdb.qlog = c.Qlog
 
 	var result bool
 
@@ -904,6 +909,7 @@ func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace strin
 
 	defer c.FuncIn(qlog.LogWorkspaceDb, SetWorkspaceImmutableLog,
 		SetWorkspaceImmutableDebug, typespace, namespace, workspace).Out()
+	wsdb.qlog = c.Qlog
 
 	err := retry(c, "SetWorkspaceImmutable", func(c *quantumfs.Ctx) error {
 		return wsdb.setWorkspaceImmutable(c, typespace, namespace, workspace)
