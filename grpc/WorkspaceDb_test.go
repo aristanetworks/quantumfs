@@ -184,7 +184,7 @@ func TestRetries(t *testing.T) {
 			fetchFinished <- err
 		}()
 
-		test.WaitForNLogStrings("Received grpc err", 5,
+		test.WaitForNLogStrings("failed, retrying", 5,
 			"fetch to attempt retry a few times")
 
 		// Unbreak the connection
