@@ -2001,3 +2001,20 @@ func TestReaddirnamesOneAtATime(t *testing.T) {
 		}
 	})
 }
+
+func TestDirectoryNlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		dir := workspace + "/dir"
+
+		test.AssertNoErr(utils.MkdirAll(dir+"/subdir1", 0124))
+		test.AssertNoErr(utils.MkdirAll(dir+"/subdir2", 0124))
+		test.createFile(workspace, "dir/file1", 1000)
+		test.createFile(workspace, "dir/file2", 1000)
+		test.createFile(workspace, "dir/file3", 1000)
+
+		var stat syscall.Stat_t
+		test.AssertNoErr(syscall.Stat(dir, &stat))
+		test.Assert(stat.Nlink == 4, "wrong nlink %d", stat.Nlink)
+	})
+}

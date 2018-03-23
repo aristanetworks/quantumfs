@@ -101,7 +101,7 @@ type workspaceDB struct {
 	subscriptions map[string]bool
 	updates       map[string]quantumfs.WorkspaceState
 
-	qlog          *qlog.Qlog
+	qlog *qlog.Qlog
 
 	// In order to avoid deadlocks, infinite recursions and a thundering herd of
 	// reconnections there exists a single goroutine which performs the

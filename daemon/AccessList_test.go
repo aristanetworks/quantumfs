@@ -6,6 +6,7 @@ package daemon
 // Test that workspaceroot maintains a list of accessed files
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"syscall"
@@ -773,5 +774,23 @@ func TestAccessListNormalizedHardlink(t *testing.T) {
 		ioutil.ReadFile(workspace + "/" + name + "_link")
 
 		test.assertWorkspaceAccessList(expectedAccessList, workspace)
+	})
+}
+
+func TestAccessListOrphanFile(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename := "test"
+
+		for i := 0; i < 100; i++ {
+			path := fmt.Sprintf("%s/%s_%d", workspace, filename, i)
+			test.AssertNoErr(testutils.PrintToFile(path,
+				string(GenData(1024))))
+
+			go func() {
+				test.AssertNoErr(syscall.Unlink(path))
+			}()
+			go ioutil.ReadFile(path)
+		}
 	})
 }

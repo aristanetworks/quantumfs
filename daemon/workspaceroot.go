@@ -116,7 +116,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) (Inode,
 }
 
 func publishHardlinkMap(c *ctx, pub publishFn,
-	records map[quantumfs.FileId]HardlinkTableEntry) *quantumfs.HardlinkEntry {
+	records map[quantumfs.FileId]*HardlinkTableEntry) *quantumfs.HardlinkEntry {
 
 	defer c.funcIn("publishHardlinkMap").Out()
 
@@ -226,7 +226,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 }
 
 func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
-	hardlinks map[quantumfs.FileId]HardlinkTableEntry,
+	hardlinks map[quantumfs.FileId]*HardlinkTableEntry,
 	pub publishFn) quantumfs.ObjectKey {
 
 	defer c.funcIn("publishWorkspaceRoot").Out()
