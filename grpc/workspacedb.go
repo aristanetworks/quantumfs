@@ -62,12 +62,19 @@ func maybeAddPort(conf string) string {
 }
 
 func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
+	return newWorkspaceDB_(conf, grpcConnect)
+}
+
+func newWorkspaceDB_(conf string, connectFn func(*grpc.ClientConn,
+	string) (*grpc.ClientConn, rpc.WorkspaceDbClient)) quantumfs.WorkspaceDB {
+
 	conf = maybeAddPort(conf)
 
 	qlog, err := qlog.NewQlog("")
 	utils.Assert(err == nil, "Unable to create empty Qlog")
 
 	wsdb := &workspaceDB{
+		connectFn:        connectFn,
 		config:           conf,
 		subscriptions:    map[string]bool{},
 		qlog:             qlog,
@@ -83,6 +90,10 @@ func NewWorkspaceDB(conf string) quantumfs.WorkspaceDB {
 }
 
 type workspaceDB struct {
+	// This is our connection function, which allows us to stub during tests
+	connectFn func(*grpc.ClientConn, string) (*grpc.ClientConn,
+		rpc.WorkspaceDbClient)
+
 	config        string
 	lock          utils.DeferableMutex
 	server        rpc.WorkspaceDbClient
@@ -103,6 +114,33 @@ type workspaceDB struct {
 	waitForReconnect chan struct{}
 }
 
+func grpcConnect(old *grpc.ClientConn, config string) (newConn *grpc.ClientConn,
+	newClient rpc.WorkspaceDbClient) {
+
+	connOptions := []grpc.DialOption{
+		grpc.WithInsecure(),
+		grpc.WithBackoffMaxDelay(100 * time.Millisecond),
+		grpc.WithBlock(),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                5 * time.Second,
+			Timeout:             1 * time.Second,
+			PermitWithoutStream: true,
+		}),
+	}
+
+	if old != nil {
+		old.Close()
+	}
+
+	var rtn *grpc.ClientConn
+	err := fmt.Errorf("Not an error")
+	for err != nil {
+		rtn, err = grpc.Dial(config, connOptions...)
+	}
+
+	return rtn, rpc.NewWorkspaceDbClient(rtn)
+}
+
 // Run in a separate goroutine to trigger reconnection when the connection has failed
 func (wsdb *workspaceDB) reconnector() {
 	var conn *grpc.ClientConn
@@ -112,28 +150,7 @@ func (wsdb *workspaceDB) reconnector() {
 		<-wsdb.triggerReconnect
 
 		// Reconnect
-		connOptions := []grpc.DialOption{
-			grpc.WithInsecure(),
-			grpc.WithBackoffMaxDelay(100 * time.Millisecond),
-			grpc.WithBlock(),
-			grpc.WithKeepaliveParams(keepalive.ClientParameters{
-				Time:                5 * time.Second,
-				Timeout:             1 * time.Second,
-				PermitWithoutStream: true,
-			}),
-		}
-
-		if conn != nil {
-			conn.Close()
-			conn = nil
-		}
-
-		err := fmt.Errorf("Not an error")
-		for err != nil {
-			conn, err = grpc.Dial(wsdb.config, connOptions...)
-		}
-
-		wsdb.server = rpc.NewWorkspaceDbClient(conn)
+		conn, wsdb.server = wsdb.connectFn(conn, wsdb.config)
 
 		// Swizzle a new notification channel into place and drain the old
 		// one
