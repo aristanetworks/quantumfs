@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	context "golang.org/x/net/context"
-	grpc "google.golang.org/grpc"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/aristanetworks/quantumfs"
