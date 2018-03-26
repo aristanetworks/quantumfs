@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/grpc"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
@@ -28,15 +29,19 @@ func init() {
 const initialPort = uint16(22222)
 
 func runTest(t *testing.T, test serverTest) {
-	runTestCommon(t, test, false)
+	runTestCommon(t, test, false, false)
 }
 
 // Run a server where the backend is erased when the server dies
 func runTestWithEphemeralBackend(t *testing.T, test serverTest) {
-	runTestCommon(t, test, true)
+	runTestCommon(t, test, true, false)
 }
 
-func runTestCommon(t *testing.T, test serverTest, ephemeral bool) {
+func runTestWithQfsDaemon(t *testing.T, test serverTest) {
+	runTestCommon(t, test, true, true)
+}
+
+func runTestCommon(t *testing.T, test serverTest, ephemeral bool, startQfs bool) {
 	t.Parallel()
 
 	// the stack depth of test name for all callers of runTest
@@ -47,8 +52,10 @@ func runTestCommon(t *testing.T, test serverTest, ephemeral bool) {
 	testName := testutils.TestName(2)
 
 	th := &testHelper{
-		TestHelper: testutils.NewTestHelper(testName,
-			testutils.TestRunDir, t),
+		TestHelper: daemon.TestHelper{
+			TestHelper: testutils.NewTestHelper(testName,
+				testutils.TestRunDir, t),
+		},
 	}
 	th.ctx = newCtx(th.Logger)
 
@@ -89,11 +96,24 @@ func runTestCommon(t *testing.T, test serverTest, ephemeral bool) {
 
 	defer th.EndTest()
 
-	th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
+	if startQfs {
+		startChan := make(chan struct{}, 0)
+
+		th.CreateTestDirs()
+
+		wsdbConfig := fmt.Sprintf("[::1]:%d", th.port)
+		wsdb := grpc.NewWorkspaceDB(wsdbConfig)
+		th.StartQuantumFsWithWsdb(wsdb, startChan)
+
+		th.RunDaemonTestCommonEpilog(testName, th.testHelperUpcast(test),
+			startChan, th.AbortFuse)
+	} else {
+		th.RunTestCommonEpilog(testName, th.testHelperUpcast(test))
+	}
 }
 
 type testHelper struct {
-	testutils.TestHelper
+	daemon.TestHelper
 	ctx           *quantumfs.Ctx
 	server        *Server
 	port          uint16
@@ -137,6 +157,8 @@ func (th *testHelper) stopServer() {
 }
 
 func (th *testHelper) EndTest() {
+	th.TestHelper.EndTest()
+
 	th.stopServer()
 
 	func() {
@@ -144,7 +166,6 @@ func (th *testHelper) EndTest() {
 		delete(servers, th.port)
 	}()
 
-	th.TestHelper.EndTest()
 }
 
 func TestMain(m *testing.M) {
