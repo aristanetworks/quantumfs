@@ -159,7 +159,7 @@ func TestDisconnectedWorkspaceDB(t *testing.T) {
 
 func TestRetries(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		wsdb, ctx, serverDown := test.setupWsdb()
+		wsdb, ctx, serverDown, _ := test.setupWsdb()
 
 		// Break the connection hard, so all requests just fail
 		atomic.StoreUint32(serverDown, 2)
@@ -185,7 +185,7 @@ func TestRetries(t *testing.T) {
 
 func TestUpdaterDoesntRetry(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		wsdb, ctx, serverDown := test.setupWsdb()
+		wsdb, ctx, serverDown, rawWsdb := test.setupWsdb()
 
 		// Fetch a workspace once to link the qlog
 		wsdb.Workspace(ctx, "a", "b", "c")
@@ -202,9 +202,6 @@ func TestUpdaterDoesntRetry(t *testing.T) {
 
 		// Cause reconnector to try reconnecting by making the stream
 		// error out
-		grpcWsdb := wsdb.(*workspaceDB)
-		server, _ := grpcWsdb.server.Snapshot()
-		rawWsdb := (*server).(*testWorkspaceDbClient)
 		rawWsdb.stream.data <- nil
 
 		// Wait for a few reconnector attempts to have happened
