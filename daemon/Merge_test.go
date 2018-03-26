@@ -1000,3 +1000,57 @@ func TestMergeOverDecrement(t *testing.T) {
 		})
 	})
 }
+
+// This test is to check the case where we deep merge two directories, but the
+// merged result ends up being identical to remote
+func TestMergeDeepMergeHardlink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(bws string) {
+			test.AssertNoErr(utils.MkdirAll(bws+"/dirA", 0777))
+			test.AssertNoErr(testutils.PrintToFile(bws+"/dirA/file",
+				"test data"))
+			test.AssertNoErr(syscall.Link(bws+"/dirA/file",
+				bws+"/dirA/link"))
+			test.AssertNoErr(syscall.Link(bws+"/dirA/file",
+				bws+"/dirA/linkB"))
+			test.AssertNoErr(syscall.Link(bws+"/dirA/file",
+				bws+"/dirA/linkC"))
+		}, func(localWs string, remoteWs string) mergeTestCheck {
+			// Make some remote only removals so we mergeDirectory
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/file"))
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/link"))
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/linkB"))
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/linkC"))
+
+			return func(merged string) {
+				// Nothing to check explicitly - we are just looking
+				// to ensure no errors occur
+			}
+		})
+	})
+}
+
+func TestMergeDeepMergeHardlinkPartial(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		MergeTester(test, func(bws string) {
+			test.AssertNoErr(utils.MkdirAll(bws+"/dirA", 0777))
+			test.AssertNoErr(testutils.PrintToFile(bws+"/dirA/file",
+				"test data"))
+			test.AssertNoErr(syscall.Link(bws+"/dirA/file",
+				bws+"/dirA/link"))
+			test.AssertNoErr(syscall.Link(bws+"/dirA/file",
+				bws+"/dirA/linkB"))
+			test.AssertNoErr(syscall.Link(bws+"/dirA/file",
+				bws+"/dirA/linkC"))
+		}, func(localWs string, remoteWs string) mergeTestCheck {
+			// Make some remote only removals so we mergeDirectory
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/linkB"))
+			test.AssertNoErr(os.Remove(remoteWs + "/dirA/linkC"))
+
+			return func(merged string) {
+				test.CheckLink(merged+"/dirA/link",
+					[]byte("test data"), 2)
+			}
+		})
+	})
+}
