@@ -219,10 +219,17 @@ func (wsdb *workspaceDB) updater() {
 		err := wsdb._update()
 
 		// we must have gotten an error for _update to return, so output it
-		wsdb.qlog.Log(qlog.LogWorkspaceDb, 0, 0,
-			"grpc::workspaceDB connection error: %s", err)
+
+		wsdb.qlog.Log(qlog.LogWorkspaceDb,
+			uint64(rpc.ReservedRequestIds_RESYNC), 0,
+			"grpc::workspaceDB connection error: %s", err.Error())
+
+		// Prevent busy looping when we try to reconnect
+		time.Sleep(retryDelay)
 	}
 }
+
+const updateLog = "_update attempting to connect to workspaceDB"
 
 // This function would only ever return due to an error
 func (wsdb *workspaceDB) _update() (rtnErr error) {
@@ -235,6 +242,9 @@ func (wsdb *workspaceDB) _update() (rtnErr error) {
 				"Updates:\n%s\n", utils.BytesToString(stackTrace))
 		}
 	}()
+
+	wsdb.qlog.Log(qlog.LogWorkspaceDb, uint64(rpc.ReservedRequestIds_RESYNC), 2,
+		updateLog)
 
 	server, serverConnIdx := wsdb.server.Snapshot()
 	defer wsdb.reconnect(serverConnIdx)
@@ -256,7 +266,9 @@ func (wsdb *workspaceDB) _update() (rtnErr error) {
 		}
 		for workspace, _ := range wsdb.subscriptions {
 			wsdb.subscribeTo(workspace)
-			key, nonce, immutable, err := wsdb.fetchWorkspace(&ctx,
+			// Make sure not to allow retries. If this call fails we
+			// need to discard our stream and start again
+			key, nonce, immutable, err := wsdb._fetchWorkspace(&ctx,
 				workspace)
 
 			if err == nil {
