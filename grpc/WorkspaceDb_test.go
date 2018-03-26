@@ -182,3 +182,41 @@ func TestRetries(t *testing.T) {
 		test.AssertNoErr(err)
 	})
 }
+
+func TestUpdaterDoesntRetry(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		wsdb, ctx, serverDown := setupWsdb(test)
+
+		// Fetch a workspace once to link the qlog
+		wsdb.Workspace(ctx, "a", "b", "c")
+
+		// Subscribe to at least one workspace so that fetch is called
+		// when we error out the stream
+		err := wsdb.SubscribeTo("test/test/test")
+		test.AssertNoErr(err)
+
+		retriesBefore := test.CountLogStrings("failed, retrying")
+
+		// Break the connection hard, so all requests fail not hang
+		atomic.StoreUint32(serverDown, 2)
+
+		// Cause reconnector to try reconnecting by making the stream
+		// error out
+		grpcWsdb := wsdb.(*workspaceDB)
+		server, _ := grpcWsdb.server.Snapshot()
+		rawWsdb := (*server).(*testWorkspaceDbClient)
+		rawWsdb.stream.data <- nil
+
+		// Wait for a few reconnector attempts to have happened
+		test.WaitForNLogStrings(updateLog, 5, "reconnection to be attempted")
+
+		// Restore the connect so we stop getting log spam
+		atomic.StoreUint32(serverDown, 0)
+
+		// Ensure that we never retried
+		retriesAfter := test.CountLogStrings("failed, retrying")
+
+		test.Assert(retriesAfter == retriesBefore,
+			"stream reconnection invoked retrying")
+	})
+}
