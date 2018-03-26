@@ -78,9 +78,9 @@ func newWorkspaceDB_(conf string, connectFn func(*grpc.ClientConn,
 		config:        conf,
 		subscriptions: map[string]bool{},
 		qlog:          qlog,
-		server:        newServerContainer(nil),
+		server:        newServerContainer(),
 		// There is no need to block on triggering a reconnect. Making this
-		// a buffered channel will ensure that concurrent grpcs users
+		// a buffered channel will ensure that concurrent grpc users
 		// aren't occasionally blocked on reconnect contention
 		triggerReconnect: make(chan badConnectionInfo, 1000),
 	}
@@ -96,7 +96,7 @@ func newWorkspaceDB_(conf string, connectFn func(*grpc.ClientConn,
 	return wsdb
 }
 
-type serverSnapshots interface {
+type serverSnapshotter interface {
 	Snapshot() (*rpc.WorkspaceDbClient, uint32)
 	ReplaceServer(*rpc.WorkspaceDbClient)
 }
@@ -107,9 +107,9 @@ type serverContainer struct {
 	serverConnIdx uint32
 }
 
-func newServerContainer(server *rpc.WorkspaceDbClient) serverSnapshots {
+func newServerContainer() serverSnapshotter {
 	return &serverContainer{
-		server: server,
+		server: nil,
 	}
 }
 
@@ -143,7 +143,7 @@ type workspaceDB struct {
 
 	qlog *qlog.Qlog
 
-	server serverSnapshots
+	server serverSnapshotter
 
 	triggerReconnect chan badConnectionInfo
 }
@@ -219,6 +219,7 @@ func (wsdb *workspaceDB) updater() {
 		err := wsdb._update()
 
 		// we must have gotten an error for _update to return, so output it
+
 		wsdb.qlog.Log(qlog.LogWorkspaceDb,
 			uint64(rpc.ReservedRequestIds_RESYNC), 0,
 			"grpc::workspaceDB connection error: %s", err.Error())
@@ -254,7 +255,7 @@ func (wsdb *workspaceDB) _update() (rtnErr error) {
 	}
 
 	var initialUpdates []*rpc.WorkspaceUpdate
-	hitError := func() error {
+	err = func() error {
 		// Replay the current state for all subscribed updates to ensure we
 		// haven't missed any notifications while we were disconnected.
 		defer wsdb.lock.Lock().Unlock()
@@ -314,8 +315,8 @@ func (wsdb *workspaceDB) _update() (rtnErr error) {
 		}
 		return nil
 	}()
-	if hitError != nil {
-		return hitError
+	if err != nil {
+		return err
 	}
 
 	for {

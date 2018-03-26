@@ -421,6 +421,10 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	defer c.qfs.flusher.lock.Lock().Unlock()
 
 	leg := dir.children.recordByInodeId(c, inodeId)
+	if leg == nil {
+		c.vlog("inode %d is no longer with us", inodeId)
+		return
+	}
 	name := leg.Filename()
 
 	if inode != nil && inode.isDirty_(c) {

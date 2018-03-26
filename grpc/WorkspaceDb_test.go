@@ -11,36 +11,40 @@ import (
 	"testing"
 	"time"
 
-	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/grpc/rpc"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-func setupWsdb(test *testHelper) (quantumfs.WorkspaceDB, *quantumfs.Ctx, *uint32) {
+func (test *testHelper) setupWsdb() (quantumfs.WorkspaceDB, *quantumfs.Ctx, *uint32,
+	*testWorkspaceDbClient) {
+
 	var serverDown uint32
+
+	testWsdb := testWorkspaceDbClient{
+		commandDelay: time.Millisecond * 1,
+		logger:       test.Logger,
+		stream:       newTestStream(),
+		serverDown:   &serverDown,
+	}
 
 	wsdb := newWorkspaceDB_("", func(*grpc.ClientConn,
 		string) (*grpc.ClientConn, rpc.WorkspaceDbClient) {
 
-		return nil, &testWorkspaceDbClient{
-			commandDelay: time.Millisecond * 1,
-			logger:       test.Logger,
-			stream:       newTestStream(),
-			serverDown:   &serverDown,
-		}
+		return nil, &testWsdb
 	})
 	ctx := &quantumfs.Ctx{
 		Qlog: test.Logger,
 	}
 
-	return wsdb, ctx, &serverDown
+	return wsdb, ctx, &serverDown, &testWsdb
 }
 
 func TestFetchWorkspace(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		wsdb, ctx, _ := setupWsdb(test)
+		wsdb, ctx, _, _ := test.setupWsdb()
 
 		key, nonce, err := wsdb.Workspace(ctx, "a", "b", "c")
 		test.Assert(key.IsEqualTo(quantumfs.EmptyWorkspaceKey),
@@ -53,7 +57,7 @@ func TestFetchWorkspace(t *testing.T) {
 
 func TestUpdateWorkspace(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		wsdb, _, _ := setupWsdb(test)
+		wsdb, _, _, rawWsdb := test.setupWsdb()
 
 		numWorkspaces := 15000
 		var workspaceLock utils.DeferableMutex
@@ -78,21 +82,8 @@ func TestUpdateWorkspace(t *testing.T) {
 		}
 
 		// Send in updates for every workspace
-		grpcWsdb := wsdb.(*workspaceDB)
-		server, _ := grpcWsdb.server.Snapshot()
-		rawWsdb := (*server).(*testWorkspaceDbClient)
 		for _, wsrStr := range wsrStrs {
-			var newNotification rpc.WorkspaceUpdate
-			newNotification.Name = wsrStr
-			newNotification.RootId = &rpc.ObjectKey{
-				Data: quantumfs.EmptyWorkspaceKey.Value(),
-			}
-			newNotification.Nonce = &rpc.WorkspaceNonce{
-				Id: 12345,
-			}
-			newNotification.Immutable = false
-
-			rawWsdb.stream.data <- &newNotification
+			rawWsdb.sendNotification(wsrStr)
 		}
 
 		test.WaitFor("All workspaces to get notifications", func() bool {
@@ -110,8 +101,7 @@ func TestUpdateWorkspace(t *testing.T) {
 
 func TestDisconnectedWorkspaceDB(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-
-		wsdb, ctx, serverDown := setupWsdb(test)
+		wsdb, ctx, serverDown, rawWsdb := test.setupWsdb()
 
 		numWorkspaces := 1000
 		var workspaceLock utils.DeferableMutex
@@ -132,17 +122,14 @@ func TestDisconnectedWorkspaceDB(t *testing.T) {
 		})
 
 		// Break the connection
-		atomic.StoreUint32(serverDown, 1)
-
-		grpcWsdb := wsdb.(*workspaceDB)
-		server, _ := grpcWsdb.server.Snapshot()
-		rawWsdb := (*server).(*testWorkspaceDbClient)
+		atomic.StoreUint32(serverDown, serverDownHang)
 
 		// Cause the current stream to error out, indicating connection prob
 		rawWsdb.stream.data <- nil
 
+		commandsToFail := 1000
 		// Queue up >1000 commands which should now fail with errors
-		for i := 0; i < 1100; i++ {
+		for i := 0; i < commandsToFail+100; i++ {
 			go func() {
 				defer func() {
 					// suppress any panics due to reconnect()
@@ -156,11 +143,11 @@ func TestDisconnectedWorkspaceDB(t *testing.T) {
 
 		// Wait for many failures to happen and potentially clog things
 		// when fetchWorkspace repeatedly fails
-		test.WaitForNLogStrings("Received grpc error", 1000,
+		test.WaitForNLogStrings("Received grpc error", commandsToFail,
 			"fetch errors to accumulate")
 
 		// Bring the connection back
-		atomic.StoreUint32(serverDown, 0)
+		atomic.StoreUint32(serverDown, serverDownReset)
 
 		// Perform some basic operations which need the wsdb.lock -
 		// if the lock is hung, then this test will timeout
