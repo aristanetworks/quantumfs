@@ -224,7 +224,7 @@ func (wsdb *workspaceDB) updater() {
 			"grpc::workspaceDB connection error: %s", err.Error())
 
 		// Prevent busy looping when we try to reconnect
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(retryDelay)
 	}
 }
 
