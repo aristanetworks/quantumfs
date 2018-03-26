@@ -75,13 +75,25 @@ type testWorkspaceDbClient struct {
 	serverDown *uint32
 }
 
+const (
+	// Setting serverDown to this const will un-hang any function previously
+	// hung by serverDownHang
+	serverDownReset = iota
+	// Setting serverDown to this const will cause the next request to hang,
+	// upon which time serverDown will be set to serverDownReturnError
+	serverDownHang
+	// Setting serverDown to this const will cause all requests to return with
+	// an error
+	serverDownReturnError
+)
+
 func (ws *testWorkspaceDbClient) NumTypespaces(ctx context.Context,
 	in *rpc.RequestId, opts ...grpc.CallOption) (*rpc.NumTypespacesResponse,
 	error) {
 
 	rtn := new(rpc.NumTypespacesResponse)
 	requestId := &rpc.RequestId{
-		Id: 12345,
+		Id: in.Id,
 	}
 	rtn.Header = &rpc.Response{
 		RequestId: requestId,
@@ -105,7 +117,7 @@ func (ws *testWorkspaceDbClient) NumNamespaces(ctx context.Context,
 
 	rtn := new(rpc.NumNamespacesResponse)
 	requestId := &rpc.RequestId{
-		Id: 12345,
+		Id: in.RequestId.Id,
 	}
 	rtn.Header = &rpc.Response{
 		RequestId: requestId,
@@ -161,27 +173,27 @@ func (ws *testWorkspaceDbClient) FetchWorkspace(ctx context.Context,
 	error) {
 
 	serverDown := atomic.LoadUint32(ws.serverDown)
-	if serverDown == 1 {
+	if serverDown == serverDownHang {
 		// Cause other functions to return an error instead of hanging
-		atomic.StoreUint32(ws.serverDown, 2)
+		atomic.StoreUint32(ws.serverDown, serverDownReturnError)
 
 		// This function is chosen to hang indefinitely
 		for {
 			serverDown := atomic.LoadUint32(ws.serverDown)
-			if serverDown == 0 {
+			if serverDown == serverDownReset {
 				break
 			}
 
 			time.Sleep(10 * time.Millisecond)
 		}
-	} else if serverDown >= 2 {
+	} else if serverDown >= serverDownReturnError {
 		// This function is chosen to return an error
 		return nil, fmt.Errorf("Server down in test")
 	}
 
 	rtn := new(rpc.FetchWorkspaceResponse)
 	requestId := &rpc.RequestId{
-		Id: 12345,
+		Id: in.RequestId.Id,
 	}
 	rtn.Header = &rpc.Response{
 		RequestId: requestId,
@@ -224,4 +236,18 @@ func (ws *testWorkspaceDbClient) AdvanceWorkspace(ctx context.Context,
 	opts ...grpc.CallOption) (*rpc.AdvanceWorkspaceResponse, error) {
 
 	panic("Not supported")
+}
+
+func (ws *testWorkspaceDbClient) sendNotification(workspace string) {
+	var newNotification rpc.WorkspaceUpdate
+	newNotification.Name = workspace
+	newNotification.RootId = &rpc.ObjectKey{
+		Data: quantumfs.EmptyWorkspaceKey.Value(),
+	}
+	newNotification.Nonce = &rpc.WorkspaceNonce{
+		Id: 12345,
+	}
+	newNotification.Immutable = false
+
+	ws.stream.data <- &newNotification
 }
