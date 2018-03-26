@@ -159,7 +159,7 @@ func TestDisconnectedWorkspaceDB(t *testing.T) {
 
 func TestRetries(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		wsdb, ctx, serverDown := setupWsdb(test)
+		wsdb, ctx, serverDown := test.setupWsdb()
 
 		// Break the connection hard, so all requests just fail
 		atomic.StoreUint32(serverDown, 2)
@@ -185,7 +185,7 @@ func TestRetries(t *testing.T) {
 
 func TestUpdaterDoesntRetry(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		wsdb, ctx, serverDown := setupWsdb(test)
+		wsdb, ctx, serverDown := test.setupWsdb()
 
 		// Fetch a workspace once to link the qlog
 		wsdb.Workspace(ctx, "a", "b", "c")
