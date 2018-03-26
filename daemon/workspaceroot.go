@@ -139,7 +139,7 @@ func publishHardlinkMap(c *ctx, pub publishFn,
 		})
 	for _, fileId := range keys {
 		entry := records[fileId]
-		record := entry.record()
+		record := entry.publishableRecord
 		if entryIdx == quantumfs.MaxDirectoryRecords() {
 			// This block is full, upload and create a new one
 			baseLayer.SetNumEntries(entryIdx)

@@ -1769,3 +1769,63 @@ func TestRefreshShortcutting(t *testing.T) {
 			"/commondir") == 0, "Common directory not skipped")
 	})
 }
+
+func TestRefreshMultiDirtyHardlinks(t *testing.T) {
+	runDualQuantumFsTest(t, func(test *testHelper) {
+		workspace0 := test.NewWorkspace()
+		c := test.TestCtx()
+		mnt1 := test.qfsInstances[1].config.MountPath + "/"
+		workspaceName := test.RelPath(workspace0)
+		workspace1 := mnt1 + workspaceName
+
+		content1 := "original content"
+		content2 := "CONTENT2"
+
+		test.markImmutable(c, workspaceName)
+		api1, err := quantumfs.NewApiWithPath(mnt1 + "api")
+		test.AssertNoErr(err)
+		defer api1.Close()
+		test.AssertNoErr(api1.EnableRootWrite(workspaceName))
+
+		// Keep a handle to workspace0 to make sure it is refreshed
+		wsr0, cleanup := test.GetWorkspaceRoot(workspace0)
+		defer cleanup()
+		test.Assert(wsr0 != nil, "workspace root does not exist")
+
+		leg1 := workspace1 + "/dirA/leg1"
+		leg2 := workspace1 + "/dirB/leg2"
+		otherfilename := "/otherfile"
+		var stat1, stat2 syscall.Stat_t
+
+		test.AssertNoErr(utils.MkdirAll(workspace1+"/dirA", 0777))
+		test.AssertNoErr(utils.MkdirAll(workspace1+"/dirB", 0777))
+		test.AssertNoErr(CreateSmallFile(leg1, content1))
+		test.AssertNoErr(syscall.Link(leg1, leg2))
+		test.AssertNoErr(api1.SyncAll())
+
+		test.AssertNoErr(CreateSmallFile(workspace1+otherfilename,
+			"othercontent"))
+		test.AssertNoErr(syscall.Stat(leg1, &stat1))
+		test.AssertNoErr(CreateMediumFile(leg1, content2))
+
+		test.WaitFor(otherfilename+" to appear ", func() bool {
+			file, err := os.OpenFile(workspace0+otherfilename,
+				os.O_RDONLY, 0777)
+			defer file.Close()
+			return err == nil
+		})
+
+		test.AssertNoErr(syscall.Stat(workspace0+"/dirA/leg1", &stat2))
+		if stat1.Mtim.Nano() != stat2.Mtim.Nano() {
+			// This might happen if the updates to the otherfile and the
+			// hardlinkleg are coalesced for some reason.
+			c.elog("updates are coalesced %d vs. %d",
+				stat1.Mtim.Nano(), stat2.Mtim.Nano())
+		}
+
+		file, err := os.OpenFile(workspace0+"/dirA/leg1", os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+		defer file.Close()
+		test.verifyContentStartsWith(file, content1)
+	})
+}
