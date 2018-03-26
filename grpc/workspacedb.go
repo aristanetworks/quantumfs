@@ -96,7 +96,7 @@ func newWorkspaceDB_(conf string, connectFn func(*grpc.ClientConn,
 	return wsdb
 }
 
-type serverSnapshots interface {
+type serverSnapshotter interface {
 	Snapshot() (*rpc.WorkspaceDbClient, uint32)
 	ReplaceServer(*rpc.WorkspaceDbClient)
 }
@@ -107,7 +107,7 @@ type serverContainer struct {
 	serverConnIdx uint32
 }
 
-func newServerContainer() serverSnapshots {
+func newServerContainer() serverSnapshotter {
 	return &serverContainer{
 		server: nil,
 	}
@@ -143,7 +143,7 @@ type workspaceDB struct {
 
 	qlog *qlog.Qlog
 
-	server serverSnapshots
+	server serverSnapshotter
 
 	triggerReconnect chan badConnectionInfo
 }
