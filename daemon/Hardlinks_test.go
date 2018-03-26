@@ -832,3 +832,35 @@ func TestHardlinkNormalization(t *testing.T) {
 			"Hardlink not normalized.")
 	})
 }
+
+func TestRenameOverridesLastHardlinkLeg(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name := "testFile"
+		other := "otherFile"
+		content1 := "original content"
+		content2 := "CONTENT2"
+
+		CreateSmallFile(workspace+"/"+name, content1)
+		CreateSmallFile(workspace+"/"+other, content2)
+		test.linkFile(workspace, name, name+"_link")
+		test.removeFile(workspace, name+"_link")
+
+		func() {
+			file, err := os.OpenFile(workspace+"/"+name,
+				os.O_RDONLY, 0777)
+			test.AssertNoErr(err)
+			defer file.Close()
+
+			test.moveFile(workspace, other, name)
+			test.verifyContentStartsWith(file, content1)
+		}()
+
+		file, err := os.OpenFile(workspace+"/"+name, os.O_RDONLY, 0777)
+		test.AssertNoErr(err)
+		defer file.Close()
+		test.verifyContentStartsWith(file, content2)
+
+		test.removeFile(workspace, name)
+	})
+}
