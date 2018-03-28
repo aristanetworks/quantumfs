@@ -34,7 +34,7 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	} else {
 		// key is invalid, but mode and rdev contain the data we want and we
 		// must store it in directoryRecord
-		filetype = mode
+		filetype = mode & syscall.S_IFMT
 		device = rdev
 		c.wlog("mknod mode %x", filetype)
 	}
