@@ -393,6 +393,7 @@ func (dir *Directory) hideEntry_DOWN_(c *ctx,
 			utils.RandomNumberGenerator.Uint64())
 	}
 	dir.children.renameChild(c, oldName, hiddenName)
+	dir.children.makePublishable(c, hiddenName)
 	c.qfs.noteDeletedInode(c, dir.inodeNum(), childId, oldName)
 	rtn := dir.children.recordByName(c, hiddenName)
 	utils.Assert(rtn != nil, "Rename failed during hideEntry")

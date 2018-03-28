@@ -284,7 +284,6 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
 	container.setRecord(c, inodeId, record)
-	container.makePublishable(c, newName)
 }
 
 // Modify the effective view of a child with the given function. The child Inode must

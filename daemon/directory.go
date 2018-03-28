@@ -1095,7 +1095,9 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	}
 	defer dir.Lock().Unlock()
 
-	oldInodeId, result := func() (InodeId, fuse.Status) {
+	oldInodeId, record, result := func() (InodeId,
+		quantumfs.ImmutableDirectoryRecord, fuse.Status) {
+
 		defer dir.childRecordLock.Lock().Unlock()
 
 		dstRecord := dir.children.recordByName(c, newName)
@@ -1104,26 +1106,42 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			dstRecord.Size() != 0 {
 
 			// We can not overwrite a non-empty directory
-			return quantumfs.InodeIdInvalid,
+			return quantumfs.InodeIdInvalid, nil,
 				fuse.Status(syscall.ENOTEMPTY)
 		}
 
 		record := dir.children.recordByName(c, oldName)
 		if record == nil {
-			return quantumfs.InodeIdInvalid, fuse.ENOENT
+			return quantumfs.InodeIdInvalid, nil, fuse.ENOENT
 		}
 
 		err := hasDirectoryWritePermSticky(c, dir, record.Owner())
 		if err != fuse.OK {
-			return quantumfs.InodeIdInvalid, err
+			return quantumfs.InodeIdInvalid, nil, err
 		}
 
 		if oldName == newName {
-			return quantumfs.InodeIdInvalid, fuse.OK
+			return quantumfs.InodeIdInvalid, nil, fuse.OK
 		}
 		oldInodeId_ := dir.children.inodeNum(oldName)
 		dir.orphanChild_(c, newName, overwrittenInode)
 		dir.children.renameChild(c, oldName, newName)
+
+		now := quantumfs.NewTime(time.Now())
+		if hardlink, isHardlink := record.(*HardlinkLeg); !isHardlink {
+			dir.children.modifyChildWithFunc(c, oldInodeId_,
+				func(record quantumfs.DirectoryRecord) {
+
+					record.SetContentTime(now)
+				})
+		} else {
+			hardlink.setCreationTime(now)
+			dir.hardlinkTable.modifyChildWithFunc(c, oldInodeId_,
+				func(record quantumfs.DirectoryRecord) {
+
+					record.SetContentTime(now)
+				})
+		}
 
 		// Conceptually we remove any entry in the way before we move
 		// the source file in its place, so update the accessed list
@@ -1134,7 +1152,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 		dir.self.markAccessed(c, newName,
 			markType(record.Type(), quantumfs.PathCreated))
 
-		return oldInodeId_, fuse.OK
+		return oldInodeId_, record, fuse.OK
 	}()
 	if oldName == newName || result != fuse.OK {
 		return
@@ -1144,7 +1162,20 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
 		child.setName(newName)
 		child.clearAccessedCache()
+
+		// The child has an effective record. Make sure it is not lost.
+		child.dirty(c)
+	} else {
+		if _, isHardlink := record.(*HardlinkLeg); isHardlink {
+			dir.hardlinkTable.makePublishable(c, record.FileId())
+		} else {
+			func() {
+				defer dir.childRecordLock.Lock().Unlock()
+				dir.children.makePublishable(c, newName)
+			}()
+		}
 	}
+
 	result = fuse.OK
 	return
 }
@@ -1278,6 +1309,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	hardlink, isHardlink := newEntry.(*HardlinkLeg)
 	if !isHardlink {
+		newEntry.SetContentTime(quantumfs.NewTime(time.Now()))
 		// Update the inode to point to the new name and
 		// mark as accessed in both parents.
 		if childInode != nil {
@@ -1312,7 +1344,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		if childInode != nil {
 			childInode.dirty(c)
 		} else {
-			dst.children.makePublishable(c, newName)
+			if isHardlink {
+				dst.hardlinkTable.makePublishable(c,
+					newEntry.FileId())
+			} else {
+				dst.children.makePublishable(c, newName)
+			}
 		}
 		dst.self.dirty(c)
 	}()
