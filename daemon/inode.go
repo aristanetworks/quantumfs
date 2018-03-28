@@ -543,7 +543,7 @@ func (inode *InodeCommon) isDirty_(c *ctx) bool {
 
 // Add this Inode to the dirty list
 func (inode *InodeCommon) dirty(c *ctx) {
-	defer c.funcIn("InodeCommon::dirty").Out()
+	defer c.FuncIn("InodeCommon::dirty", "inode %d", inode.id).Out()
 	defer c.qfs.flusher.lock.Lock().Unlock()
 
 	inode.dirty_(c)
