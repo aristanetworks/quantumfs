@@ -5,6 +5,7 @@ package qfsclientc
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"syscall"
@@ -14,6 +15,28 @@ import (
 	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/testutils"
 )
+
+func TestGetBlock(t *testing.T) {
+	t.Skip() // BUG209056
+	runTest(t, func(test *testHelper) {
+		api := test.getApi()
+		defer test.putApi(api)
+
+		for i := 0; i < 10; i++ {
+			test.Log("iteration %d", i)
+			testKey := fmt.Sprintf("%v_%d",
+				string(daemon.GenData(18)), i)
+			testData := daemon.GenData(2000)
+
+			test.AssertNoErr(api.SetBlock(testKey, testData))
+
+			readBack, err := api.GetBlock(testKey)
+			test.AssertNoErr(err)
+			test.Assert(bytes.Equal(testData, readBack),
+				"Data changed between SetBlock and GetBlock")
+		}
+	})
+}
 
 func TestBasicInterface(t *testing.T) {
 	runTest(t, func(test *testHelper) {
