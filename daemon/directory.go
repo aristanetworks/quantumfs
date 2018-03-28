@@ -241,6 +241,11 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 		attr.Nlink = uint32(entry.Size()&^NON_EMPTY_DIR_MARKER) + 2
 	case fuse.S_IFIFO:
 		fileType = specialOverrideAttr(entry, attr)
+		if fileType&^syscall.S_IFMT != 0 {
+			c.elog("fileType has permission bits set %x", fileType)
+			fileType &= syscall.S_IFMT
+		}
+
 	default:
 		c.elog("Unhandled filetype %x in fillAttrWithDirectoryRecord",
 			fileType)
