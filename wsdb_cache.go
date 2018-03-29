@@ -210,7 +210,7 @@ func (cw *cacheWsdb) Workspace(c ether.Ctx, typespace string, namespace string,
 func (cw *cacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	namespace string, workspace string, nonce wsdb.WorkspaceNonce,
 	currentRootID wsdb.ObjectKey,
-	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, wsdb.WorkspaceNonce, error) {
+	newRootID wsdb.ObjectKey) (wsdb.ObjectKey, error) {
 
 	currentKeyHex := hex.EncodeToString(currentRootID)
 	newKeyHex := hex.EncodeToString(newRootID)
@@ -221,15 +221,15 @@ func (cw *cacheWsdb) AdvanceWorkspace(c ether.Ctx, typespace string,
 	start := time.Now()
 	defer func() { cw.advanceStats.RecordOp(time.Since(start)) }()
 
-	key, nonce, err := cw.base.AdvanceWorkspace(c, typespace, namespace,
+	key, err := cw.base.AdvanceWorkspace(c, typespace, namespace,
 		workspace, nonce, currentRootID, newRootID)
 	if err != nil {
-		return key, nonce, err
+		return key, err
 	}
 
 	cw.cache.InsertEntities(c, typespace, namespace, workspace, nonce.String())
 
-	return key, nonce, nil
+	return key, nil
 }
 
 func (cw *cacheWsdb) SetWorkspaceImmutable(c ether.Ctx, typespace string, namespace string,
