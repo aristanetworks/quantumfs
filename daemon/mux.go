@@ -47,7 +47,8 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		parentOfUninstantiated: make(map[InodeId]InodeId),
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
-		toBeReleased:           make(chan FileHandleId, 1000000),
+		toBeReleased:           make(chan uint64, 1000000),
+		toBeForgotten:          make(chan uint64, 1000000),
 		toNotifyFuse:           make(chan FuseNotification, 10000),
 		stopWaitingForSignals:  make(chan struct{}),
 		syncAllRetries:         -1,
@@ -167,7 +168,8 @@ type QuantumFs struct {
 	mutabilityLock      utils.DeferableRwMutex
 	workspaceMutability map[string]workspaceState
 
-	toBeReleased chan FileHandleId
+	toBeReleased  chan uint64 // FileHandleId
+	toBeForgotten chan uint64 // InodeId
 
 	// FUSE notification requests cannot be made from the same goroutine handling
 	// any FUSE request or a deadlock inside the kernel may result. Instead we
@@ -196,7 +198,8 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	}
 
 	go qfs.adjustKernelKnobs()
-	go qfs.fileHandleReleaser()
+	go batchProcessor(qfs.toBeReleased, qfs.fileHandleReleaser)
+	go batchProcessor(qfs.toBeForgotten, qfs.inodeForgetter)
 	go qfs.fuseNotifier()
 	go qfs.waitForSignals()
 
@@ -206,42 +209,70 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	return nil
 }
 
+const InodeForgetter = "Mux::inodeForgetter"
+
+func (qfs *QuantumFs) inodeForgetter(ids []uint64) {
+	c := qfs.c.forgetCtx()
+	defer c.funcIn(InodeForgetter).Out()
+	defer qfs.instantiationLock.Lock().Unlock()
+	parents := make(map[InodeId]struct{})
+	for _, id := range ids {
+		inodeId := InodeId(id)
+		if inode := qfs.inodeNoInstantiate(c, inodeId); inode != nil {
+			inode.queueToForget(c)
+		} else {
+			c.dlog("Forgetting uninstantiated Inode %d", inodeId)
+			func() {
+				defer qfs.mapMutex.Lock().Unlock()
+				parentId := qfs.parentOfUninstantiated[inodeId]
+				parents[parentId] = struct{}{}
+			}()
+		}
+	}
+
+	for parentId, _ := range parents {
+		qfs.uninstantiateInode_(c, parentId)
+	}
+}
+
 const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
 
-func (qfs *QuantumFs) fileHandleReleaser() {
-	const maxReleasesPerCycle = 1000
+func (qfs *QuantumFs) fileHandleReleaser(ids []uint64) {
+	defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
+	defer qfs.mapMutex.Lock().Unlock()
+	for _, id := range ids {
+		qfs.setFileHandle_(&qfs.c, FileHandleId(id), nil)
+	}
+}
+
+func batchProcessor(inputChan <-chan uint64, handleBatch func(ids []uint64)) {
+	const maxPerCycle = 1000
 	i := 0
-	ids := make([]FileHandleId, 0, maxReleasesPerCycle)
+	ids := make([]uint64, 0, maxPerCycle)
 	for shutdown := false; !shutdown; {
 		shutdown = func() bool {
 			ids = ids[:0]
-			fh, ok := <-qfs.toBeReleased
+			id, ok := <-inputChan
 			if !ok {
 				return true
 			}
-			ids = append(ids, fh)
-			for i = 1; i < maxReleasesPerCycle; i++ {
+			ids = append(ids, id)
+			for i = 1; i < maxPerCycle; i++ {
 				select {
-				case fh, ok := <-qfs.toBeReleased:
+				case id, ok := <-inputChan:
 					if !ok {
 						return true
 					}
-					ids = append(ids, fh)
+					ids = append(ids, id)
 				default:
 					return false
 				}
 			}
 			return false
 		}()
-		func() {
-			defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
-			defer qfs.mapMutex.Lock().Unlock()
-			for _, fh := range ids {
-				qfs.setFileHandle_(&qfs.c, fh, nil)
-			}
-		}()
+		handleBatch(ids)
 
-		if !shutdown && i < maxReleasesPerCycle {
+		if !shutdown && i < maxPerCycle {
 			// If we didn't need our full allocation, sleep to accumulate
 			// more work with minimal mapMutex contention.
 			time.Sleep(100 * time.Millisecond)
@@ -383,6 +414,7 @@ func (qfs *QuantumFs) Shutdown() error {
 		qfs.c.elog("Syncing log file failed with %d. Closing it.", err)
 	}
 	close(qfs.toBeReleased)
+	close(qfs.toBeForgotten)
 	close(qfs.toNotifyFuse)
 	return qfs.c.Qlog.Close()
 }
@@ -1532,26 +1564,10 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	inodeId := InodeId(nodeID)
 
-	if !qfs.shouldForget(c, inodeId, nlookup) {
-		// The kernel hasn't completely forgotten this Inode. Keep it around
-		// a while longer.
-		c.dlog("inode %d lookup not zero yet", inodeId)
-		return
-	}
-
-	defer qfs.instantiationLock.Lock().Unlock()
-
-	if inode := qfs.inodeNoInstantiate(c, inodeId); inode != nil {
-		logInodeWorkspace(c, inode)
-		inode.queueToForget(c)
+	if qfs.shouldForget(c, inodeId, nlookup) {
+		qfs.toBeForgotten <- uint64(inodeId)
 	} else {
-		c.dlog("Forgetting uninstantiated Inode %d", inodeId)
-		parentId := func() InodeId {
-			defer qfs.mapMutex.Lock().Unlock()
-			parentId, _ := qfs.parentOfUninstantiated[inodeId]
-			return parentId
-		}()
-		qfs.uninstantiateInode_(c, parentId)
+		c.dlog("inode %d lookup not zero yet", inodeId)
 	}
 }
 
@@ -2206,7 +2222,7 @@ func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 	defer logRequestPanic(c)
 	defer c.FuncIn(ReleaseLog, FileHandleLog, input.Fh).Out()
 
-	qfs.toBeReleased <- FileHandleId(input.Fh)
+	qfs.toBeReleased <- input.Fh
 }
 
 const WriteLog = "Mux::Write"
@@ -2338,7 +2354,7 @@ func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
 	defer logRequestPanic(c)
 	defer c.FuncIn(ReleaseDirLog, FileHandleLog, input.Fh).Out()
 
-	qfs.toBeReleased <- FileHandleId(input.Fh)
+	qfs.toBeReleased <- input.Fh
 }
 
 const FsyncDirLog = "Mux::FsyncDir"
