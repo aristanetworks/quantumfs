@@ -1,4 +1,4 @@
-COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb
+COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthcheck
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
