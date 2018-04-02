@@ -52,6 +52,7 @@ type HardlinkTable interface {
 		record quantumfs.ImmutableDirectoryRecord)
 	modifyChildWithFunc(c *ctx, inodeId InodeId,
 		modify func(record quantumfs.DirectoryRecord))
+	makePublishable(c *ctx, fileId quantumfs.FileId)
 	setID(c *ctx, fileId quantumfs.FileId, key quantumfs.ObjectKey)
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
 	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
@@ -361,6 +362,20 @@ func (ht *HardlinkTableImpl) modifyChildWithFunc(c *ctx, inodeId InodeId,
 		link.effectiveRecord = link.publishableRecord.Clone()
 	}
 	modify(link.effectiveRecord)
+}
+
+func (ht *HardlinkTableImpl) makePublishable(c *ctx, fileId quantumfs.FileId) {
+	defer c.FuncIn("HardlinkTableImpl::makePublishable", "fileId %d", fileId)
+
+	defer ht.linkLock.Lock().Unlock()
+
+	link, exists := ht.hardlinks[fileId]
+	utils.Assert(exists, "Hardlink %d does not exist", fileId)
+
+	if link.effectiveRecord != nil {
+		link.publishableRecord = link.effectiveRecord
+		link.effectiveRecord = nil
+	}
 }
 
 func (ht *HardlinkTableImpl) setID(c *ctx, fileId quantumfs.FileId,

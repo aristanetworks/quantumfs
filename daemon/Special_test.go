@@ -44,6 +44,19 @@ func specialCreate(test *testHelper, filetype uint32) {
 
 	confirm(testFilename, 1)
 
+	test.AssertNoErr(syscall.Chmod(testFilename, syscall.S_IRWXG))
+
+	var expectedPermissions uint32
+	expectedPermissions |= filetype
+	expectedPermissions |= syscall.S_IRWXG
+	var stat syscall.Stat_t
+	test.AssertNoErr(syscall.Stat(testFilename, &stat))
+	test.Assert(stat.Mode == expectedPermissions,
+		"File permissions incorrect. Expected %x got %x",
+		expectedPermissions, stat.Mode)
+
+	test.AssertNoErr(syscall.Chmod(testFilename, syscall.S_IRWXU))
+
 	// Ensure hardlinks work too
 	testLinkname := testFilename + "_link"
 	err = syscall.Link(testFilename, testLinkname)
