@@ -6,6 +6,8 @@ package daemon
 // Various constants used throughout quantumfsd
 
 import (
+	"syscall"
+
 	"github.com/aristanetworks/quantumfs"
 	"github.com/hanwen/go-fuse/fuse"
 )
@@ -61,3 +63,7 @@ const statBlockSize = uint64(512)
 
 // This number empirically derived by looking at file sizes
 const initBlockSize = 8192
+
+// The following error message is not defined in go-fuse, therefore we
+// define it here instead.
+const ENAMETOOLONG = fuse.Status(syscall.ENAMETOOLONG)

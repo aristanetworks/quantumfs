@@ -35,7 +35,6 @@ const InodeOnlyLog = "inode %d"
 const FileHandleLog = "Fh %d"
 const FileOffsetLog = "Fh %d offset %d"
 const SetAttrArgLog = "inode %d valid 0x%x size %d"
-const ENAMETOOLONG = fuse.Status(syscall.ENAMETOOLONG)
 
 func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs := &QuantumFs{
