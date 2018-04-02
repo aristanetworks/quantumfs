@@ -1106,6 +1106,10 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 	defer c.FuncIn(LookupLog, InodeNameLog, header.NodeId, name).Out()
+
+	if isFilenameTooLong(name) {
+		return ENAMETOOLONG
+	}
 	return qfs.lookupCommon(c, InodeId(header.NodeId), name, out)
 }
 
@@ -1609,6 +1613,10 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 	defer logRequestPanic(c)
 	defer c.FuncIn(MknodLog, InodeNameLog, input.NodeId, name).Out()
 
+	if isFilenameTooLong(name) {
+		return ENAMETOOLONG
+	}
+
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
 	logInodeWorkspace(c, inode)
@@ -1634,6 +1642,10 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 	defer c.FuncIn(MkdirLog, InodeNameLog, input.NodeId, name).Out()
+
+	if isFilenameTooLong(name) {
+		return ENAMETOOLONG
+	}
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
@@ -1715,6 +1727,10 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	defer c.FuncIn(RenameLog, RenameDebugLog, input.NodeId, input.Newdir,
 		oldName, newName).Out()
 
+	if isFilenameTooLong(oldName) || isFilenameTooLong(newName) {
+		return ENAMETOOLONG
+	}
+
 	srcInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
 	logInodeWorkspace(c, srcInode)
@@ -1769,6 +1785,10 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	defer logRequestPanic(c)
 	defer c.FuncIn(LinkLog, LinkDebugLog, input.Oldnodeid, filename,
 		input.NodeId).Out()
+
+	if isFilenameTooLong(filename) {
+		return ENAMETOOLONG
+	}
 
 	srcInode := qfs.inode(c, InodeId(input.Oldnodeid))
 	logInodeWorkspace(c, srcInode)
@@ -1825,6 +1845,10 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 	defer c.FuncIn(SymlinkLog, InodeNameLog, header.NodeId, linkName).Out()
+
+	if isFilenameTooLong(linkName) {
+		return ENAMETOOLONG
+	}
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
@@ -1890,6 +1914,10 @@ func isPosixAclName(name string) bool {
 	}
 
 	return false
+}
+
+func isFilenameTooLong(name string) bool {
+	return len(name) > quantumfs.MaxFilenameLength
 }
 
 const GetXAttrSizeLog = "Mux::GetXAttrSize"
@@ -2099,6 +2127,10 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 	defer c.FuncIn(CreateLog, InodeNameLog, input.NodeId, name).Out()
+
+	if isFilenameTooLong(name) {
+		return ENAMETOOLONG
+	}
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
