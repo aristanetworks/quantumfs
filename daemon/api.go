@@ -286,9 +286,9 @@ func (api *ApiInode) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (api *ApiInode) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+func (api *ApiInode) instantiateChild(c *ctx, inodeNum InodeId) Inode {
 	c.elog("Invalid instantiateChild on ApiInode")
-	return nil, nil
+	return nil
 }
 
 func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
