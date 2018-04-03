@@ -825,18 +825,12 @@ func TestHardlinkNormalization(t *testing.T) {
 		test.createFile(workspace, name, 100)
 		test.linkFile(workspace, name, name+"_link")
 		test.removeFileSync(workspace, name)
+		test.dirtyAndSync(workspace)
 
 		wsr, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
-		test.WaitFor("Hardlink to be normalized", func() bool {
-			// Dirty the parent directory again to give the link a
-			// chance to be normalized
-			test.createFile(workspace, "tmp", 100)
-			os.Remove(workspace+"/tmp")
-			test.SyncAllWorkspaces()
-
-			return len(wsr.hardlinkTable.hardlinks) == 0
-		})
+		test.Assert(len(wsr.hardlinkTable.hardlinks) == 0,
+			"Hardlink not normalized.")
 	})
 }
 

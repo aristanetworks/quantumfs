@@ -885,3 +885,11 @@ func ManualLookup(c *ctx, parent Inode, childName string) {
 	defer parent.RLockTree().RUnlock()
 	parent.Lookup(c, childName, &dummy)
 }
+
+func (test *testHelper) dirtyAndSync(path string) {
+	// Dirty the parent directory again to give the link a
+	// chance to be normalized
+	test.createFile(path, "tmp", 100)
+	os.Remove(path+"/tmp")
+	test.SyncAllWorkspaces()
+}
