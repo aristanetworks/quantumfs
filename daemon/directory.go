@@ -1896,7 +1896,7 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 }
 
 func (dir *Directory) normalizeChildren(c *ctx) {
-	defer c.funcIn("Directory::normalizeChildren")
+	defer c.funcIn("Directory::normalizeChildren").Out()
 
 	// The normalization happens in three stages for a
 	// hardlink entry which is ready:
