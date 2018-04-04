@@ -114,6 +114,10 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) Inode {
 	return wsr.Directory.instantiateChild(c, inodeId)
 }
 
+func (wsr *WorkspaceRoot) finishInit(c *ctx) []InodeId {
+	return wsr.Directory.finishInit(c)
+}
+
 func publishHardlinkMap(c *ctx, pub publishFn,
 	records map[quantumfs.FileId]*HardlinkTableEntry) *quantumfs.HardlinkEntry {
 

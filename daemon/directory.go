@@ -91,16 +91,16 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.hardlinkDelta = newHardlinkDelta()
 
 	// childRecordLock is locked initially. It will be unlocked in
-	// initChildContainer.
-	// initChildContainer is the bottom half of the initialization which
+	// finishInit.
+	// finishInit is the bottom half of the initialization which
 	// is delayed to speed up initDirectory().
 	dir.childRecordLock.Lock()
 
 	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
 }
 
-func (dir *Directory) initChildContainer(c *ctx) []InodeId {
-	defer c.funcIn("Directory::initChildContainer").Out()
+func (dir *Directory) finishInit(c *ctx) []InodeId {
+	defer c.funcIn("Directory::finishInit").Out()
 	defer dir.childRecordLock.Unlock()
 	utils.Assert(dir.children == nil, "children already loaded")
 	container, uninstantiated := newChildContainer(c, dir, dir.baseLayerId)
@@ -835,7 +835,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 			newDirectory, quantumfs.ObjectTypeDirectory,
 			quantumfs.EmptyDirKey, out)
 		if newDir != nil {
-			asDirectory(newDir).initChildContainer(c)
+			newDir.finishInit(c)
 		}
 		return fuse.OK
 	}()

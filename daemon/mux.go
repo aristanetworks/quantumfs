@@ -811,25 +811,27 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	}
 	// If we didn't find it, get the more expensive lock and check again. This
 	// will instantiate the Inode if necessary and possible.
-	lockedDirectory := false
+	instantiated := false
 	func() {
 		defer qfs.instantiationLock.Lock().Unlock()
 		defer qfs.mapMutex.Lock().Unlock()
-		inode, lockedDirectory = qfs.inode_(c, id)
+		inode, instantiated = qfs.inode_(c, id)
 	}()
 
-	if lockedDirectory {
-		uninstantiated := asDirectory(inode).initChildContainer(c)
-		defer qfs.mapMutex.Lock().Unlock()
-		qfs.addUninstantiated_(c, uninstantiated, inode.inodeNum())
+	if instantiated {
+		uninstantiated := inode.finishInit(c)
+		if len(uninstantiated) > 0 {
+			defer qfs.mapMutex.Lock().Unlock()
+			qfs.addUninstantiated_(c, uninstantiated, inode.inodeNum())
+		}
 	}
 
 	return inode
 }
 
 // Must hold the instantiationLock and mapMutex for write
-// Returns the inode and a flag showing whether the created inode
-// is a directory requiring to get unlocked
+// Returns the inode and whether the inode was instantiated
+// as part of this function, or was instantiated already.
 func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	inode, needsInstantiation := qfs.getInode_(c, id)
 	if !needsInstantiation && inode != nil {
@@ -876,15 +878,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = inode
 
-	lockedDirectory := false
-	switch inode.(type) {
-	case *WorkspaceRoot:
-		lockedDirectory = true
-	case *Directory:
-		lockedDirectory = true
-	}
-
-	return inode, lockedDirectory
+	return inode, true
 }
 
 // Set an inode in a thread safe way, set to nil to delete
