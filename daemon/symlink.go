@@ -15,7 +15,7 @@ import (
 
 func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) Inode {
 
 	defer c.FuncIn("newSymlink", "name %s", name).Out()
 
@@ -35,7 +35,7 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	if dirRecord != nil {
 		dirRecord.SetPermissions(modeToPermissions(0777, 0))
 	}
-	return &symlink, nil
+	return &symlink
 }
 
 type Symlink struct {
@@ -184,9 +184,9 @@ func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return link.parentRemoveChildXAttr(c, link.inodeNum(), attr)
 }
 
-func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) Inode {
 	c.elog("Invalid instantiateChild on Symlink")
-	return nil, nil
+	return nil
 }
 
 func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {

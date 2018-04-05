@@ -95,7 +95,8 @@ type Inode interface {
 	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 
 	// Instantiate the Inode for the given child on demand
-	instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId)
+	instantiateChild(c *ctx, inodeNum InodeId) Inode
+	finishInit(c *ctx) []InodeId
 
 	name() string
 	setName(name string)
@@ -587,6 +588,10 @@ func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 
 	msg := fmt.Sprintf("Unsupported syncChild() call on Inode %v", inode)
 	panic(msg)
+}
+
+func (inode *InodeCommon) finishInit(c *ctx) []InodeId {
+	return nil
 }
 
 func (inode *InodeCommon) queueToForget(c *ctx) {

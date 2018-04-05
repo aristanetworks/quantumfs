@@ -47,7 +47,7 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 }
 
 func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace string,
-	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
+	parent Inode, inodeNum InodeId) Inode {
 
 	workspaceName := typespace + "/" + namespace + "/" + workspace
 
@@ -59,7 +59,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 		typespace, namespace, workspace)
 	if err != nil {
 		c.vlog("workspace %s is removed remotely", workspaceName)
-		return nil, nil
+		return nil
 	}
 
 	c.vlog("Workspace Loading %s %s", workspaceName, rootId.String())
@@ -83,11 +83,11 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 
 	wsr.hardlinkTable = newHardlinkTable(c, &wsr, workspaceRoot.HardlinkEntry())
-	uninstantiated := initDirectory(c, workspace, &wsr.Directory,
+	initDirectory(c, workspace, &wsr.Directory,
 		wsr.hardlinkTable, workspaceRoot.BaseLayer(), inodeNum,
 		parent.inodeNum(), &treeLock)
 
-	return &wsr, uninstantiated
+	return &wsr
 }
 
 func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
@@ -102,17 +102,20 @@ func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
 	}
 }
 
-func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) (Inode,
-	[]InodeId) {
+func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) Inode {
 
 	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeId).Out()
 
 	inode := wsr.hardlinkTable.instantiateHardlink(c, inodeId)
 	if inode != nil {
-		return inode, nil
+		return inode
 	}
 	// This isn't a hardlink, so proceed as normal
 	return wsr.Directory.instantiateChild(c, inodeId)
+}
+
+func (wsr *WorkspaceRoot) finishInit(c *ctx) []InodeId {
+	return wsr.Directory.finishInit(c)
 }
 
 func publishHardlinkMap(c *ctx, pub publishFn,

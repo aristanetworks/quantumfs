@@ -811,29 +811,43 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	}
 	// If we didn't find it, get the more expensive lock and check again. This
 	// will instantiate the Inode if necessary and possible.
-	defer qfs.instantiationLock.Lock().Unlock()
-	defer qfs.mapMutex.Lock().Unlock()
-	return qfs.inode_(c, id)
+	instantiated := false
+	func() {
+		defer qfs.instantiationLock.Lock().Unlock()
+		defer qfs.mapMutex.Lock().Unlock()
+		inode, instantiated = qfs.inode_(c, id)
+	}()
+
+	if instantiated {
+		uninstantiated := inode.finishInit(c)
+		if len(uninstantiated) > 0 {
+			defer qfs.mapMutex.Lock().Unlock()
+			qfs.addUninstantiated_(c, uninstantiated, inode.inodeNum())
+		}
+	}
+
+	return inode
 }
 
 // Must hold the instantiationLock and mapMutex for write
-func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
+// Returns the inode and whether the inode was instantiated
+// as part of this function, or was instantiated already.
+func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	inode, needsInstantiation := qfs.getInode_(c, id)
 	if !needsInstantiation && inode != nil {
-		return inode
+		return inode, false
 	}
 
 	c.vlog("Inode %d needs to be instantiated", id)
-	var newUninstantiated []InodeId
 
 	parentId, uninstantiated := qfs.parentOfUninstantiated[id]
 	if !uninstantiated {
 		// We don't know anything about this Inode
-		return nil
+		return nil, false
 	}
 
 	for {
-		parent := qfs.inode_(c, parentId)
+		parent, _ := qfs.getInode_(c, parentId)
 		if parent == nil {
 			panic(fmt.Sprintf("Unable to instantiate parent %d",
 				parentId))
@@ -844,7 +858,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 			defer qfs.mapMutex.Lock()
 			// without mapMutex the child could move underneath this
 			// parent, in such cases, find the new parent
-			inode, newUninstantiated = parent.instantiateChild(c, id)
+			inode = parent.instantiateChild(c, id)
 		}()
 		if inode != nil {
 			break
@@ -853,7 +867,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 		newParentId, uninstantiated := qfs.parentOfUninstantiated[id]
 		if !uninstantiated {
 			// The dentry has been removed
-			return nil
+			return nil, false
 		}
 		// The dentry is still there, verify the parent has changed
 		utils.Assert(newParentId != parentId,
@@ -863,9 +877,8 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = inode
-	qfs.addUninstantiated_(c, newUninstantiated, inode.inodeNum())
 
-	return inode
+	return inode, true
 }
 
 // Set an inode in a thread safe way, set to nil to delete
