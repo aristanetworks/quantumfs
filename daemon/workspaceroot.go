@@ -77,8 +77,10 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.nonce = nonce
 	wsr.accessList = NewAccessList()
 
-	treeLock := TreeLock{lock: &wsr.realTreeLock,
-		name: typespace + "/" + namespace + "/" + workspace}
+	treeLock := TreeLock{
+		lock: &wsr.realTreeLock,
+		name: workspace,
+	}
 	wsr.treeLock_ = &treeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
 
@@ -86,6 +88,8 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	initDirectory(c, workspace, &wsr.Directory,
 		wsr.hardlinkTable, workspaceRoot.BaseLayer(), inodeNum,
 		parent.inodeNum(), &treeLock)
+
+	c.qfs.flusher.markWorkspaceUndeleted(c, workspaceName)
 
 	return &wsr
 }

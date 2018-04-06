@@ -542,6 +542,18 @@ func (flusher *Flusher) markWorkspaceDeleted(c *ctx, workspace string) {
 	}
 }
 
+func (flusher *Flusher) markWorkspaceUndeleted(c *ctx, workspace string) {
+	defer c.FuncIn("Flusher::markWorkspaceUndeleted", "%s", workspace).Out()
+	defer flusher.lock.Lock().Unlock()
+
+	for _, dq := range flusher.dqs {
+		if strings.HasPrefix(workspace, dq.treelock.name) {
+			c.vlog("Marked %s as undeleted", dq.treelock.name)
+			dq.deleted = false
+		}
+	}
+}
+
 // Must be called with the tree locked
 func (flusher *Flusher) syncWorkspace_(c *ctx, workspace string) error {
 	defer c.FuncIn("Flusher::syncWorkspace_", "%s", workspace).Out()
