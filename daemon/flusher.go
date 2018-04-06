@@ -52,6 +52,7 @@ type DirtyQueue struct {
 	trigger  chan triggerCmd
 	cmd      chan FlushRequest
 	treelock *TreeLock
+	deleted  bool
 }
 
 func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
@@ -215,11 +216,17 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// the inode should be marked clean before flushing so that any new
 	// attemps to write to the inode dirties it again.
 	dirtyElement := inode.markClean_()
-	success := func() bool {
-		c.qfs.flusher.lock.Unlock()
-		defer c.qfs.flusher.lock.Lock()
-		return c.qfs.flushInode_(c, inode)
-	}()
+
+	success := false
+	if dq.deleted {
+		success = true
+	} else {
+		success = func() bool {
+			c.qfs.flusher.lock.Unlock()
+			defer c.qfs.flusher.lock.Lock()
+			return c.qfs.flushInode_(c, inode)
+		}()
+	}
 
 	if !success {
 		// flushing the inode has failed, if the inode has been dirtied in
@@ -521,6 +528,18 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 func (flusher *Flusher) syncAll(c *ctx) error {
 	defer c.funcIn("Flusher::syncAll").Out()
 	return flusher.sync_(c, "")
+}
+
+func (flusher *Flusher) markWorkspaceDeleted(c *ctx, workspace string) {
+	defer c.FuncIn("Flusher::markWorkspaceDeleted", "%s", workspace).Out()
+	defer flusher.lock.Lock().Unlock()
+
+	for _, dq := range flusher.dqs {
+		if strings.HasPrefix(workspace, dq.treelock.name) {
+			c.vlog("Marked %s as deleted", dq.treelock.name)
+			dq.deleted = true
+		}
+	}
 }
 
 // Must be called with the tree locked

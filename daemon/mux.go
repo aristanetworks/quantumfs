@@ -457,6 +457,8 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	// other required actions
 	_, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	cleanup()
+
+	qfs.flusher.markWorkspaceDeleted(c, name)
 }
 
 func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
