@@ -178,9 +178,9 @@ func reduceGCPercent(cacheSize uint64) {
 			// before running garbage collection. Once we've surpassed
 			// the configured cache size for total heap used, switch to
 			// the more frequent garbage collection.
-			oneGPercent := (100 * (5 * 1024 * 1024 * 1024)) / cacheSize
-			fmt.Printf("Changing GCPercent to %d\n", oneGPercent)
-			debug.SetGCPercent(int(oneGPercent))
+			gcPercent := (100 * (5 * 1024 * 1024 * 1024)) / cacheSize
+			fmt.Printf("Changing GCPercent to %d\n", gcPercent)
+			debug.SetGCPercent(int(gcPercent))
 			return
 		}
 
