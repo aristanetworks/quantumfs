@@ -19,7 +19,7 @@ import (
 const (
 	HealthOK   = 0
 	HealthBad  = 1
-	CheckError = 3
+	CheckError = 2
 )
 
 func healthIsBad(msg string, err error) {
@@ -34,7 +34,8 @@ func healthIsBad(msg string, err error) {
 
 func main() {
 	address := flag.String("address", "",
-		"Address of the service to connect to. ie localhost or service:2222")
+		"Address of the service to connect to. "+
+			"e.g. localhost or service:2222")
 	flag.Parse()
 
 	if *address == "" {
