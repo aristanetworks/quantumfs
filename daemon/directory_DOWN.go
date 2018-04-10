@@ -114,11 +114,6 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
-func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
-	c.vlog("directorySnapshot::Sync_DOWN doing nothing")
-	return fuse.OK
-}
-
 // Return extended key by combining ObjectKey, inode type, and inode size
 func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byte,
 	fuse.Status) {

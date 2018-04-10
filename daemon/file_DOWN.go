@@ -19,11 +19,3 @@ func (fi *File) Sync_DOWN(c *ctx) fuse.Status {
 	fi.flush(c)
 	return fuse.OK
 }
-
-func (fd *FileDescriptor) Sync_DOWN(c *ctx) fuse.Status {
-	defer c.funcIn("FileDescriptor::Sync_DOWN").Out()
-
-	fd.file.flush(c)
-
-	return fuse.OK
-}
