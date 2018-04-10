@@ -397,7 +397,7 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 
 	for name, state := range updates {
 		if state.Deleted {
-			go qfs.handleDeletedWorkspace(c, name)
+			go qfs.handleDeletedWorkspace(c, name, state.Nonce)
 		} else {
 			go qfs.refreshWorkspace(c, name)
 		}
@@ -458,7 +458,7 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	_, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	cleanup()
 
-	qfs.flusher.markWorkspaceDeleted(c, name)
+	qfs.flusher.markWorkspaceDeleted(c, name, nonce)
 }
 
 func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
