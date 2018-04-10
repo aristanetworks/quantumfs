@@ -488,6 +488,8 @@ func TestRecreateWorkspaceWithContents(t *testing.T) {
 		api := test.getApi()
 		test.AssertNoErr(api.DeleteWorkspace(workspaceName))
 
+		test.waitForPropagate(fileName1, []byte{})
+
 		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(), workspaceName))
 		test.AssertNoErr(api.EnableRootWrite(workspaceName))
 
