@@ -217,6 +217,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	flushSuccess, shouldForget := func() (bool, bool) {
 		if dq.deleted {
 			// Don't waste time flushing inodes in deleted workspaces
+			c.vlog("Skipping flush as workspace is deleted")
 			return true, false
 		}
 
