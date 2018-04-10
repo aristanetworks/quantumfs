@@ -458,7 +458,7 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string,
 	// We need the current in-memory state though to take
 	// other required actions
 	_, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
-	defer cleanup()
+	cleanup()
 
 	qfs.flusher.markWorkspaceDeleted(c, name, nonce)
 }
