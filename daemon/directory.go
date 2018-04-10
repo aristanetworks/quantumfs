@@ -2049,8 +2049,3 @@ func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uin
 	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }
-
-func (ds *directorySnapshot) Sync(c *ctx) fuse.Status {
-	c.vlog("directorySnapshot::Sync doing nothing")
-	return fuse.OK
-}
