@@ -1241,6 +1241,12 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		inode.cleanup(c)
 		c.vlog("Set inode %d to nil", inodeNum)
 
+		func() {
+			defer qfs.flusher.lock.Lock().Unlock()
+			utils.Assert(inode.dirtyElement_() == nil,
+				"inode %d dirty after uninstantiation", inodeNum)
+		}()
+
 		if !inode.isOrphaned() && inodeNum != quantumfs.InodeIdRoot {
 			// Then check our parent and iterate again
 			inode = func() (parent Inode) {
