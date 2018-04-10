@@ -547,10 +547,10 @@ func (flusher *Flusher) syncWorkspace_(c *ctx, workspace string) error {
 
 // flusher lock must be locked when calling this function
 func (flusher *Flusher) queue_(c *ctx, inode Inode,
-	shouldUninstantiate bool, shouldWait bool) *list.Element {
+	shouldUninstantiate bool) *list.Element {
 
-	defer c.FuncIn("Flusher::queue_", "inode %d uninstantiate %t wait %t",
-		inode.inodeNum(), shouldUninstantiate, shouldWait).Out()
+	defer c.FuncIn("Flusher::queue_", "inode %d uninstantiate %t",
+		inode.inodeNum(), shouldUninstantiate).Out()
 
 	var dirtyNode *dirtyInode
 	dirtyElement := inode.dirtyElement_()
@@ -570,14 +570,19 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 			launch = true
 		}
 
-		if shouldWait {
+		if shouldUninstantiate {
+			// There is not much point in delaying the uninstantiation,
+			// do it as soon as possible.
+			dirtyNode.expiryTime = time.Now()
+			dirtyElement = dq.PushFront_(dirtyNode)
+		} else {
+			// Delay the flushing of dirty inode so as to potentially
+			// absorb more writes and consolidate them into a single
+			// write into durable storage.
 			dirtyNode.expiryTime =
 				time.Now().Add(c.qfs.config.DirtyFlushDelay)
 
 			dirtyElement = dq.PushBack_(dirtyNode)
-		} else {
-			dirtyNode.expiryTime = time.Now()
-			dirtyElement = dq.PushFront_(dirtyNode)
 		}
 	} else {
 		dirtyNode = dirtyElement.Value.(*dirtyInode)
