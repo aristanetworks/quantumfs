@@ -46,7 +46,6 @@ type Directory struct {
 	childRecordLock utils.DeferableMutex
 	children        *ChildContainer
 	_generation     uint64
-	uninstantiating bool
 }
 
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
@@ -1932,9 +1931,7 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
 		dir.name_).Out()
 
-	if !dir.uninstantiating {
-		dir.normalizeChildren(c)
-	}
+	dir.normalizeChildren(c)
 	dir.parentSyncChild(c, func() (quantumfs.ObjectKey, *HardlinkDelta) {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
@@ -1942,11 +1939,6 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	})
 
 	return dir.baseLayerId
-}
-
-func (dir *Directory) cleanup(c *ctx) {
-	defer c.funcIn("Directory::cleanup").Out()
-	dir.uninstantiating = true
 }
 
 func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
