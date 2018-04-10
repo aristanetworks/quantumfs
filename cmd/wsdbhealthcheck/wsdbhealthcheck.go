@@ -68,7 +68,7 @@ func main() {
 	var wsdb quantumfs.WorkspaceDB
 
 	select {
-	case <-time.After(1 * time.Second):
+	case <-time.After(30 * time.Second):
 		// We must be able to connect within the limited time
 		healthIsBad("Connection timeout", nil)
 	case wsdb = <-connectWait:
