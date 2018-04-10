@@ -79,7 +79,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 
 	treeLock := TreeLock{
 		lock: &wsr.realTreeLock,
-		name: workspace,
+		name: workspaceName,
 	}
 	wsr.treeLock_ = &treeLock
 	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
