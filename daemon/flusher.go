@@ -24,6 +24,7 @@ const flushSanityTimeout = time.Minute
 type dirtyInode struct {
 	inode               Inode
 	shouldUninstantiate bool
+	shouldFlush         bool
 	expiryTime          time.Time
 }
 
@@ -233,9 +234,13 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		// incremented above.
 		dirtyElement = inode.markClean_()
 
-		c.qfs.flusher.lock.Unlock()
-		defer c.qfs.flusher.lock.Lock()
-		return c.qfs.flushInode_(c, inode), forget()
+		flushSuccess := true
+		if dirtyInode.shouldFlush {
+			c.qfs.flusher.lock.Unlock()
+			defer c.qfs.flusher.lock.Lock()
+			flushSuccess = c.qfs.flushInode_(c, inode)
+		}
+		return flushSuccess, forget()
 	}()
 	if !flushSuccess {
 		// flushing the inode has failed, if the inode has been dirtied in
@@ -587,6 +592,8 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	}
 	if shouldUninstantiate {
 		dirtyNode.shouldUninstantiate = true
+	} else {
+		dirtyNode.shouldFlush = true
 	}
 
 	treelock := inode.treeLock()
