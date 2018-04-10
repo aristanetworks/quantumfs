@@ -811,29 +811,43 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	}
 	// If we didn't find it, get the more expensive lock and check again. This
 	// will instantiate the Inode if necessary and possible.
-	defer qfs.instantiationLock.Lock().Unlock()
-	defer qfs.mapMutex.Lock().Unlock()
-	return qfs.inode_(c, id)
+	instantiated := false
+	func() {
+		defer qfs.instantiationLock.Lock().Unlock()
+		defer qfs.mapMutex.Lock().Unlock()
+		inode, instantiated = qfs.inode_(c, id)
+	}()
+
+	if instantiated {
+		uninstantiated := inode.finishInit(c)
+		if len(uninstantiated) > 0 {
+			defer qfs.mapMutex.Lock().Unlock()
+			qfs.addUninstantiated_(c, uninstantiated, inode.inodeNum())
+		}
+	}
+
+	return inode
 }
 
 // Must hold the instantiationLock and mapMutex for write
-func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
+// Returns the inode and whether the inode was instantiated
+// as part of this function, or was instantiated already.
+func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	inode, needsInstantiation := qfs.getInode_(c, id)
 	if !needsInstantiation && inode != nil {
-		return inode
+		return inode, false
 	}
 
 	c.vlog("Inode %d needs to be instantiated", id)
-	var newUninstantiated []InodeId
 
 	parentId, uninstantiated := qfs.parentOfUninstantiated[id]
 	if !uninstantiated {
 		// We don't know anything about this Inode
-		return nil
+		return nil, false
 	}
 
 	for {
-		parent := qfs.inode_(c, parentId)
+		parent, _ := qfs.getInode_(c, parentId)
 		if parent == nil {
 			panic(fmt.Sprintf("Unable to instantiate parent %d",
 				parentId))
@@ -844,7 +858,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 			defer qfs.mapMutex.Lock()
 			// without mapMutex the child could move underneath this
 			// parent, in such cases, find the new parent
-			inode, newUninstantiated = parent.instantiateChild(c, id)
+			inode = parent.instantiateChild(c, id)
 		}()
 		if inode != nil {
 			break
@@ -853,7 +867,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 		newParentId, uninstantiated := qfs.parentOfUninstantiated[id]
 		if !uninstantiated {
 			// The dentry has been removed
-			return nil
+			return nil, false
 		}
 		// The dentry is still there, verify the parent has changed
 		utils.Assert(newParentId != parentId,
@@ -863,9 +877,8 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) Inode {
 
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = inode
-	qfs.addUninstantiated_(c, newUninstantiated, inode.inodeNum())
 
-	return inode
+	return inode, true
 }
 
 // Set an inode in a thread safe way, set to nil to delete
@@ -1106,6 +1119,10 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 	defer c.FuncIn(LookupLog, InodeNameLog, header.NodeId, name).Out()
+
+	if isFilenameTooLong(name) {
+		return ENAMETOOLONG
+	}
 	return qfs.lookupCommon(c, InodeId(header.NodeId), name, out)
 }
 
@@ -1224,9 +1241,13 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		inode.cleanup(c)
 		c.vlog("Set inode %d to nil", inodeNum)
 
-		if !inode.isOrphaned() && inodeNum != quantumfs.InodeIdRoot {
-			key := inode.flush(c)
+		func() {
+			defer qfs.flusher.lock.Lock().Unlock()
+			utils.Assert(inode.dirtyElement_() == nil,
+				"inode %d dirty after uninstantiation", inodeNum)
+		}()
 
+		if !inode.isOrphaned() && inodeNum != quantumfs.InodeIdRoot {
 			// Then check our parent and iterate again
 			inode = func() (parent Inode) {
 				defer inode.getParentLock().RLock().RUnlock()
@@ -1243,8 +1264,6 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 						"before child! %d %d",
 						inode.parentId_(), inodeNum))
 				}
-
-				parent.syncChild(c, inodeNum, key, nil)
 
 				qfs.addUninstantiated(c, []InodeId{inodeNum},
 					inode.parentId_())
@@ -1609,6 +1628,10 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 	defer logRequestPanic(c)
 	defer c.FuncIn(MknodLog, InodeNameLog, input.NodeId, name).Out()
 
+	if isFilenameTooLong(name) {
+		return ENAMETOOLONG
+	}
+
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
 	logInodeWorkspace(c, inode)
@@ -1634,6 +1657,10 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 	defer c.FuncIn(MkdirLog, InodeNameLog, input.NodeId, name).Out()
+
+	if isFilenameTooLong(name) {
+		return ENAMETOOLONG
+	}
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
@@ -1715,6 +1742,10 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 	defer c.FuncIn(RenameLog, RenameDebugLog, input.NodeId, input.Newdir,
 		oldName, newName).Out()
 
+	if isFilenameTooLong(oldName) || isFilenameTooLong(newName) {
+		return ENAMETOOLONG
+	}
+
 	srcInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
 	logInodeWorkspace(c, srcInode)
@@ -1769,6 +1800,10 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 	defer logRequestPanic(c)
 	defer c.FuncIn(LinkLog, LinkDebugLog, input.Oldnodeid, filename,
 		input.NodeId).Out()
+
+	if isFilenameTooLong(filename) {
+		return ENAMETOOLONG
+	}
 
 	srcInode := qfs.inode(c, InodeId(input.Oldnodeid))
 	logInodeWorkspace(c, srcInode)
@@ -1825,6 +1860,10 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
 	defer c.FuncIn(SymlinkLog, InodeNameLog, header.NodeId, linkName).Out()
+
+	if isFilenameTooLong(linkName) {
+		return ENAMETOOLONG
+	}
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
@@ -1890,6 +1929,10 @@ func isPosixAclName(name string) bool {
 	}
 
 	return false
+}
+
+func isFilenameTooLong(name string) bool {
+	return len(name) > quantumfs.MaxFilenameLength
 }
 
 const GetXAttrSizeLog = "Mux::GetXAttrSize"
@@ -2099,6 +2142,10 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
 	defer c.FuncIn(CreateLog, InodeNameLog, input.NodeId, name).Out()
+
+	if isFilenameTooLong(name) {
+		return ENAMETOOLONG
+	}
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()

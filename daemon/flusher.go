@@ -211,24 +211,40 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// against the deferred unlocking from our caller, even in
 	// the case of a panic.
 	inode := dirtyInode.inode
+	var dirtyElement *list.Element
 
-	// the inode should be marked clean before flushing so that any new
-	// attemps to write to the inode dirties it again.
-	dirtyElement := inode.markClean_()
-	success := func() bool {
+	flushSuccess, shouldForget := func() (bool, bool) {
+		// Increment the lookup count to prevent the inode from
+		// getting uninstantiated.
+		c.qfs.increaseLookupCount(c, inode.inodeNum())
+		forgetCalled := false
+		forget := func() bool {
+			if !forgetCalled {
+				forgetCalled = true
+				return c.qfs.shouldForget(c, inode.inodeNum(), 1)
+			}
+			return false
+		}
+		defer forget()
+
+		// the inode should be marked clean before flushing so that any new
+		// attemps to write to the inode dirties it again. Even though the
+		// inode is clean, it cannot be uninstantiated as the lookupCount is
+		// incremented above.
+		dirtyElement = inode.markClean_()
+
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
-		return c.qfs.flushInode_(c, inode)
+		return c.qfs.flushInode_(c, inode), forget()
 	}()
-
-	if !success {
+	if !flushSuccess {
 		// flushing the inode has failed, if the inode has been dirtied in
 		// the meantime, just drop this list entry as there is now another
 		// one
 		return inode.markUnclean_(dirtyElement)
 	}
 
-	if dirtyInode.shouldUninstantiate {
+	if dirtyInode.shouldUninstantiate || shouldForget {
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
 		c.qfs.uninstantiateInode(c, inode.inodeNum())

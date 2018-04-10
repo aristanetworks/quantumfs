@@ -527,14 +527,14 @@ func (tsl *TypespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (tsl *TypespaceList) instantiateChild(c *ctx,
-	inodeNum InodeId) (Inode, []InodeId) {
+	inodeNum InodeId) Inode {
 
 	defer c.funcIn("TypespaceList::instantiateChild").Out()
 	defer tsl.Lock().Unlock()
 
 	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
-		return inode, nil
+		return inode
 	}
 
 	// The api file will never be truly forgotten (see QuantumFs.Forget()) and so
@@ -556,7 +556,7 @@ func (tsl *TypespaceList) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newNamespaceList(c *ctx, typespace string, namespace string, workspace string,
-	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
+	parent Inode, inodeNum InodeId) Inode {
 
 	defer c.FuncIn("newNamespaceList", "typespace %s", typespace).Out()
 
@@ -571,7 +571,7 @@ func newNamespaceList(c *ctx, typespace string, namespace string, workspace stri
 	treeLock := TreeLock{lock: &nsl.realTreeLock, name: typespace}
 	nsl.InodeCommon.treeLock_ = &treeLock
 	utils.Assert(nsl.treeLock() != nil, "NamespaceList treeLock nil at init")
-	return &nsl, nil
+	return &nsl
 }
 
 type NamespaceList struct {
@@ -851,14 +851,14 @@ func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (nsl *NamespaceList) instantiateChild(c *ctx,
-	inodeNum InodeId) (Inode, []InodeId) {
+	inodeNum InodeId) Inode {
 
 	defer c.funcIn("NamespaceList::instantiateChild").Out()
 	defer nsl.Lock().Unlock()
 
 	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
-		return inode, nil
+		return inode
 	}
 
 	name, exists := nsl.namespacesById[inodeNum]
@@ -889,7 +889,7 @@ func (nsl *NamespaceList) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newWorkspaceList(c *ctx, typespace string, namespace string,
-	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
+	parent Inode, inodeNum InodeId) Inode {
 
 	defer c.FuncIn("newWorkspaceList", "typespace %s namespace %s",
 		typespace, namespace).Out()
@@ -907,7 +907,7 @@ func newWorkspaceList(c *ctx, typespace string, namespace string,
 		name: typespace + "/" + namespace}
 	wsl.InodeCommon.treeLock_ = &treeLock
 	utils.Assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
-	return &wsl, nil
+	return &wsl
 }
 
 type workspaceInfo struct {
@@ -1243,14 +1243,14 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (wsl *WorkspaceList) instantiateChild(c *ctx,
-	inodeNum InodeId) (Inode, []InodeId) {
+	inodeNum InodeId) Inode {
 
 	defer c.funcIn("WorkspaceList::instantiateChild").Out()
 	defer wsl.Lock().Unlock()
 
 	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
-		return inode, nil
+		return inode
 	}
 
 	name, exists := wsl.workspacesById[inodeNum]

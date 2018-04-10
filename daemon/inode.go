@@ -95,7 +95,8 @@ type Inode interface {
 	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 
 	// Instantiate the Inode for the given child on demand
-	instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId)
+	instantiateChild(c *ctx, inodeNum InodeId) Inode
+	finishInit(c *ctx) []InodeId
 
 	name() string
 	setName(name string)
@@ -589,6 +590,10 @@ func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 	panic(msg)
 }
 
+func (inode *InodeCommon) finishInit(c *ctx) []InodeId {
+	return nil
+}
+
 func (inode *InodeCommon) queueToForget(c *ctx) {
 	defer c.funcIn("InodeCommon::queueToForget").Out()
 
@@ -805,8 +810,6 @@ type FileHandle interface {
 
 	Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (
 		uint32, fuse.Status)
-
-	Sync_DOWN(c *ctx) fuse.Status
 
 	treeLock() *TreeLock
 	LockTree() *TreeLock

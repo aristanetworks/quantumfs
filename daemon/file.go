@@ -18,46 +18,46 @@ const FMODE_EXEC = 0x20 // From Linux
 
 func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) Inode {
 
 	defer c.FuncIn("newSmallFile", "name %s", name).Out()
 
 	accessor := newSmallAccessor(c, size, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
 func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) Inode {
 
 	defer c.FuncIn("newMediumFile", "name %s", name).Out()
 
 	accessor := newMediumAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
 func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) Inode {
 
 	defer c.FuncIn("newLargeFile", "name %s", name).Out()
 
 	accessor := newLargeAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
 func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) Inode {
 
 	defer c.FuncIn("newVeryLargeFile", "name %s", name).Out()
 
 	accessor := newVeryLargeAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
 func newFile_(c *ctx, name string, inodeNum InodeId,
@@ -293,9 +293,9 @@ func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fi.parentRemoveChildXAttr(c, fi.inodeNum(), attr)
 }
 
-func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) Inode {
 	c.elog("Invalid instantiateChild on File")
-	return nil, nil
+	return nil
 }
 
 func resize(buffer []byte, size int) []byte {

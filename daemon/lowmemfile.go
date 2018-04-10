@@ -259,9 +259,9 @@ func (lm *LowMemFile) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (lm *LowMemFile) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+func (lm *LowMemFile) instantiateChild(c *ctx, inodeNum InodeId) Inode {
 	c.elog("Invalid instantiateChild on LowMemFile")
-	return nil, nil
+	return nil
 }
 
 func (lm *LowMemFile) flush(c *ctx) quantumfs.ObjectKey {

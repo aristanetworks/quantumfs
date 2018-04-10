@@ -15,6 +15,7 @@ ExecStop=/usr/bin/killall -SIGUSR1 quantumfsd
 User=root
 KillMode=none
 Restart=always
+OOMScoreAdjust=-500
 
 [Install]
 WantedBy=multi-user.target
