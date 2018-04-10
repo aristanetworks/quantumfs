@@ -431,11 +431,24 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	inode.orphan_(c, nil)
 }
 
-func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
+func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string,
+	nonce quantumfs.WorkspaceNonce) {
+
 	defer c.FuncIn("Mux::handleDeletedWorkspace", "%s", name).Out()
 
 	defer logRequestPanic(c)
 	parts := strings.Split(name, "/")
+
+	// Instantiating the workspace has the side effect of querying the
+	// workspaceDB and updating the in-memory data structures.
+	// We need the current in-memory state though to take
+	// other required actions
+	wsr, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	defer cleanup()
+
+	if wsr != nil && !nonce.SameIncarnation(&wsr.nonce) {
+		return
+	}
 
 	wsrLineage, err := qfs.getWsrLineageNoInstantiate(c,
 		parts[0], parts[1], parts[2])
@@ -450,13 +463,6 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 				wsrLineage[3], parts[2], wsrLineage[2])
 		}
 	}
-
-	// Instantiating the workspace has the side effect of querying the
-	// workspaceDB and updating the in-memory data structures.
-	// We need the current in-memory state though to take
-	// other required actions
-	_, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
-	cleanup()
 
 	qfs.flusher.markWorkspaceDeleted(c, name, nonce)
 }
