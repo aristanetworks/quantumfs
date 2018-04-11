@@ -927,23 +927,16 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 	}
 }
 
-// Increase an Inode's lookup count. This must be called whenever a fuse.EntryOut is
+// Increment an Inode's lookup count. This must be called whenever a fuse.EntryOut is
 // returned.
-func (qfs *QuantumFs) increaseLookupCount(c *ctx, inodeId InodeId) {
-	qfs.increaseLookupCountWithNum(c, inodeId, 1)
-}
-
-func (qfs *QuantumFs) increaseLookupCountWithNum(c *ctx, inodeId InodeId,
-	num uint64) {
-
-	defer c.FuncIn("Mux::increaseLookupCountWithNum",
-		"inode %d, val %d", inodeId, num).Out()
+func (qfs *QuantumFs) incrementLookupCount(c *ctx, inodeId InodeId) {
+	defer c.FuncIn("Mux::incrementLookupCount", "inode %d", inodeId).Out()
 	defer qfs.lookupCountLock.Lock().Unlock()
 	prev, exists := qfs.lookupCounts[inodeId]
 	if !exists {
-		qfs.lookupCounts[inodeId] = num
+		qfs.lookupCounts[inodeId] = 1
 	} else {
-		qfs.lookupCounts[inodeId] = prev + num
+		qfs.lookupCounts[inodeId] = prev + 1
 	}
 }
 

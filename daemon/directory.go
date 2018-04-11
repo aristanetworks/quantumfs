@@ -594,7 +594,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	}
 
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
@@ -729,7 +729,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	}()
 
 	c.qfs.setInode(c, inodeNum, newEntity)
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
@@ -1812,7 +1812,7 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	c.vlog("Directory::lookupInternal found inode %d Name %s", inodeNum, name)
 	child = c.qfs.inode(c, inodeNum)
 	if child != nil {
-		c.qfs.increaseLookupCount(c, inodeNum)
+		c.qfs.incrementLookupCount(c, inodeNum)
 	}
 	return child, nil
 }
@@ -2021,7 +2021,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 
 		details.NodeId = child.attr.Ino
 		if child.filename != "." && child.filename != ".." {
-			c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
+			c.qfs.incrementLookupCount(c, InodeId(child.attr.Ino))
 		}
 		if ds._generation == ds.src.generation() {
 			fillEntryOutCacheData(c, details)

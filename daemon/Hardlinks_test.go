@@ -244,7 +244,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		wsrInode := test.getInodeNum(workspace)
 		dirInode := test.getInodeNum(dirName)
 		linkInode := test.getInodeNum(linkFile)
-		test.qfs.increaseLookupCount(testCtx, linkInode)
+		test.qfs.incrementLookupCount(testCtx, linkInode)
 
 		// Check that the directory parent uninstantiated, even if the
 		// Hardlink itself cannot be.
