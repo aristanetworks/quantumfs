@@ -57,10 +57,6 @@ func (tsl *TypespaceList) dirty_(c *ctx) {
 	c.vlog("TypespaceList::dirty_ doing nothing")
 }
 
-func (tsl *TypespaceList) dirtyChild(c *ctx, child InodeId) {
-	c.vlog("TypespaceList::dirtyChild doing nothing")
-}
-
 func (tsl *TypespaceList) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
@@ -591,10 +587,6 @@ func (nsl *NamespaceList) dirty_(c *ctx) {
 	c.vlog("NamespaceList::dirty_ doing nothing")
 }
 
-func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
-	c.vlog("NamespaceList::dirtyChild doing nothing")
-}
-
 func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
@@ -931,10 +923,6 @@ func (wsl *WorkspaceList) dirty_(c *ctx) {
 	// Override InodeCommon.dirty_() because workspaces don't get dirty in the
 	// traditional manner.
 	c.vlog("WorkspaceList::dirty_ doing nothing")
-}
-
-func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
-	c.vlog("WorkspaceList::dirtyChild doing nothing")
 }
 
 func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
