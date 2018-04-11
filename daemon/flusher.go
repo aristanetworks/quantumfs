@@ -216,7 +216,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	flushSuccess, shouldForget := func() (bool, bool) {
 		// Increment the lookup count to prevent the inode from
 		// getting uninstantiated.
-		c.qfs.increaseLookupCount(c, inode.inodeNum())
+		c.qfs.incrementLookupCount(c, inode.inodeNum())
 		forgetCalled := false
 		forget := func() bool {
 			if !forgetCalled {
