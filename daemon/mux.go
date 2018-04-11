@@ -619,22 +619,16 @@ func (qfs *QuantumFs) uninstantiateInode(c *ctx, inodeNum InodeId) {
 	qfs.uninstantiateInode_(c, inodeNum)
 }
 
-// Queue an Inode to be flushed because it is dirty, at the front of the queue
-// flusher lock must be locked when calling this function
-func (qfs *QuantumFs) queueDirtyInodeNow_(c *ctx, inode Inode) *list.Element {
-	return qfs.flusher.queue_(c, inode, false, false)
-}
-
 // Queue an Inode to be flushed because it is dirty
 // flusher lock must be locked when calling this function
 func (qfs *QuantumFs) queueDirtyInode_(c *ctx, inode Inode) *list.Element {
-	return qfs.flusher.queue_(c, inode, false, true)
+	return qfs.flusher.queue_(c, inode, false)
 }
 
 // Queue an Inode because the kernel has forgotten about it
 // flusher lock must be locked when calling this function
 func (qfs *QuantumFs) queueInodeToForget_(c *ctx, inode Inode) *list.Element {
-	return qfs.flusher.queue_(c, inode, true, false)
+	return qfs.flusher.queue_(c, inode, true)
 }
 
 // There are several configuration knobs in the kernel which can affect FUSE
@@ -933,23 +927,16 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 	}
 }
 
-// Increase an Inode's lookup count. This must be called whenever a fuse.EntryOut is
+// Increment an Inode's lookup count. This must be called whenever a fuse.EntryOut is
 // returned.
-func (qfs *QuantumFs) increaseLookupCount(c *ctx, inodeId InodeId) {
-	qfs.increaseLookupCountWithNum(c, inodeId, 1)
-}
-
-func (qfs *QuantumFs) increaseLookupCountWithNum(c *ctx, inodeId InodeId,
-	num uint64) {
-
-	defer c.FuncIn("Mux::increaseLookupCountWithNum",
-		"inode %d, val %d", inodeId, num).Out()
+func (qfs *QuantumFs) incrementLookupCount(c *ctx, inodeId InodeId) {
+	defer c.FuncIn("Mux::incrementLookupCount", "inode %d", inodeId).Out()
 	defer qfs.lookupCountLock.Lock().Unlock()
 	prev, exists := qfs.lookupCounts[inodeId]
 	if !exists {
-		qfs.lookupCounts[inodeId] = num
+		qfs.lookupCounts[inodeId] = 1
 	} else {
-		qfs.lookupCounts[inodeId] = prev + num
+		qfs.lookupCounts[inodeId] = prev + 1
 	}
 }
 

@@ -13,7 +13,6 @@ package daemon
 import (
 	"container/list"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aristanetworks/quantumfs/utils"
@@ -217,7 +216,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	flushSuccess, shouldForget := func() (bool, bool) {
 		// Increment the lookup count to prevent the inode from
 		// getting uninstantiated.
-		c.qfs.increaseLookupCount(c, inode.inodeNum())
+		c.qfs.incrementLookupCount(c, inode.inodeNum())
 		forgetCalled := false
 		forget := func() bool {
 			if !forgetCalled {
@@ -504,7 +503,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 		for _, dq := range flusher.dqs {
 			response := make(chan error, 1)
 			if workspace != "" {
-				if !strings.HasPrefix(workspace, dq.treelock.name) {
+				if workspace != dq.treelock.name {
 					continue
 				}
 
@@ -552,10 +551,10 @@ func (flusher *Flusher) syncWorkspace_(c *ctx, workspace string) error {
 
 // flusher lock must be locked when calling this function
 func (flusher *Flusher) queue_(c *ctx, inode Inode,
-	shouldUninstantiate bool, shouldWait bool) *list.Element {
+	shouldUninstantiate bool) *list.Element {
 
-	defer c.FuncIn("Flusher::queue_", "inode %d uninstantiate %t wait %t",
-		inode.inodeNum(), shouldUninstantiate, shouldWait).Out()
+	defer c.FuncIn("Flusher::queue_", "inode %d uninstantiate %t",
+		inode.inodeNum(), shouldUninstantiate).Out()
 
 	var dirtyNode *dirtyInode
 	dirtyElement := inode.dirtyElement_()
@@ -575,14 +574,19 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 			launch = true
 		}
 
-		if shouldWait {
+		if shouldUninstantiate {
+			// There is not much point in delaying the uninstantiation,
+			// do it as soon as possible.
+			dirtyNode.expiryTime = time.Now()
+			dirtyElement = dq.PushFront_(dirtyNode)
+		} else {
+			// Delay the flushing of dirty inode so as to potentially
+			// absorb more writes and consolidate them into a single
+			// write into durable storage.
 			dirtyNode.expiryTime =
 				time.Now().Add(c.qfs.config.DirtyFlushDelay)
 
 			dirtyElement = dq.PushBack_(dirtyNode)
-		} else {
-			dirtyNode.expiryTime = time.Now()
-			dirtyElement = dq.PushFront_(dirtyNode)
 		}
 	} else {
 		dirtyNode = dirtyElement.Value.(*dirtyInode)

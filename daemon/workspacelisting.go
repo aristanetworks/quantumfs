@@ -370,7 +370,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	c.vlog("Typespace exists")
 
 	inodeNum := tsl.typespacesByName[name]
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillTypespaceAttr(c, &out.Attr, inodeNum, name, "")
@@ -694,7 +694,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	c.vlog("Namespace exists")
 
 	inodeNum := nsl.namespacesByName[name]
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillNamespaceAttr(c, &out.Attr, inodeNum, nsl.typespaceName, name)
@@ -1083,7 +1083,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	c.vlog("Workspace exists")
 
 	inodeInfo := wsl.workspacesByName[name]
-	c.qfs.increaseLookupCount(c, inodeInfo.id)
+	c.qfs.incrementLookupCount(c, inodeInfo.id)
 	out.NodeId = uint64(inodeInfo.id)
 	fillEntryOutCacheData(c, out)
 	fillWorkspaceAttrFake(c, &out.Attr, inodeInfo.id, "", "")

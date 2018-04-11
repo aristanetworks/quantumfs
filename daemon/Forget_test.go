@@ -269,8 +269,8 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		// them back at the end of the test
 		test.qfs.Forget(uint64(fileId), 1)
 		test.qfs.Forget(uint64(wsrId), 1)
-		defer test.qfs.increaseLookupCount(test.newCtx(), fileId)
-		defer test.qfs.increaseLookupCount(test.newCtx(), wsrId)
+		defer test.qfs.incrementLookupCount(test.newCtx(), fileId)
+		defer test.qfs.incrementLookupCount(test.newCtx(), wsrId)
 		test.SyncAllWorkspaces()
 
 		api := test.getApi()
