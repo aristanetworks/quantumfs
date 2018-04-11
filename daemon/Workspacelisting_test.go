@@ -162,7 +162,7 @@ func TestWorkspaceDeletionManualForget(t *testing.T) {
 		test.qfs.Forget(uint64(workspaceInodeId), 1)
 		test.TestLogDoesNotContain(fmt.Sprintf(skipForgetLog,
 			workspaceInodeId))
-		defer test.qfs.increaseLookupCount(test.newCtx(), workspaceInodeId)
+		defer test.qfs.incrementLookupCount(test.newCtx(), workspaceInodeId)
 	})
 }
 
