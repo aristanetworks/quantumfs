@@ -46,7 +46,6 @@ type Directory struct {
 	childRecordLock utils.DeferableMutex
 	children        *ChildContainer
 	_generation     uint64
-	uninstantiating bool
 }
 
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
@@ -595,7 +594,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	}
 
 	c.vlog("Directory::Lookup found inode %d", inodeNum)
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
@@ -730,7 +729,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	}()
 
 	c.qfs.setInode(c, inodeNum, newEntity)
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
@@ -1813,7 +1812,7 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	c.vlog("Directory::lookupInternal found inode %d Name %s", inodeNum, name)
 	child = c.qfs.inode(c, inodeNum)
 	if child != nil {
-		c.qfs.increaseLookupCount(c, inodeNum)
+		c.qfs.incrementLookupCount(c, inodeNum)
 	}
 	return child, nil
 }
@@ -1932,9 +1931,7 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	defer c.FuncIn("Directory::flush", "%d %s", dir.inodeNum(),
 		dir.name_).Out()
 
-	if !dir.uninstantiating {
-		dir.normalizeChildren(c)
-	}
+	dir.normalizeChildren(c)
 	dir.parentSyncChild(c, func() (quantumfs.ObjectKey, *HardlinkDelta) {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
@@ -1942,11 +1939,6 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	})
 
 	return dir.baseLayerId
-}
-
-func (dir *Directory) cleanup(c *ctx) {
-	defer c.funcIn("Directory::cleanup").Out()
-	dir.uninstantiating = true
 }
 
 func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
@@ -2029,7 +2021,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 
 		details.NodeId = child.attr.Ino
 		if child.filename != "." && child.filename != ".." {
-			c.qfs.increaseLookupCount(c, InodeId(child.attr.Ino))
+			c.qfs.incrementLookupCount(c, InodeId(child.attr.Ino))
 		}
 		if ds._generation == ds.src.generation() {
 			fillEntryOutCacheData(c, details)
@@ -2056,9 +2048,4 @@ func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uin
 
 	c.elog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
-}
-
-func (ds *directorySnapshot) Sync(c *ctx) fuse.Status {
-	c.vlog("directorySnapshot::Sync doing nothing")
-	return fuse.OK
 }

@@ -811,8 +811,6 @@ type FileHandle interface {
 	Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (
 		uint32, fuse.Status)
 
-	Sync_DOWN(c *ctx) fuse.Status
-
 	treeLock() *TreeLock
 	LockTree() *TreeLock
 	RLockTree() *TreeLock
