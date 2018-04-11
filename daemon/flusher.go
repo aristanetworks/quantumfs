@@ -555,7 +555,7 @@ func (flusher *Flusher) markWorkspaceDeleted(c *ctx, workspace string,
 	defer flusher.lock.Lock().Unlock()
 
 	for _, dq := range flusher.dqs {
-		if strings.HasPrefix(workspace, dq.treelock.name) {
+		if workspace == dq.treelock.name {
 			if dq.deletedNonce == 0 || dq.deletedNonce == nonce.Id {
 				c.vlog("Marked %s as deleted", dq.treelock.name)
 				dq.deleted = true
@@ -572,7 +572,7 @@ func (flusher *Flusher) markWorkspaceUndeleted(c *ctx, workspace string,
 	defer flusher.lock.Lock().Unlock()
 
 	for _, dq := range flusher.dqs {
-		if strings.HasPrefix(workspace, dq.treelock.name) {
+		if workspace == dq.treelock.name {
 			c.vlog("Marked %s as undeleted", dq.treelock.name)
 			dq.deleted = false
 			dq.deletedNonce = nonce.Id
