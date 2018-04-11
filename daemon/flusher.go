@@ -13,7 +13,6 @@ package daemon
 import (
 	"container/list"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -508,7 +507,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 		for _, dq := range flusher.dqs {
 			response := make(chan error, 1)
 			if workspace != "" {
-				if !strings.HasPrefix(workspace, dq.treelock.name) {
+				if workspace != dq.treelock.name {
 					continue
 				}
 
