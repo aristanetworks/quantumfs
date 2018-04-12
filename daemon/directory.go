@@ -219,14 +219,6 @@ func (dir *Directory) delChild_(c *ctx,
 	return record
 }
 
-// Record that a specific child is dirty and when syncing heirarchically, sync them
-// as well.
-func (dir *Directory) dirtyChild(c *ctx, childId InodeId) {
-	defer c.funcIn("Directory::dirtyChild").Out()
-
-	dir.self.dirty(c)
-}
-
 func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	owner fuse.Owner, entry quantumfs.ImmutableDirectoryRecord) {
 

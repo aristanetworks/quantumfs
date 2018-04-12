@@ -105,13 +105,6 @@ func (fi *File) handleAccessorTypeChange(c *ctx,
 	}
 }
 
-func (fi *File) dirtyChild(c *ctx, child InodeId) {
-	c.FuncIn("FuncIn::dirtyChild", "inode %d", child).Out()
-	if child != fi.inodeNum() {
-		panic("Unsupported dirtyChild() call on File")
-	}
-}
-
 func (fi *File) Access(c *ctx, mask uint32, uid uint32, gid uint32) fuse.Status {
 
 	defer c.funcIn("File::Access").Out()
