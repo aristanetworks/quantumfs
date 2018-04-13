@@ -597,7 +597,7 @@ func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode) bool {
 
 const skipForgetLog = "inode %d doesn't need to be forgotten"
 
-// Requires treeLock for read and the instantiationLock
+// Requires treeState lock for read and the instantiationLock
 func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	defer c.FuncIn("Mux::uninstantiateInode_", "inode %d", inodeNum).Out()
 

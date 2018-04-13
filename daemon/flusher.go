@@ -201,7 +201,7 @@ func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushCmd, response chan error) erro
 	}
 }
 
-// treeLock and flusher lock must be locked R/W when calling this function
+// treeState lock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// We must release the flusher lock because when we flush
 	// an Inode it will modify its parent and likely place that
@@ -255,9 +255,9 @@ func init() {
 	panicErr = fmt.Errorf("flushQueue panic")
 }
 
-// treeLock and flusher lock must be locked R/W when calling this function
 var panicErr error
 
+// treeState lock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) {
 
 	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()

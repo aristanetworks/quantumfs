@@ -25,7 +25,7 @@ func NewLowMemFile(treeState *TreeState, parent InodeId) Inode {
 	}
 	lm.self = &lm
 	lm.setParent(parent)
-	utils.Assert(lm.treeState() != nil, "LowMemFile treeLock is nil at init")
+	utils.Assert(lm.treeState() != nil, "LowMemFile treeState is nil at init")
 	return &lm
 }
 

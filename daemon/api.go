@@ -28,7 +28,7 @@ func NewApiInode(treeState *TreeState, parent InodeId) Inode {
 	}
 	api.self = &api
 	api.setParent(parent)
-	utils.Assert(api.treeState() != nil, "ApiInode treeLock is nil at init")
+	utils.Assert(api.treeState() != nil, "ApiInode treeState is nil at init")
 	return &api
 }
 
@@ -307,7 +307,7 @@ func newApiHandle(c *ctx, treeState *TreeState) *ApiHandle {
 		},
 		responses: make(chan fuse.ReadResult, 10),
 	}
-	utils.Assert(api.treeState() != nil, "ApiHandle treeLock nil at init")
+	utils.Assert(api.treeState() != nil, "ApiHandle treeState nil at init")
 	return &api
 }
 
