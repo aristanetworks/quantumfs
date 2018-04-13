@@ -397,7 +397,7 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 
 	for name, state := range updates {
 		if state.Deleted {
-			go qfs.handleDeletedWorkspace(c, name, state.Nonce)
+			go qfs.handleDeletedWorkspace(c, name)
 		} else {
 			go qfs.refreshWorkspace(c, name)
 		}
@@ -431,9 +431,7 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	inode.orphan_(c, nil)
 }
 
-func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string,
-	nonce quantumfs.WorkspaceNonce) {
-
+func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	defer c.FuncIn("Mux::handleDeletedWorkspace", "%s", name).Out()
 
 	defer logRequestPanic(c)
