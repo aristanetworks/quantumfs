@@ -1989,7 +1989,8 @@ func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapsho
 		src:         src,
 	}
 
-	utils.Assert(ds.treeState() != nil, "directorySnapshot treeState nil at init")
+	utils.Assert(ds.treeState() != nil,
+		"directorySnapshot treeState nil at init")
 
 	return &ds
 }

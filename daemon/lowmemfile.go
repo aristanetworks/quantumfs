@@ -279,7 +279,8 @@ func newLowMemFileHandle(c *ctx, treeState *TreeState) *LowMemFileHandle {
 			treeState_: treeState,
 		},
 	}
-	utils.Assert(lmh.treeState() != nil, "LowMemFileHandle treeState nil at init")
+	utils.Assert(lmh.treeState() != nil,
+		"LowMemFileHandle treeState nil at init")
 	return &lmh
 }
 
