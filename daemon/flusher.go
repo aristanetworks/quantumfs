@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -48,12 +47,10 @@ const (
 
 type DirtyQueue struct {
 	// The Front of the list are the Inodes next in line to flush.
-	l            *list.List
-	trigger      chan triggerCmd
-	cmd          chan FlushRequest
-	treeState    *TreeState
-	deleted      bool
-	deletedNonce uint64
+	l         *list.List
+	trigger   chan triggerCmd
+	cmd       chan FlushRequest
+	treeState *TreeState
 }
 
 func NewDirtyQueue(treeState *TreeState) *DirtyQueue {
@@ -216,7 +213,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	var dirtyElement *list.Element
 
 	flushSuccess, shouldForget := func() (bool, bool) {
-		if dq.deleted {
+		if dq.treeState.doNotFlush {
 			// Don't waste time flushing inodes in deleted workspaces
 			c.vlog("Skipping flush as workspace is deleted")
 			return true, false
@@ -545,39 +542,6 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 func (flusher *Flusher) syncAll(c *ctx) error {
 	defer c.funcIn("Flusher::syncAll").Out()
 	return flusher.sync_(c, "")
-}
-
-func (flusher *Flusher) markWorkspaceDeleted(c *ctx, workspace string,
-	nonce quantumfs.WorkspaceNonce) {
-
-	defer c.FuncIn("Flusher::markWorkspaceDeleted", "%s : %d", workspace,
-		nonce.Id).Out()
-	defer flusher.lock.Lock().Unlock()
-
-	for _, dq := range flusher.dqs {
-		if workspace == dq.treelock.name {
-			if dq.deletedNonce == 0 || dq.deletedNonce == nonce.Id {
-				c.vlog("Marked %s as deleted", dq.treelock.name)
-				dq.deleted = true
-			}
-		}
-	}
-}
-
-func (flusher *Flusher) markWorkspaceUndeleted(c *ctx, workspace string,
-	nonce quantumfs.WorkspaceNonce) {
-
-	defer c.FuncIn("Flusher::markWorkspaceUndeleted", "%s : %d", workspace,
-		nonce.Id).Out()
-	defer flusher.lock.Lock().Unlock()
-
-	for _, dq := range flusher.dqs {
-		if workspace == dq.treelock.name {
-			c.vlog("Marked %s as undeleted", dq.treelock.name)
-			dq.deleted = false
-			dq.deletedNonce = nonce.Id
-		}
-	}
 }
 
 // Must be called with the tree locked

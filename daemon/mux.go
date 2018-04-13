@@ -457,10 +457,11 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string,
 	// workspaceDB and updating the in-memory data structures.
 	// We need the current in-memory state though to take
 	// other required actions
-	_, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	wsr, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	if wsr != nil {
+		wsr.treeState().doNotFlush = true
+	}
 	cleanup()
-
-	qfs.flusher.markWorkspaceDeleted(c, name, nonce)
 }
 
 func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {

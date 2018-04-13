@@ -86,8 +86,6 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 		wsr.hardlinkTable, workspaceRoot.BaseLayer(), inodeNum,
 		parent.inodeNum(), wsr.treeState())
 
-	c.qfs.flusher.markWorkspaceUndeleted(c, workspaceName, nonce)
-
 	return &wsr
 }
 
