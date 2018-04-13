@@ -7,7 +7,6 @@ package daemon
 // the directory hierarchy.
 
 import (
-	"sync"
 	"syscall"
 	"time"
 
@@ -33,11 +32,13 @@ func NewTypespaceList() Inode {
 		InodeCommon:      InodeCommon{id: quantumfs.InodeIdRoot},
 		typespacesByName: make(map[string]InodeId),
 		typespacesById:   make(map[InodeId]string),
+		realTreeState: &TreeState{
+			name: "",
+		},
 	}
 	tsl.self = &tsl
-	treeLock := TreeLock{lock: &tsl.realTreeLock, name: ""}
-	tsl.InodeCommon.treeLock_ = &treeLock
-	utils.Assert(tsl.treeLock() != nil, "TypespaceList treeLock nil at init")
+	tsl.InodeCommon.treeState_ = tsl.realTreeState
+	utils.Assert(tsl.treeState() != nil, "TypespaceList treeState nil at init")
 	return &tsl
 }
 
@@ -48,7 +49,7 @@ type TypespaceList struct {
 	typespacesByName map[string]InodeId
 	typespacesById   map[InodeId]string
 
-	realTreeLock sync.RWMutex
+	realTreeState *TreeState
 }
 
 func (tsl *TypespaceList) dirty_(c *ctx) {
@@ -561,12 +562,14 @@ func newNamespaceList(c *ctx, typespace string, namespace string, workspace stri
 		typespaceName:    typespace,
 		namespacesByName: make(map[string]InodeId),
 		namespacesById:   make(map[InodeId]string),
+		realTreeState: &TreeState{
+			name: typespace,
+		},
 	}
 	nsl.self = &nsl
 	nsl.setParent(parent.inodeNum())
-	treeLock := TreeLock{lock: &nsl.realTreeLock, name: typespace}
-	nsl.InodeCommon.treeLock_ = &treeLock
-	utils.Assert(nsl.treeLock() != nil, "NamespaceList treeLock nil at init")
+	nsl.InodeCommon.treeState_ = nsl.realTreeState
+	utils.Assert(nsl.treeState() != nil, "NamespaceList treeState nil at init")
 	return &nsl
 }
 
@@ -578,7 +581,7 @@ type NamespaceList struct {
 	namespacesByName map[string]InodeId
 	namespacesById   map[InodeId]string
 
-	realTreeLock sync.RWMutex
+	realTreeState *TreeState
 }
 
 func (nsl *NamespaceList) dirty_(c *ctx) {
@@ -892,13 +895,14 @@ func newWorkspaceList(c *ctx, typespace string, namespace string,
 		namespaceName:    namespace,
 		workspacesByName: make(map[string]workspaceInfo),
 		workspacesById:   make(map[InodeId]string),
+		realTreeState: &TreeState{
+			name: typespace + "/" + namespace,
+		},
 	}
 	wsl.self = &wsl
 	wsl.setParent(parent.inodeNum())
-	treeLock := TreeLock{lock: &wsl.realTreeLock,
-		name: typespace + "/" + namespace}
-	wsl.InodeCommon.treeLock_ = &treeLock
-	utils.Assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
+	wsl.InodeCommon.treeState_ = wsl.realTreeState
+	utils.Assert(wsl.treeState() != nil, "WorkspaceList treeState nil at init")
 	return &wsl
 }
 
@@ -916,7 +920,7 @@ type WorkspaceList struct {
 	workspacesByName map[string]workspaceInfo
 	workspacesById   map[InodeId]string
 
-	realTreeLock sync.RWMutex
+	realTreeState *TreeState
 }
 
 func (wsl *WorkspaceList) dirty_(c *ctx) {

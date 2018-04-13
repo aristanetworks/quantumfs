@@ -73,7 +73,7 @@ func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 func initDirectory(c *ctx, name string, dir *Directory,
 	hardlinkTable HardlinkTable,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
-	parent InodeId, treeLock *TreeLock) {
+	parent InodeId, treeState *TreeState) {
 
 	defer c.FuncIn("initDirectory",
 		"baselayer from %s", baseLayerId.String()).Out()
@@ -84,7 +84,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.InodeCommon.name_ = name
 	dir.InodeCommon.accessed_ = 0
 	dir.setParent(parent)
-	dir.treeLock_ = treeLock
+	dir.treeState_ = treeState
 	dir.hardlinkTable = hardlinkTable
 	dir.baseLayerId = baseLayerId
 	dir.hardlinkDelta = newHardlinkDelta()
@@ -95,7 +95,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	// is delayed to speed up initDirectory().
 	dir.childRecordLock.Lock()
 
-	utils.Assert(dir.treeLock() != nil, "Directory treeLock nil at init")
+	utils.Assert(dir.treeState() != nil, "Directory treeState nil at init")
 }
 
 func (dir *Directory) finishInit(c *ctx) []InodeId {
@@ -128,7 +128,7 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 	}
 
 	initDirectory(c, name, &dir, hardlinkTable,
-		baseLayerId, inodeNum, parent.inodeNum(), parent.treeLock())
+		baseLayerId, inodeNum, parent.inodeNum(), parent.treeState())
 	return &dir
 }
 
@@ -785,7 +785,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(file.(*File), file.inodeNum(),
-		fileHandleNum, file.treeLock())
+		fileHandleNum, file.treeState())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	c.vlog("New file inode %d, Fh %d", file.inodeNum(), fileHandleNum)
@@ -1955,7 +1955,7 @@ type directoryContents struct {
 type directorySnapshotSource interface {
 	getChildSnapshot(c *ctx) []directoryContents
 	inodeNum() InodeId
-	treeLock() *TreeLock
+	treeState() *TreeState
 	generation() uint64
 }
 
@@ -1965,15 +1965,16 @@ func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapsho
 
 	ds := directorySnapshot{
 		FileHandleCommon: FileHandleCommon{
-			id:        c.qfs.newFileHandleId(),
-			inodeNum:  src.inodeNum(),
-			treeLock_: src.treeLock(),
+			id:         c.qfs.newFileHandleId(),
+			inodeNum:   src.inodeNum(),
+			treeState_: src.treeState(),
 		},
 		_generation: src.generation(),
 		src:         src,
 	}
 
-	utils.Assert(ds.treeLock() != nil, "directorySnapshot treeLock nil at init")
+	utils.Assert(ds.treeState() != nil,
+		"directorySnapshot treeState nil at init")
 
 	return &ds
 }

@@ -67,17 +67,17 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 
 	file := File{
 		InodeCommon: InodeCommon{
-			id:        inodeNum,
-			name_:     name,
-			accessed_: 0,
-			treeLock_: parent.treeLock(),
+			id:         inodeNum,
+			name_:      name,
+			accessed_:  0,
+			treeState_: parent.treeState(),
 		},
 		accessor: accessor,
 	}
 	file.self = &file
 	file.setParent(parent.inodeNum())
 
-	utils.Assert(file.treeLock() != nil, "File treeLock nil at init")
+	utils.Assert(file.treeState() != nil, "File treeState nil at init")
 
 	return &file
 }
@@ -129,7 +129,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	}
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())
+	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeState())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	c.dlog(OpenedInodeDebug, fi.inodeNum(), fileHandleNum)
@@ -522,18 +522,18 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,
-	fileHandleId FileHandleId, treeLock *TreeLock) FileHandle {
+	fileHandleId FileHandleId, treeState *TreeState) FileHandle {
 
 	fd := &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{
-			id:        fileHandleId,
-			inodeNum:  inodeNum,
-			treeLock_: treeLock,
+			id:         fileHandleId,
+			inodeNum:   inodeNum,
+			treeState_: treeState,
 		},
 		file: file,
 	}
 
-	utils.Assert(fd.treeLock() != nil, "FileDescriptor treeLock nil at init")
+	utils.Assert(fd.treeState() != nil, "FileDescriptor treeState nil at init")
 	return fd
 }
 

@@ -15,17 +15,17 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-func NewLowMemFile(treeLock *TreeLock, parent InodeId) Inode {
+func NewLowMemFile(treeState *TreeState, parent InodeId) Inode {
 	lm := LowMemFile{
 		InodeCommon: InodeCommon{
-			id:        quantumfs.InodeIdLowMemMarker,
-			name_:     quantumfs.LowMemFileName,
-			treeLock_: treeLock,
+			id:         quantumfs.InodeIdLowMemMarker,
+			name_:      quantumfs.LowMemFileName,
+			treeState_: treeState,
 		},
 	}
 	lm.self = &lm
 	lm.setParent(parent)
-	utils.Assert(lm.treeLock() != nil, "LowMemFile treeLock is nil at init")
+	utils.Assert(lm.treeState() != nil, "LowMemFile treeState is nil at init")
 	return &lm
 }
 
@@ -127,7 +127,7 @@ func (lm *LowMemFile) Open(c *ctx, flags uint32, mode uint32,
 	defer c.FuncIn("LowMemFile::Open", "flags %d mode %d", flags, mode).Out()
 
 	out.OpenFlags = 0
-	handle := newLowMemFileHandle(c, lm.treeLock())
+	handle := newLowMemFileHandle(c, lm.treeState())
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
 	out.Fh = uint64(handle.FileHandleCommon.id)
 	return fuse.OK
@@ -269,17 +269,18 @@ func (lm *LowMemFile) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func newLowMemFileHandle(c *ctx, treeLock *TreeLock) *LowMemFileHandle {
+func newLowMemFileHandle(c *ctx, treeState *TreeState) *LowMemFileHandle {
 	defer c.funcIn("newLowMemFileHandle").Out()
 
 	lmh := LowMemFileHandle{
 		FileHandleCommon: FileHandleCommon{
-			id:        c.qfs.newFileHandleId(),
-			inodeNum:  quantumfs.InodeIdLowMemMarker,
-			treeLock_: treeLock,
+			id:         c.qfs.newFileHandleId(),
+			inodeNum:   quantumfs.InodeIdLowMemMarker,
+			treeState_: treeState,
 		},
 	}
-	utils.Assert(lmh.treeLock() != nil, "LowMemFileHandle treeLock nil at init")
+	utils.Assert(lmh.treeState() != nil,
+		"LowMemFileHandle treeState nil at init")
 	return &lmh
 }
 

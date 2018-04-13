@@ -41,17 +41,17 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 	special := Special{
 		InodeCommon: InodeCommon{
-			id:        inodeNum,
-			name_:     name,
-			accessed_: 0,
-			treeLock_: parent.treeLock(),
+			id:         inodeNum,
+			name_:      name,
+			accessed_:  0,
+			treeState_: parent.treeState(),
 		},
 		filetype: filetype,
 		device:   device,
 	}
 	special.self = &special
 	special.setParent(parent.inodeNum())
-	utils.Assert(special.treeLock() != nil, "Special treeLock nil at init")
+	utils.Assert(special.treeState() != nil, "Special treeState nil at init")
 
 	if dirRecord != nil {
 		dirRecord.SetID(quantumfs.EncodeSpecialKey(filetype, device))
