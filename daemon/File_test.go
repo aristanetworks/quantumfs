@@ -707,7 +707,6 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 	file, err := os.Create(filePath)
 	test.AssertNoErr(err)
 	file.Close()
-	fileInode := test.getInodeNum(filePath)
 
 	if hardlinks {
 		test.AssertNoErr(os.Link(filePath, linkPath))
@@ -742,6 +741,7 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 	}
 
 	func() {
+		fileInode := test.getInodeNum(filePath)
 		var record quantumfs.ImmutableDirectoryRecord
 		if !hardlinks {
 			defer dir.childRecordLock.Lock().Unlock()
@@ -764,6 +764,7 @@ func testChangefileTypeBeforeSync(test *testHelper, hardlinks bool) {
 	inode = test.getInode(dirName)
 	dir = inode.(*Directory)
 	func() {
+		fileInode := test.getInodeNum(filePath)
 		var record quantumfs.ImmutableDirectoryRecord
 		if !hardlinks {
 			defer dir.childRecordLock.Lock().Unlock()

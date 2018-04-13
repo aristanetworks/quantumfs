@@ -58,10 +58,6 @@ func (tsl *TypespaceList) dirty_(c *ctx) {
 	c.vlog("TypespaceList::dirty_ doing nothing")
 }
 
-func (tsl *TypespaceList) dirtyChild(c *ctx, child InodeId) {
-	c.vlog("TypespaceList::dirtyChild doing nothing")
-}
-
 func (tsl *TypespaceList) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
@@ -371,7 +367,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	c.vlog("Typespace exists")
 
 	inodeNum := tsl.typespacesByName[name]
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillTypespaceAttr(c, &out.Attr, inodeNum, name, "")
@@ -594,10 +590,6 @@ func (nsl *NamespaceList) dirty_(c *ctx) {
 	c.vlog("NamespaceList::dirty_ doing nothing")
 }
 
-func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
-	c.vlog("NamespaceList::dirtyChild doing nothing")
-}
-
 func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
@@ -697,7 +689,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	c.vlog("Namespace exists")
 
 	inodeNum := nsl.namespacesByName[name]
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillNamespaceAttr(c, &out.Attr, inodeNum, nsl.typespaceName, name)
@@ -937,10 +929,6 @@ func (wsl *WorkspaceList) dirty_(c *ctx) {
 	c.vlog("WorkspaceList::dirty_ doing nothing")
 }
 
-func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
-	c.vlog("WorkspaceList::dirtyChild doing nothing")
-}
-
 func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
 	gid uint32) fuse.Status {
 
@@ -1087,7 +1075,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	c.vlog("Workspace exists")
 
 	inodeInfo := wsl.workspacesByName[name]
-	c.qfs.increaseLookupCount(c, inodeInfo.id)
+	c.qfs.incrementLookupCount(c, inodeInfo.id)
 	out.NodeId = uint64(inodeInfo.id)
 	fillEntryOutCacheData(c, out)
 	fillWorkspaceAttrFake(c, &out.Attr, inodeInfo.id, "", "")

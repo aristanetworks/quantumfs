@@ -269,8 +269,8 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		// them back at the end of the test
 		test.qfs.Forget(uint64(fileId), 1)
 		test.qfs.Forget(uint64(wsrId), 1)
-		defer test.qfs.increaseLookupCount(test.newCtx(), fileId)
-		defer test.qfs.increaseLookupCount(test.newCtx(), wsrId)
+		defer test.qfs.incrementLookupCount(test.newCtx(), fileId)
+		defer test.qfs.incrementLookupCount(test.newCtx(), wsrId)
 		test.SyncAllWorkspaces()
 
 		api := test.getApi()
@@ -370,6 +370,11 @@ func TestForgetMarking(t *testing.T) {
 		test.qfs.Forget(uint64(childIdA), 1)
 		test.SyncAllWorkspaces()
 
+		// Wait for uninstantiation
+		uninstMsg := fmt.Sprintf("Mux::uninstantiateInode_ inode %d",
+			childIdA)
+		test.WaitForLogString(uninstMsg, "childA uninstantiation")
+
 		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
 		test.Assert(parent != nil,
 			"Parent forgotten when only 1/2 children unloaded")
@@ -381,16 +386,21 @@ func TestForgetMarking(t *testing.T) {
 		test.qfs.Forget(uint64(childIdB), 1)
 		test.SyncAllWorkspaces()
 
+		uninstMsg = fmt.Sprintf("Mux::uninstantiateInode_ inode %d",
+			childIdB)
+		test.WaitForLogString(uninstMsg, "childB uninstantiation")
+
 		childA = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
 		test.Assert(childA == nil, "ChildA not forgotten when requested")
 
 		childB = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdB)
 		test.Assert(childB == nil, "ChildB not forgotten when requested")
 
-		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.Assert(parent == nil,
-			"Parent %d not forgotten when all children unloaded",
-			parentId)
+		test.WaitFor("parent uninstantiation", func() bool {
+			parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
+			test.qfs.c.vlog("parent is nil: %t", parent == nil)
+			return parent == nil
+		})
 	})
 }
 
@@ -452,8 +462,10 @@ func TestForgetUnlinkedUninstantiated(t *testing.T) {
 		test.remountFilesystem()
 		test.AssertNoErr(syscall.Unlink(fullname))
 		test.SyncAllWorkspaces()
-		_, exists := test.qfs.lookupCount(test.TestCtx(), inodeId)
 
-		utils.Assert(!exists, "file %s still exists in the lookup map", name)
+		test.WaitFor("dropping fileA's inode", func() bool {
+			_, exists := test.qfs.lookupCount(test.TestCtx(), inodeId)
+			return !exists
+		})
 	})
 }
