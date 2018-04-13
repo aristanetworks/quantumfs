@@ -213,12 +213,6 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	var dirtyElement *list.Element
 
 	flushSuccess, shouldForget := func() (bool, bool) {
-		if dq.treeState.doNotFlush {
-			// Don't waste time flushing inodes in deleted workspaces
-			c.vlog("Skipping flush as workspace is deleted")
-			return true, false
-		}
-
 		// Increment the lookup count to prevent the inode from
 		// getting uninstantiated.
 		c.qfs.increaseLookupCount(c, inode.inodeNum())
@@ -237,6 +231,12 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		// inode is clean, it cannot be uninstantiated as the lookupCount is
 		// incremented above.
 		dirtyElement = inode.markClean_()
+
+		if dq.treeState.doNotFlush {
+			// Don't waste time flushing inodes in deleted workspaces
+			c.vlog("Skipping flush as workspace is deleted")
+			return true, forget()
+		}
 
 		c.qfs.flusher.lock.Unlock()
 		defer c.qfs.flusher.lock.Lock()
