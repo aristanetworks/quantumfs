@@ -89,18 +89,6 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	return &wsr
 }
 
-func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
-	defer c.funcIn("WorkspaceRoot::dirtyChild").Out()
-
-	isHardlink, _ := wsr.hardlinkTable.checkHardlink(childId)
-
-	if isHardlink {
-		wsr.self.dirty(c)
-	} else {
-		wsr.Directory.dirtyChild(c, childId)
-	}
-}
-
 func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) Inode {
 
 	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeId).Out()

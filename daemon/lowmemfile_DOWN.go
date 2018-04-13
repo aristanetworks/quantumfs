@@ -18,8 +18,3 @@ func (lm *LowMemFile) Sync_DOWN(c *ctx) fuse.Status {
 	c.vlog("LowMemFile::Sync_DOWN doing nothing")
 	return fuse.OK
 }
-
-func (lm *LowMemFileHandle) Sync_DOWN(c *ctx) fuse.Status {
-	c.vlog("ApiHandle::Sync_DOWN doing nothing")
-	return fuse.OK
-}
