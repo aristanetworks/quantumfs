@@ -5,7 +5,6 @@ package daemon
 
 import (
 	"sort"
-	"sync"
 	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
@@ -26,9 +25,7 @@ type WorkspaceRoot struct {
 
 	accessList *accessList
 
-	// The RWMutex which backs the treeLock for all the inodes in this workspace
-	// tree.
-	realTreeLock sync.RWMutex
+	realTreeState *TreeState
 
 	hardlinkTable *HardlinkTableImpl
 }
@@ -53,8 +50,6 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 
 	defer c.FuncIn("WorkspaceRoot::newWorkspaceRoot", "%s", workspaceName).Out()
 
-	var wsr WorkspaceRoot
-
 	rootId, nonce, err := c.workspaceDB.FetchAndSubscribeWorkspace(&c.Ctx,
 		typespace, namespace, workspace)
 	if err != nil {
@@ -67,25 +62,29 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := MutableCopy(c, buffer).AsWorkspaceRoot()
 
+	wsr := WorkspaceRoot{
+		typespace:       typespace,
+		namespace:       namespace,
+		workspace:       workspace,
+		publishedRootId: rootId,
+		nonce:           nonce,
+		accessList:      NewAccessList(),
+		realTreeState: &TreeState{
+			name: workspaceName,
+		},
+	}
+
 	defer wsr.Lock().Unlock()
 
 	wsr.self = &wsr
-	wsr.typespace = typespace
-	wsr.namespace = namespace
-	wsr.workspace = workspace
-	wsr.publishedRootId = rootId
-	wsr.nonce = nonce
-	wsr.accessList = NewAccessList()
+	wsr.treeState_ = wsr.realTreeState
 
-	treeLock := TreeLock{lock: &wsr.realTreeLock,
-		name: typespace + "/" + namespace + "/" + workspace}
-	wsr.treeLock_ = &treeLock
-	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
+	utils.Assert(wsr.treeState() != nil, "WorkspaceRoot treeState nil at init")
 
 	wsr.hardlinkTable = newHardlinkTable(c, &wsr, workspaceRoot.HardlinkEntry())
 	initDirectory(c, workspace, &wsr.Directory,
 		wsr.hardlinkTable, workspaceRoot.BaseLayer(), inodeNum,
-		parent.inodeNum(), &treeLock)
+		parent.inodeNum(), wsr.treeState())
 
 	return &wsr
 }
@@ -495,7 +494,7 @@ func (wsr *WorkspaceRoot) handleFlushFailure_(c *ctx) bool {
 
 	// If there is anything in the dirty queue, postpone handling of the
 	// failure to the next time flush fails
-	if c.qfs.flusher.nQueued(c, wsr.treeLock()) != 1 {
+	if c.qfs.flusher.nQueued(c, wsr.treeState()) != 1 {
 		return true
 	}
 	return nil == forceMerge(c, wsr)

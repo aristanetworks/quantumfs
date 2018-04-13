@@ -18,17 +18,17 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-func NewApiInode(treeLock *TreeLock, parent InodeId) Inode {
+func NewApiInode(treeState *TreeState, parent InodeId) Inode {
 	api := ApiInode{
 		InodeCommon: InodeCommon{
-			id:        quantumfs.InodeIdApi,
-			name_:     quantumfs.ApiPath,
-			treeLock_: treeLock,
+			id:         quantumfs.InodeIdApi,
+			name_:      quantumfs.ApiPath,
+			treeState_: treeState,
 		},
 	}
 	api.self = &api
 	api.setParent(parent)
-	utils.Assert(api.treeLock() != nil, "ApiInode treeLock is nil at init")
+	utils.Assert(api.treeState() != nil, "ApiInode treeLock is nil at init")
 	return &api
 }
 
@@ -152,7 +152,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	}
 
 	out.OpenFlags = 0
-	handle := newApiHandle(c, api.treeLock())
+	handle := newApiHandle(c, api.treeState())
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
 
 	c.dlog(OpenedInodeDebug, api.id, handle.id)
@@ -296,18 +296,18 @@ func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func newApiHandle(c *ctx, treeLock *TreeLock) *ApiHandle {
+func newApiHandle(c *ctx, treeState *TreeState) *ApiHandle {
 	defer c.funcIn("newApiHandle").Out()
 
 	api := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
-			id:        c.qfs.newFileHandleId(),
-			inodeNum:  quantumfs.InodeIdApi,
-			treeLock_: treeLock,
+			id:         c.qfs.newFileHandleId(),
+			inodeNum:   quantumfs.InodeIdApi,
+			treeState_: treeState,
 		},
 		responses: make(chan fuse.ReadResult, 10),
 	}
-	utils.Assert(api.treeLock() != nil, "ApiHandle treeLock nil at init")
+	utils.Assert(api.treeState() != nil, "ApiHandle treeLock nil at init")
 	return &api
 }
 
