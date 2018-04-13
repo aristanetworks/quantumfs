@@ -27,6 +27,21 @@ const minimumNamespaceNum = 3
 // Choose three to represent 1 workspace
 const minimumWorkspaceNum = 3
 
+func interpretListingError(c *ctx, err error, cmd string) fuse.Status {
+	switch err := err.(type) {
+	default:
+		c.elog("Unexpected error from %s: %s", cmd, err.Error())
+		return fuse.EIO
+
+	case quantumfs.WorkspaceDbErr:
+		if err.Code == quantumfs.WSDB_WORKSPACE_NOT_FOUND {
+			return fuse.ENOENT
+		}
+		c.elog("Unexpected wsdb error from %s: %s", cmd, err.Error())
+		return fuse.EIO
+	}
+}
+
 func NewTypespaceList() Inode {
 	tsl := TypespaceList{
 		InodeCommon:      InodeCommon{id: quantumfs.InodeIdRoot},
@@ -345,9 +360,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	if err != nil {
-		c.elog("Unexpected error from WorkspaceDB.TypespaceList: %s",
-			err.Error())
-		return fuse.EIO
+		return interpretListingError(c, err, "WorkspaceDB.TypespaceList")
 	}
 
 	exists := false
@@ -668,9 +681,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	if err != nil {
-		c.elog("Unexpected error from WorkspaceDB.NamespaceList: %s",
-			err.Error())
-		return fuse.EIO
+		return interpretListingError(c, err, "WorkspaceDB.NamespaceList")
 	}
 
 	exists := false
@@ -1054,9 +1065,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	workspaces, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	if err != nil {
-		c.elog("Unexpected error from WorkspaceDB.WorkspaceList: %s",
-			err.Error())
-		return fuse.EIO
+		return interpretListingError(c, err, "WorkspaceDB.WorkspaceList")
 	}
 
 	exists := false
