@@ -115,7 +115,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 		}
 
 		err := func() error {
-			defer dq.treeState.lock.RLock()
+			dq.treeState.lock.RLock()
 			defer dq.treeState.lock.RUnlock()
 
 			doneChan := make(chan error, 1)
