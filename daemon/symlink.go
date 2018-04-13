@@ -21,16 +21,16 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 
 	symlink := Symlink{
 		InodeCommon: InodeCommon{
-			id:        inodeNum,
-			name_:     name,
-			accessed_: 0,
-			treeLock_: parent.treeLock(),
+			id:         inodeNum,
+			name_:      name,
+			accessed_:  0,
+			treeState_: parent.treeState(),
 		},
 		key: key,
 	}
 	symlink.self = &symlink
 	symlink.setParent(parent.inodeNum())
-	utils.Assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
+	utils.Assert(symlink.treeState() != nil, "Symlink treeState nil at init")
 
 	if dirRecord != nil {
 		dirRecord.SetPermissions(modeToPermissions(0777, 0))

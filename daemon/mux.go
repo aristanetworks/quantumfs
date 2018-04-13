@@ -69,10 +69,10 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 
 	typespaceList := NewTypespaceList()
 	qfs.inodes[quantumfs.InodeIdRoot] = typespaceList
-	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(typespaceList.treeLock(),
+	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(typespaceList.treeState(),
 		typespaceList.inodeNum())
 	qfs.inodes[quantumfs.InodeIdLowMemMarker] = NewLowMemFile(
-		typespaceList.treeLock(), typespaceList.inodeNum())
+		typespaceList.treeState(), typespaceList.inodeNum())
 	return qfs
 }
 
@@ -601,7 +601,7 @@ func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode) bool {
 
 const skipForgetLog = "inode %d doesn't need to be forgotten"
 
-// Requires treeLock for read and the instantiationLock
+// Requires treeState lock for read and the instantiationLock
 func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
 	defer c.FuncIn("Mux::uninstantiateInode_", "inode %d", inodeNum).Out()
 
@@ -745,7 +745,7 @@ func (qfs *QuantumFs) RLockTreeGetInode(c *ctx, inodeId InodeId) (Inode,
 	// once we have the lock, re-grab (and possibly reinstantiate) the inode
 	// since it may have been just forgotten
 	inode = qfs.inode(c, inodeId)
-	return inode, inode.treeLock()
+	return inode, inode.treeState()
 }
 
 // Same as the RLockTreeGetInode, but for writes
@@ -759,7 +759,7 @@ func (qfs *QuantumFs) LockTreeGetInode(c *ctx, inodeId InodeId) (Inode,
 	inode.LockTree()
 
 	inode = qfs.inode(c, inodeId)
-	return inode, inode.treeLock()
+	return inode, inode.treeState()
 }
 
 func (qfs *QuantumFs) RLockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
@@ -774,7 +774,7 @@ func (qfs *QuantumFs) RLockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
 
 	// once we have the lock, re-grab
 	fileHandle = qfs.fileHandle(c, fh)
-	return fileHandle, fileHandle.treeLock()
+	return fileHandle, fileHandle.treeState()
 }
 
 func (qfs *QuantumFs) LockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
@@ -788,7 +788,7 @@ func (qfs *QuantumFs) LockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
 
 	// once we have the lock, re-grab
 	fileHandle = qfs.fileHandle(c, fh)
-	return fileHandle, fileHandle.treeLock()
+	return fileHandle, fileHandle.treeState()
 }
 
 func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
@@ -1071,8 +1071,7 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 	}
 
 	wsr := inode.(*WorkspaceRoot)
-	wsr.realTreeLock.Lock()
-	defer wsr.realTreeLock.Unlock()
+	defer wsr.LockTree().Unlock()
 
 	err = qfs.flusher.syncWorkspace_(c, workspace)
 	if err != nil {
@@ -1100,7 +1099,7 @@ const FuseRequestWorkspace = "FUSE Request Workspace: %s"
 func logInodeWorkspace(c *ctx, inode Inode) {
 	wsName := "none"
 	if inode != nil {
-		wsName = inode.treeLock().name
+		wsName = inode.treeState().name
 	}
 	c.vlog(FuseRequestWorkspace, wsName)
 }
@@ -1108,7 +1107,7 @@ func logInodeWorkspace(c *ctx, inode Inode) {
 func logFilehandleWorkspace(c *ctx, filehandle FileHandle) {
 	wsName := "none"
 	if filehandle != nil {
-		wsName = filehandle.treeLock().name
+		wsName = filehandle.treeState().name
 	}
 	c.vlog(FuseRequestWorkspace, wsName)
 }
@@ -1769,7 +1768,7 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 			return fuse.ENOENT
 		}
 
-		if dstInode.treeLock() != srcInode.treeLock() {
+		if dstInode.treeState() != srcInode.treeState() {
 			dstInode, unlock := qfs.RLockTreeGetInode(c,
 				InodeId(input.Newdir))
 			defer unlock.RUnlock()
@@ -1825,7 +1824,7 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 
 	// Via races, srcInode and dstInode can be forgotten here
 
-	if srcInode.treeLock() == dstInode.treeLock() {
+	if srcInode.treeState() == dstInode.treeState() {
 		// If src and dst live in the same workspace, we only need one lock
 		defer dstInode.LockTree().Unlock()
 	} else {

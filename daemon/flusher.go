@@ -51,12 +51,12 @@ type DirtyQueue struct {
 	l            *list.List
 	trigger      chan triggerCmd
 	cmd          chan FlushRequest
-	treelock     *TreeLock
+	treeState    *TreeState
 	deleted      bool
 	deletedNonce uint64
 }
 
-func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
+func NewDirtyQueue(treeState *TreeState) *DirtyQueue {
 	dq := DirtyQueue{
 		l:       list.New(),
 		trigger: make(chan triggerCmd, 1000),
@@ -64,8 +64,8 @@ func NewDirtyQueue(treelock *TreeLock) *DirtyQueue {
 		// cmds to be queued for the flusher thread
 		// without the callers worrying about blocking
 		// This should change to consolidate all KICKs into one
-		cmd:      make(chan FlushRequest, 1000),
-		treelock: treelock,
+		cmd:       make(chan FlushRequest, 1000),
+		treeState: treeState,
 	}
 	return &dq
 }
@@ -96,7 +96,7 @@ func (dq *DirtyQueue) PushFront_(v interface{}) *list.Element {
 }
 
 func (dq *DirtyQueue) kicker(c *ctx) {
-	defer c.FuncIn("DirtyQueue::kicker", "%s", dq.treelock.name).Out()
+	defer c.FuncIn("DirtyQueue::kicker", "%s", dq.treeState.name).Out()
 	defer logRequestPanic(c)
 
 	// When we think we have no inodes try periodically anyways to ensure sanity
@@ -118,8 +118,8 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 		}
 
 		err := func() error {
-			dq.treelock.lock.RLock()
-			defer dq.treelock.lock.RUnlock()
+			dq.treeState.lock.RLock()
+			defer dq.treeState.lock.RUnlock()
 
 			doneChan := make(chan error, 1)
 			func() {
@@ -188,7 +188,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 // Try sending a command to the dirtyqueue, failing immediately
 // if it would have blocked
 func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushCmd, response chan error) error {
-	c.vlog("Sending cmd %d to dirtyqueue %s", cmd, dq.treelock.name)
+	c.vlog("Sending cmd %d to dirtyqueue %s", cmd, dq.treeState.name)
 
 	newCmd := FlushRequest{
 		cmd:      cmd,
@@ -204,7 +204,7 @@ func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushCmd, response chan error) erro
 	}
 }
 
-// treeLock and flusher lock must be locked R/W when calling this function
+// treeState lock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// We must release the flusher lock because when we flush
 	// an Inode it will modify its parent and likely place that
@@ -264,9 +264,9 @@ func init() {
 	panicErr = fmt.Errorf("flushQueue panic")
 }
 
-// treeLock and flusher lock must be locked R/W when calling this function
 var panicErr error
 
+// treeState lock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) {
 
 	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()
@@ -318,7 +318,7 @@ func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 }
 
 func (dq *DirtyQueue) flusher(c *ctx) {
-	defer c.FuncIn("DirtyQueue::flusher", "%s", dq.treelock.name).Out()
+	defer c.FuncIn("DirtyQueue::flusher", "%s", dq.treeState.name).Out()
 	defer logRequestPanic(c)
 	done := false
 
@@ -355,7 +355,7 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 
 			if done {
 				// Cleanup
-				delete(c.qfs.flusher.dqs, dq.treelock)
+				delete(c.qfs.flusher.dqs, dq.treeState)
 
 				// end the kicker thread and cleanup triggers
 				dq.TryCommand(c, RETURN, nil)
@@ -464,21 +464,21 @@ func (dq *DirtyQueue) sortTopologically_(c *ctx) {
 }
 
 type Flusher struct {
-	// This is a map from the treeLock to a list of dirty inodes. We use the
-	// treelock because every Inode already has the treelock of its workspace so
-	// this is an easy way to sort Inodes by workspace.
-	dqs  map[*TreeLock]*DirtyQueue
+	// This is a map from the treeState to a list of dirty inodes. We use the
+	// treeState because every Inode already has the treeState of its workspace
+	// so this is an easy way to sort Inodes by workspace.
+	dqs  map[*TreeState]*DirtyQueue
 	lock utils.DeferableMutex
 }
 
-func (flusher *Flusher) nQueued(c *ctx, treelock *TreeLock) int {
+func (flusher *Flusher) nQueued(c *ctx, treeState *TreeState) int {
 	defer flusher.lock.Lock().Unlock()
-	return flusher.nQueued_(c, treelock)
+	return flusher.nQueued_(c, treeState)
 }
 
 // flusher lock must be locked when calling this function
-func (flusher *Flusher) nQueued_(c *ctx, treelock *TreeLock) int {
-	dq, exists := flusher.dqs[treelock]
+func (flusher *Flusher) nQueued_(c *ctx, treeState *TreeState) int {
+	dq, exists := flusher.dqs[treeState]
 	if !exists {
 		return 0
 	}
@@ -487,7 +487,7 @@ func (flusher *Flusher) nQueued_(c *ctx, treelock *TreeLock) int {
 
 func NewFlusher() *Flusher {
 	dqs := Flusher{
-		dqs: make(map[*TreeLock]*DirtyQueue),
+		dqs: make(map[*TreeState]*DirtyQueue),
 	}
 	return &dqs
 }
@@ -507,7 +507,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 		for _, dq := range flusher.dqs {
 			response := make(chan error, 1)
 			if workspace != "" {
-				if workspace != dq.treelock.name {
+				if workspace != dq.treeState.name {
 					continue
 				}
 
@@ -603,11 +603,11 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 			shouldUninstantiate: shouldUninstantiate,
 		}
 
-		treelock := inode.treeLock()
-		dq, ok := flusher.dqs[treelock]
+		treeState := inode.treeState()
+		dq, ok := flusher.dqs[treeState]
 		if !ok {
-			dq = NewDirtyQueue(treelock)
-			flusher.dqs[treelock] = dq
+			dq = NewDirtyQueue(treeState)
+			flusher.dqs[treeState] = dq
 			launch = true
 		}
 
@@ -630,8 +630,8 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 		dirtyNode.shouldUninstantiate = true
 	}
 
-	treelock := inode.treeLock()
-	dq := flusher.dqs[treelock]
+	treeState := inode.treeState()
+	dq := flusher.dqs[treeState]
 	if launch {
 		go dq.flusher(c)
 		go dq.kicker(c.flusherCtx())
