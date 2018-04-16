@@ -87,7 +87,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	inodeNum := srcInode.inodeNum()
 	out.NodeId = uint64(inodeNum)
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
 		newRecord)
@@ -111,11 +111,6 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 
 	dir.flush(c)
 
-	return fuse.OK
-}
-
-func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
-	c.vlog("directorySnapshot::Sync_DOWN doing nothing")
 	return fuse.OK
 }
 

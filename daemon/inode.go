@@ -161,8 +161,6 @@ type Inode interface {
 	markClean_() *list.Element // Mark this Inode as cleaned
 	// Undo marking the inode as clean
 	markUnclean_(dirtyElement *list.Element) bool
-	// Mark this Inode dirty because a child is dirty
-	dirtyChild(c *ctx, child InodeId)
 
 	// The kernel has forgotten about this Inode. Add yourself to the list to be
 	// flushed and forgotten.
@@ -579,12 +577,6 @@ func (inode *InodeCommon) markUnclean_(dirtyElement *list.Element) (already bool
 	return true
 }
 
-func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
-	msg := fmt.Sprintf("Unsupported dirtyChild() call on Inode %d: %v", child,
-		inode)
-	panic(msg)
-}
-
 func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
@@ -812,8 +804,6 @@ type FileHandle interface {
 
 	Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (
 		uint32, fuse.Status)
-
-	Sync_DOWN(c *ctx) fuse.Status
 
 	treeState() *TreeState
 	LockTree() utils.NeedWriteUnlock
