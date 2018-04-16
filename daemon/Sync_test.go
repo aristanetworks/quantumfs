@@ -473,3 +473,32 @@ func TestFlushAllSorting(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 	})
 }
+
+func TestRecreateWorkspaceWithContents(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		workspaceName := test.RelPath(workspace)
+		fileName1 := workspace + "/file1"
+		fileName2 := workspace + "/file2"
+
+		file, err := os.Create(fileName1)
+		test.AssertNoErr(err)
+		file.Close()
+
+		api := test.getApi()
+		test.AssertNoErr(api.DeleteWorkspace(workspaceName))
+
+		test.waitForPropagate(fileName1, []byte{})
+
+		test.AssertNoErr(api.Branch(test.nullWorkspaceRel(), workspaceName))
+		test.AssertNoErr(api.EnableRootWrite(workspaceName))
+
+		file, err = os.Create(fileName2)
+		test.AssertNoErr(err)
+		file.Close()
+
+		workspace2 := test.AbsPath(test.branchWorkspace(workspace))
+		test.assertNoFile(workspace2 + "/file1")
+		test.assertFileExists(workspace2 + "/file2")
+	})
+}

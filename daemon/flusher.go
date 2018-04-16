@@ -233,6 +233,12 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		// incremented above.
 		dirtyElement = inode.markClean_()
 
+		if dq.treeState.doNotFlush {
+			// Don't waste time flushing inodes in deleted workspaces
+			c.vlog("Skipping flush as workspace is deleted")
+			return true, forget()
+		}
+
 		flushSuccess := true
 		if dirtyInode.shouldFlush {
 			c.qfs.flusher.lock.Unlock()
