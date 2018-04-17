@@ -440,7 +440,7 @@ func (q *Qlogger) Vlog(format string, args ...interface{}) {
 
 var uniqueQloggerRequestId uint64
 
-func (q *Qlogger) NewRequestId() *Qlogger {
+func (q *Qlogger) NewContext() *Qlogger {
 	return &Qlogger{
 		RequestId: atomic.AddUint64(&uniqueQloggerRequestId, 1),
 		qlog:      q.qlog,
