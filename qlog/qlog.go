@@ -391,7 +391,7 @@ func newLogSubsystem(sys string) LogSubsystem {
 //       and record the subsystem in qlog file, for qparse to be able to
 //       parse the logs.
 func NewQlogger(subsystem string, ramfsPath string) *Qlogger {
-	return NewQloggerWithSize(subsystem, ramfsPath, 10*1024*1024)
+	return NewQloggerWithSize(subsystem, ramfsPath, uint64(DefaultMmapSize))
 }
 
 func NewQloggerWithSize(subsystem string, ramfsPath string, size uint64) *Qlogger {
