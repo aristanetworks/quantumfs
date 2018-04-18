@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -390,12 +391,16 @@ func newLogSubsystem(sys string) LogSubsystem {
 //       and record the subsystem in qlog file, for qparse to be able to
 //       parse the logs.
 func NewQlogger(subsystem string, ramfsPath string) *Qlogger {
+	return NewQloggerWithSize(subsystem, ramfsPath, uint64(DefaultMmapSize))
+}
+
+func NewQloggerWithSize(subsystem string, ramfsPath string, size uint64) *Qlogger {
 	sub, err := getSubsystem(subsystem)
 	if err != nil {
 		sub = newLogSubsystem(subsystem)
 	}
 
-	log, err := NewQlog(ramfsPath)
+	log, err := NewQlogExt(ramfsPath, size, subsystem, PrintToStdout)
 	utils.AssertNoErr(err)
 	qlogger := &Qlogger{
 		RequestId: 0,
@@ -431,4 +436,14 @@ func (q *Qlogger) Dlog(format string, args ...interface{}) {
 // Log a Verbose tracing message
 func (q *Qlogger) Vlog(format string, args ...interface{}) {
 	q.wrapQlog(3, format, args...)
+}
+
+var uniqueQloggerRequestId uint64
+
+func (q *Qlogger) NewContext() *Qlogger {
+	return &Qlogger{
+		RequestId: atomic.AddUint64(&uniqueQloggerRequestId, 1),
+		qlog:      q.qlog,
+		subsystem: q.subsystem,
+	}
 }
