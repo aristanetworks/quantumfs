@@ -216,7 +216,7 @@ func (ht *HardlinkTableImpl) newHardlink(c *ctx, inodeId InodeId,
 	fileId := record.FileId()
 	utils.Assert(fileId != quantumfs.InvalidFileId, "invalid fileId")
 	_, exists := ht.hardlinks[fileId]
-	utils.Assert(!exists, "newHardlink on pre-existing FileId %x", fileId)
+	utils.Assert(!exists, "newHardlink on pre-existing FileId %d", fileId)
 
 	ht.hardlinks[fileId] = newEntry
 	ht.inodeToLink[inodeId] = fileId
