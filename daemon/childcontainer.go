@@ -312,9 +312,8 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 	modify(record)
 }
 
-func (container *ChildContainer) directInodes() []InodeId {
-	inodes := make([]InodeId, 0, len(container.children))
-
+type inodeVisitFn func(InodeId) bool
+func (container *ChildContainer) foreachDirectInode(visit inodeVisitFn) {
 	for name, inodeId := range container.children {
 		records := container.effective[inodeId]
 		if records == nil {
@@ -324,10 +323,12 @@ func (container *ChildContainer) directInodes() []InodeId {
 		record := records[name]
 		_, isHardlink := record.(*HardlinkLeg)
 		if !isHardlink {
-			inodes = append(inodes, inodeId)
+			iterateAgain := visit(inodeId)
+			if !iterateAgain {
+				return
+			}
 		}
 	}
-	return inodes
 }
 
 func (container *ChildContainer) publishableRecords(

@@ -488,16 +488,18 @@ func (wsr *WorkspaceRoot) handleFlushFailure_(c *ctx) bool {
 	return nil == forceMerge(c, wsr)
 }
 
-func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
+func (wsr *WorkspaceRoot) foreachDirectInode(visitFn inodeVisitFn) {
 	defer wsr.Lock().Unlock()
-
-	directChildren := wsr.Directory.directChildInodes()
-
+	
+	// Iterate through hardlinks first to ensure we can escape early
 	for inodeNum, _ := range wsr.hardlinkTable.inodeToLink {
-		directChildren = append(directChildren, inodeNum)
+		iterateAgain := visitFn(inodeNum)
+		if !iterateAgain {
+			return
+		}
 	}
 
-	return directChildren
+	wsr.Directory.foreachDirectInode(visitFn)
 }
 
 func (wsr *WorkspaceRoot) cleanup(c *ctx) {
