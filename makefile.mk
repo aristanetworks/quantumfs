@@ -119,22 +119,27 @@ check-fpm:
 		sudo gem install --no-ri --no-rdoc fpm \
 	)
 
+define RPM_COMMON_CONTACT
+-m 'quantumfs-dev@arista.com' \
+--license='Arista Proprietary' \
+--vendor='Arista Networks' \
+--url http://gut/repos/quantumfs
+endef
+
+RPM_COMMON_VERSION := --version $(RPM_VERSION) --iteration $(RPM_RELEASE)
+
+FPM := fpm -f -s dir -t rpm $(RPM_COMMON_CONTACT) $(RPM_COMMON_VERSION)
+
 RPM_BASENAME_QUPLOAD := QuantumFS-qupload
 RPM_FILE_QUPLOAD := $(RPM_BASENAME_QUPLOAD)-$(RPM_VERSION)-$(RPM_RELEASE)
 quploadRPM: check-fpm $(COMMANDS)
-	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n $(RPM_BASENAME_QUPLOAD) --no-depends \
-		--license='Arista Proprietary' \
-		--vendor='Arista Networks' \
-		--url http://gut/repos/quantumfs \
+	$(FPM) -n $(RPM_BASENAME_QUPLOAD) \
 		--description='A tool to upload directory hierarchy into datastore' \
-		--version $(RPM_VERSION) --iteration $(RPM_RELEASE) \
+		--no-depends \
 		./qupload=/usr/bin/qupload
 
 quantumfsRPM: check-fpm $(COMMANDS)
-	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS \
-		--license='Arista Proprietary' \
-		--vendor='Arista Networks' \
-		--url http://gut/repos/quantumfs \
+	$(FPM) -n QuantumFS \
 		--description='A distributed filesystem optimized for large scale software development' \
 		--depends libstdc++ \
 		--depends fuse \
@@ -142,36 +147,29 @@ quantumfsRPM: check-fpm $(COMMANDS)
 		--after-install systemd_reload \
 		--after-remove systemd_reload \
 		--after-upgrade systemd_reload \
-		--version $(RPM_VERSION) --iteration $(RPM_RELEASE) \
 		./quantumfsd=/usr/sbin/quantumfsd \
 		./qloggerdb=/usr/sbin/qloggerdb \
 		./qloggerdb_system_unit=/usr/lib/systemd/system/qloggerdb.service \
 		./systemd_unit=/usr/lib/systemd/system/quantumfs.service
 
 qfsRPM: check-fpm $(COMMANDS)
-	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS-tool --no-depends \
-		--license='Arista Proprietary' \
-		--vendor='Arista Networks' \
-		--url http://gut/repos/quantumfs \
+	$(FPM) -n QuantumFS-tool \
+		--no-depends \
 		--description='A distributed filesystem optimized for large scale software development' \
 		--after-install systemd_reload \
 		--after-remove systemd_reload \
 		--after-upgrade systemd_reload \
-		--version $(RPM_VERSION) --iteration $(RPM_RELEASE) \
 		./qfs=/usr/bin/qfs \
 		./qparse=/usr/sbin/qparse
 
 qfsRPMi686: check-fpm $(COMMANDS386)
-	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS-tool --no-depends \
+	$(FPM) -n QuantumFS-tool \
 		-a i686 \
-		--license='Arista Proprietary' \
-		--vendor='Arista Networks' \
-		--url http://gut/repos/quantumfs \
 		--description='A distributed filesystem optimized for large scale software development' \
+		--no-depends \
 		--after-install systemd_reload \
 		--after-remove systemd_reload \
 		--after-upgrade systemd_reload \
-		--version $(RPM_VERSION) --iteration $(RPM_RELEASE) \
 		./qfs-386=/usr/bin/qfs \
 		./qparse-386=/usr/sbin/qparse
 
@@ -188,27 +186,15 @@ RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_PREFIX_CLIENT).x86_64.rpm $(RPM_FILE_PREF
 RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_QUPLOAD).x86_64.rpm
 
 clientRPM: check-fpm qfsclient
-	fpm --force -s dir -t rpm -n $(RPM_BASENAME_CLIENT) \
-		--maintainer 'quantumfs-dev@arista.com' \
-		--license='Arista Proprietary' \
-		--vendor='Arista Networks' \
-		--url http://gut/repos/quantumfs \
+	$(FPM) -n $(RPM_BASENAME_CLIENT) \
 		--description='QuantumFS client API' \
 		--depends jansson \
 		--depends openssl \
 		--depends libstdc++ \
-		--version $(RPM_VERSION) \
-		--iteration $(RPM_RELEASE) \
 		QFSClient/libqfsclient.so=$(RPM_LIBDIR)/libqfsclient.so
-	fpm --force -s dir -t rpm -n $(RPM_BASENAME_CLIENT_DEVEL) \
-		--maintainer 'quantumfs-dev@arista.com' \
-		--license='Arista Proprietary' \
-		--vendor='Arista Networks' \
-		--url http://gut/repos/quantumfs \
+	$(FPM) -n $(RPM_BASENAME_CLIENT_DEVEL) \
 		--description='Development files for QuantumFS client API' \
 		--depends $(RPM_BASENAME_CLIENT) \
-		--version $(RPM_VERSION) \
-		--iteration $(RPM_RELEASE) \
 		QFSClient/qfs_client.h=/usr/include/qfs_client.h
 
 clientRPM32:
