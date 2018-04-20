@@ -174,13 +174,9 @@ qfsRPMi686: check-fpm $(COMMANDS386)
 		./qparse-386=/usr/sbin/qparse
 
 healthCheckRpm: check-fpm $(COMMANDS)
-	fpm -f -s dir -t rpm -m 'quantumfs-dev@arista.com' -n QuantumFS-wsdbhealthcheck --no-depends \
-		-a i686 \
-		--license='Arista Proprietary' \
-		--vendor='Arista Networks' \
-		--url http://gut/repos/quantumfs \
-		--description='A distributed filesystem optimized for large scale software development' \
-		--version $(RPM_VERSION) --iteration $(RPM_RELEASE) \
+	$(fpm) -n QuantumFS-wsdbhealthcheck \
+		--description='Utility to confirm healthy operation of the wsdbservice' \
+		--no-depends \
 		./wsdbhealthcheck=/usr/bin/wsdbhealthcheck
 
 # Default to x86_64 location; we'll override when building via mock
