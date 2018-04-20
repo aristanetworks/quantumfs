@@ -2003,6 +2003,7 @@ func TestReaddirnamesOneAtATime(t *testing.T) {
 }
 
 func TestDirectoryNlink(t *testing.T) {
+	t.Skip()
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		dir := workspace + "/dir"
