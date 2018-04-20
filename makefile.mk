@@ -174,7 +174,7 @@ qfsRPMi686: check-fpm $(COMMANDS386)
 		./qparse-386=/usr/sbin/qparse
 
 healthCheckRpm: check-fpm $(COMMANDS)
-	$(fpm) -n QuantumFS-wsdbhealthcheck \
+	$(FPM) -n QuantumFS-wsdbhealthcheck \
 		--description='Utility to confirm healthy operation of the wsdbservice' \
 		--no-depends \
 		./wsdbhealthcheck=/usr/bin/wsdbhealthcheck
