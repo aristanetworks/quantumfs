@@ -490,7 +490,7 @@ func (wsr *WorkspaceRoot) handleFlushFailure_(c *ctx) bool {
 
 func (wsr *WorkspaceRoot) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer wsr.Lock().Unlock()
-	
+
 	// Iterate through hardlinks first to ensure we can escape early
 	for inodeNum, _ := range wsr.hardlinkTable.inodeToLink {
 		iterateAgain := visitFn(inodeNum)
