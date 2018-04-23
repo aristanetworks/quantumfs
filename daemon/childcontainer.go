@@ -313,7 +313,7 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 }
 
 type inodeVisitFn func(InodeId) bool
-func (container *ChildContainer) foreachDirectInode(visit inodeVisitFn) {
+func (container *ChildContainer) foreachDirectInode(c *ctx, visit inodeVisitFn) {
 	for name, inodeId := range container.children {
 		records := container.effective[inodeId]
 		if records == nil {

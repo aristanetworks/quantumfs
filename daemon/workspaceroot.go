@@ -488,7 +488,7 @@ func (wsr *WorkspaceRoot) handleFlushFailure_(c *ctx) bool {
 	return nil == forceMerge(c, wsr)
 }
 
-func (wsr *WorkspaceRoot) foreachDirectInode(visitFn inodeVisitFn) {
+func (wsr *WorkspaceRoot) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer wsr.Lock().Unlock()
 	
 	// Iterate through hardlinks first to ensure we can escape early
@@ -499,7 +499,7 @@ func (wsr *WorkspaceRoot) foreachDirectInode(visitFn inodeVisitFn) {
 		}
 	}
 
-	wsr.Directory.foreachDirectInode(visitFn)
+	wsr.Directory.foreachDirectInode(c, visitFn)
 }
 
 func (wsr *WorkspaceRoot) cleanup(c *ctx) {

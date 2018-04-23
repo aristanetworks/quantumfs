@@ -196,7 +196,7 @@ type Inode interface {
 }
 
 type inodeHolder interface {
-	foreachDirectInode(visitFn inodeVisitFn) bool
+	foreachDirectInode(c *ctx, visitFn inodeVisitFn)
 }
 
 type TreeState struct {

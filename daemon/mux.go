@@ -1209,7 +1209,7 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 
 		if dir, isDir := inode.(inodeHolder); isDir {
 			childrenReady := true
-			dir.foreachDirectInode(func (i InodeId) bool {
+			dir.foreachDirectInode(c, func (i InodeId) bool {
 				// To be fully unloaded, the child must have lookup
 				// count of zero (no kernel refs) *and*
 				// be uninstantiated

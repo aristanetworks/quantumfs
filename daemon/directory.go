@@ -859,10 +859,10 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	return nil
 }
 
-func (dir *Directory) foreachDirectInode(visitFn inodeVisitFn) {
+func (dir *Directory) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer dir.childRecordLock.Lock().Unlock()
 
-	dir.children.foreachDirectInode(visitFn)
+	dir.children.foreachDirectInode(c, visitFn)
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
