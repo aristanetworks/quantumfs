@@ -381,7 +381,6 @@ func publishDirectoryRecords(c *ctx,
 				quantumfs.NewDirectoryEntry(numEntries)
 			entryIdx = 0
 		}
-		c.vlog("Setting child %s", child.Filename())
 		baseLayer.SetEntry(entryIdx, child.Publishable())
 
 		entryIdx++
@@ -860,10 +859,10 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	return nil
 }
 
-func (dir *Directory) directChildInodes() []InodeId {
+func (dir *Directory) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.children.directInodes()
+	dir.children.foreachDirectInode(c, visitFn)
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {

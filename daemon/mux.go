@@ -1208,9 +1208,8 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 		lookupCountDel := make([]InodeId, 0)
 
 		if dir, isDir := inode.(inodeHolder); isDir {
-			children := dir.directChildInodes()
-
-			for _, i := range children {
+			childrenReady := true
+			dir.foreachDirectInode(c, func(i InodeId) bool {
 				// To be fully unloaded, the child must have lookup
 				// count of zero (no kernel refs) *and*
 				// be uninstantiated
@@ -1221,15 +1220,21 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 					// Not ready to forget, no more to do
 					c.dlog("Not all children unloaded, %d in %d",
 						i, inodeNum)
-					return
+					childrenReady = false
+					return false
 				}
 				c.dlog("Child %d of %d not loaded", i, inodeNum)
 				if exists {
 					lookupCountDel = append(lookupCountDel, i)
 				}
-			}
 
-			inodeChildren = append(inodeChildren, children...)
+				inodeChildren = append(inodeChildren, i)
+				return true
+			})
+
+			if !childrenReady {
+				return
+			}
 		}
 
 		// Great, we want to forget this so proceed
