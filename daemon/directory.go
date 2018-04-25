@@ -136,8 +136,6 @@ func (dir *Directory) generation() uint64 {
 	return atomic.LoadUint64(&dir._generation)
 }
 
-var NON_EMPTY_DIR_MARKER = uint64(1) << 32
-
 func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	defer c.funcIn("Directory::updateSize").Out()
 
@@ -157,26 +155,8 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	}
 
 	dir.parentUpdateSize(c, func() uint64 {
-		// The size of a directory represents:
-		// 1. The number of its children of type directory represented
-		//    by the first 32 bits.
-		// 2. If it has any children of any type by the NON_EMPTY_DIR_MARKER.
-		//
-		// Only the first 32 bits should be used when computing the nlink of
-		// the directory from its size.
-
 		defer dir.childRecordLock.Lock().Unlock()
-
-		ndirs := uint64(0)
-		for _, record := range dir.children.records() {
-			if record.Type() == quantumfs.ObjectTypeDirectory {
-				ndirs++
-			}
-		}
-		if dir.children.count() != 0 {
-			ndirs |= NON_EMPTY_DIR_MARKER
-		}
-		return ndirs
+		return dir.children.count()
 	})
 }
 
@@ -239,7 +219,7 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 		// sizes, even though the real encoding is variable length.
 		attr.Size = 25 + 331*entry.Size()
 		attr.Blocks = utils.BlocksRoundUp(attr.Size, statBlockSize)
-		attr.Nlink = uint32(entry.Size()&^NON_EMPTY_DIR_MARKER) + 2
+		attr.Nlink = uint32(entry.Size()) + 2
 	case fuse.S_IFIFO:
 		fileType = specialOverrideAttr(entry, attr)
 		if fileType&^syscall.S_IFMT != 0 {
@@ -401,7 +381,6 @@ func publishDirectoryRecords(c *ctx,
 				quantumfs.NewDirectoryEntry(numEntries)
 			entryIdx = 0
 		}
-		c.vlog("Setting child %s", child.Filename())
 		baseLayer.SetEntry(entryIdx, child.Publishable())
 
 		entryIdx++
@@ -880,10 +859,10 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	return nil
 }
 
-func (dir *Directory) directChildInodes() []InodeId {
+func (dir *Directory) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.children.directInodes()
+	dir.children.foreachDirectInode(c, visitFn)
 }
 
 func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {

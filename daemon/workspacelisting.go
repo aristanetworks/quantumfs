@@ -302,15 +302,15 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (tsl *TypespaceList) directChildInodes() []InodeId {
+func (tsl *TypespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer tsl.Lock().Unlock()
 
-	rtn := make([]InodeId, 0, len(tsl.typespacesById))
 	for k, _ := range tsl.typespacesById {
-		rtn = append(rtn, k)
+		iterateAgain := visitFn(k)
+		if !iterateAgain {
+			return
+		}
 	}
-
-	return rtn
 }
 
 func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
@@ -638,15 +638,15 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) directChildInodes() []InodeId {
+func (nsl *NamespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer nsl.Lock().Unlock()
 
-	rtn := make([]InodeId, 0, len(nsl.namespacesById))
 	for k, _ := range nsl.namespacesById {
-		rtn = append(rtn, k)
+		iterateAgain := visitFn(k)
+		if !iterateAgain {
+			return
+		}
 	}
-
-	return rtn
 }
 
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
@@ -976,15 +976,15 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) directChildInodes() []InodeId {
+func (wsl *WorkspaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer wsl.Lock().Unlock()
 
-	rtn := make([]InodeId, 0, len(wsl.workspacesById))
 	for k, _ := range wsl.workspacesById {
-		rtn = append(rtn, k)
+		iterateAgain := visitFn(k)
+		if !iterateAgain {
+			return
+		}
 	}
-
-	return rtn
 }
 
 // Update the internal workspace list with the most recent available listing

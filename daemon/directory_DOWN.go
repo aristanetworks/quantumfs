@@ -102,7 +102,13 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum()).Out()
 
-	children := dir.directChildInodes()
+	children := make([]InodeId, 0)
+	dir.foreachDirectInode(c, func(child InodeId) bool {
+		children = append(children, child)
+
+		return true
+	})
+
 	for _, child := range children {
 		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
 			inode.Sync_DOWN(c)
