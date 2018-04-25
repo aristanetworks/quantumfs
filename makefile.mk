@@ -173,6 +173,12 @@ qfsRPMi686: check-fpm $(COMMANDS386)
 		./qfs-386=/usr/bin/qfs \
 		./qparse-386=/usr/sbin/qparse
 
+healthCheckRpm: check-fpm $(COMMANDS)
+	$(FPM) -n QuantumFS-wsdbhealthcheck \
+		--description='Utility to confirm healthy operation of the wsdbservice' \
+		--no-depends \
+		./wsdbhealthcheck=/usr/bin/wsdbhealthcheck
+
 # Default to x86_64 location; we'll override when building via mock
 RPM_LIBDIR ?= /usr/lib64
 
@@ -215,7 +221,7 @@ clientRPM32:
 		) 9>$$MOCKLOCK ; \
 	}
 
-rpm: $(COMMANDS) quantumfsRPM qfsRPM qfsRPMi686 quploadRPM clientRPM clientRPM32
+rpm: $(COMMANDS) quantumfsRPM qfsRPM qfsRPMi686 quploadRPM clientRPM clientRPM32 healthCheckRpm
 
 push-rpms: $(RPM_FILES_TOOLSV2_I686) $(RPM_FILES_TOOLSV2_X86_64)
 	a4 scp $(RPM_FILES_TOOLSV2_I686) dist:/dist/release/ToolsV2/repo/i386/RPMS
