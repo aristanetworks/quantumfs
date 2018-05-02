@@ -432,7 +432,7 @@ func (dq *DirtyQueue) moveToBackOfQueue_(c *ctx, inode Inode) {
 //
 // Must hold the flusher lock
 func (dq *DirtyQueue) sortTopologically_(c *ctx) {
-	defer c.funcIn("DirtyQueue::sortTopologically").Out()
+	defer c.funcIn("DirtyQueue::sortTopologically_").Out()
 
 	// The general strategy is to dirty all the parents and grand-parents of each
 	// inode on the dirty queue up to the WSR. At the end we'll have a close,
