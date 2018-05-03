@@ -200,7 +200,11 @@ func (th *TestHelper) EndTest() {
 		th.waitForQuantumFsToFinish()
 		time.Sleep(1 * time.Second)
 
-		if testFailed := th.Logscan(); !testFailed {
+		testFailed := false
+		if th.T != nil {
+			testFailed = th.Logscan()
+		}
+		if !testFailed {
 			if err := os.RemoveAll(th.TempDir); err != nil {
 				th.T.Fatalf("Failed to cleanup temporary mount "+
 					"point: %v", err)
