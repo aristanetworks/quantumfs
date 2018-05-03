@@ -231,7 +231,12 @@ func (qfs *QuantumFs) inodeForgetter(ids []uint64) {
 	}
 
 	for parentId, _ := range parents {
-		qfs.uninstantiateInode_(c, parentId)
+		func() {
+			_, unlock := qfs.RLockTreeGetInode(c, parentId)
+			defer unlock.RUnlock()
+
+			qfs.uninstantiateInode_(c, parentId)
+		}()
 	}
 }
 
@@ -765,11 +770,17 @@ func (qfs *QuantumFs) RLockTreeGetInode(c *ctx, inodeId InodeId) (Inode,
 		return nil, &emptyUnlocker{}
 	}
 
+	unlocker := inode.treeState()
 	inode.RLockTree()
 
 	// once we have the lock, re-grab (and possibly reinstantiate) the inode
 	// since it may have been just forgotten
 	inode = qfs.inode(c, inodeId)
+	if inode == nil {
+		unlocker.RUnlock()
+		return nil, &emptyUnlocker{}
+	}
+
 	return inode, inode.treeState()
 }
 
@@ -781,9 +792,15 @@ func (qfs *QuantumFs) LockTreeGetInode(c *ctx, inodeId InodeId) (Inode,
 		return nil, &emptyUnlocker{}
 	}
 
+	unlocker := inode.treeState()
 	inode.LockTree()
 
 	inode = qfs.inode(c, inodeId)
+	if inode == nil {
+		unlocker.Unlock()
+		return nil, &emptyUnlocker{}
+	}
+
 	return inode, inode.treeState()
 }
 
