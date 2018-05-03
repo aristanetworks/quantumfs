@@ -29,8 +29,8 @@ type ChildContainer struct {
 	effective map[InodeId]map[string]quantumfs.DirectoryRecord
 }
 
-func newChildContainer(c *ctx, dir *Directory,
-	baseLayerId quantumfs.ObjectKey) (*ChildContainer, []InodeId) {
+func newChildContainer(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
+	wsr InodeId) (*ChildContainer, []inodePair) {
 
 	defer c.funcIn("newChildContainer").Out()
 
@@ -41,7 +41,7 @@ func newChildContainer(c *ctx, dir *Directory,
 		effective:   make(map[InodeId]map[string]quantumfs.DirectoryRecord),
 	}
 
-	uninstantiated := container.loadAllChildren(c, baseLayerId)
+	uninstantiated := container.loadAllChildren(c, baseLayerId, wsr)
 
 	return container, uninstantiated
 }
@@ -75,18 +75,24 @@ func addToMap(m map[InodeId]map[string]quantumfs.DirectoryRecord,
 }
 
 func (container *ChildContainer) loadAllChildren(c *ctx,
-	baseLayerId quantumfs.ObjectKey) []InodeId {
+	baseLayerId quantumfs.ObjectKey, wsr InodeId) []inodePair {
 
 	defer c.funcIn("ChildContainer::loadAllChildren").Out()
 
-	uninstantiated := make([]InodeId, 0, 200) // 200 arbitrarily chosen
+	uninstantiated := make([]inodePair, 0, 200) // 200 arbitrarily chosen
 
 	foreachDentry(c, baseLayerId,
 		func(record quantumfs.ImmutableDirectoryRecord) {
 
 			childInodeNum := container.loadChild(c, record.Clone())
 			c.vlog("loaded child %d", childInodeNum)
-			uninstantiated = append(uninstantiated, childInodeNum)
+			parent := container.dir.inodeNum()
+			if record.Type() == quantumfs.ObjectTypeHardlink {
+				parent = wsr
+			}
+
+			uninstantiated = append(uninstantiated,
+				newInodePair(childInodeNum, parent))
 		})
 
 	return uninstantiated

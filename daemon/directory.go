@@ -98,11 +98,12 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	utils.Assert(dir.treeState() != nil, "Directory treeState nil at init")
 }
 
-func (dir *Directory) finishInit(c *ctx) []InodeId {
+func (dir *Directory) finishInit(c *ctx) []inodePair {
 	defer c.funcIn("Directory::finishInit").Out()
 	defer dir.childRecordLock.Unlock()
 	utils.Assert(dir.children == nil, "children already loaded")
-	container, uninstantiated := newChildContainer(c, dir, dir.baseLayerId)
+	container, uninstantiated := newChildContainer(c, dir, dir.baseLayerId,
+		dir.hardlinkTable.getWorkspaceRoot().inodeNum())
 	dir.children = container
 	return uninstantiated
 }
@@ -428,8 +429,9 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 			inode.setName(name)
 			inode.setParent_(dir.inodeNum())
 		} else {
-			c.qfs.addUninstantiated(c, []InodeId{inodeId},
-				dir.inodeNum())
+			c.qfs.addUninstantiated(c, []inodePair{
+				newInodePair(inodeId, dir.inodeNum()),
+			})
 		}
 	}()
 
@@ -1344,10 +1346,11 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		markType(newEntry.Type(), quantumfs.PathCreated))
 
 	// Set entry in new directory. If the renamed inode is
-	// uninstantiated, we swizzle the parent here.
-	if childInode == nil {
-		c.qfs.addUninstantiated(c, []InodeId{childInodeId},
-			dst.inodeNum())
+	// uninstantiated, we swizzle the parent here. If it's a hardlink, it's
+	// already matched to the workspaceroot so don't corrupt that
+	if childInode == nil && !isHardlink {
+		c.qfs.addUninstantiated(c, []inodePair{
+			newInodePair(childInodeId, dir.inodeNum())})
 	}
 
 	result = fuse.OK
@@ -1847,7 +1850,11 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 		return dir.children.loadChild(c, entry)
 	}()
 
-	c.qfs.addUninstantiated(c, []InodeId{inodeNum}, dir.inodeNum())
+	parent := dir.inodeNum()
+	if type_ == quantumfs.ObjectTypeHardlink {
+		parent = dir.hardlinkTable.getWorkspaceRoot().inodeNum()
+	}
+	c.qfs.addUninstantiated(c, []inodePair{newInodePair(inodeNum, parent)})
 
 	c.qfs.noteChildCreated(c, dir.inodeNum(), name)
 

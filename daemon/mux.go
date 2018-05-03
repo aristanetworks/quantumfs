@@ -851,7 +851,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 		uninstantiated := inode.finishInit(c)
 		if len(uninstantiated) > 0 {
 			defer qfs.mapMutex.Lock().Unlock()
-			qfs.addUninstantiated_(c, uninstantiated, inode.inodeNum())
+			qfs.addUninstantiated_(c, uninstantiated)
 		}
 	}
 
@@ -923,30 +923,35 @@ func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 }
 
 // Set a list of inode numbers to be uninstantiated with the given parent
-func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []InodeId,
-	parent InodeId) {
+type inodePair struct {
+	child  InodeId
+	parent InodeId
+}
 
-	defer c.funcIn("Mux::addUninstantiated").Out()
-
-	if parent == 0 {
-		panic("Invalid parentId in addUninstantiated")
+func newInodePair(c InodeId, p InodeId) inodePair {
+	return inodePair{
+		child:  c,
+		parent: p,
 	}
+}
 
+func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []inodePair) {
 	defer qfs.mapMutex.Lock().Unlock()
 
-	qfs.addUninstantiated_(c, uninstantiated, parent)
+	qfs.addUninstantiated_(c, uninstantiated)
 }
 
 // Requires the mapMutex for writing
-func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []InodeId,
-	parent InodeId) {
-
+func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []inodePair) {
 	defer c.funcIn("Mux::addUninstantiated_").Out()
 
-	for _, inodeNum := range uninstantiated {
-		qfs.parentOfUninstantiated[inodeNum] = parent
-		c.vlog("Adding uninstantiated %d from %d (%d)", inodeNum, parent,
-			len(qfs.parentOfUninstantiated))
+	for _, pair := range uninstantiated {
+		utils.Assert(pair.parent != 0,
+			"Invalid parentId in addUninstantiated")
+
+		qfs.parentOfUninstantiated[pair.child] = pair.parent
+		c.vlog("Adding uninstantiated %d from %d (%d)", pair.child,
+			pair.parent, len(qfs.parentOfUninstantiated))
 	}
 }
 
@@ -1291,8 +1296,8 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 						inode.parentId_(), inodeNum))
 				}
 
-				qfs.addUninstantiated(c, []InodeId{inodeNum},
-					inode.parentId_())
+				qfs.addUninstantiated(c, []inodePair{
+					newInodePair(inodeNum, inode.parentId_())})
 
 				return parent
 			}()
