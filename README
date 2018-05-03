@@ -89,6 +89,8 @@ Limits
 ------
 
 * Maximum supported file size is 28.4 terabytes
+* Maximum size of an atomic DIRECT_IO write is 128KB. Writes larger than 128KB
+  are split into a set of 128KB writes by the kernel. See BUG230026 for details.
 
 Signals
 -------

@@ -15,27 +15,27 @@ import (
 
 func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) Inode {
 
 	defer c.FuncIn("newSymlink", "name %s", name).Out()
 
 	symlink := Symlink{
 		InodeCommon: InodeCommon{
-			id:        inodeNum,
-			name_:     name,
-			accessed_: 0,
-			treeLock_: parent.treeLock(),
+			id:         inodeNum,
+			name_:      name,
+			accessed_:  0,
+			treeState_: parent.treeState(),
 		},
 		key: key,
 	}
 	symlink.self = &symlink
 	symlink.setParent(parent.inodeNum())
-	utils.Assert(symlink.treeLock() != nil, "Symlink treeLock nil at init")
+	utils.Assert(symlink.treeState() != nil, "Symlink treeState nil at init")
 
 	if dirRecord != nil {
 		dirRecord.SetPermissions(modeToPermissions(0777, 0))
 	}
-	return &symlink, nil
+	return &symlink
 }
 
 type Symlink struct {
@@ -184,9 +184,9 @@ func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return link.parentRemoveChildXAttr(c, link.inodeNum(), attr)
 }
 
-func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) Inode {
 	c.elog("Invalid instantiateChild on Symlink")
-	return nil, nil
+	return nil
 }
 
 func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
@@ -219,13 +219,5 @@ func (link *Symlink) setLink(c *ctx, pointTo string) {
 	defer c.FuncIn("Symlink::setLink", "%s", pointTo).Out()
 
 	defer link.Lock().Unlock()
-
 	link.dirtyPointsTo = pointTo
-
-	// queue the symlink in the dirty queue at the front, regardless of
-	// whether it's already in the queue to ensure it's flushed before its
-	// parent, thus ensuring a consistent uploaded metadata tree
-	defer c.qfs.flusher.lock.Lock().Unlock()
-	c.vlog("Queueing symlink %d on dirty list at the front", link.id)
-	link.dirtyElement__ = c.qfs.queueDirtyInodeNow_(c, link.self)
 }

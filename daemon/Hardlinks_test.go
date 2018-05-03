@@ -244,7 +244,7 @@ func TestHardlinkUninstantiateDirectory(t *testing.T) {
 		wsrInode := test.getInodeNum(workspace)
 		dirInode := test.getInodeNum(dirName)
 		linkInode := test.getInodeNum(linkFile)
-		test.qfs.increaseLookupCount(testCtx, linkInode)
+		test.qfs.incrementLookupCount(testCtx, linkInode)
 
 		// Check that the directory parent uninstantiated, even if the
 		// Hardlink itself cannot be.
@@ -862,5 +862,106 @@ func TestRenameOverridesLastHardlinkLeg(t *testing.T) {
 		test.verifyContentStartsWith(file, content2)
 
 		test.removeFile(workspace, name)
+	})
+}
+
+func checkParentOfUninstantiated(test *testHelper, wsrPath string, dirPath string,
+	filename string) {
+
+	ioutil.ReadDir(wsrPath + "/" + dirPath)
+	link := test.getInodeNum(wsrPath + "/" + dirPath + "/" + filename)
+	wsr := test.getInodeNum(wsrPath)
+
+	defer test.qfs.mapMutex.RLock().RUnlock()
+	test.Assert(test.qfs.parentOfUninstantiated[link] == wsr,
+		"Hardlink parent isn't workspace root")
+}
+
+func TestHardlinkParentInstantiated(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		test.AssertNoErr(utils.MkdirAll(workspace+"/dir", 0777))
+
+		CreateSmallFile(workspace+"/dir/file", "sample data")
+		test.linkFile(workspace, "dir/file", "dir/link")
+
+		api := test.getApi()
+		test.AssertNoErr(api.Branch(test.RelPath(workspace),
+			"test/test/test"))
+
+		checkParentOfUninstantiated(test, test.AbsPath("test/test/test"),
+			"dir", "link")
+	})
+}
+
+func TestHardlinkParentMoved(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		test.AssertNoErr(utils.MkdirAll(workspace+"/dir", 0777))
+		test.AssertNoErr(utils.MkdirAll(workspace+"/dirB", 0777))
+
+		CreateSmallFile(workspace+"/dir/file", "sample data")
+		test.linkFile(workspace, "dir/file", "dir/link")
+
+		api := test.getApi()
+		test.AssertNoErr(api.Branch(test.RelPath(workspace),
+			"test/test/test"))
+		test.AssertNoErr(api.EnableRootWrite("test/test/test"))
+
+		absBranch := test.AbsPath("test/test/test")
+		test.AssertNoErr(os.Rename(absBranch+"/dir/link", absBranch+
+			"/dirB/linkB"))
+		checkParentOfUninstantiated(test, absBranch, "dirB", "linkB")
+	})
+}
+
+func TestHardlinkParentRefreshTwoLink(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		utils.MkdirAll(workspace+"/dir", 0777)
+		utils.MkdirAll(workspace+"/dirB", 0777)
+
+		CreateSmallFile(workspace+"/dir/file", "sample data")
+		newRootId1 := test.linkFileSync(workspace, "dir/file", "dir/linkB")
+		newRootId2 := test.linkFileSync(workspace, "dir/file", "dirB/link")
+
+		refreshTest(test.TestCtx(), test, workspace, newRootId2,
+			newRootId1)
+
+		// instantiate the subdir only
+		ioutil.ReadDir(workspace + "/dirB")
+
+		refreshTestNoRemount(test.TestCtx(), test, workspace, newRootId1,
+			newRootId2)
+
+		// Check that parentOfUninstantiated is correct when set via refresh
+		checkParentOfUninstantiated(test, workspace, "dirB", "link")
+	})
+}
+
+func TestHardlinkParentRefreshOneLink(t *testing.T) {
+	// BUG 260643
+	t.Skip()
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		utils.MkdirAll(workspace+"/dir", 0777)
+		utils.MkdirAll(workspace+"/dirB", 0777)
+
+		newRootId1 := test.createFileSync(workspace, "dir/file", 0)
+		newRootId2 := test.linkFileSync(workspace, "dir/file", "dirB/link")
+
+		refreshTest(test.TestCtx(), test, workspace, newRootId2,
+			newRootId1)
+
+		// instantiate the subdir only
+		ioutil.ReadDir(workspace + "/dirB")
+
+		refreshTestNoRemount(test.TestCtx(), test, workspace, newRootId1,
+			newRootId2)
+
+		// Check that parentOfUninstantiated is correct when set via refresh
+		checkParentOfUninstantiated(test, workspace, "dirB", "link")
 	})
 }

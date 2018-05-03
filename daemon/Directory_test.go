@@ -2003,6 +2003,7 @@ func TestReaddirnamesOneAtATime(t *testing.T) {
 }
 
 func TestDirectoryNlink(t *testing.T) {
+	t.Skip("BUG198654")
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		dir := workspace + "/dir"
@@ -2016,5 +2017,50 @@ func TestDirectoryNlink(t *testing.T) {
 		var stat syscall.Stat_t
 		test.AssertNoErr(syscall.Stat(dir, &stat))
 		test.Assert(stat.Nlink == 4, "wrong nlink %d", stat.Nlink)
+	})
+}
+
+func TestRenameCtime(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name1 := "file1"
+		name2 := "file2"
+		var stat1, stat2 syscall.Stat_t
+
+		test.createFile(workspace, name1, 1000)
+		test.AssertNoErr(syscall.Stat(workspace+"/"+name1, &stat1))
+
+		// Wait to make sure some time passes between the creation and
+		// the move
+		time.Sleep(10 * time.Millisecond)
+		test.moveFile(workspace, name1, name2)
+		test.AssertNoErr(syscall.Stat(workspace+"/"+name2, &stat2))
+
+		test.Assert(stat1.Ctim.Nano() < stat2.Ctim.Nano(),
+			"rename did not update ctime %d vs. %d",
+			stat1.Ctim.Nano(), stat2.Ctim.Nano())
+	})
+}
+
+func TestMvChildCtime(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		name1 := "dir1/file1"
+		name2 := "file2"
+		var stat1, stat2 syscall.Stat_t
+
+		utils.MkdirAll(workspace+"/dir1", 0777)
+		test.createFile(workspace, name1, 1000)
+		test.AssertNoErr(syscall.Stat(workspace+"/"+name1, &stat1))
+
+		// Wait to make sure some time passes between the creation and
+		// the move
+		time.Sleep(10 * time.Millisecond)
+		test.moveFile(workspace, name1, name2)
+		test.AssertNoErr(syscall.Stat(workspace+"/"+name2, &stat2))
+
+		test.Assert(stat1.Ctim.Nano() < stat2.Ctim.Nano(),
+			"rename did not update ctime %d vs. %d",
+			stat1.Ctim.Nano(), stat2.Ctim.Nano())
 	})
 }

@@ -5,7 +5,6 @@ package daemon
 
 import (
 	"sort"
-	"sync"
 	"syscall"
 
 	"github.com/aristanetworks/quantumfs"
@@ -26,9 +25,7 @@ type WorkspaceRoot struct {
 
 	accessList *accessList
 
-	// The RWMutex which backs the treeLock for all the inodes in this workspace
-	// tree.
-	realTreeLock sync.RWMutex
+	realTreeState *TreeState
 
 	hardlinkTable *HardlinkTableImpl
 }
@@ -47,19 +44,17 @@ func fillWorkspaceAttrFake(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 }
 
 func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace string,
-	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
+	parent Inode, inodeNum InodeId) Inode {
 
 	workspaceName := typespace + "/" + namespace + "/" + workspace
 
 	defer c.FuncIn("WorkspaceRoot::newWorkspaceRoot", "%s", workspaceName).Out()
 
-	var wsr WorkspaceRoot
-
 	rootId, nonce, err := c.workspaceDB.FetchAndSubscribeWorkspace(&c.Ctx,
 		typespace, namespace, workspace)
 	if err != nil {
 		c.vlog("workspace %s is removed remotely", workspaceName)
-		return nil, nil
+		return nil
 	}
 
 	c.vlog("Workspace Loading %s %s", workspaceName, rootId.String())
@@ -67,52 +62,47 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	buffer := c.dataStore.Get(&c.Ctx, rootId)
 	workspaceRoot := MutableCopy(c, buffer).AsWorkspaceRoot()
 
+	wsr := WorkspaceRoot{
+		typespace:       typespace,
+		namespace:       namespace,
+		workspace:       workspace,
+		publishedRootId: rootId,
+		nonce:           nonce,
+		accessList:      NewAccessList(),
+		realTreeState: &TreeState{
+			name: workspaceName,
+		},
+	}
+
 	defer wsr.Lock().Unlock()
 
 	wsr.self = &wsr
-	wsr.typespace = typespace
-	wsr.namespace = namespace
-	wsr.workspace = workspace
-	wsr.publishedRootId = rootId
-	wsr.nonce = nonce
-	wsr.accessList = NewAccessList()
+	wsr.treeState_ = wsr.realTreeState
 
-	treeLock := TreeLock{lock: &wsr.realTreeLock,
-		name: typespace + "/" + namespace + "/" + workspace}
-	wsr.treeLock_ = &treeLock
-	utils.Assert(wsr.treeLock() != nil, "WorkspaceRoot treeLock nil at init")
+	utils.Assert(wsr.treeState() != nil, "WorkspaceRoot treeState nil at init")
 
 	wsr.hardlinkTable = newHardlinkTable(c, &wsr, workspaceRoot.HardlinkEntry())
-	uninstantiated := initDirectory(c, workspace, &wsr.Directory,
+	initDirectory(c, workspace, &wsr.Directory,
 		wsr.hardlinkTable, workspaceRoot.BaseLayer(), inodeNum,
-		parent.inodeNum(), &treeLock)
+		parent.inodeNum(), wsr.treeState())
 
-	return &wsr, uninstantiated
+	return &wsr
 }
 
-func (wsr *WorkspaceRoot) dirtyChild(c *ctx, childId InodeId) {
-	defer c.funcIn("WorkspaceRoot::dirtyChild").Out()
-
-	isHardlink, _ := wsr.hardlinkTable.checkHardlink(childId)
-
-	if isHardlink {
-		wsr.self.dirty(c)
-	} else {
-		wsr.Directory.dirtyChild(c, childId)
-	}
-}
-
-func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) (Inode,
-	[]InodeId) {
+func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) Inode {
 
 	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeId).Out()
 
 	inode := wsr.hardlinkTable.instantiateHardlink(c, inodeId)
 	if inode != nil {
-		return inode, nil
+		return inode
 	}
 	// This isn't a hardlink, so proceed as normal
 	return wsr.Directory.instantiateChild(c, inodeId)
+}
+
+func (wsr *WorkspaceRoot) finishInit(c *ctx) []inodePair {
+	return wsr.Directory.finishInit(c)
 }
 
 func publishHardlinkMap(c *ctx, pub publishFn,
@@ -492,22 +482,24 @@ func (wsr *WorkspaceRoot) handleFlushFailure_(c *ctx) bool {
 
 	// If there is anything in the dirty queue, postpone handling of the
 	// failure to the next time flush fails
-	if c.qfs.flusher.nQueued(c, wsr.treeLock()) != 1 {
+	if c.qfs.flusher.nQueued(c, wsr.treeState()) != 1 {
 		return true
 	}
 	return nil == forceMerge(c, wsr)
 }
 
-func (wsr *WorkspaceRoot) directChildInodes() []InodeId {
+func (wsr *WorkspaceRoot) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer wsr.Lock().Unlock()
 
-	directChildren := wsr.Directory.directChildInodes()
-
+	// Iterate through hardlinks first to ensure we can escape early
 	for inodeNum, _ := range wsr.hardlinkTable.inodeToLink {
-		directChildren = append(directChildren, inodeNum)
+		iterateAgain := visitFn(inodeNum)
+		if !iterateAgain {
+			return
+		}
 	}
 
-	return directChildren
+	wsr.Directory.foreachDirectInode(c, visitFn)
 }
 
 func (wsr *WorkspaceRoot) cleanup(c *ctx) {

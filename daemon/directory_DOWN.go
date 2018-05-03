@@ -90,7 +90,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	inodeNum := srcInode.inodeNum()
 	out.NodeId = uint64(inodeNum)
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
 		newRecord)
@@ -105,7 +105,13 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum()).Out()
 
-	children := dir.directChildInodes()
+	children := make([]InodeId, 0)
+	dir.foreachDirectInode(c, func(child InodeId) bool {
+		children = append(children, child)
+
+		return true
+	})
+
 	for _, child := range children {
 		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
 			inode.Sync_DOWN(c)
@@ -114,11 +120,6 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 
 	dir.flush(c)
 
-	return fuse.OK
-}
-
-func (dir *directorySnapshot) Sync_DOWN(c *ctx) fuse.Status {
-	c.vlog("directorySnapshot::Sync_DOWN doing nothing")
 	return fuse.OK
 }
 
@@ -155,31 +156,27 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
 	// Traverse through the workspace, reach the target inode
 	length := len(path) - 1 // leave the target node at the end
 	currDir := dir
-	// Indicate we've started instantiating inodes and therefore need to start
-	// Forgetting them
-	startForgotten := false
 	// Go along the given path to the destination. The path is stored in a string
 	// slice, each cell index contains an inode.
 	// Skip the first three Inodes: typespace / namespace / workspace
 	for num := 3; num < length; num++ {
-		if startForgotten {
-			// The lookupInternal() doesn't increase the lookupCount of
-			// the current directory, so it should be forgotten with 0
-			defer c.qfs.Forget(uint64(currDir.inodeNum()), 0)
-		}
 		// all preceding nodes have to be directories
-		child, instantiated, err := currDir.lookupInternal(c, path[num],
+		child, err := currDir.lookupInternal(c, path[num],
 			quantumfs.ObjectTypeDirectory)
-		startForgotten = !instantiated
 		if err != nil {
 			return child, func() {}, err
+		}
+		if num < length-1 {
+			defer c.qfs.Forget(uint64(child.inodeNum()), 1)
 		}
 
 		currDir = child.(*Directory)
 	}
 
 	cleanup = func() {
-		c.qfs.Forget(uint64(currDir.inodeNum()), 0)
+		if length > 3 {
+			c.qfs.Forget(uint64(currDir.inodeNum()), 1)
+		}
 	}
 	return currDir, cleanup, nil
 }
@@ -396,6 +393,7 @@ func (dir *Directory) hideEntry_DOWN_(c *ctx,
 			utils.RandomNumberGenerator.Uint64())
 	}
 	dir.children.renameChild(c, oldName, hiddenName)
+	dir.children.makePublishable(c, hiddenName)
 	c.qfs.noteDeletedInode(c, dir.inodeNum(), childId, oldName)
 	rtn := dir.children.recordByName(c, hiddenName)
 	utils.Assert(rtn != nil, "Rename failed during hideEntry")
@@ -479,7 +477,7 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	baseLayerId quantumfs.ObjectKey) {
 
 	defer c.funcIn("Directory::refresh_DOWN").Out()
-	uninstantiated := make([]InodeId, 0)
+	uninstantiated := make([]inodePair, 0)
 
 	localEntries := make(map[string]InodeId, 0)
 	defer dir.childRecordLock.Lock().Unlock()
@@ -493,8 +491,15 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 		localRecord, inodeId, missingDentry :=
 			dir.findLocalMatch_DOWN_(c, rc, record, localEntries)
 		if localRecord == nil {
+			parent := dir.inodeNum()
+			if record.Type() == quantumfs.ObjectTypeHardlink {
+				parent = dir.hardlinkTable.getWorkspaceRoot().id
+			}
+
+			childId := dir.loadNewChild_DOWN_(c, record, inodeId)
+
 			uninstantiated = append(uninstantiated,
-				dir.loadNewChild_DOWN_(c, record, inodeId))
+				newInodePair(childId, parent))
 			return
 		}
 		if missingDentry {
@@ -509,5 +514,5 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 		}
 		dir.refreshChild_DOWN_(c, rc, localRecord, inodeId, record)
 	})
-	c.qfs.addUninstantiated(c, uninstantiated, dir.inodeNum())
+	c.qfs.addUninstantiated(c, uninstantiated)
 }
