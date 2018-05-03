@@ -214,27 +214,33 @@ const InodeForgetter = "Mux::inodeForgetter"
 func (qfs *QuantumFs) inodeForgetter(ids []uint64) {
 	c := qfs.c.forgetCtx()
 	defer c.funcIn(InodeForgetter).Out()
-	defer qfs.instantiationLock.Lock().Unlock()
+
 	parents := make(map[InodeId]struct{})
-	for _, id := range ids {
-		inodeId := InodeId(id)
-		if inode := qfs.inodeNoInstantiate(c, inodeId); inode != nil {
-			inode.queueToForget(c)
-		} else {
-			c.dlog("Forgetting uninstantiated Inode %d", inodeId)
-			func() {
-				defer qfs.mapMutex.Lock().Unlock()
-				parentId := qfs.parentOfUninstantiated[inodeId]
-				parents[parentId] = struct{}{}
-			}()
+
+	func() {
+		defer qfs.instantiationLock.Lock().Unlock()
+		for _, id := range ids {
+			inodeId := InodeId(id)
+			inode := qfs.inodeNoInstantiate(c, inodeId)
+			if inode != nil {
+				inode.queueToForget(c)
+			} else {
+				c.dlog("Forgetting uninstantiated Inode %d", inodeId)
+				func() {
+					defer qfs.mapMutex.Lock().Unlock()
+					parent := qfs.parentOfUninstantiated[inodeId]
+					parents[parent] = struct{}{}
+				}()
+			}
 		}
-	}
+	}()
 
 	for parentId, _ := range parents {
 		func() {
 			_, unlock := qfs.RLockTreeGetInode(c, parentId)
 			defer unlock.RUnlock()
 
+			defer qfs.instantiationLock.Lock().Unlock()
 			qfs.uninstantiateInode_(c, parentId)
 		}()
 	}
