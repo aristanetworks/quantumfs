@@ -161,14 +161,15 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	})
 }
 
-func (dir *Directory) prepareForOrphaning(c *ctx, name string,
+// Directory inode lock must be held to protect the hardlink deltas
+func (dir *Directory) prepareForOrphaning_(c *ctx, name string,
 	record quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
-	defer c.FuncIn("Directory::prepareForOrphaning", "%s", name).Out()
+	defer c.FuncIn("Directory::prepareForOrphaning_", "%s", name).Out()
 	if record.Type() != quantumfs.ObjectTypeHardlink {
 		return record
 	}
-	newRecord := dir.hardlinkDec(record.FileId())
+	newRecord := dir.hardlinkDec_(record.FileId())
 	if newRecord != nil {
 		// This was the last leg of the hardlink
 		newRecord.SetFilename(name)
@@ -188,7 +189,7 @@ func (dir *Directory) delChild_(c *ctx,
 	record := func() quantumfs.DirectoryRecord {
 		defer dir.childRecordLock.Lock().Unlock()
 		detachedChild := dir.children.deleteChild(c, name)
-		return dir.prepareForOrphaning(c, name, detachedChild)
+		return dir.prepareForOrphaning_(c, name, detachedChild)
 	}()
 
 	pathFlags := quantumfs.PathFlags(quantumfs.PathDeleted)
@@ -439,7 +440,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 
 	// Bubble up the -1 as we are inheriting the hardlink
 	// from the root now.
-	dir.hardlinkDec(fileId)
+	dir.hardlinkDec_(fileId)
 	dir.children.deleteChild(c, name)
 
 	records[0].SetFilename(name)
@@ -1179,7 +1180,7 @@ func (dir *Directory) orphanChild_(c *ctx, name string, inode Inode) {
 		markType(removedRecord.Type(),
 			quantumfs.PathDeleted))
 
-	removedRecord = dir.prepareForOrphaning(c, name, removedRecord)
+	removedRecord = dir.prepareForOrphaning_(c, name, removedRecord)
 	if removedId == quantumfs.InodeIdInvalid || removedRecord == nil {
 		return
 	}
@@ -1919,12 +1920,14 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	return dir.baseLayerId
 }
 
-func (dir *Directory) hardlinkInc(fileId quantumfs.FileId) {
+// Directory inode lock must be held
+func (dir *Directory) hardlinkInc_(fileId quantumfs.FileId) {
 	dir.hardlinkDelta.inc(fileId)
 	dir.hardlinkTable.hardlinkInc(fileId)
 }
 
-func (dir *Directory) hardlinkDec(
+// Directory inode lock must be held
+func (dir *Directory) hardlinkDec_(
 	fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord) {
 
 	dir.hardlinkDelta.dec(fileId)
