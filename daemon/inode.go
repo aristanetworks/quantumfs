@@ -96,7 +96,7 @@ type Inode interface {
 
 	// Instantiate the Inode for the given child on demand
 	instantiateChild(c *ctx, inodeNum InodeId) Inode
-	finishInit(c *ctx) []InodeId
+	finishInit(c *ctx) []inodePair
 
 	name() string
 	setName(name string)
@@ -584,7 +584,7 @@ func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 	panic(msg)
 }
 
-func (inode *InodeCommon) finishInit(c *ctx) []InodeId {
+func (inode *InodeCommon) finishInit(c *ctx) []inodePair {
 	return nil
 }
 

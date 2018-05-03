@@ -101,7 +101,7 @@ func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) Inode {
 	return wsr.Directory.instantiateChild(c, inodeId)
 }
 
-func (wsr *WorkspaceRoot) finishInit(c *ctx) []InodeId {
+func (wsr *WorkspaceRoot) finishInit(c *ctx) []inodePair {
 	return wsr.Directory.finishInit(c)
 }
 
