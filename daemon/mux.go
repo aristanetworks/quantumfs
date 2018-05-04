@@ -783,8 +783,7 @@ func (qfs *QuantumFs) RLockTreeGetInode(c *ctx, inodeId InodeId) (Inode,
 	// since it may have been just forgotten
 	inode = qfs.inode(c, inodeId)
 	if inode == nil {
-		unlocker.RUnlock()
-		return nil, &emptyUnlocker{}
+		return nil, unlocker
 	}
 
 	return inode, inode.treeState()
@@ -803,8 +802,7 @@ func (qfs *QuantumFs) LockTreeGetInode(c *ctx, inodeId InodeId) (Inode,
 
 	inode = qfs.inode(c, inodeId)
 	if inode == nil {
-		unlocker.Unlock()
-		return nil, &emptyUnlocker{}
+		return nil, unlocker
 	}
 
 	return inode, inode.treeState()
