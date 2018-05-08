@@ -61,7 +61,10 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	newRecord.SetFilename(newName)
 	// Update the reference count
-	dir.hardlinkInc(newRecord.FileId())
+	func() {
+		defer dir.Lock().Unlock()
+		dir.hardlinkInc_(newRecord.FileId())
+	}()
 
 	if needsSync {
 		// In order to avoid the scenarios where the second leg's delta
@@ -474,7 +477,7 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	baseLayerId quantumfs.ObjectKey) {
 
 	defer c.funcIn("Directory::refresh_DOWN").Out()
-	uninstantiated := make([]InodeId, 0)
+	uninstantiated := make([]inodePair, 0)
 
 	localEntries := make(map[string]InodeId, 0)
 	defer dir.childRecordLock.Lock().Unlock()
@@ -488,8 +491,15 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 		localRecord, inodeId, missingDentry :=
 			dir.findLocalMatch_DOWN_(c, rc, record, localEntries)
 		if localRecord == nil {
+			parent := dir.inodeNum()
+			if record.Type() == quantumfs.ObjectTypeHardlink {
+				parent = dir.hardlinkTable.getWorkspaceRoot().id
+			}
+
+			childId := dir.loadNewChild_DOWN_(c, record, inodeId)
+
 			uninstantiated = append(uninstantiated,
-				dir.loadNewChild_DOWN_(c, record, inodeId))
+				newInodePair(childId, parent))
 			return
 		}
 		if missingDentry {
@@ -504,5 +514,5 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 		}
 		dir.refreshChild_DOWN_(c, rc, localRecord, inodeId, record)
 	})
-	c.qfs.addUninstantiated(c, uninstantiated, dir.inodeNum())
+	c.qfs.addUninstantiated(c, uninstantiated)
 }

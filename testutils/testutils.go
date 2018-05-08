@@ -440,7 +440,9 @@ func (th *TestHelper) WaitFor(description string, condition func() bool) {
 
 // Log using the logger in TestHelper
 func (th *TestHelper) Log(format string, args ...interface{}) error {
-	th.T.Logf(th.TestName+": "+format, args...)
+	if th.T != nil {
+		th.T.Logf(th.TestName+": "+format, args...)
+	}
 	th.Logger.Log(qlog.LogTest, qlog.TestReqId, 1,
 		"[%s] "+format, append([]interface{}{th.TestName},
 			args...)...)
