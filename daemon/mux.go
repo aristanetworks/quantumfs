@@ -214,24 +214,35 @@ const InodeForgetter = "Mux::inodeForgetter"
 func (qfs *QuantumFs) inodeForgetter(ids []uint64) {
 	c := qfs.c.forgetCtx()
 	defer c.funcIn(InodeForgetter).Out()
-	defer qfs.instantiationLock.Lock().Unlock()
+
 	parents := make(map[InodeId]struct{})
-	for _, id := range ids {
-		inodeId := InodeId(id)
-		if inode := qfs.inodeNoInstantiate(c, inodeId); inode != nil {
-			inode.queueToForget(c)
-		} else {
-			c.dlog("Forgetting uninstantiated Inode %d", inodeId)
-			func() {
-				defer qfs.mapMutex.Lock().Unlock()
-				parentId := qfs.parentOfUninstantiated[inodeId]
-				parents[parentId] = struct{}{}
-			}()
+
+	func() {
+		defer qfs.instantiationLock.Lock().Unlock()
+		for _, id := range ids {
+			inodeId := InodeId(id)
+			inode := qfs.inodeNoInstantiate(c, inodeId)
+			if inode != nil {
+				inode.queueToForget(c)
+			} else {
+				c.dlog("Forgetting uninstantiated Inode %d", inodeId)
+				func() {
+					defer qfs.mapMutex.Lock().Unlock()
+					parent := qfs.parentOfUninstantiated[inodeId]
+					parents[parent] = struct{}{}
+				}()
+			}
 		}
-	}
+	}()
 
 	for parentId, _ := range parents {
-		qfs.uninstantiateInode_(c, parentId)
+		func() {
+			_, unlock := qfs.RLockTreeGetInode(c, parentId)
+			defer unlock.RUnlock()
+
+			defer qfs.instantiationLock.Lock().Unlock()
+			qfs.uninstantiateInode_(c, parentId)
+		}()
 	}
 }
 
@@ -765,11 +776,16 @@ func (qfs *QuantumFs) RLockTreeGetInode(c *ctx, inodeId InodeId) (Inode,
 		return nil, &emptyUnlocker{}
 	}
 
+	unlocker := inode.treeState()
 	inode.RLockTree()
 
 	// once we have the lock, re-grab (and possibly reinstantiate) the inode
 	// since it may have been just forgotten
 	inode = qfs.inode(c, inodeId)
+	if inode == nil {
+		return nil, unlocker
+	}
+
 	return inode, inode.treeState()
 }
 
@@ -781,9 +797,14 @@ func (qfs *QuantumFs) LockTreeGetInode(c *ctx, inodeId InodeId) (Inode,
 		return nil, &emptyUnlocker{}
 	}
 
+	unlocker := inode.treeState()
 	inode.LockTree()
 
 	inode = qfs.inode(c, inodeId)
+	if inode == nil {
+		return nil, unlocker
+	}
+
 	return inode, inode.treeState()
 }
 
