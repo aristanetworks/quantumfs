@@ -1248,7 +1248,6 @@ func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
 					childrenReady = false
 					return false
 				}
-				c.dlog("Child %d of %d not loaded", i, inodeNum)
 				if exists {
 					lookupCountDel = append(lookupCountDel, i)
 				}
