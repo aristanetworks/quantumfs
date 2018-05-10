@@ -270,7 +270,8 @@ var panicErr error
 
 // treeState lock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) {
-	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()
+	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t notflush %t",
+		flushAll, dq.treeState.doNotFlush).Out()
 	defer logRequestPanic(c)
 	err = panicErr
 
@@ -284,7 +285,9 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) 
 		candidate := element.Value.(*dirtyInode)
 
 		now := time.Now()
-		if !flushAll && candidate.expiryTime.After(now) {
+		if !flushAll && !dq.treeState.doNotFlush &&
+			candidate.expiryTime.After(now) {
+
 			// all expiring inodes have been flushed
 			return false, nil
 		}
