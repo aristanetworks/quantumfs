@@ -270,7 +270,6 @@ var panicErr error
 
 // treeState lock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) {
-
 	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()
 	defer logRequestPanic(c)
 	err = panicErr
