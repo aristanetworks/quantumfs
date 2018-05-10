@@ -306,7 +306,6 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) 
 func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 	sleepTime := nextExpiringInode.Sub(time.Now())
 	if sleepTime > flushSanityTimeout {
-		c.elog("Overlong flusher sleepTime %s!", sleepTime)
 		sleepTime = flushSanityTimeout
 	}
 	if sleepTime < time.Millisecond {
