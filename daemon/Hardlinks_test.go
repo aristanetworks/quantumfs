@@ -825,6 +825,7 @@ func TestHardlinkNormalization(t *testing.T) {
 		test.createFile(workspace, name, 100)
 		test.linkFile(workspace, name, name+"_link")
 		test.removeFileSync(workspace, name)
+		test.dirtyAndSync(workspace)
 
 		wsr, cleanup := test.GetWorkspaceRoot(workspace)
 		defer cleanup()
@@ -963,5 +964,45 @@ func TestHardlinkParentRefreshOneLink(t *testing.T) {
 
 		// Check that parentOfUninstantiated is correct when set via refresh
 		checkParentOfUninstantiated(test, workspace, "dirB", "link")
+	})
+}
+
+func TestNormalizationRace(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		// Make a deep hardlink
+		dir := workspace + "/dir/dir/dir/dir/dir/dir/dir/dir"
+		utils.MkdirAll(dir, 0777)
+
+		CreateSmallFile(dir+"/linkA", "some data")
+		test.linkFile(dir, "linkA", "linkB")
+		test.linkFile(dir, "linkA", "linkC")
+
+		test.SyncAllWorkspaces()
+
+		parentDir := test.getInode(dir).(*Directory)
+		test.AssertNoErr(os.Remove(dir + "/linkB"))
+		test.AssertNoErr(os.Remove(dir + "/linkC"))
+
+		// Ensure it gets normalized
+		parentDir.normalizeChildren(&test.qfs.c)
+
+		// Before that propagates, link it again
+		test.AssertNoErr(syscall.Link(dir+"/linkA", workspace+"/linkA2"))
+		test.AssertNoErr(syscall.Link(dir+"/linkA", workspace+"/linkB2"))
+
+		// Force the delta to propagate now
+		test.SyncAllWorkspaces()
+
+		go func() {
+			defer logRequestPanic(&test.qfs.c)
+			test.AssertNoErr(os.Remove(workspace + "/linkA2"))
+		}()
+
+		go func() {
+			defer logRequestPanic(&test.qfs.c)
+			test.AssertNoErr(os.Remove(dir + "/linkA"))
+		}()
 	})
 }

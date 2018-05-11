@@ -543,6 +543,8 @@ func TestRefreshChangeTypeDirToHardlink(t *testing.T) {
 		test.removeFile(workspace, name)
 		utils.MkdirAll(workspace+"/"+name, 0777)
 		test.SyncAllWorkspaces()
+		test.dirtyAndSync(workspace)
+
 		newRootId2 := test.getRootId(workspace)
 		test.Assert(!newRootId2.IsEqualTo(newRootId1),
 			"no changes to the rootId")
