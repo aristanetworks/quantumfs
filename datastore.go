@@ -955,12 +955,6 @@ type PublishableRecord struct {
 	*EncodedDirectoryRecord
 }
 
-func AsPublishableRecord(record DirectoryRecord) PublishableRecord {
-	return PublishableRecord{
-		record.(*EncodedDirectoryRecord),
-	}
-}
-
 func (pr *PublishableRecord) Nlinks() uint32 {
 	panic("A publishable record must not be queried for nlinks")
 }
@@ -1009,7 +1003,9 @@ func overlayDirectoryRecord(r encoding.DirectoryRecord) *EncodedDirectoryRecord 
 }
 
 func (record *EncodedDirectoryRecord) Publishable() PublishableRecord {
-	return AsPublishableRecord(record)
+	return PublishableRecord{
+		record,
+	}
 }
 
 func (record *EncodedDirectoryRecord) Nlinks() uint32 {
@@ -1109,20 +1105,7 @@ func (record *EncodedDirectoryRecord) EncodeExtendedKey() []byte {
 }
 
 func (record *EncodedDirectoryRecord) AsImmutable() ImmutableDirectoryRecord {
-	return &ImmutableRecord{
-		filename:    record.Filename(),
-		id:          record.ID(),
-		filetype:    record.Type(),
-		permissions: record.Permissions(),
-		owner:       record.Owner(),
-		group:       record.Group(),
-		size:        record.Size(),
-		xattr:       record.ExtendedAttributes(),
-		ctime:       record.ContentTime(),
-		mtime:       record.ModificationTime(),
-		fileId:      record.FileId(),
-		nlinks:      record.Nlinks(),
-	}
+	return ToThinRecord(record)
 }
 
 func (record *EncodedDirectoryRecord) Clone() DirectoryRecord {
@@ -1568,12 +1551,12 @@ func init() {
 		emptyDirValueStrSize, KeyValueStrSize)
 }
 
-func NewImmutableRecord(filename string, id ObjectKey, filetype ObjectType,
+func NewThinRecord(filename string, id ObjectKey, filetype ObjectType,
 	permissions uint32, owner UID, group GID, size uint64, xattr ObjectKey,
 	ctime Time, mtime Time, nlinks uint32,
 	fileId FileId) ImmutableDirectoryRecord {
 
-	return &ImmutableRecord{
+	return &ThinRecord{
 		filename:    filename,
 		id:          id,
 		filetype:    filetype,
@@ -1589,7 +1572,24 @@ func NewImmutableRecord(filename string, id ObjectKey, filetype ObjectType,
 	}
 }
 
-type ImmutableRecord struct {
+func ToThinRecord(record ImmutableDirectoryRecord) DirectoryRecord {
+	return &ThinRecord{
+		filename:    record.Filename(),
+		id:          record.ID(),
+		filetype:    record.Type(),
+		permissions: record.Permissions(),
+		owner:       record.Owner(),
+		group:       record.Group(),
+		size:        record.Size(),
+		xattr:       record.ExtendedAttributes(),
+		ctime:       record.ContentTime(),
+		mtime:       record.ModificationTime(),
+		nlinks:      record.Nlinks(),
+		fileId:      record.FileId(),
+	}
+}
+
+type ThinRecord struct {
 	filename    string
 	id          ObjectKey
 	filetype    ObjectType
@@ -1604,71 +1604,127 @@ type ImmutableRecord struct {
 	fileId      FileId
 }
 
-func (ir *ImmutableRecord) Filename() string {
-	return ir.filename
+func (tr *ThinRecord) Filename() string {
+	return tr.filename
 }
 
-func (ir *ImmutableRecord) ID() ObjectKey {
-	return ir.id
+func (tr *ThinRecord) SetFilename(name string) {
+	tr.filename = name
 }
 
-func (ir *ImmutableRecord) Type() ObjectType {
-	return ir.filetype
+func (tr *ThinRecord) ID() ObjectKey {
+	return tr.id
 }
 
-func (ir *ImmutableRecord) Permissions() uint32 {
-	return ir.permissions
+func (tr *ThinRecord) SetID(key ObjectKey) {
+	tr.id = key
 }
 
-func (ir *ImmutableRecord) Owner() UID {
-	return ir.owner
+func (tr *ThinRecord) Type() ObjectType {
+	return tr.filetype
 }
 
-func (ir *ImmutableRecord) Group() GID {
-	return ir.group
+func (tr *ThinRecord) SetType(t ObjectType) {
+	tr.filetype = t
 }
 
-func (ir *ImmutableRecord) Size() uint64 {
-	return ir.size
+func (tr *ThinRecord) Permissions() uint32 {
+	return tr.permissions
 }
 
-func (ir *ImmutableRecord) ExtendedAttributes() ObjectKey {
-	return ir.xattr
+func (tr *ThinRecord) SetPermissions(p uint32) {
+	tr.permissions = p
 }
 
-func (ir *ImmutableRecord) ContentTime() Time {
-	return ir.ctime
+func (tr *ThinRecord) Owner() UID {
+	return tr.owner
 }
 
-func (ir *ImmutableRecord) ModificationTime() Time {
-	return ir.mtime
+func (tr *ThinRecord) SetOwner(u UID) {
+	tr.owner = u
 }
 
-func (ir *ImmutableRecord) FileId() FileId {
-	return ir.fileId
+func (tr *ThinRecord) Group() GID {
+	return tr.group
 }
 
-func (ir *ImmutableRecord) Nlinks() uint32 {
-	return ir.nlinks
+func (tr *ThinRecord) SetGroup(g GID) {
+	tr.group = g
 }
 
-func (ir *ImmutableRecord) EncodeExtendedKey() []byte {
-	return EncodeExtendedKey(ir.ID(), ir.Type(), ir.Size())
+func (tr *ThinRecord) Size() uint64 {
+	return tr.size
 }
 
-func (ir *ImmutableRecord) Clone() DirectoryRecord {
+func (tr *ThinRecord) SetSize(s uint64) {
+	tr.size = s
+}
+
+func (tr *ThinRecord) ExtendedAttributes() ObjectKey {
+	return tr.xattr
+}
+
+func (tr *ThinRecord) SetExtendedAttributes(key ObjectKey) {
+	tr.xattr = key
+}
+
+func (tr *ThinRecord) ContentTime() Time {
+	return tr.ctime
+}
+
+func (tr *ThinRecord) SetContentTime(t Time) {
+	tr.ctime = t
+}
+
+func (tr *ThinRecord) ModificationTime() Time {
+	return tr.mtime
+}
+
+func (tr *ThinRecord) SetModificationTime(t Time) {
+	tr.mtime = t
+}
+
+func (tr *ThinRecord) FileId() FileId {
+	return tr.fileId
+}
+
+func (tr *ThinRecord) SetFileId(fileId FileId) {
+	tr.fileId = fileId
+}
+
+func (tr *ThinRecord) Publishable() PublishableRecord {
 	rtn := NewDirectoryRecord()
-	rtn.SetFilename(ir.filename)
-	rtn.SetID(ir.id)
-	rtn.SetType(ir.filetype)
-	rtn.SetPermissions(ir.permissions)
-	rtn.SetOwner(ir.owner)
-	rtn.SetGroup(ir.group)
-	rtn.SetSize(ir.size)
-	rtn.SetExtendedAttributes(ir.xattr)
-	rtn.SetContentTime(ir.ctime)
-	rtn.SetModificationTime(ir.mtime)
+	rtn.SetFilename(tr.filename)
+	rtn.SetID(tr.id)
+	rtn.SetType(tr.filetype)
+	rtn.SetPermissions(tr.permissions)
+	rtn.SetOwner(tr.owner)
+	rtn.SetGroup(tr.group)
+	rtn.SetSize(tr.size)
+	rtn.SetExtendedAttributes(tr.xattr)
+	rtn.SetContentTime(tr.ctime)
+	rtn.SetModificationTime(tr.mtime)
 	// Nlinks isn't stored in DirectoryRecord so don't set it
-	rtn.SetFileId(ir.fileId)
-	return rtn
+	rtn.SetFileId(tr.fileId)
+	return rtn.Publishable()
+}
+
+func (tr *ThinRecord) Nlinks() uint32 {
+	return tr.nlinks
+}
+
+func (tr *ThinRecord) SetNlinks(n uint32) {
+	tr.nlinks = n
+}
+
+func (tr *ThinRecord) EncodeExtendedKey() []byte {
+	return EncodeExtendedKey(tr.ID(), tr.Type(), tr.Size())
+}
+
+func (tr *ThinRecord) AsImmutable() ImmutableDirectoryRecord {
+	return tr
+}
+
+func (tr *ThinRecord) Clone() DirectoryRecord {
+	return ToThinRecord(tr)
 }
