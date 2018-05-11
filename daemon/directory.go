@@ -1818,7 +1818,7 @@ func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
 
 	// set up the Inode record
 	now := time.Now()
-	entry := quantumfs.NewDirectoryRecord()
+	var entry quantumfs.ThinRecord
 	entry.SetFilename(name)
 	entry.SetID(key)
 	entry.SetType(type_)
@@ -1832,8 +1832,9 @@ func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
 	entry.SetContentTime(quantumfs.NewTime(now))
 	entry.SetModificationTime(quantumfs.NewTime(now))
 	entry.SetFileId(quantumfs.GenerateUniqueFileId())
+	entry.SetNlinks(1)
 
-	return entry
+	return &entry
 }
 
 // Needs exclusive Inode lock

@@ -22,15 +22,16 @@ func newHardlinkLeg(name string, fileId quantumfs.FileId,
 
 	var newLink HardlinkLeg
 
-	record := quantumfs.NewDirectoryRecord()
+	var record quantumfs.ThinRecord
 	record.SetType(quantumfs.ObjectTypeHardlink)
 	record.SetID(newLink.ID())
 	record.SetFileId(fileId)
 	record.SetExtendedAttributes(quantumfs.EmptyBlockKey)
 	record.SetFilename(name)
 	record.SetContentTime(creationTime)
+	record.SetNlinks(1)
 
-	newLink.record = record
+	newLink.record = &record
 	newLink.hardlinkTable = hardlinkTable
 
 	return &newLink
@@ -158,7 +159,7 @@ func (link *HardlinkLeg) SetFileId(fileId quantumfs.FileId) {
 }
 
 func (link *HardlinkLeg) Publishable() quantumfs.PublishableRecord {
-	return quantumfs.AsPublishableRecord(link.record)
+	return link.record.Publishable()
 }
 
 func (link *HardlinkLeg) Nlinks() uint32 {
@@ -178,7 +179,7 @@ func (l *HardlinkLeg) AsImmutable() quantumfs.ImmutableDirectoryRecord {
 
 	realRecord := link.get()
 
-	return quantumfs.NewImmutableRecord(
+	return quantumfs.NewThinRecord(
 		link.Filename(),
 		realRecord.ID(),
 		realRecord.Type(),
