@@ -68,7 +68,7 @@ func (df *DeferableRwMutex) RLock() NeedReadUnlock {
 						"previously at %s!", goid, location)
 			}
 
-			pc, _, _, _ = runtime.Caller(1)
+			pc, _, _, _ = runtime.Caller(2)
 			df.readHolders[goid] = pc
 		}()
 	}

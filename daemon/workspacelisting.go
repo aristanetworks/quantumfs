@@ -7,7 +7,6 @@ package daemon
 // the directory hierarchy.
 
 import (
-	"sync"
 	"syscall"
 	"time"
 
@@ -28,16 +27,33 @@ const minimumNamespaceNum = 3
 // Choose three to represent 1 workspace
 const minimumWorkspaceNum = 3
 
+func interpretListingError(c *ctx, err error, cmd string) fuse.Status {
+	switch err := err.(type) {
+	default:
+		c.elog("Unexpected error from %s: %s", cmd, err.Error())
+		return fuse.EIO
+
+	case quantumfs.WorkspaceDbErr:
+		if err.Code == quantumfs.WSDB_WORKSPACE_NOT_FOUND {
+			return fuse.ENOENT
+		}
+		c.elog("Unexpected wsdb error from %s: %s", cmd, err.Error())
+		return fuse.EIO
+	}
+}
+
 func NewTypespaceList() Inode {
 	tsl := TypespaceList{
 		InodeCommon:      InodeCommon{id: quantumfs.InodeIdRoot},
 		typespacesByName: make(map[string]InodeId),
 		typespacesById:   make(map[InodeId]string),
+		realTreeState: &TreeState{
+			name: "",
+		},
 	}
 	tsl.self = &tsl
-	treeLock := TreeLock{lock: &tsl.realTreeLock, name: ""}
-	tsl.InodeCommon.treeLock_ = &treeLock
-	utils.Assert(tsl.treeLock() != nil, "TypespaceList treeLock nil at init")
+	tsl.InodeCommon.treeState_ = tsl.realTreeState
+	utils.Assert(tsl.treeState() != nil, "TypespaceList treeState nil at init")
 	return &tsl
 }
 
@@ -48,17 +64,13 @@ type TypespaceList struct {
 	typespacesByName map[string]InodeId
 	typespacesById   map[InodeId]string
 
-	realTreeLock sync.RWMutex
+	realTreeState *TreeState
 }
 
 func (tsl *TypespaceList) dirty_(c *ctx) {
 	// Override InodeCommon.dirty_() because namespaces don't get dirty in the
 	// traditional manner
 	c.vlog("TypespaceList::dirty_ doing nothing")
-}
-
-func (tsl *TypespaceList) dirtyChild(c *ctx, child InodeId) {
-	c.vlog("TypespaceList::dirtyChild doing nothing")
 }
 
 func (tsl *TypespaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -200,8 +212,8 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 			(*inodeMap)[name] = inodeId
 			(*nameMap)[inodeId] = name
 
-			c.qfs.addUninstantiated(c, []InodeId{inodeId},
-				parent.inodeNum())
+			c.qfs.addUninstantiated(c, []inodePair{
+				newInodePair(inodeId, parent.inodeNum())})
 		}
 		touched[name] = true
 	}
@@ -290,15 +302,15 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (tsl *TypespaceList) directChildInodes() []InodeId {
+func (tsl *TypespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer tsl.Lock().Unlock()
 
-	rtn := make([]InodeId, 0, len(tsl.typespacesById))
 	for k, _ := range tsl.typespacesById {
-		rtn = append(rtn, k)
+		iterateAgain := visitFn(k)
+		if !iterateAgain {
+			return
+		}
 	}
-
-	return rtn
 }
 
 func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
@@ -348,9 +360,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 	list, err := c.workspaceDB.TypespaceList(&c.Ctx)
 	if err != nil {
-		c.elog("Unexpected error from WorkspaceDB.TypespaceList: %s",
-			err.Error())
-		return fuse.EIO
+		return interpretListingError(c, err, "WorkspaceDB.TypespaceList")
 	}
 
 	exists := false
@@ -370,7 +380,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	c.vlog("Typespace exists")
 
 	inodeNum := tsl.typespacesByName[name]
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillTypespaceAttr(c, &out.Attr, inodeNum, name, "")
@@ -527,14 +537,14 @@ func (tsl *TypespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (tsl *TypespaceList) instantiateChild(c *ctx,
-	inodeNum InodeId) (Inode, []InodeId) {
+	inodeNum InodeId) Inode {
 
 	defer c.funcIn("TypespaceList::instantiateChild").Out()
 	defer tsl.Lock().Unlock()
 
 	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
-		return inode, nil
+		return inode
 	}
 
 	// The api file will never be truly forgotten (see QuantumFs.Forget()) and so
@@ -556,7 +566,7 @@ func (tsl *TypespaceList) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newNamespaceList(c *ctx, typespace string, namespace string, workspace string,
-	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
+	parent Inode, inodeNum InodeId) Inode {
 
 	defer c.FuncIn("newNamespaceList", "typespace %s", typespace).Out()
 
@@ -565,13 +575,15 @@ func newNamespaceList(c *ctx, typespace string, namespace string, workspace stri
 		typespaceName:    typespace,
 		namespacesByName: make(map[string]InodeId),
 		namespacesById:   make(map[InodeId]string),
+		realTreeState: &TreeState{
+			name: typespace,
+		},
 	}
 	nsl.self = &nsl
 	nsl.setParent(parent.inodeNum())
-	treeLock := TreeLock{lock: &nsl.realTreeLock, name: typespace}
-	nsl.InodeCommon.treeLock_ = &treeLock
-	utils.Assert(nsl.treeLock() != nil, "NamespaceList treeLock nil at init")
-	return &nsl, nil
+	nsl.InodeCommon.treeState_ = nsl.realTreeState
+	utils.Assert(nsl.treeState() != nil, "NamespaceList treeState nil at init")
+	return &nsl
 }
 
 type NamespaceList struct {
@@ -582,17 +594,13 @@ type NamespaceList struct {
 	namespacesByName map[string]InodeId
 	namespacesById   map[InodeId]string
 
-	realTreeLock sync.RWMutex
+	realTreeState *TreeState
 }
 
 func (nsl *NamespaceList) dirty_(c *ctx) {
 	// Override InodeCommon.dirty_() because namespaces don't get dirty in the
 	// traditional manner
 	c.vlog("NamespaceList::dirty_ doing nothing")
-}
-
-func (nsl *NamespaceList) dirtyChild(c *ctx, child InodeId) {
-	c.vlog("NamespaceList::dirtyChild doing nothing")
 }
 
 func (nsl *NamespaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -630,15 +638,15 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) directChildInodes() []InodeId {
+func (nsl *NamespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer nsl.Lock().Unlock()
 
-	rtn := make([]InodeId, 0, len(nsl.namespacesById))
 	for k, _ := range nsl.namespacesById {
-		rtn = append(rtn, k)
+		iterateAgain := visitFn(k)
+		if !iterateAgain {
+			return
+		}
 	}
-
-	return rtn
 }
 
 func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
@@ -673,9 +681,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 
 	list, err := c.workspaceDB.NamespaceList(&c.Ctx, nsl.typespaceName)
 	if err != nil {
-		c.elog("Unexpected error from WorkspaceDB.NamespaceList: %s",
-			err.Error())
-		return fuse.EIO
+		return interpretListingError(c, err, "WorkspaceDB.NamespaceList")
 	}
 
 	exists := false
@@ -694,7 +700,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	c.vlog("Namespace exists")
 
 	inodeNum := nsl.namespacesByName[name]
-	c.qfs.increaseLookupCount(c, inodeNum)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
 	fillNamespaceAttr(c, &out.Attr, inodeNum, nsl.typespaceName, name)
@@ -851,14 +857,14 @@ func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (nsl *NamespaceList) instantiateChild(c *ctx,
-	inodeNum InodeId) (Inode, []InodeId) {
+	inodeNum InodeId) Inode {
 
 	defer c.funcIn("NamespaceList::instantiateChild").Out()
 	defer nsl.Lock().Unlock()
 
 	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
-		return inode, nil
+		return inode
 	}
 
 	name, exists := nsl.namespacesById[inodeNum]
@@ -889,7 +895,7 @@ func (nsl *NamespaceList) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newWorkspaceList(c *ctx, typespace string, namespace string,
-	parent Inode, inodeNum InodeId) (Inode, []InodeId) {
+	parent Inode, inodeNum InodeId) Inode {
 
 	defer c.FuncIn("newWorkspaceList", "typespace %s namespace %s",
 		typespace, namespace).Out()
@@ -900,14 +906,15 @@ func newWorkspaceList(c *ctx, typespace string, namespace string,
 		namespaceName:    namespace,
 		workspacesByName: make(map[string]workspaceInfo),
 		workspacesById:   make(map[InodeId]string),
+		realTreeState: &TreeState{
+			name: typespace + "/" + namespace,
+		},
 	}
 	wsl.self = &wsl
 	wsl.setParent(parent.inodeNum())
-	treeLock := TreeLock{lock: &wsl.realTreeLock,
-		name: typespace + "/" + namespace}
-	wsl.InodeCommon.treeLock_ = &treeLock
-	utils.Assert(wsl.treeLock() != nil, "WorkspaceList treeLock nil at init")
-	return &wsl, nil
+	wsl.InodeCommon.treeState_ = wsl.realTreeState
+	utils.Assert(wsl.treeState() != nil, "WorkspaceList treeState nil at init")
+	return &wsl
 }
 
 type workspaceInfo struct {
@@ -924,17 +931,13 @@ type WorkspaceList struct {
 	workspacesByName map[string]workspaceInfo
 	workspacesById   map[InodeId]string
 
-	realTreeLock sync.RWMutex
+	realTreeState *TreeState
 }
 
 func (wsl *WorkspaceList) dirty_(c *ctx) {
 	// Override InodeCommon.dirty_() because workspaces don't get dirty in the
 	// traditional manner.
 	c.vlog("WorkspaceList::dirty_ doing nothing")
-}
-
-func (wsl *WorkspaceList) dirtyChild(c *ctx, child InodeId) {
-	c.vlog("WorkspaceList::dirtyChild doing nothing")
 }
 
 func (wsl *WorkspaceList) Access(c *ctx, mask uint32, uid uint32,
@@ -973,15 +976,15 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) directChildInodes() []InodeId {
+func (wsl *WorkspaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	defer wsl.Lock().Unlock()
 
-	rtn := make([]InodeId, 0, len(wsl.workspacesById))
 	for k, _ := range wsl.workspacesById {
-		rtn = append(rtn, k)
+		iterateAgain := visitFn(k)
+		if !iterateAgain {
+			return
+		}
 	}
-
-	return rtn
 }
 
 // Update the internal workspace list with the most recent available listing
@@ -1018,8 +1021,8 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 			}
 			wsl.workspacesById[inodeId] = name
 
-			c.qfs.addUninstantiated(c, []InodeId{inodeId},
-				wsl.inodeNum())
+			c.qfs.addUninstantiated(c, []inodePair{
+				newInodePair(inodeId, wsl.inodeNum())})
 		}
 	}
 
@@ -1062,9 +1065,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	workspaces, err := c.workspaceDB.WorkspaceList(&c.Ctx, wsl.typespaceName,
 		wsl.namespaceName)
 	if err != nil {
-		c.elog("Unexpected error from WorkspaceDB.WorkspaceList: %s",
-			err.Error())
-		return fuse.EIO
+		return interpretListingError(c, err, "WorkspaceDB.WorkspaceList")
 	}
 
 	exists := false
@@ -1083,7 +1084,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	c.vlog("Workspace exists")
 
 	inodeInfo := wsl.workspacesByName[name]
-	c.qfs.increaseLookupCount(c, inodeInfo.id)
+	c.qfs.incrementLookupCount(c, inodeInfo.id)
 	out.NodeId = uint64(inodeInfo.id)
 	fillEntryOutCacheData(c, out)
 	fillWorkspaceAttrFake(c, &out.Attr, inodeInfo.id, "", "")
@@ -1243,14 +1244,14 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (wsl *WorkspaceList) instantiateChild(c *ctx,
-	inodeNum InodeId) (Inode, []InodeId) {
+	inodeNum InodeId) Inode {
 
 	defer c.funcIn("WorkspaceList::instantiateChild").Out()
 	defer wsl.Lock().Unlock()
 
 	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
-		return inode, nil
+		return inode
 	}
 
 	name, exists := wsl.workspacesById[inodeNum]

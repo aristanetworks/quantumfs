@@ -18,46 +18,46 @@ const FMODE_EXEC = 0x20 // From Linux
 
 func newSmallFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) Inode {
 
 	defer c.FuncIn("newSmallFile", "name %s", name).Out()
 
 	accessor := newSmallAccessor(c, size, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
 func newMediumFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) Inode {
 
 	defer c.FuncIn("newMediumFile", "name %s", name).Out()
 
 	accessor := newMediumAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
 func newLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) Inode {
 
 	defer c.FuncIn("newLargeFile", "name %s", name).Out()
 
 	accessor := newLargeAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
 func newVeryLargeFile(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 	inodeNum InodeId, parent Inode, mode uint32, rdev uint32,
-	dirRecord quantumfs.DirectoryRecord) (Inode, []InodeId) {
+	dirRecord quantumfs.DirectoryRecord) Inode {
 
 	defer c.FuncIn("newVeryLargeFile", "name %s", name).Out()
 
 	accessor := newVeryLargeAccessor(c, key)
 
-	return newFile_(c, name, inodeNum, key, parent, accessor), nil
+	return newFile_(c, name, inodeNum, key, parent, accessor)
 }
 
 func newFile_(c *ctx, name string, inodeNum InodeId,
@@ -67,17 +67,17 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 
 	file := File{
 		InodeCommon: InodeCommon{
-			id:        inodeNum,
-			name_:     name,
-			accessed_: 0,
-			treeLock_: parent.treeLock(),
+			id:         inodeNum,
+			name_:      name,
+			accessed_:  0,
+			treeState_: parent.treeState(),
 		},
 		accessor: accessor,
 	}
 	file.self = &file
 	file.setParent(parent.inodeNum())
 
-	utils.Assert(file.treeLock() != nil, "File treeLock nil at init")
+	utils.Assert(file.treeState() != nil, "File treeState nil at init")
 
 	return &file
 }
@@ -105,13 +105,6 @@ func (fi *File) handleAccessorTypeChange(c *ctx,
 	}
 }
 
-func (fi *File) dirtyChild(c *ctx, child InodeId) {
-	c.FuncIn("FuncIn::dirtyChild", "inode %d", child).Out()
-	if child != fi.inodeNum() {
-		panic("Unsupported dirtyChild() call on File")
-	}
-}
-
 func (fi *File) Access(c *ctx, mask uint32, uid uint32, gid uint32) fuse.Status {
 
 	defer c.funcIn("File::Access").Out()
@@ -136,7 +129,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	}
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeLock())
+	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeState())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	c.dlog(OpenedInodeDebug, fi.inodeNum(), fileHandleNum)
@@ -293,9 +286,9 @@ func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fi.parentRemoveChildXAttr(c, fi.inodeNum(), attr)
 }
 
-func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId) {
+func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) Inode {
 	c.elog("Invalid instantiateChild on File")
-	return nil, nil
+	return nil
 }
 
 func resize(buffer []byte, size int) []byte {
@@ -529,18 +522,18 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 }
 
 func newFileDescriptor(file *File, inodeNum InodeId,
-	fileHandleId FileHandleId, treeLock *TreeLock) FileHandle {
+	fileHandleId FileHandleId, treeState *TreeState) FileHandle {
 
 	fd := &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{
-			id:        fileHandleId,
-			inodeNum:  inodeNum,
-			treeLock_: treeLock,
+			id:         fileHandleId,
+			inodeNum:   inodeNum,
+			treeState_: treeState,
 		},
 		file: file,
 	}
 
-	utils.Assert(fd.treeLock() != nil, "FileDescriptor treeLock nil at init")
+	utils.Assert(fd.treeState() != nil, "FileDescriptor treeState nil at init")
 	return fd
 }
 

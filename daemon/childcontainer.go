@@ -29,8 +29,8 @@ type ChildContainer struct {
 	effective map[InodeId]map[string]quantumfs.DirectoryRecord
 }
 
-func newChildContainer(c *ctx, dir *Directory,
-	baseLayerId quantumfs.ObjectKey) (*ChildContainer, []InodeId) {
+func newChildContainer(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
+	wsr InodeId) (*ChildContainer, []inodePair) {
 
 	defer c.funcIn("newChildContainer").Out()
 
@@ -41,7 +41,7 @@ func newChildContainer(c *ctx, dir *Directory,
 		effective:   make(map[InodeId]map[string]quantumfs.DirectoryRecord),
 	}
 
-	uninstantiated := container.loadAllChildren(c, baseLayerId)
+	uninstantiated := container.loadAllChildren(c, baseLayerId, wsr)
 
 	return container, uninstantiated
 }
@@ -75,18 +75,25 @@ func addToMap(m map[InodeId]map[string]quantumfs.DirectoryRecord,
 }
 
 func (container *ChildContainer) loadAllChildren(c *ctx,
-	baseLayerId quantumfs.ObjectKey) []InodeId {
+	baseLayerId quantumfs.ObjectKey, wsr InodeId) []inodePair {
 
 	defer c.funcIn("ChildContainer::loadAllChildren").Out()
 
-	uninstantiated := make([]InodeId, 0, 200) // 200 arbitrarily chosen
+	uninstantiated := make([]inodePair, 0, 200) // 200 arbitrarily chosen
 
 	foreachDentry(c, baseLayerId,
 		func(record quantumfs.ImmutableDirectoryRecord) {
 
-			childInodeNum := container.loadChild(c, record.Clone())
+			childInodeNum := container.loadChild(c,
+				quantumfs.ToThinRecord(record))
 			c.vlog("loaded child %d", childInodeNum)
-			uninstantiated = append(uninstantiated, childInodeNum)
+			parent := container.dir.inodeNum()
+			if record.Type() == quantumfs.ObjectTypeHardlink {
+				parent = wsr
+			}
+
+			uninstantiated = append(uninstantiated,
+				newInodePair(childInodeNum, parent))
 		})
 
 	return uninstantiated
@@ -305,16 +312,16 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 		// We do not modify publishable records in this method. If we don't
 		// have an effective entry we must create one. Hardlinks are always
 		// publishable, so do not create an effective entry for those types.
-		record = record.Clone()
+		record = quantumfs.ToThinRecord(record)
 		container.setRecord(c, inodeId, record)
 	}
 
 	modify(record)
 }
 
-func (container *ChildContainer) directInodes() []InodeId {
-	inodes := make([]InodeId, 0, len(container.children))
+type inodeVisitFn func(InodeId) bool
 
+func (container *ChildContainer) foreachDirectInode(c *ctx, visit inodeVisitFn) {
 	for name, inodeId := range container.children {
 		records := container.effective[inodeId]
 		if records == nil {
@@ -324,10 +331,12 @@ func (container *ChildContainer) directInodes() []InodeId {
 		record := records[name]
 		_, isHardlink := record.(*HardlinkLeg)
 		if !isHardlink {
-			inodes = append(inodes, inodeId)
+			iterateAgain := visit(inodeId)
+			if !iterateAgain {
+				return
+			}
 		}
 	}
-	return inodes
 }
 
 func (container *ChildContainer) publishableRecords(

@@ -574,11 +574,13 @@ func confirmMatchingArchitecture() {
 	}
 
 	if (systemArch == "x86_64" && runtime.GOARCH != "amd64") ||
-		(systemArch == "i686" && runtime.GOARCH != "i386") {
+		(systemArch == "i686" && runtime.GOARCH != "386") {
 
 		fmt.Fprintln(os.Stderr, "qfs executable architecture mismatch!")
 		fmt.Fprintln(os.Stderr, "Use qfs version compiled for your "+
 			"architecture")
+		fmt.Fprintln(os.Stderr, "Build for", runtime.GOARCH, "running on",
+			systemArch)
 		os.Exit(exitInternalError)
 	}
 }
@@ -633,7 +635,7 @@ func chroot() {
 	}
 
 	if err := nonPersistentChroot(username, wsr, dir, cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "error chrooting: %s", err.Error())
+		fmt.Fprintf(os.Stderr, "error chrooting: %s\n", err.Error())
 		os.Exit(exitInternalError)
 	}
 }

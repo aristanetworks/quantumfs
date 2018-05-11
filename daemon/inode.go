@@ -95,7 +95,8 @@ type Inode interface {
 	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 
 	// Instantiate the Inode for the given child on demand
-	instantiateChild(c *ctx, inodeNum InodeId) (Inode, []InodeId)
+	instantiateChild(c *ctx, inodeNum InodeId) Inode
+	finishInit(c *ctx) []inodePair
 
 	name() string
 	setName(name string)
@@ -160,8 +161,6 @@ type Inode interface {
 	markClean_() *list.Element // Mark this Inode as cleaned
 	// Undo marking the inode as clean
 	markUnclean_(dirtyElement *list.Element) bool
-	// Mark this Inode dirty because a child is dirty
-	dirtyChild(c *ctx, child InodeId)
 
 	// The kernel has forgotten about this Inode. Add yourself to the list to be
 	// flushed and forgotten.
@@ -182,9 +181,9 @@ type Inode interface {
 
 	Lock() utils.NeedWriteUnlock
 
-	treeLock() *TreeLock
-	LockTree() *TreeLock
-	RLockTree() *TreeLock
+	treeState() *TreeState
+	LockTree() utils.NeedWriteUnlock
+	RLockTree() utils.NeedReadUnlock
 
 	isWorkspaceRoot() bool
 	isListingType() bool
@@ -197,20 +196,21 @@ type Inode interface {
 }
 
 type inodeHolder interface {
-	directChildInodes() []InodeId
+	foreachDirectInode(c *ctx, visitFn inodeVisitFn)
 }
 
-type TreeLock struct {
-	lock *sync.RWMutex
-	name string
+type TreeState struct {
+	lock       sync.RWMutex
+	name       string
+	doNotFlush bool
 }
 
-func (treelock *TreeLock) Unlock() {
-	treelock.lock.Unlock()
+func (ts *TreeState) Unlock() {
+	ts.lock.Unlock()
 }
 
-func (treelock *TreeLock) RUnlock() {
-	treelock.lock.RUnlock()
+func (ts *TreeState) RUnlock() {
+	ts.lock.RUnlock()
 }
 
 type InodeCommon struct {
@@ -229,11 +229,12 @@ type InodeCommon struct {
 
 	utils.DeferableRwMutex
 
-	// The treeLock is used to lock the entire workspace tree when certain
-	// tree-wide operations are being performed. Primarily this is done with all
-	// requests which call downward (parent to child) in the tree. This is done
-	// to ensure that all Inode locks are only acquired child to parent.
-	treeLock_ *TreeLock
+	// The treeState contains some per-tree metadata and the internal lock is
+	// used to lock the entire workspace tree when certain tree-wide operations
+	// are being performed. Primarily this is done with all requests which call
+	// downward (parent to child) in the tree. This is done to ensure that all
+	// Inode locks are only acquired child to parent.
+	treeState_ *TreeState
 
 	// This element is protected by the flusher lock
 	dirtyElement__ *list.Element
@@ -576,17 +577,15 @@ func (inode *InodeCommon) markUnclean_(dirtyElement *list.Element) (already bool
 	return true
 }
 
-func (inode *InodeCommon) dirtyChild(c *ctx, child InodeId) {
-	msg := fmt.Sprintf("Unsupported dirtyChild() call on Inode %d: %v", child,
-		inode)
-	panic(msg)
-}
-
 func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
 	msg := fmt.Sprintf("Unsupported syncChild() call on Inode %v", inode)
 	panic(msg)
+}
+
+func (inode *InodeCommon) finishInit(c *ctx) []inodePair {
+	return nil
 }
 
 func (inode *InodeCommon) queueToForget(c *ctx) {
@@ -633,22 +632,22 @@ func (inode *InodeCommon) clearAccessedCache() {
 	atomic.StoreUint32(&(inode.accessed_), 0)
 }
 
-func (inode *InodeCommon) treeLock() *TreeLock {
-	return inode.treeLock_
+func (inode *InodeCommon) treeState() *TreeState {
+	return inode.treeState_
 }
 
 func (inode *InodeCommon) generation() uint64 {
 	return 0
 }
 
-func (inode *InodeCommon) LockTree() *TreeLock {
-	inode.treeLock_.lock.Lock()
-	return inode.treeLock_
+func (inode *InodeCommon) LockTree() utils.NeedWriteUnlock {
+	inode.treeState_.lock.Lock()
+	return inode.treeState_
 }
 
-func (inode *InodeCommon) RLockTree() *TreeLock {
-	inode.treeLock_.lock.RLock()
-	return inode.treeLock_
+func (inode *InodeCommon) RLockTree() utils.NeedReadUnlock {
+	inode.treeState_.lock.RLock()
+	return inode.treeState_
 }
 
 // the inode parentLock must be locked
@@ -806,31 +805,29 @@ type FileHandle interface {
 	Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (
 		uint32, fuse.Status)
 
-	Sync_DOWN(c *ctx) fuse.Status
-
-	treeLock() *TreeLock
-	LockTree() *TreeLock
-	RLockTree() *TreeLock
+	treeState() *TreeState
+	LockTree() utils.NeedWriteUnlock
+	RLockTree() utils.NeedReadUnlock
 }
 
 type FileHandleId uint64
 
 type FileHandleCommon struct {
-	id        FileHandleId
-	inodeNum  InodeId
-	treeLock_ *TreeLock
+	id         FileHandleId
+	inodeNum   InodeId
+	treeState_ *TreeState
 }
 
-func (file *FileHandleCommon) treeLock() *TreeLock {
-	return file.treeLock_
+func (file *FileHandleCommon) treeState() *TreeState {
+	return file.treeState_
 }
 
-func (file *FileHandleCommon) LockTree() *TreeLock {
-	file.treeLock_.lock.Lock()
-	return file.treeLock_
+func (file *FileHandleCommon) LockTree() utils.NeedWriteUnlock {
+	file.treeState_.lock.Lock()
+	return file.treeState_
 }
 
-func (file *FileHandleCommon) RLockTree() *TreeLock {
-	file.treeLock_.lock.RLock()
-	return file.treeLock_
+func (file *FileHandleCommon) RLockTree() utils.NeedReadUnlock {
+	file.treeState_.lock.RLock()
+	return file.treeState_
 }

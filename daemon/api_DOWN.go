@@ -18,8 +18,3 @@ func (api *ApiInode) Sync_DOWN(c *ctx) fuse.Status {
 	c.vlog("ApiInode::Sync_DOWN doing nothing")
 	return fuse.OK
 }
-
-func (api *ApiHandle) Sync_DOWN(c *ctx) fuse.Status {
-	c.vlog("ApiHandle::Sync_DOWN doing nothing")
-	return fuse.OK
-}
