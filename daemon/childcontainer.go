@@ -327,7 +327,9 @@ func (container *ChildContainer) foreachDirectInode(c *ctx, visit inodeVisitFn) 
 		if records == nil {
 			records = container.publishable[inodeId]
 		}
-		utils.Assert(records != nil, "did not find child %s", name)
+		if records == nil {
+			utils.Assert(records != nil, "did not find child %s", name)
+		}
 		record := records[name]
 		_, isHardlink := record.(*HardlinkLeg)
 		if !isHardlink {
