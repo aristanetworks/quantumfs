@@ -75,6 +75,24 @@ func (th *testHelper) checkUploadMatches(checkPath string, workspace string,
 	th.Assert(checkedRoot, "Didn't check %s", checkPath)
 }
 
+type encoded *quantumfs.EncodedDirectoryRecord
+
+func toEncoded(record quantumfs.ImmutableDirectoryRecord) encoded {
+	rtn := quantumfs.NewDirectoryRecord()
+	rtn.SetFilename(record.Filename())
+	rtn.SetID(record.ID())
+	rtn.SetType(record.Type())
+	rtn.SetPermissions(record.Permissions())
+	rtn.SetOwner(record.Owner())
+	rtn.SetGroup(record.Group())
+	rtn.SetSize(record.Size())
+	rtn.SetExtendedAttributes(record.ExtendedAttributes())
+	rtn.SetContentTime(record.ContentTime())
+	rtn.SetModificationTime(record.ModificationTime())
+	rtn.SetFileId(record.FileId())
+	return rtn
+}
+
 func TestFileMatches(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -87,8 +105,10 @@ func TestFileMatches(t *testing.T) {
 			func(recA quantumfs.ImmutableDirectoryRecord,
 				recB quantumfs.ImmutableDirectoryRecord) {
 
-				recADirect := recA.Clone().Publishable()
-				recBDirect := recB.Clone().Publishable()
+				A := toEncoded(recA)
+				recADirect := (*quantumfs.EncodedDirectoryRecord)(A)
+				B := toEncoded(recB)
+				recBDirect := (*quantumfs.EncodedDirectoryRecord)(B)
 
 				// Everything except fileId should match
 				recBDirect.SetFileId(recADirect.FileId())

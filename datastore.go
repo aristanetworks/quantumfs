@@ -376,8 +376,7 @@ func (dir *DirectoryEntry) Entry(i int) *EncodedDirectoryRecord {
 }
 
 func (dir *DirectoryEntry) SetEntry(i int, record PublishableRecord) {
-	newER := copyDirectoryRecordIntoSegment(dir.dir.Segment,
-		record.EncodedDirectoryRecord)
+	newER := copyDirectoryRecordIntoSegment(dir.dir.Segment, record)
 
 	dir.dir.Entries().Set(i, newER)
 }
@@ -611,7 +610,7 @@ func createEmptyDirectory() ObjectKey {
 var EmptyBlockKey ObjectKey
 
 func copyDirectoryRecordIntoSegment(s *capn.Segment,
-	record DirectoryRecord) encoding.DirectoryRecord {
+	record PublishableRecord) encoding.DirectoryRecord {
 
 	newRecord := EncodedDirectoryRecord{
 		record: encoding.NewDirectoryRecord(s),
@@ -951,16 +950,18 @@ type DirectoryRecord interface {
 	Publishable() PublishableRecord
 }
 
-type PublishableRecord struct {
-	*EncodedDirectoryRecord
-}
-
-func (pr *PublishableRecord) Nlinks() uint32 {
-	panic("A publishable record must not be queried for nlinks")
-}
-
-func (pr *PublishableRecord) Record() encoding.DirectoryRecord {
-	return pr.record
+type PublishableRecord interface {
+	Filename() string
+	ID() ObjectKey
+	Type() ObjectType
+	Permissions() uint32
+	Owner() UID
+	Group() GID
+	Size() uint64
+	ExtendedAttributes() ObjectKey
+	ContentTime() Time
+	ModificationTime() Time
+	FileId() FileId
 }
 
 // Just like DirectoryRecord, but without any mutators
@@ -1003,9 +1004,7 @@ func overlayDirectoryRecord(r encoding.DirectoryRecord) *EncodedDirectoryRecord 
 }
 
 func (record *EncodedDirectoryRecord) Publishable() PublishableRecord {
-	return PublishableRecord{
-		record,
-	}
+	return record
 }
 
 func (record *EncodedDirectoryRecord) Nlinks() uint32 {
@@ -1693,20 +1692,7 @@ func (tr *ThinRecord) SetFileId(fileId FileId) {
 }
 
 func (tr *ThinRecord) Publishable() PublishableRecord {
-	rtn := NewDirectoryRecord()
-	rtn.SetFilename(tr.filename)
-	rtn.SetID(tr.id)
-	rtn.SetType(tr.filetype)
-	rtn.SetPermissions(tr.permissions)
-	rtn.SetOwner(tr.owner)
-	rtn.SetGroup(tr.group)
-	rtn.SetSize(tr.size)
-	rtn.SetExtendedAttributes(tr.xattr)
-	rtn.SetContentTime(tr.ctime)
-	rtn.SetModificationTime(tr.mtime)
-	// Nlinks isn't stored in DirectoryRecord so don't set it
-	rtn.SetFileId(tr.fileId)
-	return rtn.Publishable()
+	return tr
 }
 
 func (tr *ThinRecord) Nlinks() uint32 {
