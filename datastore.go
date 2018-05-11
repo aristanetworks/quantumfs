@@ -1105,7 +1105,7 @@ func (record *EncodedDirectoryRecord) EncodeExtendedKey() []byte {
 }
 
 func (record *EncodedDirectoryRecord) AsImmutable() ImmutableDirectoryRecord {
-	return MutableToThinRecord(record)
+	return ToThinRecord(record)
 }
 
 func (record *EncodedDirectoryRecord) Clone() DirectoryRecord {
@@ -1572,24 +1572,7 @@ func NewThinRecord(filename string, id ObjectKey, filetype ObjectType,
 	}
 }
 
-func ImmutableToThinRecord(record ImmutableDirectoryRecord) DirectoryRecord {
-	return &ThinRecord{
-		filename:    record.Filename(),
-		id:          record.ID(),
-		filetype:    record.Type(),
-		permissions: record.Permissions(),
-		owner:       record.Owner(),
-		group:       record.Group(),
-		size:        record.Size(),
-		xattr:       record.ExtendedAttributes(),
-		ctime:       record.ContentTime(),
-		mtime:       record.ModificationTime(),
-		nlinks:      record.Nlinks(),
-		fileId:      record.FileId(),
-	}
-}
-
-func MutableToThinRecord(record DirectoryRecord) DirectoryRecord {
+func ToThinRecord(record ImmutableDirectoryRecord) DirectoryRecord {
 	return &ThinRecord{
 		filename:    record.Filename(),
 		id:          record.ID(),
@@ -1743,5 +1726,5 @@ func (tr *ThinRecord) AsImmutable() ImmutableDirectoryRecord {
 }
 
 func (tr *ThinRecord) Clone() DirectoryRecord {
-	return MutableToThinRecord(tr)
+	return ToThinRecord(tr)
 }

@@ -85,7 +85,7 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 		func(record quantumfs.ImmutableDirectoryRecord) {
 
 			childInodeNum := container.loadChild(c,
-				quantumfs.ImmutableToThinRecord(record))
+				quantumfs.ToThinRecord(record))
 			c.vlog("loaded child %d", childInodeNum)
 			parent := container.dir.inodeNum()
 			if record.Type() == quantumfs.ObjectTypeHardlink {
@@ -312,7 +312,7 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 		// We do not modify publishable records in this method. If we don't
 		// have an effective entry we must create one. Hardlinks are always
 		// publishable, so do not create an effective entry for those types.
-		record = quantumfs.MutableToThinRecord(record)
+		record = quantumfs.ToThinRecord(record)
 		container.setRecord(c, inodeId, record)
 	}
 
