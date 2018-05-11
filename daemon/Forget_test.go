@@ -314,7 +314,7 @@ func TestLookupCountHardlinks(t *testing.T) {
 			test.qfs.Lookup(&header, "test", &out)
 		}
 
-		count, exists := test.qfs.lookupCount(test.TestCtx(), inodeNum)
+		count, exists := test.qfs.lookupCount(inodeNum)
 		test.Assert(exists, "Lookup count missing for file")
 
 		// Since we can't guarantee the kernel hasn't looked it up extra by
@@ -445,7 +445,7 @@ func TestForgetUnlinkedInstantiated(t *testing.T) {
 			test.AssertNoErr(syscall.Unlink(fullname))
 		}()
 		test.SyncAllWorkspaces()
-		_, exists := test.qfs.lookupCount(test.TestCtx(), inodeId)
+		_, exists := test.qfs.lookupCount(inodeId)
 
 		utils.Assert(!exists, "file %s still exists in the lookup map", name)
 	})
@@ -464,7 +464,7 @@ func TestForgetUnlinkedUninstantiated(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		test.WaitFor("dropping fileA's inode", func() bool {
-			_, exists := test.qfs.lookupCount(test.TestCtx(), inodeId)
+			_, exists := test.qfs.lookupCount(inodeId)
 			return !exists
 		})
 	})

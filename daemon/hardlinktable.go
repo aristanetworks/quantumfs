@@ -215,6 +215,9 @@ func (ht *HardlinkTableImpl) newHardlink(c *ctx, inodeId InodeId,
 
 	fileId := record.FileId()
 	utils.Assert(fileId != quantumfs.InvalidFileId, "invalid fileId")
+	_, exists := ht.hardlinks[fileId]
+	utils.Assert(!exists, "newHardlink on pre-existing FileId %d", fileId)
+
 	ht.hardlinks[fileId] = newEntry
 	ht.inodeToLink[inodeId] = fileId
 
@@ -467,10 +470,13 @@ func (ht *HardlinkTableImpl) getNormalized(
 	if !exists {
 		return nil, nil
 	}
-	if link.effectiveNlink() != 1 {
-		return nil, nil
+
+	// Only normalize if there are no more legs or deltas inbound
+	if link.nlink == 1 && link.delta == 0 {
+		return link.publishableRecord, link.effectiveRecord
 	}
-	return link.publishableRecord, link.effectiveRecord
+
+	return nil, nil
 }
 
 // Invalidate the inode of the normalizing child in the hardlink table

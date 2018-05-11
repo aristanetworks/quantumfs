@@ -766,6 +766,7 @@ func TestAccessListNormalizedHardlink(t *testing.T) {
 		test.createFile(workspace, name, 100)
 		test.linkFile(workspace, name, name+"_link")
 		test.removeFileSync(workspace, name)
+		test.dirtyAndSync(workspace)
 
 		expectedAccessList := quantumfs.NewPathsAccessed()
 		expectedAccessList.Paths["/testFile_link"] = quantumfs.PathCreated |
