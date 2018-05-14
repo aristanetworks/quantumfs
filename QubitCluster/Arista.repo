@@ -1,0 +1,12 @@
+[Arora18Release]
+name=AroraRelease 18 - $basearch
+baseurl=http://dist/Abuild/Arora18.release/x86_64_18/latest/RPMS
+enabled=1
+gpgcheck=0
+
+[ToolsV2]
+name=ToolsV2 $basearch
+baseurl=http://tools/ToolsV2/repo/$basearch/RPMS/
+enabled=1
+gpgcheck=0
+metadata_expire=2h
