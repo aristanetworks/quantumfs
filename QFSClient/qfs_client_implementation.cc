@@ -174,14 +174,24 @@ Error ApiImpl::OpenCommon(bool directIo) {
 
 	if (this->fd == -1) {
 		int flags = O_RDWR | O_CLOEXEC;
+#if defined(O_DIRECT)
 		if (directIo) {
 			flags |= O_DIRECT;
 		}
+#endif
 
 		this->fd = open(this->path.c_str(), flags);
 		if (this->fd == -1) {
 			return util::getError(kCantOpenApiFile, this->path);
 		}
+#if !defined(O_DIRECT) && defined(F_NOCACHE)
+		// macOS doesn't support O_DIRECT but does have an equivalent fcntl
+		if (directIo) {
+			if (fcntl(this->fd, F_NOCACHE, 1) == -1) {
+				return util::getError(kCantOpenApiFile, this->path);
+			}
+		}
+#endif
 	}
 
 	return util::getError(kSuccess);
