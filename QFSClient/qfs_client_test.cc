@@ -26,29 +26,50 @@
 namespace qfsclient {
 
 void QfsClientTest::CreateTempDirTree(const std::vector<std::string> &path) {
-	char* temp_rootDir = getenv("ROOTDIRNAME");
-	char temp_directory_template[128];
-	struct stat info;
-	snprintf(temp_directory_template, sizeof(temp_directory_template),
-			"/dev/shm/%s", temp_rootDir);
-	if (stat(temp_directory_template,  &info) != 0 &&
-		mkdir(temp_directory_template, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
-			util::fperror(__func__, "mkdir()");
-			this->tree.clear();
-			return;
-	}
+	char dir_tmpl[128];
+	// Use the ROOTDIRNAME provided by the Makefile if present, but fall
+	// back to the system temp dir so that the client tests can be run
+	// without needing /dev/shm
+	const char* temp_rootDir = getenv("ROOTDIRNAME");
+	if (temp_rootDir) {
+		struct stat info;
+		snprintf(dir_tmpl, sizeof(dir_tmpl),
+				"/dev/shm/%s", temp_rootDir);
+		if (stat(dir_tmpl,  &info) != 0 &&
+			mkdir(dir_tmpl, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
+				util::fperror(__func__, "mkdir()");
+				this->tree.clear();
+				return;
+		}
 
-	memset(temp_directory_template, 0x00, sizeof(temp_directory_template));
-	snprintf(temp_directory_template, sizeof(temp_directory_template),
-			"/dev/shm/%s/qfs-client-test-XXXXXX", temp_rootDir);
-	char *temp_directory_name = mkdtemp(temp_directory_template);
+		memset(dir_tmpl, 0x00, sizeof(dir_tmpl));
+		snprintf(dir_tmpl, sizeof(dir_tmpl),
+				"/dev/shm/%s/qfs-client-test-XXXXXX", temp_rootDir);
+	} else {
+		temp_rootDir = getenv("TMPDIR");
+		if (!temp_rootDir) {
+			temp_rootDir = "/tmp";
+		}
+		snprintf(dir_tmpl, sizeof(dir_tmpl),
+				 "%s/qfs-client-test-XXXXXX", temp_rootDir);
+	}
+	char *temp_directory_name = mkdtemp(dir_tmpl);
 	if (!temp_directory_name) {
 		util::fperror(__func__, "mkdtemp()");
 		this->tree.clear();
 		return;
 	}
 
+	// Canonicalize path to simplify comparisons - particularly important on
+	// macOS where TMPDIR is /var/folders/... which symlinks to /private/var/...
+	temp_directory_name = realpath(temp_directory_name, NULL);
+	if (!temp_directory_name) {
+		util::fperror(__func__, "realpath()");
+		this->tree.clear();
+		return;
+	}
 	std::string temp_directory_path(temp_directory_name);
+	free(temp_directory_name);
 
 	for (auto path_part : path) {
 		temp_directory_path += "/" + path_part;
@@ -663,22 +684,7 @@ TEST_F(QfsClientDeterminePathTest, DeterminePathTest) {
 	Error err = this->api->DeterminePath();
 	ASSERT_EQ(err.code, kSuccess);
 
-	if (this->api->path.length() <= this->api_path.length()) {
-		ASSERT_STREQ(this->api->path.c_str(), this->api_path.c_str());
-	} else {
-		// the reason we don't always use ASSERT_STREQ is that on macOS,
-		// mkdtemp() creates tmp files in /private/tmp, even when the
-		// template begins with "/tmp", so the call to getcwd() in
-		// ApiImpl::DeterminePath() will return a string beginning
-		// "/private/tmp/..."
-		// This test verifies that this->api->path *ends* with whatever is
-		// in this->api_path.
-		ASSERT_EQ(0,
-			  this->api->path.compare(
-				this->api->path.length() - this->api_path.length(),
-				this->api_path.length(),
-				this->api_path));
-	}
+	ASSERT_STREQ(this->api->path.c_str(), this->api_path.c_str());
 
 	// Test again when the api file doesn't exist anywhere
 	unlink(this->api_path.c_str());
