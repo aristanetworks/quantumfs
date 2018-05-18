@@ -261,7 +261,7 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 	procStatus = procStatus[start+1:]
 	//c.vlog("groups start '%s'", string(procStatus[:50]))
 
-	// Test each number in the line against the groupp we are looking for
+	// Test each number in the line against the group we are looking for
 	for {
 		nextSeparator := bytes.IndexAny(procStatus, " \n")
 		if nextSeparator == -1 {
