@@ -26,57 +26,37 @@
 namespace qfsclient {
 
 void QfsClientTest::CreateTempDirTree(const std::vector<std::string> &path) {
-	char dir_tmpl[128];
-	// Use the ROOTDIRNAME provided by the Makefile if present, but fall
-	// back to the system temp dir so that the client tests can be run
-	// without needing /dev/shm
-	const char* temp_rootDir = getenv("ROOTDIRNAME");
-	if (temp_rootDir) {
-		struct stat info;
-		snprintf(dir_tmpl, sizeof(dir_tmpl),
-				"/dev/shm/%s", temp_rootDir);
-		if (stat(dir_tmpl,  &info) != 0 &&
-			mkdir(dir_tmpl, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
-				util::fperror(__func__, "mkdir()");
-				this->tree.clear();
-				return;
-		}
+	this->tree.clear();
 
-		memset(dir_tmpl, 0x00, sizeof(dir_tmpl));
-		snprintf(dir_tmpl, sizeof(dir_tmpl),
-				"/dev/shm/%s/qfs-client-test-XXXXXX", temp_rootDir);
-	} else {
-		temp_rootDir = getenv("TMPDIR");
-		if (!temp_rootDir) {
-			temp_rootDir = "/tmp";
-		}
-		snprintf(dir_tmpl, sizeof(dir_tmpl),
-				 "%s/qfs-client-test-XXXXXX", temp_rootDir);
+	const char * sys_tmp_dir = getenv("TMPDIR");
+	if (!sys_tmp_dir) {
+		sys_tmp_dir = "/tmp";
 	}
-	char *temp_directory_name = mkdtemp(dir_tmpl);
-	if (!temp_directory_name) {
+	char tmp_dir_tpl[PATH_MAX];
+	snprintf(tmp_dir_tpl, sizeof(tmp_dir_tpl),
+		"%s/qfs-client-test-XXXXXX", sys_tmp_dir);
+	char *tmp_dir = mkdtemp(tmp_dir_tpl);
+	if (!tmp_dir) {
 		util::fperror(__func__, "mkdtemp()");
-		this->tree.clear();
 		return;
 	}
 
-	// Canonicalize path to simplify comparisons - particularly important on
+	// Canonicalize tmp_dir to simplify comparisons - particularly important on
 	// macOS where TMPDIR is /var/folders/... which symlinks to /private/var/...
-	temp_directory_name = realpath(temp_directory_name, NULL);
-	if (!temp_directory_name) {
+	tmp_dir = realpath(tmp_dir, NULL);
+	if (!tmp_dir) {
 		util::fperror(__func__, "realpath()");
-		this->tree.clear();
 		return;
 	}
-	std::string temp_directory_path(temp_directory_name);
-	free(temp_directory_name);
+	this->tmp_root_dir = tmp_dir;
+	free(tmp_dir);
 
+	std::string temp_directory_path = this->tmp_root_dir;
 	for (auto path_part : path) {
 		temp_directory_path += "/" + path_part;
 
 		if (mkdir(temp_directory_path.c_str(), S_IRWXU) == -1) {
 			util::fperror(__func__, "mkdir()");
-			this->tree.clear();
 			return;
 		}
 	}
@@ -146,6 +126,11 @@ void QfsClientTest::TearDown() {
 	}
 	ReleaseApi(this->api);
 	this->api = NULL;
+
+	if (!this->tmp_root_dir.empty()) {
+		std::string command = "rm -rf " + this->tmp_root_dir;
+		ASSERT_EQ(system(command.c_str()), 0);
+	}
 }
 
 TEST_F(QfsClientTest, OpenTest) {
