@@ -209,9 +209,6 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	entryType := underlyingType(entry)
 	fileType := _objectTypeToFileType(c, entryType)
 
-	c.vlog("filling attr inode %d type %d/%x perms %o links %d",
-		inodeNum, entryType, fileType, entry.Permissions(), attr.Nlink)
-
 	switch fileType {
 	case fuse.S_IFDIR:
 		// Approximate the read size of the Directory objects in the
