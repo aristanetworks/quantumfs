@@ -250,7 +250,7 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 		return false
 	}
 	procStatus = procStatus[start:]
-	c.vlog("line start '%s'", string(procStatus[:50]))
+	//c.vlog("line start '%s'", string(procStatus[:50]))
 
 	// Skip "Groups:\t"
 	start = bytes.IndexRune(procStatus, '\t')
@@ -259,7 +259,7 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 		return false
 	}
 	procStatus = procStatus[start+1:]
-	c.vlog("groups start '%s'", string(procStatus[:50]))
+	//c.vlog("groups start '%s'", string(procStatus[:50]))
 
 	// Test each number in the line against the groupp we are looking for
 	for {
@@ -275,7 +275,7 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 		}
 
 		num := string(procStatus[:nextSeparator])
-		c.vlog("Parsing '%s'", num)
+		//c.vlog("Parsing '%s'", num)
 
 		gid, err := strconv.Atoi(num)
 		if err != nil {
@@ -292,7 +292,7 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 			return false
 		}
 
-		c.vlog("next is '%d'", procStatus[nextSeparator])
+		//c.vlog("next is '%d'", procStatus[nextSeparator])
 		procStatus = procStatus[nextSeparator+1:]
 	}
 }
