@@ -224,18 +224,19 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 	// The primary group doesn't match. We now need to check the supplementary
 	// groups. Unfortunately FUSE doesn't give us these so we need to parse them
 	// ourselves out of /proc.
-	file, err := os.Open(fmt.Sprintf("/proc/%d/task/%d/status", pid, pid))
+	fd, err := syscall.Open(fmt.Sprintf("/proc/%d/task/%d/status", pid, pid),
+		syscall.O_RDONLY, 0)
 	if err != nil {
 		c.dlog("Unable to open /proc/status for %d: %s", pid, err.Error())
 		return false
 	}
-	defer file.Close()
+	defer syscall.Close(fd)
 
 	// We are looking for the Group: line in the status file. This is generally
 	// within 4k of the start of the file. Allow extra room to be sure we get it
 	// in a single read.
 	procStatus := make([]byte, 6000)
-	numRead, err := file.Read(procStatus)
+	numRead, err := syscall.Read(fd, procStatus)
 	if err != nil {
 		c.dlog("Failed reading status file for pid %d", pid)
 		return false
