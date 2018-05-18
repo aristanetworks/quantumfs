@@ -2003,9 +2003,6 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		}
 
 		details.NodeId = child.attr.Ino
-		if child.filename != "." && child.filename != ".." {
-			c.qfs.incrementLookupCount(c, InodeId(child.attr.Ino))
-		}
 		if ds._generation == ds.src.generation() {
 			fillEntryOutCacheData(c, details)
 		} else {
@@ -2015,6 +2012,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 
 		processed++
 	}
+	c.qfs.incrementLookupCounts(c, ds.children[offset:int(offset)+processed])
 
 	return fuse.OK
 }
