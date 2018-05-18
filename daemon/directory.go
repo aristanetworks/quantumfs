@@ -1980,7 +1980,9 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	defer c.funcIn("directorySnapshot::ReadDirPlus").Out()
 	offset := input.Offset
 
-	if offset == 0 {
+	if offset == 0 && (ds.children == nil ||
+		ds._generation != ds.src.generation()) {
+
 		c.dlog("Refreshing child list")
 		ds.children = ds.src.getChildSnapshot(c)
 	}
