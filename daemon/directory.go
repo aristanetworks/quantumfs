@@ -669,7 +669,10 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	// on every invocation
 	sort.Slice(children,
 		func(i, j int) bool {
-			return children[i].filename < children[j].filename
+			if children[i].attr.Ino == children[j].attr.Ino {
+				return children[i].filename < children[j].filename
+			}
+			return children[i].attr.Ino < children[j].attr.Ino
 		})
 
 	return children
