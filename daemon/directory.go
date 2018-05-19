@@ -140,6 +140,11 @@ func (dir *Directory) generation() uint64 {
 	return atomic.LoadUint64(&dir._generation)
 }
 
+func (dir *Directory) dirty(c *ctx) {
+	atomic.AddUint64(&dir._generation, 1)
+	dir.InodeCommon.dirty(c)
+}
+
 func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	defer c.funcIn("Directory::updateSize").Out()
 
@@ -150,7 +155,6 @@ func (dir *Directory) updateSize(c *ctx, result fuse.Status) {
 	}
 	// We think we've made a change to this directory, so we should mark it dirty
 	dir.self.dirty(c)
-	atomic.AddUint64(&dir._generation, 1)
 
 	// The parent of a WorkspaceRoot is a workspacelist and we have nothing to
 	// update.
