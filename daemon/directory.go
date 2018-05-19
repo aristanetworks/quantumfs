@@ -46,6 +46,9 @@ type Directory struct {
 	childRecordLock utils.DeferableMutex
 	children        *ChildContainer
 	_generation     uint64
+
+	childSnapshot      []directoryContents
+	snapshotGeneration uint64
 }
 
 func foreachDentry(c *ctx, key quantumfs.ObjectKey,
@@ -604,12 +607,23 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	return fuse.OK
 }
 
+func cloneChildSnapshot(original []directoryContents) []directoryContents {
+	clone := make([]directoryContents, len(original))
+	copy(clone, original)
+	return clone
+}
+
 func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	defer c.funcIn("Directory::getChildSnapshot").Out()
 
 	dir.self.markSelfAccessed(c, quantumfs.PathRead|quantumfs.PathIsDir)
 
 	defer dir.RLock().RUnlock()
+
+	if dir.childSnapshot != nil && dir.snapshotGeneration == dir.generation() {
+		c.vlog("Returning cached child snapshot")
+		return cloneChildSnapshot(dir.childSnapshot)
+	}
 
 	c.vlog("Adding .")
 	selfInfo := directoryContents{
@@ -675,7 +689,10 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 			return children[i].attr.Ino < children[j].attr.Ino
 		})
 
-	return children
+	dir.childSnapshot = children
+	dir.snapshotGeneration = dir.generation()
+
+	return cloneChildSnapshot(children)
 }
 
 // Needs inode lock for write
@@ -1980,9 +1997,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	defer c.funcIn("directorySnapshot::ReadDirPlus").Out()
 	offset := input.Offset
 
-	if offset == 0 && (ds.children == nil ||
-		ds._generation != ds.src.generation()) {
-
+	if offset == 0 {
 		c.dlog("Refreshing child list")
 		ds.children = ds.src.getChildSnapshot(c)
 	}
