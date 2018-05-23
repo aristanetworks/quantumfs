@@ -55,6 +55,7 @@ type ExitFuncLog struct {
 	c         *Ctx
 	subsystem qlog.LogSubsystem
 	funcName  string
+	level     uint8
 }
 
 func (c *Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLog {
@@ -68,6 +69,7 @@ func (c *Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncL
 		c:         c,
 		subsystem: subsystem,
 		funcName:  funcName,
+		level:     3,
 	}
 }
 
@@ -92,6 +94,7 @@ func (c *Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 		c:         c,
 		subsystem: subsystem,
 		funcName:  funcName,
+		level:     3,
 	}
 }
 
@@ -108,6 +111,7 @@ func (c *Ctx) StatsFuncInName(subsystem qlog.LogSubsystem,
 		c:         c,
 		subsystem: subsystem,
 		funcName:  funcName,
+		level:     2,
 	}
 }
 
@@ -132,6 +136,7 @@ func (c *Ctx) StatsFuncIn(subsystem qlog.LogSubsystem, funcName string,
 		c:         c,
 		subsystem: subsystem,
 		funcName:  funcName,
+		level:     2,
 	}
 }
 
@@ -147,5 +152,5 @@ func (e ExitFuncLog) Out() {
 	index += copy(format[index:], e.funcName)
 	formatStr := dangerous.MoveByteSliceToString(format[:index])
 
-	e.c.Qlog.Log(e.subsystem, e.c.RequestId, 3, formatStr)
+	e.c.Qlog.Log(e.subsystem, e.c.RequestId, e.level, formatStr)
 }
