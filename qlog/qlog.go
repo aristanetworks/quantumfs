@@ -259,6 +259,9 @@ type Qlog struct {
 	// they are forced to be allocated on the stack.
 	Write     func(format string, args ...interface{}) error
 	logBuffer *SharedMemory
+
+	// Maximum level to log to the qlog file
+	maxLevel uint8
 }
 
 func PrintToStdout(format string, args ...interface{}) error {
@@ -288,6 +291,7 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 	q := Qlog{
 		LogLevels: 0,
 		Write:     outLog,
+		maxLevel:  255,
 	}
 	var err error
 	q.logBuffer, err = newSharedMemory(ramfsPath, defaultMmapFile,
@@ -312,6 +316,10 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 
 func (q *Qlog) SetWriter(w func(format string, args ...interface{}) error) {
 	q.Write = w
+}
+
+func (q *Qlog) SetMaxLevel(level uint8) {
+	q.maxLevel = level
 }
 
 // Only for tests - causes all logs starting with prefix to be incompletely written
@@ -348,8 +356,10 @@ func (q *Qlog) Close() error {
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
-	t := time.Now()
-	q.Log_(t, idx, reqId, level, format, args...)
+	if level <= q.maxLevel {
+		t := time.Now()
+		q.Log_(t, idx, reqId, level, format, args...)
+	}
 }
 
 // Should only be used by tests
