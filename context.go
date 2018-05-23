@@ -95,6 +95,44 @@ func (c *Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 	}
 }
 
+func (c *Ctx) StatsFuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLog {
+	format := qlog.FnEnterStr + funcName
+	if len(c.Prefix) > 0 {
+		format = c.Prefix + format
+	}
+
+	c.Qlog.Log(subsystem, c.RequestId, 2, format)
+	return ExitFuncLog{
+		c:         c,
+		subsystem: subsystem,
+		funcName:  funcName,
+	}
+}
+
+func (c *Ctx) StatsFuncIn(subsystem qlog.LogSubsystem, funcName string,
+	extraFmtStr string, args ...interface{}) ExitFuncLog {
+
+	// A format larger than LogStrSize bytes will be silently dropped
+	format := [qlog.LogStrSize]byte{}
+	index := 0
+
+	if len(c.Prefix) > 0 {
+		index += copy(format[index:], c.Prefix)
+	}
+	index += copy(format[index:], qlog.FnEnterStr)
+	index += copy(format[index:], funcName)
+	index += copy(format[index:], " ")
+	index += copy(format[index:], extraFmtStr)
+	formatStr := dangerous.MoveByteSliceToString(format[:index])
+
+	c.Qlog.Log(subsystem, c.RequestId, 2, formatStr, args...)
+	return ExitFuncLog{
+		c:         c,
+		subsystem: subsystem,
+		funcName:  funcName,
+	}
+}
+
 func (e ExitFuncLog) Out() {
 	// A format larger than LogStrSize bytes will be silently dropped
 	format := [qlog.LogStrSize]byte{}

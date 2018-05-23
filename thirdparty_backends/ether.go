@@ -240,7 +240,7 @@ func (ebt *EtherBlobStoreTranslator) cacheTtl(c *quantumfs.Ctx, key string) {
 	defer ebt.ttlCacheLock.Lock().Unlock()
 
 	for ebt.ttlFifo.Len() >= maxTtlCacheSize {
-		c.Vlog(qlog.LogDatastore, EtherTtlCacheEvict)
+		c.Dlog(qlog.LogDatastore, EtherTtlCacheEvict)
 		toRemove := ebt.ttlFifo.Remove(ebt.ttlFifo.Front()).(string)
 		delete(ebt.ttlCache, toRemove)
 	}
@@ -258,7 +258,7 @@ const KeyLog = "key %s"
 func (ebt *EtherBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
 
-	defer c.FuncIn(qlog.LogDatastore, EtherGetLog, KeyLog, key.String()).Out()
+	defer c.StatsFuncIn(qlog.LogDatastore, EtherGetLog, KeyLog, key.String()).Out()
 	kv := key.Value()
 	data, metadata, err := ebt.Blobstore.Get((*dsApiCtx)(c), kv)
 	if err != nil {
@@ -286,10 +286,10 @@ func (ebt *EtherBlobStoreTranslator) cachedTtlGood(c *quantumfs.Ctx,
 	defer ebt.ttlCacheLock.RLock().RUnlock()
 	expiry, cached := ebt.ttlCache[key]
 	if cached && time.Now().Before(expiry) {
-		c.Vlog(qlog.LogDatastore, EtherTtlCacheHit)
+		c.Dlog(qlog.LogDatastore, EtherTtlCacheHit)
 		return true
 	}
-	c.Vlog(qlog.LogDatastore, EtherTtlCacheMiss)
+	c.Dlog(qlog.LogDatastore, EtherTtlCacheMiss)
 	return false
 }
 
@@ -304,7 +304,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 	kv := key.Value()
 	ks := key.String()
 
-	defer c.FuncIn(qlog.LogDatastore, EtherSetLog, KeyLog, ks).Out()
+	defer c.StatsFuncIn(qlog.LogDatastore, EtherSetLog, KeyLog, ks).Out()
 
 	if buf.Size() > quantumfs.MaxBlockSize {
 		err := fmt.Errorf("Key %s size:%d is bigger than max block size",
@@ -440,7 +440,7 @@ const EtherTypespaceLog = "EtherWsdbTranslator::TypespaceList"
 func (w *etherWsdbTranslator) TypespaceList(
 	c *quantumfs.Ctx) ([]string, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, EtherTypespaceLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, EtherTypespaceLog).Out()
 	defer w.lock.RLock().RUnlock()
 
 	list, err := w.wsdb.TypespaceList((*wsApiCtx)(c))
@@ -471,7 +471,7 @@ const EtherNamespaceDebugLog = "typespace: %s"
 func (w *etherWsdbTranslator) NamespaceList(c *quantumfs.Ctx,
 	typespace string) ([]string, error) {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, EtherNamespaceLog,
+	defer c.StatsFuncIn(qlog.LogWorkspaceDb, EtherNamespaceLog,
 		EtherNamespaceDebugLog, typespace).Out()
 	defer w.lock.RLock().RUnlock()
 
@@ -504,7 +504,7 @@ func (w *etherWsdbTranslator) WorkspaceList(c *quantumfs.Ctx,
 	typespace string, namespace string) (map[string]quantumfs.WorkspaceNonce,
 	error) {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, EtherWorkspaceListLog,
+	defer c.StatsFuncIn(qlog.LogWorkspaceDb, EtherWorkspaceListLog,
 		EtherWorkspaceListDebugLog, typespace, namespace).Out()
 	defer w.lock.RLock().RUnlock()
 
@@ -529,7 +529,7 @@ func (w *etherWsdbTranslator) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey,
 	quantumfs.WorkspaceNonce, error) {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, EtherWorkspaceLog,
+	defer c.StatsFuncIn(qlog.LogWorkspaceDb, EtherWorkspaceLog,
 		EtherWorkspaceDebugLog, typespace, namespace, workspace).Out()
 	defer w.lock.RLock().RUnlock()
 
@@ -566,7 +566,7 @@ func (w *etherWsdbTranslator) BranchWorkspace(c *quantumfs.Ctx, srcTypespace str
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, EtherBranchLog, EtherBranchDebugLog,
+	defer c.StatsFuncIn(qlog.LogWorkspaceDb, EtherBranchLog, EtherBranchDebugLog,
 		srcTypespace, srcNamespace, srcWorkspace,
 		dstTypespace, dstNamespace, dstWorkspace).Out()
 	defer w.lock.Lock().Unlock()
@@ -603,7 +603,7 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 	currentRootId quantumfs.ObjectKey,
 	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, EtherAdvanceLog, EtherAdvanceDebugLog,
+	defer c.StatsFuncIn(qlog.LogWorkspaceDb, EtherAdvanceLog, EtherAdvanceDebugLog,
 		typespace, namespace, workspace,
 		currentRootId.String(),
 		newRootId.String()).Out()

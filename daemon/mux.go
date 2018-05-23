@@ -249,7 +249,7 @@ func (qfs *QuantumFs) inodeForgetter(ids []uint64) {
 const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
 
 func (qfs *QuantumFs) fileHandleReleaser(ids []uint64) {
-	defer qfs.c.funcIn(ReleaseFileHandleLog).Out()
+	defer qfs.c.statsFuncIn(ReleaseFileHandleLog).Out()
 	defer qfs.mapMutex.Lock().Unlock()
 	for _, id := range ids {
 		qfs.setFileHandle_(&qfs.c, FileHandleId(id), nil)
@@ -1087,7 +1087,7 @@ func (qfs *QuantumFs) newFileHandleId() FileHandleId {
 const SyncAllLog = "Mux::syncAll"
 
 func (qfs *QuantumFs) syncAll(c *ctx) error {
-	defer c.funcIn(SyncAllLog).Out()
+	defer c.statsFuncIn(SyncAllLog).Out()
 	return qfs.flusher.syncAll(c)
 }
 
@@ -1095,7 +1095,7 @@ func (qfs *QuantumFs) syncAll(c *ctx) error {
 const SyncWorkspaceLog = "Mux::syncWorkspace"
 
 func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
-	defer c.funcIn(SyncWorkspaceLog).Out()
+	defer c.statsFuncIn(SyncWorkspaceLog).Out()
 
 	parts := strings.Split(workspace, "/")
 	ids, err := qfs.getWsrLineageNoInstantiate(c, parts[0], parts[1], parts[2])
@@ -1164,7 +1164,7 @@ func (qfs *QuantumFs) Lookup(header *fuse.InHeader, name string,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	defer c.FuncIn(LookupLog, InodeNameLog, header.NodeId, name).Out()
+	defer c.StatsFuncIn(LookupLog, InodeNameLog, header.NodeId, name).Out()
 
 	if isFilenameTooLong(name) {
 		return ENAMETOOLONG
@@ -1588,7 +1588,7 @@ const ForgetLog = "Mux::Forget"
 
 func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 	c := qfs.c.forgetCtx()
-	defer c.funcIn(ForgetLog).Out()
+	defer c.statsFuncIn(ForgetLog).Out()
 	defer logRequestPanic(c)
 
 	c.dlog("Forget called on inode %d Looked up %d Times", nodeID, nlookup)
@@ -1611,7 +1611,7 @@ func (qfs *QuantumFs) GetAttr(input *fuse.GetAttrIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(GetAttrLog, InodeOnlyLog, input.NodeId).Out()
+	defer c.StatsFuncIn(GetAttrLog, InodeOnlyLog, input.NodeId).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
@@ -1633,7 +1633,7 @@ func (qfs *QuantumFs) SetAttr(input *fuse.SetAttrIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(SetAttrLog, SetAttrArgLog, input.NodeId,
+	defer c.StatsFuncIn(SetAttrLog, SetAttrArgLog, input.NodeId,
 		input.Valid, input.Size).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
@@ -1660,7 +1660,7 @@ func (qfs *QuantumFs) Mknod(input *fuse.MknodIn, name string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(MknodLog, InodeNameLog, input.NodeId, name).Out()
+	defer c.StatsFuncIn(MknodLog, InodeNameLog, input.NodeId, name).Out()
 
 	if isFilenameTooLong(name) {
 		return ENAMETOOLONG
@@ -1690,7 +1690,7 @@ func (qfs *QuantumFs) Mkdir(input *fuse.MkdirIn, name string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(MkdirLog, InodeNameLog, input.NodeId, name).Out()
+	defer c.StatsFuncIn(MkdirLog, InodeNameLog, input.NodeId, name).Out()
 
 	if isFilenameTooLong(name) {
 		return ENAMETOOLONG
@@ -1720,7 +1720,7 @@ func (qfs *QuantumFs) Unlink(header *fuse.InHeader,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	defer c.FuncIn(UnlinkLog, InodeNameLog, header.NodeId, name).Out()
+	defer c.StatsFuncIn(UnlinkLog, InodeNameLog, header.NodeId, name).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
@@ -1746,7 +1746,7 @@ func (qfs *QuantumFs) Rmdir(header *fuse.InHeader,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	defer c.FuncIn(RmdirLog, InodeNameLog, header.NodeId, name).Out()
+	defer c.StatsFuncIn(RmdirLog, InodeNameLog, header.NodeId, name).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
@@ -1773,7 +1773,7 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(RenameLog, RenameDebugLog, input.NodeId, input.Newdir,
+	defer c.StatsFuncIn(RenameLog, RenameDebugLog, input.NodeId, input.Newdir,
 		oldName, newName).Out()
 
 	if isFilenameTooLong(oldName) || isFilenameTooLong(newName) {
@@ -1832,7 +1832,7 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(LinkLog, LinkDebugLog, input.Oldnodeid, filename,
+	defer c.StatsFuncIn(LinkLog, LinkDebugLog, input.Oldnodeid, filename,
 		input.NodeId).Out()
 
 	if isFilenameTooLong(filename) {
@@ -1893,7 +1893,7 @@ func (qfs *QuantumFs) Symlink(header *fuse.InHeader, pointedTo string,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	defer c.FuncIn(SymlinkLog, InodeNameLog, header.NodeId, linkName).Out()
+	defer c.StatsFuncIn(SymlinkLog, InodeNameLog, header.NodeId, linkName).Out()
 
 	if isFilenameTooLong(linkName) {
 		return ENAMETOOLONG
@@ -1924,7 +1924,7 @@ func (qfs *QuantumFs) Readlink(header *fuse.InHeader) (out []byte,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	defer c.FuncIn(ReadlinkLog, InodeOnlyLog, header.NodeId).Out()
+	defer c.StatsFuncIn(ReadlinkLog, InodeOnlyLog, header.NodeId).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
@@ -1944,7 +1944,7 @@ func (qfs *QuantumFs) Access(input *fuse.AccessIn) (result fuse.Status) {
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(AccessLog, InodeOnlyLog, input.NodeId).Out()
+	defer c.StatsFuncIn(AccessLog, InodeOnlyLog, input.NodeId).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
@@ -1979,7 +1979,7 @@ func (qfs *QuantumFs) GetXAttrSize(header *fuse.InHeader, attr string) (size int
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	defer c.FuncIn(GetXAttrSizeLog, InodeOnlyLog, header.NodeId).Out()
+	defer c.StatsFuncIn(GetXAttrSizeLog, InodeOnlyLog, header.NodeId).Out()
 
 	if isPosixAclName(attr) {
 		return 0, fuse.EINVAL
@@ -2052,7 +2052,7 @@ func (qfs *QuantumFs) GetXAttrData(header *fuse.InHeader, attr string) (data []b
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	defer c.FuncIn(GetXAttrDataLog, InodeOnlyLog, header.NodeId).Out()
+	defer c.StatsFuncIn(GetXAttrDataLog, InodeOnlyLog, header.NodeId).Out()
 
 	if isPosixAclName(attr) {
 		return nil, fuse.EINVAL
@@ -2087,7 +2087,7 @@ func (qfs *QuantumFs) ListXAttr(header *fuse.InHeader) (attributes []byte,
 
 	c := qfs.c.req(header)
 	defer logRequestPanic(c)
-	defer c.FuncIn(ListXAttrLog, InodeOnlyLog, header.NodeId).Out()
+	defer c.StatsFuncIn(ListXAttrLog, InodeOnlyLog, header.NodeId).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(header.NodeId))
 	defer unlock.RUnlock()
@@ -2109,7 +2109,7 @@ func (qfs *QuantumFs) SetXAttr(input *fuse.SetXAttrIn, attr string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(SetXAttrLog, InodeOnlyLog, input.NodeId).Out()
+	defer c.StatsFuncIn(SetXAttrLog, InodeOnlyLog, input.NodeId).Out()
 
 	if isPosixAclName(attr) {
 		return fuse.EINVAL
@@ -2175,7 +2175,7 @@ func (qfs *QuantumFs) Create(input *fuse.CreateIn, name string,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(CreateLog, InodeNameLog, input.NodeId, name).Out()
+	defer c.StatsFuncIn(CreateLog, InodeNameLog, input.NodeId, name).Out()
 
 	if isFilenameTooLong(name) {
 		return ENAMETOOLONG
@@ -2205,7 +2205,7 @@ func (qfs *QuantumFs) Open(input *fuse.OpenIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(OpenLog, InodeOnlyLog, input.NodeId).Out()
+	defer c.StatsFuncIn(OpenLog, InodeOnlyLog, input.NodeId).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
@@ -2232,7 +2232,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(ReadLog, FileHandleLog, input.Fh).Out()
+	defer c.StatsFuncIn(ReadLog, FileHandleLog, input.Fh).Out()
 
 	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	defer unlock.RUnlock()
@@ -2251,7 +2251,7 @@ const ReleaseLog = "Mux::Release"
 func (qfs *QuantumFs) Release(input *fuse.ReleaseIn) {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(ReleaseLog, FileHandleLog, input.Fh).Out()
+	defer c.StatsFuncIn(ReleaseLog, FileHandleLog, input.Fh).Out()
 
 	qfs.toBeReleased <- input.Fh
 }
@@ -2266,7 +2266,7 @@ func (qfs *QuantumFs) Write(input *fuse.WriteIn, data []byte) (written uint32,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(WriteLog, FileHandleLog, input.Fh).Out()
+	defer c.StatsFuncIn(WriteLog, FileHandleLog, input.Fh).Out()
 
 	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	defer unlock.RUnlock()
@@ -2288,7 +2288,7 @@ func (qfs *QuantumFs) Flush(input *fuse.FlushIn) (result fuse.Status) {
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(FlushLog, FlushDebugLog, input.Fh, input.Context.Uid,
+	defer c.StatsFuncIn(FlushLog, FlushDebugLog, input.Fh, input.Context.Uid,
 		input.Context.Gid, input.Context.Pid).Out()
 
 	return fuse.OK
@@ -2301,7 +2301,7 @@ func (qfs *QuantumFs) Fsync(input *fuse.FsyncIn) (result fuse.Status) {
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(FsyncLog, FileHandleLog, input.Fh).Out()
+	defer c.StatsFuncIn(FsyncLog, FileHandleLog, input.Fh).Out()
 
 	return fuse.ENOSYS
 }
@@ -2313,7 +2313,7 @@ func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (result fuse.Status) {
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.funcIn(FallocateLog).Out()
+	defer c.statsFuncIn(FallocateLog).Out()
 
 	c.elog("Unhandled request Fallocate")
 	return fuse.ENOSYS
@@ -2328,7 +2328,7 @@ func (qfs *QuantumFs) OpenDir(input *fuse.OpenIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(OpenDirLog, InodeOnlyLog, input.NodeId).Out()
+	defer c.StatsFuncIn(OpenDirLog, InodeOnlyLog, input.NodeId).Out()
 
 	inode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock.RUnlock()
@@ -2350,7 +2350,7 @@ func (qfs *QuantumFs) ReadDir(input *fuse.ReadIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(ReadDirLog, FileOffsetLog, input.Fh, input.Offset).Out()
+	defer c.StatsFuncIn(ReadDirLog, FileOffsetLog, input.Fh, input.Offset).Out()
 
 	c.elog("Unhandled request ReadDir")
 	return fuse.ENOSYS
@@ -2365,7 +2365,7 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(ReadDirPlusLog, FileOffsetLog, input.Fh, input.Offset).Out()
+	defer c.StatsFuncIn(ReadDirPlusLog, FileOffsetLog, input.Fh, input.Offset).Out()
 
 	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	defer unlock.RUnlock()
@@ -2383,7 +2383,7 @@ const ReleaseDirLog = "Mux::ReleaseDir"
 func (qfs *QuantumFs) ReleaseDir(input *fuse.ReleaseIn) {
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(ReleaseDirLog, FileHandleLog, input.Fh).Out()
+	defer c.StatsFuncIn(ReleaseDirLog, FileHandleLog, input.Fh).Out()
 
 	qfs.toBeReleased <- input.Fh
 }
@@ -2395,7 +2395,7 @@ func (qfs *QuantumFs) FsyncDir(input *fuse.FsyncIn) (result fuse.Status) {
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.FuncIn(FsyncDirLog, FileHandleLog, input.Fh).Out()
+	defer c.StatsFuncIn(FsyncDirLog, FileHandleLog, input.Fh).Out()
 
 	return fuse.ENOSYS
 }
@@ -2409,7 +2409,7 @@ func (qfs *QuantumFs) StatFs(input *fuse.InHeader,
 
 	c := qfs.c.req(input)
 	defer logRequestPanic(c)
-	defer c.funcIn(StatFsLog).Out()
+	defer c.statsFuncIn(StatFsLog).Out()
 
 	out.Blocks = 2684354560 // 10TB
 	out.Bfree = out.Blocks / 2

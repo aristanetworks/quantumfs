@@ -99,3 +99,13 @@ func (c *ctx) FuncIn(funcName string, extraFmtStr string,
 
 	return c.Ctx.FuncIn(qlog.LogDaemon, funcName, extraFmtStr, args...)
 }
+
+func (c *ctx) statsFuncIn(funcName string) quantumfs.ExitFuncLog {
+	return c.Ctx.StatsFuncInName(qlog.LogDaemon, funcName)
+}
+
+func (c *ctx) StatsFuncIn(funcName string, extraFmtStr string,
+	args ...interface{}) quantumfs.ExitFuncLog {
+
+	return c.Ctx.StatsFuncIn(qlog.LogDaemon, funcName, extraFmtStr, args...)
+}
