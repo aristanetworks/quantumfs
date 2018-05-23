@@ -779,8 +779,8 @@ func (wsdb *workspaceDB) fetchWorkspace(c *quantumfs.Ctx, workspaceName string) 
 	key quantumfs.ObjectKey, nonce quantumfs.WorkspaceNonce, immutable bool,
 	err error) {
 
-	defer c.StatsFuncIn(qlog.LogWorkspaceDb, FetchWorkspaceLog, FetchWorkspaceDebug,
-		workspaceName).Out()
+	defer c.StatsFuncIn(qlog.LogWorkspaceDb, FetchWorkspaceLog,
+		FetchWorkspaceDebug, workspaceName).Out()
 
 	err = retry(c, "fetchWorkspace", func(c *quantumfs.Ctx) error {
 		var err error

@@ -2365,7 +2365,8 @@ func (qfs *QuantumFs) ReadDirPlus(input *fuse.ReadIn,
 
 	c := qfs.c.req(&input.InHeader)
 	defer logRequestPanic(c)
-	defer c.StatsFuncIn(ReadDirPlusLog, FileOffsetLog, input.Fh, input.Offset).Out()
+	defer c.StatsFuncIn(ReadDirPlusLog, FileOffsetLog, input.Fh,
+		input.Offset).Out()
 
 	fileHandle, unlock := qfs.RLockTreeGetHandle(c, FileHandleId(input.Fh))
 	defer unlock.RUnlock()

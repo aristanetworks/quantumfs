@@ -95,7 +95,9 @@ func (c *Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 	}
 }
 
-func (c *Ctx) StatsFuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncLog {
+func (c *Ctx) StatsFuncInName(subsystem qlog.LogSubsystem,
+	funcName string) ExitFuncLog {
+
 	format := qlog.FnEnterStr + funcName
 	if len(c.Prefix) > 0 {
 		format = c.Prefix + format
