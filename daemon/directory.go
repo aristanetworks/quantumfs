@@ -1983,7 +1983,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	offset := input.Offset
 
 	if offset == 0 {
-		c.vlog("Refreshing child list")
+		c.dlog("Refreshing child list")
 		ds.children = ds.src.getChildSnapshot(c)
 	}
 

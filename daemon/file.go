@@ -403,7 +403,7 @@ func operateOnBlocks(c *ctx, accessor blockAccessor, offset uint64, size uint32,
 	offset = newOffset
 
 	// Handle the first block a little specially (with offset)
-	c.vlog("Reading initial block %d offset %d", startBlkIdx, offset)
+	c.dlog("Reading initial block %d offset %d", startBlkIdx, offset)
 	err := fn(c, startBlkIdx, offset)
 	if err != nil {
 		c.dlog("Unable to operate on first data block: %s", err.Error())
