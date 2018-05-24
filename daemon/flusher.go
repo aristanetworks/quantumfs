@@ -18,7 +18,7 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-const flushSanityTimeout = time.Minute
+const flusherSanityTimeout = time.Minute
 
 type dirtyInode struct {
 	inode               Inode
@@ -98,7 +98,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 	defer logRequestPanic(c)
 
 	// When we think we have no inodes try periodically anyways to ensure sanity
-	nextExpiringInode := time.Now().Add(flushSanityTimeout)
+	nextExpiringInode := time.Now().Add(flusherSanityTimeout)
 
 	for {
 		sleepTime := getSleepTime(c, nextExpiringInode)
@@ -308,8 +308,8 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) 
 
 func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 	sleepTime := nextExpiringInode.Sub(time.Now())
-	if sleepTime > flushSanityTimeout {
-		sleepTime = flushSanityTimeout
+	if sleepTime > flusherSanityTimeout {
+		sleepTime = flusherSanityTimeout
 	}
 	if sleepTime < time.Millisecond {
 		c.vlog("Do not allow busywaiting in the flusher")
