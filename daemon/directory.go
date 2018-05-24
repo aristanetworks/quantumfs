@@ -183,7 +183,7 @@ func (dir *Directory) delChild_(c *ctx,
 
 	defer c.funcIn("Directory::delChild_").Out()
 
-	c.dlog("Unlinking inode %s", name)
+	c.vlog("Unlinking inode %s", name)
 
 	// If this is a file we need to reparent it to itself
 	record := func() quantumfs.DirectoryRecord {
@@ -598,7 +598,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource))
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
-	c.dlog(OpenedInodeDebug, dir.inodeNum(), ds.FileHandleCommon.id)
+	c.vlog(OpenedInodeDebug, dir.inodeNum(), ds.FileHandleCommon.id)
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 
 	return fuse.OK
@@ -809,7 +809,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	}()
 
 	dir.updateSize(c, result)
-	c.dlog("Directory::Mkdir created inode %d", out.NodeId)
+	c.vlog("Directory::Mkdir created inode %d", out.NodeId)
 
 	return result
 }
@@ -1038,7 +1038,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 			return err
 		}
 
-		c.dlog("Directory::Mknod Mode %x", input.Mode)
+		c.vlog("Directory::Mknod Mode %x", input.Mode)
 		if utils.BitFlagsSet(uint(input.Mode), syscall.S_IFIFO) ||
 			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFSOCK) ||
 			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFBLK) ||
@@ -1758,7 +1758,7 @@ func (dir *Directory) recordToChild(c *ctx, inodeNum InodeId,
 		constructor = newSpecial
 	}
 
-	c.dlog("Instantiating child %d with key %s", inodeNum, entry.ID().String())
+	c.vlog("Instantiating child %d with key %s", inodeNum, entry.ID().String())
 
 	return constructor(c, entry.Filename(), entry.ID(), entry.Size(), inodeNum,
 		dir.self, 0, 0, nil)
@@ -1818,7 +1818,7 @@ func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
 	entry.SetID(key)
 	entry.SetType(type_)
 	entry.SetPermissions(modeToPermissions(mode, umask))
-	c.dlog("Directory::createNewEntry mode %o umask %o permissions %o",
+	c.vlog("Directory::createNewEntry mode %o umask %o permissions %o",
 		mode, umask, entry.Permissions())
 	entry.SetOwner(uid)
 	entry.SetGroup(gid)
@@ -1978,7 +1978,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	offset := input.Offset
 
 	if offset == 0 {
-		c.dlog("Refreshing child list")
+		c.vlog("Refreshing child list")
 		ds.children = ds.src.getChildSnapshot(c)
 	}
 

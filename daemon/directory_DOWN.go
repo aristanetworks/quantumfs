@@ -86,7 +86,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	dir.self.markAccessed(c, newName,
 		markType(newRecord.Type(), quantumfs.PathCreated))
 
-	c.dlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
+	c.vlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
 	inodeNum := srcInode.inodeNum()
 	out.NodeId = uint64(inodeNum)
@@ -206,7 +206,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 		child.Type() != quantumfs.ObjectTypeSymlink &&
 		child.Type() != quantumfs.ObjectTypeSpecial {
 
-		c.dlog("Cannot hardlink %s - not a file", child.Filename())
+		c.vlog("Cannot hardlink %s - not a file", child.Filename())
 		return nil, false, fuse.EINVAL
 	}
 

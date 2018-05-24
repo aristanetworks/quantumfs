@@ -174,9 +174,11 @@ Error ApiImpl::OpenCommon(bool directIo) {
 
 	if (this->fd == -1) {
 		int flags = O_RDWR | O_CLOEXEC;
+#if defined(O_DIRECT)
 		if (directIo) {
 			flags |= O_DIRECT;
 		}
+#endif
 
 		this->fd = open(this->path.c_str(), flags);
 		if (this->fd == -1) {

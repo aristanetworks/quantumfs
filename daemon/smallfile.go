@@ -175,7 +175,7 @@ func (fi *SmallFile) convertToMultiBlock(c *ctx,
 	input.expandTo(numBlocks)
 	dataInPrevBlocks := 0
 	if numBlocks > 0 {
-		c.dlog("Syncing smallFile dataBlock")
+		c.vlog("Syncing smallFile dataBlock")
 		input.toSync[0] = fi.getBufferToDirty(c)
 		dataInPrevBlocks = (numBlocks - 1) * int(input.metadata.BlockSize)
 	}
