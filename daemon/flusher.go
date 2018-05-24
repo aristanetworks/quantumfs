@@ -279,7 +279,9 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) 
 		dq.sortTopologically_(c)
 	}
 
-	// If we are going to skip flushing the inodes, there is no need to wait.
+	// If we are going to skip flushing the inodes, there is no need to wait. We
+	// must still go through all the motions to ensure the inode is properly
+	// forgotten and, if necessary, uninstantiated.
 	if !flushAll {
 		flushAll = dq.treeState.skipFlush
 	}
