@@ -233,7 +233,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		// incremented above.
 		dirtyElement = inode.markClean_()
 
-		if dq.treeState.doNotFlush {
+		if dq.treeState.skipFlush {
 			// Don't waste time flushing inodes in deleted workspaces
 			c.vlog("Skipping flush as workspace is deleted")
 			return true, forget()
@@ -270,13 +270,18 @@ var panicErr error
 
 // treeState lock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) {
-	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t notflush %t",
-		flushAll, dq.treeState.doNotFlush).Out()
+	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t skipFlush %t",
+		flushAll, dq.treeState.skipFlush).Out()
 	defer logRequestPanic(c)
 	err = panicErr
 
 	if flushAll {
 		dq.sortTopologically_(c)
+	}
+
+	// If we are going to skip flushing the inodes, there is no need to wait.
+	if !flushAll {
+		flushAll = dq.treeState.skipFlush
 	}
 
 	for dq.Len_() > 0 {
@@ -285,9 +290,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) 
 		candidate := element.Value.(*dirtyInode)
 
 		now := time.Now()
-		if !flushAll && !dq.treeState.doNotFlush &&
-			candidate.expiryTime.After(now) {
-
+		if !flushAll && candidate.expiryTime.After(now) {
 			// all expiring inodes have been flushed
 			return false, nil
 		}

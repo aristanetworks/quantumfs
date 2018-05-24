@@ -200,9 +200,9 @@ type inodeHolder interface {
 }
 
 type TreeState struct {
-	lock       sync.RWMutex
-	name       string
-	doNotFlush bool
+	lock      sync.RWMutex
+	name      string
+	skipFlush bool
 }
 
 func (ts *TreeState) Unlock() {

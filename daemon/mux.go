@@ -487,8 +487,8 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	} else if len(wsrLineage) == 4 {
 		wsr := qfs.inodeNoInstantiate(c, wsrLineage[3])
 		if wsr != nil {
-			c.vlog("Setting tree doNotFlush")
-			wsr.treeState().doNotFlush = true
+			c.vlog("Setting tree skipFlush")
+			wsr.treeState().skipFlush = true
 		}
 
 		// In case the deletion has happened remotely, workspacelisting does
