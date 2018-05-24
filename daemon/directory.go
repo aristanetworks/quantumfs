@@ -611,10 +611,8 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	defer dir.RLock().RUnlock()
 
-	children := make([]directoryContents, 0, 200+2)
-
 	c.vlog("Adding .")
-	entryInfo := directoryContents{
+	selfInfo := directoryContents{
 		filename: ".",
 	}
 
@@ -622,14 +620,13 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	// WorkspaceRoot.getChildSnapShot() will overwrite the first two entries with
 	// the correct data.
 	if !dir.self.isWorkspaceRoot() {
-		dir.parentGetChildAttr(c, dir.inodeNum(), &entryInfo.attr,
+		dir.parentGetChildAttr(c, dir.inodeNum(), &selfInfo.attr,
 			c.fuseCtx.Owner)
-		entryInfo.fuseType = entryInfo.attr.Mode
+		selfInfo.fuseType = selfInfo.attr.Mode
 	}
-	children = append(children, entryInfo)
 
 	c.vlog("Adding ..")
-	entryInfo = directoryContents{
+	parentInfo := directoryContents{
 		filename: "..",
 	}
 
@@ -640,31 +637,32 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 			if parent.isWorkspaceRoot() {
 				wsr := parent.(*WorkspaceRoot)
-				wsr.fillWorkspaceAttrReal(c, &entryInfo.attr)
+				wsr.fillWorkspaceAttrReal(c, &parentInfo.attr)
 			} else {
 				c.vlog("Got record from grandparent")
 				parent.parentGetChildAttr(c, parent.inodeNum(),
-					&entryInfo.attr, c.fuseCtx.Owner)
+					&parentInfo.attr, c.fuseCtx.Owner)
 			}
-			entryInfo.fuseType = entryInfo.attr.Mode
+			parentInfo.fuseType = parentInfo.attr.Mode
 		}()
 	}
-	children = append(children, entryInfo)
 
 	c.vlog("Adding real children")
 
 	defer dir.childRecordLock.Lock().Unlock()
 	records := dir.children.records()
 
-	for filename, entry := range records {
-		entryInfo := directoryContents{
-			filename: filename,
-		}
-		fillAttrWithDirectoryRecord(c, &entryInfo.attr,
-			dir.children.inodeNum(filename), c.fuseCtx.Owner, entry)
-		entryInfo.fuseType = entryInfo.attr.Mode
+	children := make([]directoryContents, len(records)+2)
+	children[0] = selfInfo
+	children[1] = parentInfo
 
-		children = append(children, entryInfo)
+	i := 2
+	for filename, entry := range records {
+		children[i].filename = filename
+		fillAttrWithDirectoryRecord(c, &children[i].attr,
+			dir.children.inodeNum(filename), c.fuseCtx.Owner, entry)
+		children[i].fuseType = children[i].attr.Mode
+		i++
 	}
 
 	// Sort the dentries so that their order is deterministic
