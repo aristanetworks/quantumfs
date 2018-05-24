@@ -241,7 +241,7 @@ func (ht *HardlinkTableImpl) instantiateHardlink(c *ctx, inodeId InodeId) Inode 
 			return nil
 		}
 
-		c.dlog("Instantiating hardlink %d", id)
+		c.vlog("Instantiating hardlink %d", id)
 		return ht.hardlinks[id].record()
 	}()
 	if hardlinkRecord == nil {
