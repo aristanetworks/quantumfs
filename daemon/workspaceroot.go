@@ -201,7 +201,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 	}
 
 	if wsr.publishedRootId.IsEqualTo(publishedRootId) {
-		c.dlog("Not refreshing workspace %s as there has been no updates",
+		c.vlog("Not refreshing workspace %s as there has been no updates",
 			workspaceName)
 		return
 	}
@@ -280,7 +280,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 			return handleAdvanceError(c, wsr, rootId, newRootId, err)
 		}
 
-		c.dlog("Advanced rootId %s -> %s", wsr.publishedRootId.String(),
+		c.vlog("Advanced rootId %s -> %s", wsr.publishedRootId.String(),
 			rootId.String())
 		wsr.publishedRootId = rootId
 	}

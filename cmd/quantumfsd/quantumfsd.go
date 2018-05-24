@@ -91,6 +91,9 @@ func init() {
 
 	qflag.BoolVar(&showMaxSizes, "showMaxSizes", false,
 		"Show max block counts, metadata entries and max file sizes")
+
+	qflag.BoolVar(&config.VerboseTracing, "verboseTracing", true,
+		"Enable verbose qlog tracing")
 }
 
 func maxSizes() {
