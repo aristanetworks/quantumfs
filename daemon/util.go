@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"strconv"
@@ -223,61 +224,77 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 	// The primary group doesn't match. We now need to check the supplementary
 	// groups. Unfortunately FUSE doesn't give us these so we need to parse them
 	// ourselves out of /proc.
-	file, err := os.Open(fmt.Sprintf("/proc/%d/task/%d/status", pid, pid))
+	fd, err := syscall.Open(fmt.Sprintf("/proc/%d/task/%d/status", pid, pid),
+		syscall.O_RDONLY, 0)
 	if err != nil {
 		c.dlog("Unable to open /proc/status for %d: %s", pid, err.Error())
 		return false
 	}
-	defer file.Close()
-	procStatus := bufio.NewReader(file)
+	defer syscall.Close(fd)
+
+	// We are looking for the Group: line in the status file. This is generally
+	// within 4k of the start of the file. Allow extra room to be sure we get it
+	// in a single read.
+	procStatus := make([]byte, 6000)
+	numRead, err := syscall.Read(fd, procStatus)
+	if err != nil {
+		c.dlog("Failed reading status file for pid %d", pid)
+		return false
+	}
+	procStatus = procStatus[:numRead]
 
 	// Find "Groups:" line
+	start := bytes.Index(procStatus, []byte("Groups:\t"))
+	if start == -1 {
+		c.dlog("Groups: not found in status file for pid %d", pid)
+		return false
+	}
+	procStatus = procStatus[start:]
+	//c.vlog("line start '%s'", string(procStatus[:50]))
+
+	// Skip "Groups:\t"
+	start = bytes.IndexRune(procStatus, '\t')
+	if start == -1 {
+		c.dlog("tab not found in groups for pid %d", pid)
+		return false
+	}
+	procStatus = procStatus[start+1:]
+	//c.vlog("groups start '%s'", string(procStatus[:50]))
+
+	// Test each number in the line against the group we are looking for
 	for {
-		bline, _, err := procStatus.ReadLine()
-		if err != nil {
-			c.dlog("Error reading proc status line: %s", err.Error())
+		nextSeparator := bytes.IndexAny(procStatus, " \n")
+		if nextSeparator == -1 {
+			c.dlog("reached EOF without Groups newline for pid %d", pid)
 			return false
 		}
 
-		line := string(bline)
-
-		if !strings.HasPrefix(line, "Groups:") {
-			continue
+		if nextSeparator == 0 {
+			c.vlog("No supplementary groups")
+			return false
 		}
 
-		// We now have something like "Groups:\t10 10545 ", get all the GIDs
-		// and skip the prefix
-		groups := strings.Split(line, "\t")[1:]
-		c.vlog("Groups: %s", groups[0])
+		num := string(procStatus[:nextSeparator])
+		//c.vlog("Parsing '%s'", num)
 
-		// Now we need to split the groups themselves up
-		groups = strings.Split(groups[0], " ")
-
-		for _, sgid := range groups {
-			if sgid == "" {
-				continue
-			}
-
-			gid, err := strconv.Atoi(sgid)
-			if err != nil {
-				c.elog("Failed to parse gid from '%s' out of '%s'",
-					sgid, line)
-				continue
-			}
-			if uint32(gid) == inodeGid {
-				c.vlog("Supplementary group %d matches inode", gid)
-				return true
-			}
+		gid, err := strconv.Atoi(num)
+		if err != nil {
+			c.elog("Failed to parse gid from '%s' out of '%s...'",
+				num, string(procStatus[:200]))
+		} else if uint32(gid) == inodeGid {
+			c.vlog("Supplementary group %d matches inode", gid)
+			return true
 		}
 
-		// We've processed the only line which matters. Since we didn't find
-		// a matching group we are done. However, to protect against the
-		// possibility that the Groups line is empty we do not return here.
-		break
+		if procStatus[nextSeparator+1] == '\n' {
+			// We reached the end of the line without finding a match
+			c.vlog("Reached EOL")
+			return false
+		}
+
+		//c.vlog("next is '%d'", procStatus[nextSeparator])
+		procStatus = procStatus[nextSeparator+1:]
 	}
-
-	c.vlog("No matching user groups")
-	return false
 }
 
 func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
