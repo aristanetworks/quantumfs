@@ -73,8 +73,8 @@ func (c *Ctx) FuncInName(subsystem qlog.LogSubsystem, funcName string) ExitFuncL
 	}
 }
 
-func (c *Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
-	extraFmtStr string, args ...interface{}) ExitFuncLog {
+func (c *Ctx) functionEntryLog(subsystem qlog.LogSubsystem, funcName string,
+	extraFmtStr string, level uint8, args ...interface{}) ExitFuncLog {
 
 	// A format larger than LogStrSize bytes will be silently dropped
 	format := [qlog.LogStrSize]byte{}
@@ -89,13 +89,19 @@ func (c *Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
 	index += copy(format[index:], extraFmtStr)
 	formatStr := dangerous.MoveByteSliceToString(format[:index])
 
-	c.Qlog.Log(subsystem, c.RequestId, 3, formatStr, args...)
+	c.Qlog.Log(subsystem, c.RequestId, level, formatStr, args...)
 	return ExitFuncLog{
 		c:         c,
 		subsystem: subsystem,
 		funcName:  funcName,
-		level:     3,
+		level:     level,
 	}
+}
+
+func (c *Ctx) FuncIn(subsystem qlog.LogSubsystem, funcName string,
+	extraFmtStr string, args ...interface{}) ExitFuncLog {
+
+	return c.functionEntryLog(subsystem, funcName, extraFmtStr, 3, args...)
 }
 
 func (c *Ctx) StatsFuncInName(subsystem qlog.LogSubsystem,
@@ -118,26 +124,7 @@ func (c *Ctx) StatsFuncInName(subsystem qlog.LogSubsystem,
 func (c *Ctx) StatsFuncIn(subsystem qlog.LogSubsystem, funcName string,
 	extraFmtStr string, args ...interface{}) ExitFuncLog {
 
-	// A format larger than LogStrSize bytes will be silently dropped
-	format := [qlog.LogStrSize]byte{}
-	index := 0
-
-	if len(c.Prefix) > 0 {
-		index += copy(format[index:], c.Prefix)
-	}
-	index += copy(format[index:], qlog.FnEnterStr)
-	index += copy(format[index:], funcName)
-	index += copy(format[index:], " ")
-	index += copy(format[index:], extraFmtStr)
-	formatStr := dangerous.MoveByteSliceToString(format[:index])
-
-	c.Qlog.Log(subsystem, c.RequestId, 2, formatStr, args...)
-	return ExitFuncLog{
-		c:         c,
-		subsystem: subsystem,
-		funcName:  funcName,
-		level:     2,
-	}
+	return c.functionEntryLog(subsystem, funcName, extraFmtStr, 2, args...)
 }
 
 func (e ExitFuncLog) Out() {
