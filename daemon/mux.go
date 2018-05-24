@@ -488,24 +488,25 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 		parts[0], parts[1], parts[2])
 	if err != nil {
 		c.elog("getting wsrLineage failed: %s", err.Error())
-	} else {
-		// In case the deletion has happened remotely, workspacelisting
-		// does not have the capability of orphaning the workspace if the
-		// namespace or typespace have been removed as well.
-		if len(wsrLineage) == 4 {
-			qfs.handleMetaInodeRemoval(c,
-				wsrLineage[3], parts[2], wsrLineage[2])
+	} else if len(wsrLineage) == 4 {
+		wsr := qfs.inodeNoInstantiate(c, wsrLineage[3])
+		if wsr != nil {
+			c.vlog("Setting tree skipFlush")
+			wsr.treeState().skipFlush = true
 		}
+
+		// In case the deletion has happened remotely, workspacelisting does
+		// not have the capability of orphaning the workspace if the
+		// namespace or typespace have been removed as well.
+		qfs.handleMetaInodeRemoval(c,
+			wsrLineage[3], parts[2], wsrLineage[2])
 	}
 
 	// Instantiating the workspace has the side effect of querying the
 	// workspaceDB and updating the in-memory data structures.
 	// We need the current in-memory state though to take
 	// other required actions
-	wsr, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
-	if wsr != nil {
-		wsr.treeState().doNotFlush = true
-	}
+	_, cleanup, _ := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
 	cleanup()
 }
 

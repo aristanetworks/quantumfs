@@ -18,7 +18,7 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-const flushSanityTimeout = time.Minute
+const flusherSanityTimeout = time.Minute
 
 type dirtyInode struct {
 	inode               Inode
@@ -98,7 +98,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 	defer logRequestPanic(c)
 
 	// When we think we have no inodes try periodically anyways to ensure sanity
-	nextExpiringInode := time.Now().Add(flushSanityTimeout)
+	nextExpiringInode := time.Now().Add(flusherSanityTimeout)
 
 	for {
 		sleepTime := getSleepTime(c, nextExpiringInode)
@@ -233,7 +233,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		// incremented above.
 		dirtyElement = inode.markClean_()
 
-		if dq.treeState.doNotFlush {
+		if dq.treeState.skipFlush {
 			// Don't waste time flushing inodes in deleted workspaces
 			c.vlog("Skipping flush as workspace is deleted")
 			return true, forget()
@@ -270,13 +270,20 @@ var panicErr error
 
 // treeState lock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) {
-
-	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t", flushAll).Out()
+	defer c.FuncIn("DirtyQueue::flushQueue_", "flushAll %t skipFlush %t",
+		flushAll, dq.treeState.skipFlush).Out()
 	defer logRequestPanic(c)
 	err = panicErr
 
 	if flushAll {
 		dq.sortTopologically_(c)
+	}
+
+	// If we are going to skip flushing the inodes, there is no need to wait. We
+	// must still go through all the motions to ensure the inode is properly
+	// forgotten and, if necessary, uninstantiated.
+	if !flushAll {
+		flushAll = dq.treeState.skipFlush
 	}
 
 	for dq.Len_() > 0 {
@@ -306,9 +313,8 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) 
 
 func getSleepTime(c *ctx, nextExpiringInode time.Time) time.Duration {
 	sleepTime := nextExpiringInode.Sub(time.Now())
-	if sleepTime > flushSanityTimeout {
-		c.elog("Overlong flusher sleepTime %s!", sleepTime)
-		sleepTime = flushSanityTimeout
+	if sleepTime > flusherSanityTimeout {
+		sleepTime = flusherSanityTimeout
 	}
 	if sleepTime < time.Millisecond {
 		c.vlog("Do not allow busywaiting in the flusher")

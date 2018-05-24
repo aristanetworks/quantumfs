@@ -40,6 +40,7 @@ var memLogMegabytes uint
 var config daemon.QuantumFsConfig
 var showMaxSizes bool
 var qflag *flag.FlagSet
+var dirtyFlushDelay uint
 
 func init() {
 	const (
@@ -48,6 +49,7 @@ func init() {
 		defaultMountPath        = "/qfs"
 		defaultCacheTimeSeconds = 3600
 		defaultCacheTimeNsecs   = 0
+		defaultDirtyFlushDelay  = 30
 		defaultMemLogMegabytes  = 500
 	)
 
@@ -68,9 +70,12 @@ func init() {
 	qflag.Uint64Var(&config.CacheTimeSeconds, "cacheTimeSeconds",
 		defaultCacheTimeSeconds,
 		"Number of seconds the kernel will cache response data")
-
 	qflag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
 		"Number of nanoseconds the kernel will cache response data")
+
+	qflag.UintVar(&dirtyFlushDelay, "dirtyFlushDelay", defaultDirtyFlushDelay,
+		"Number of seconds to delay flushing dirty inodes")
+
 	qflag.UintVar(&memLogMegabytes, "memLogMegabytes", defaultMemLogMegabytes,
 		"The number of MB to allocate, total, to the shared memory log.")
 
@@ -156,7 +161,11 @@ func processArgs() {
 	}
 	config.CacheTimeNsecs = uint32(cacheTimeNsecs)
 	config.MemLogBytes = uint64(memLogMegabytes) * 1024 * 1024
-	config.DirtyFlushDelay = 30 * time.Second
+
+	duration, err := time.ParseDuration(fmt.Sprintf("%ds", dirtyFlushDelay))
+	utils.Assert(err == nil, "Failed to parse dirty flush delay: %d",
+		dirtyFlushDelay)
+	config.DirtyFlushDelay = duration
 
 	loadDatastore()
 	loadWorkspaceDB()
