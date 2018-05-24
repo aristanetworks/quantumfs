@@ -24,6 +24,8 @@ class QfsClientTest : public testing::Test {
 	ApiImpl *api;
 
  protected:
+	// path to the root of our temporary directory tree
+	std::string tmp_root_dir;
 	// path of temporary directory tree created by CreateTempDirTree()
 	std::string tree;
 

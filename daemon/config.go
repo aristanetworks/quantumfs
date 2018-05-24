@@ -34,4 +34,8 @@ type QuantumFsConfig struct {
 
 	WorkspaceDB  quantumfs.WorkspaceDB
 	DurableStore quantumfs.DataStore
+
+	// Whether to do verbose tracing or not. This adds ~20% overhead, but makes
+	// debugging _much_ easier.
+	VerboseTracing bool
 }
