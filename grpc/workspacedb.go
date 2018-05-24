@@ -430,7 +430,7 @@ func retry(c *quantumfs.Ctx, opName string, op func(c *quantumfs.Ctx) error) err
 const NumTypespaceLog = "grpc::NumTypespaces"
 
 func (wsdb *workspaceDB) NumTypespaces(c *quantumfs.Ctx) (int, error) {
-	defer c.FuncInName(qlog.LogWorkspaceDb, NumTypespaceLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, NumTypespaceLog).Out()
 
 	wsdb.qlog = c.Qlog
 	var result int
@@ -467,7 +467,7 @@ func (wsdb *workspaceDB) numTypespaces(c *quantumfs.Ctx) (int, error) {
 const TypespaceListLog = "grpc::TypespaceList"
 
 func (wsdb *workspaceDB) TypespaceList(c *quantumfs.Ctx) ([]string, error) {
-	defer c.FuncInName(qlog.LogWorkspaceDb, TypespaceListLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, TypespaceListLog).Out()
 
 	wsdb.qlog = c.Qlog
 	var result []string
@@ -506,7 +506,7 @@ const NumNamespacesLog = "grpc::NumNamespaces"
 func (wsdb *workspaceDB) NumNamespaces(c *quantumfs.Ctx, typespace string) (int,
 	error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, NumNamespacesLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, NumNamespacesLog).Out()
 	wsdb.qlog = c.Qlog
 
 	var result int
@@ -550,7 +550,7 @@ const NamespaceListLog = "grpc::NamespaceList"
 func (wsdb *workspaceDB) NamespaceList(c *quantumfs.Ctx, typespace string) ([]string,
 	error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, NamespaceListLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, NamespaceListLog).Out()
 	wsdb.qlog = c.Qlog
 
 	var result []string
@@ -594,7 +594,7 @@ const NumWorkspacesLog = "grpc::NumWorkspaces"
 func (wsdb *workspaceDB) NumWorkspaces(c *quantumfs.Ctx, typespace string,
 	namespace string) (int, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, NumWorkspacesLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, NumWorkspacesLog).Out()
 	wsdb.qlog = c.Qlog
 
 	var result int
@@ -639,7 +639,7 @@ const WorkspaceListLog = "grpc::WorkspaceList"
 func (wsdb *workspaceDB) WorkspaceList(c *quantumfs.Ctx, typespace string,
 	namespace string) (map[string]quantumfs.WorkspaceNonce, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, WorkspaceListLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, WorkspaceListLog).Out()
 	wsdb.qlog = c.Qlog
 
 	var result map[string]quantumfs.WorkspaceNonce
@@ -694,7 +694,7 @@ func (wsdb *workspaceDB) BranchWorkspace(c *quantumfs.Ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) error {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, BranchWorkspaceLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, BranchWorkspaceLog).Out()
 	wsdb.qlog = c.Qlog
 
 	err := retry(c, "BranchWorkspace", func(c *quantumfs.Ctx) error {
@@ -737,7 +737,7 @@ const DeleteWorkspaceLog = "grpc::DeleteWorkspace"
 func (wsdb *workspaceDB) DeleteWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, DeleteWorkspaceLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, DeleteWorkspaceLog).Out()
 	wsdb.qlog = c.Qlog
 
 	err := retry(c, "DeleteWorkspace", func(c *quantumfs.Ctx) error {
@@ -779,8 +779,8 @@ func (wsdb *workspaceDB) fetchWorkspace(c *quantumfs.Ctx, workspaceName string) 
 	key quantumfs.ObjectKey, nonce quantumfs.WorkspaceNonce, immutable bool,
 	err error) {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, FetchWorkspaceLog, FetchWorkspaceDebug,
-		workspaceName).Out()
+	defer c.StatsFuncIn(qlog.LogWorkspaceDb, FetchWorkspaceLog,
+		FetchWorkspaceDebug, workspaceName).Out()
 
 	err = retry(c, "fetchWorkspace", func(c *quantumfs.Ctx) error {
 		var err error
@@ -832,7 +832,7 @@ func (wsdb *workspaceDB) Workspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (quantumfs.ObjectKey,
 	quantumfs.WorkspaceNonce, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, WorkspaceLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, WorkspaceLog).Out()
 	wsdb.qlog = c.Qlog
 
 	var resKey quantumfs.ObjectKey
@@ -881,7 +881,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 	workspaceName := typespace + "/" + namespace + "/" + workspace
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, AdvanceWorkspaceLog,
+	defer c.StatsFuncIn(qlog.LogWorkspaceDb, AdvanceWorkspaceLog,
 		AdvanceWorkspaceDebug, workspaceName, currentRootId.String(),
 		newRootId.String()).Out()
 
@@ -939,7 +939,7 @@ const WorkspaceIsImmutableLog = "grpc::WorkspaceIsImmutable"
 func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
-	defer c.FuncInName(qlog.LogWorkspaceDb, WorkspaceIsImmutableLog).Out()
+	defer c.StatsFuncInName(qlog.LogWorkspaceDb, WorkspaceIsImmutableLog).Out()
 	wsdb.qlog = c.Qlog
 
 	var result bool
@@ -969,7 +969,7 @@ const SetWorkspaceImmutableDebug = "%s/%s/%s"
 func (wsdb *workspaceDB) SetWorkspaceImmutable(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string) error {
 
-	defer c.FuncIn(qlog.LogWorkspaceDb, SetWorkspaceImmutableLog,
+	defer c.StatsFuncIn(qlog.LogWorkspaceDb, SetWorkspaceImmutableLog,
 		SetWorkspaceImmutableDebug, typespace, namespace, workspace).Out()
 	wsdb.qlog = c.Qlog
 
