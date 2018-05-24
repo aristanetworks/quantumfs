@@ -132,7 +132,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeState())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
-	c.dlog(OpenedInodeDebug, fi.inodeNum(), fileHandleNum)
+	c.vlog(OpenedInodeDebug, fi.inodeNum(), fileHandleNum)
 
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 	out.Fh = uint64(fileHandleNum)
@@ -323,7 +323,7 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 	defer c.funcIn("File::reconcileFileType").Out()
 
 	neededType := calcTypeGivenBlocks(blockIdx + 1)
-	c.dlog("blockIdx %d", blockIdx)
+	c.vlog("blockIdx %d", blockIdx)
 	newAccessor := fi.accessor.convertTo(c, neededType)
 	if newAccessor == nil {
 		return errors.New("Unable to process needed type for accessor")
@@ -403,7 +403,7 @@ func operateOnBlocks(c *ctx, accessor blockAccessor, offset uint64, size uint32,
 	offset = newOffset
 
 	// Handle the first block a little specially (with offset)
-	c.dlog("Reading initial block %d offset %d", startBlkIdx, offset)
+	c.vlog("Reading initial block %d offset %d", startBlkIdx, offset)
 	err := fn(c, startBlkIdx, offset)
 	if err != nil {
 		c.dlog("Unable to operate on first data block: %s", err.Error())

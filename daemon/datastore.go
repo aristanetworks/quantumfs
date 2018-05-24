@@ -87,10 +87,10 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 		})
 
 	if bufResult != nil {
-		c.Vlog(qlog.LogDaemon, CacheHitLog)
+		c.Dlog(qlog.LogDaemon, CacheHitLog)
 		return bufResult
 	}
-	c.Vlog(qlog.LogDaemon, CacheMissLog)
+	c.Dlog(qlog.LogDaemon, CacheMissLog)
 
 	return <-resultChannel
 }
