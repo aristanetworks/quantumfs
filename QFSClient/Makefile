@@ -52,8 +52,13 @@ gotests: qfsclient
 	sudo LD_LIBRARY_PATH="$(d)" CGO_LDFLAGS="-L$(d)" CGO_CFLAGS="-I$(d)" \
 		go test github.com/aristanetworks/quantumfs/qfsclientc
 
+# Use the ramfs root container as the temp dir for the client tests when
+# run from this Makefile.
+# If the tests are run in some other way (eg on macOS for stand-alone
+# client library testing), the tests will use the system tempdir instead.
 test: cleanuplocal $(TEST_TARGET) gotests
-	LD_LIBRARY_PATH=$(d) $(TEST_TARGET)
+	mkdir -p /dev/shm/$(ROOTDIRNAME)
+	LD_LIBRARY_PATH=$(d) TMPDIR=/dev/shm/$(ROOTDIRNAME) $(TEST_TARGET)
 
 $(TEST_TARGET): $(TEST_OBJS) $(TARGET)
 	$(CXX) $(TEST_LD_FLAGS) -o $@ $(TEST_OBJS)
