@@ -69,7 +69,8 @@ func init() {
 
 	qflag = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
-	qflag.StringVar(&configFile, "config", "", "File to load configuration from")
+	qflag.StringVar(&configFile, "config", "",
+		"JSON file to load configuration from")
 
 	qflag.StringVar(&config.CachePath, "cachePath", config.CachePath,
 		"Location of the internal cache. Should be on a ramfs or "+
