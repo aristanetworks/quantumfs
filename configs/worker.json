@@ -3,6 +3,6 @@
         "DataStoreConf": "/etc/ether.conf",
         "WorkspaceDbName": "grpc",
         "WorkspaceDbConf": "qubit-wsdbservice",
-        "DirtyFlushDelay": 3600,
+        "DirtyFlushDelay": "1h",
         "VerboseTracing": false,
 }
