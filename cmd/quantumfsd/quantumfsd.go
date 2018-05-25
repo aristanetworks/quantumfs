@@ -180,6 +180,12 @@ func parseConfigFile() {
 		}
 
 		conf := make([]byte, info.Size())
+		_, err = file.Read(conf)
+		if err != nil {
+			fmt.Printf("Error reading config file: %v\n", err)
+			os.Exit(1)
+		}
+
 		err = json.Unmarshal(conf, &config)
 		if err != nil {
 			fmt.Printf("Error parsing config file: %v\n", err)
