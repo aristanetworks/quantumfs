@@ -59,6 +59,7 @@ func init() {
 		DirtyFlushDelay:  daemon.Duration{Duration: 30 * time.Second},
 		MemLogBytes:      500 * 1024 * 1024,
 		VerboseTracing:   true,
+		MagicOwnership:   true,
 	}
 
 	const (
@@ -111,6 +112,9 @@ func init() {
 
 	qflag.BoolVar(&config.VerboseTracing, "verboseTracing",
 		config.VerboseTracing, "Enable verbose qlog tracing")
+
+	qflag.BoolVar(&config.MagicOwnership, "magicOwnership",
+		config.MagicOwnership, "Enable magic ownership")
 }
 
 func maxSizes() {
