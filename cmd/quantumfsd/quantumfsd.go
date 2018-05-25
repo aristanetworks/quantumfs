@@ -162,7 +162,7 @@ func loadWorkspaceDB() {
 func parseConfigFile() {
 	confFlag := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	confFlag.Usage = func() {} // Be silent
-	confFlag.StringVar(&configFile, "config", "", "File to load configuration from")
+	confFlag.StringVar(&configFile, "config", "", "")
 	confFlag.Parse(os.Args[1:])
 
 	if configFile != "" {
