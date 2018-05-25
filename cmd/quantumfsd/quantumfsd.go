@@ -168,21 +168,21 @@ func parseConfigFile() {
 	if configFile != "" {
 		file, err := os.Open(configFile)
 		if err != nil {
-			fmt.Printf("Error opening configuration file: %v", err)
+			fmt.Printf("Error opening configuration file: %v\n", err)
 			os.Exit(1)
 		}
 		defer file.Close()
 
 		info, err := file.Stat()
 		if err != nil {
-			fmt.Printf("Error getting file size: %v", err)
+			fmt.Printf("Error getting file size: %v\n", err)
 			os.Exit(1)
 		}
 
 		conf := make([]byte, info.Size())
 		err = json.Unmarshal(conf, &config)
 		if err != nil {
-			fmt.Printf("Error parsing config file: %v", err)
+			fmt.Printf("Error parsing config file: %v\n", err)
 			os.Exit(1)
 		}
 	}
