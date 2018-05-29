@@ -32,10 +32,6 @@ func newHardlinkDelta() *HardlinkDelta {
 	return &nd
 }
 
-func (nd *HardlinkDelta) reset() {
-	nd.m = make(map[quantumfs.FileId]deltaTuple)
-}
-
 func (nd *HardlinkDelta) inc(fileId quantumfs.FileId) {
 	d := nd.m[fileId]
 	d.additions++
@@ -46,6 +42,10 @@ func (nd *HardlinkDelta) dec(fileId quantumfs.FileId) {
 	d := nd.m[fileId]
 	d.deletions++
 	nd.m[fileId] = d
+}
+
+func (nd *HardlinkDelta) reset() {
+	nd.m = make(map[quantumfs.FileId]deltaTuple)
 }
 
 func (nd *HardlinkDelta) populateFrom(ond *HardlinkDelta) {
