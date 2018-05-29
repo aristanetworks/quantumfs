@@ -121,14 +121,26 @@ func maxSizes() {
 }
 
 func loadDatastore() {
-	ds, err := thirdparty_backends.ConnectDatastore(config.DataStoreName,
-		config.DataStoreConf)
-	if err != nil {
-		fmt.Printf("Datastore load failed\n")
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(exitDataStoreInitFail)
+	retryDelay := 100 * time.Millisecond;
+	maxRetryDelay := 5 * time.Second;
+
+	for {
+		ds, err := thirdparty_backends.ConnectDatastore(config.DataStoreName,
+			config.DataStoreConf)
+		if err != nil {
+			fmt.Printf("Datastore load failed, error: %v\n", err)
+			fmt.Printf("Retrying in %s...\n", retryDelay.String())
+
+			time.Sleep(retryDelay);
+			retryDelay *= 2;
+			if (retryDelay > maxRetryDelay) {
+				retryDelay = maxRetryDelay
+			}
+		} else {
+			config.DurableStore = ds
+			break
+		}
 	}
-	config.DurableStore = ds
 }
 
 func loadWorkspaceDB() {
