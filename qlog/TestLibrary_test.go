@@ -8,16 +8,15 @@ import (
 	"os"
 	"testing"
 
-	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/testutils"
 )
 
 func TestMain(m *testing.M) {
 	flag.Parse()
 
-	daemon.PreTestRuns()
+	testutils.PreTestRuns()
 	result := m.Run()
-	daemon.PostTestRuns()
+	testutils.PostTestRuns()
 
 	os.Exit(result)
 }
@@ -35,11 +34,10 @@ func runTestCommon(t *testing.T, test qfsclientTest) {
 	// 0 runTestCommon
 	testName := testutils.TestName(2)
 	th := &testHelper{
-		TestHelper: daemon.TestHelper{
-			TestHelper: testutils.NewTestHelper(testName,
-				daemon.TestRunDir, t),
-		},
+		TestHelper: testutils.NewTestHelper(testName,
+			ioutil.TempDir("", ""), t),
 	}
+	th.logger = NewQlog(th.TempDir)
 
 	th.CreateTestDirs()
 	defer th.EndTest()
@@ -54,8 +52,8 @@ func runTestCommon(t *testing.T, test qfsclientTest) {
 }
 
 type testHelper struct {
-	daemon.TestHelper
-	config daemon.QuantumFsConfig
+	logger *Qlog
+	testutils.TestHelper
 }
 
 type qlogTest func(test *testHelper)
