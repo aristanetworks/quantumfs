@@ -8,34 +8,20 @@ package qlog
 import (
 	"errors"
 	"fmt"
-	"math"
-	"os"
-	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
-	"unsafe"
-
-	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/aristanetworks/quantumfs/utils/dangerous"
 )
 
-type LogSubsystem uint8
-
-// These should be short to save space, visually different to aid in reading
-const FnEnterStr = "---In "
-const FnExitStr = "Out-- "
-
-func IsFunctionIn(test string) bool {
+func isFunctionIn(test string) bool {
 	return strings.Index(test, FnEnterStr) == 0
 }
 
-func IsFunctionOut(test string) bool {
+func isFunctionOut(test string) bool {
 	return strings.Index(test, FnExitStr) == 0
 }
 
 // Returns whether the strings are a function in/out log pair
-func IsLogFnPair(formatIn string, formatOut string) bool {
+func isLogFnPair(formatIn string, formatOut string) bool {
 	if strings.Index(formatIn, FnEnterStr) != 0 {
 		return false
 	}
@@ -63,38 +49,9 @@ func IsLogFnPair(formatIn string, formatOut string) bool {
 	return true
 }
 
-const (
-	LogDaemon LogSubsystem = iota
-	LogDatastore
-	LogWorkspaceDb
-	LogTest
-	LogQlog
-	LogQuark
-	LogSpin
-	LogTool
-	logSubsystemMax = LogTool
-)
+const timeFormat = "2006-01-02T15:04:05.000000000"
 
-const (
-	MuxReqId uint64 = math.MaxUint64 - iota
-	FlushReqId
-	QlogReqId
-	TestReqId
-	RefreshReqId
-	MinFixedReqId
-)
-
-const (
-	MinSpecialReqId     = uint64(0xb) << 48
-	FlusherRequestIdMin = uint64(0xb) << 48
-	RefreshRequestIdMin = uint64(0xc) << 48
-	ForgetRequstIdMin   = uint64(0xd) << 48
-	UnusedRequestIdMin  = uint64(0xe) << 48
-)
-
-const TimeFormat = "2006-01-02T15:04:05.000000000"
-
-func SpecialReq(reqId uint64) string {
+func specialReq(reqId uint64) string {
 	if reqId > MinFixedReqId {
 		switch reqId {
 		default:
@@ -162,13 +119,6 @@ func addLogSubsystem(sys string, l LogSubsystem) {
 	logSubsystemMap[strings.ToLower(sys)] = l
 }
 
-func (enum LogSubsystem) String() string {
-	if 0 <= enum && enum <= logSubsystemMax {
-		return logSubsystem[enum]
-	}
-	return ""
-}
-
 func getSubsystem(sys string) (LogSubsystem, error) {
 	if m, ok := logSubsystemMap[strings.ToLower(sys)]; ok {
 		return m, nil
@@ -193,198 +143,21 @@ func (q *Qlog) setLogLevelBitmask(sys LogSubsystem, level uint8) {
 	q.LogLevels |= uint32(level) << uint32(idx*maxLogLevels)
 }
 
-// Load desired log levels from the environment variable
-func (q *Qlog) SetLogLevels(levels string) {
-	// reset all levels
-	defaultSetting := uint8(1)
-	if levels == "*/*" {
-		defaultSetting = ^uint8(0)
-	}
-
-	for i := 0; i <= int(logSubsystemMax); i++ {
-		q.setLogLevelBitmask(LogSubsystem(i), defaultSetting)
-	}
-
-	bases := strings.Split(levels, ",")
-
-	for i := range bases {
-		cummulative := true
-		tokens := strings.Split(bases[i], "/")
-		if len(tokens) != 2 {
-			tokens = strings.Split(bases[i], "|")
-			cummulative = false
-			if len(tokens) != 2 {
-				continue
-			}
-		}
-
-		// convert the string into an int
-		var level int = 0
-		var e error
-		if tokens[1] == "*" {
-			level = int(maxLogLevels)
-			cummulative = true
-		} else {
-			var e error
-			level, e = strconv.Atoi(tokens[1])
-			if e != nil {
-				continue
-			}
-		}
-
-		// if it's cummulative, turn it into a cummulative mask
-		if cummulative {
-			if level >= int(maxLogLevels) {
-				level = int(maxLogLevels - 1)
-			}
-			level = (1 << uint8(level+1)) - 1
-		}
-
-		var idx LogSubsystem
-		idx, e = getSubsystem(tokens[0])
-		if e != nil {
-			continue
-		}
-
-		q.setLogLevelBitmask(idx, uint8(level))
-	}
-}
-
-type Qlog struct {
-	// This is the logging system level store. Increase size as the number of
-	// LogSubsystems increases past your capacity
-	LogLevels uint32
-
-	// N.B. The format and args arguments are only valid until Write returns as
-	// they are forced to be allocated on the stack.
-	Write     func(format string, args ...interface{}) error
-	logBuffer *SharedMemory
-
-	// Maximum level to log to the qlog file
-	maxLevel uint8
-}
-
-func PrintToStdout(format string, args ...interface{}) error {
-	format += "\n"
-	_, err := fmt.Printf(format, args...)
-	return err
-}
-
-func NewQlog(ramfsPath string) (*Qlog, error) {
-	return NewQlogExt(ramfsPath, uint64(DefaultMmapSize), "noVersion",
-		PrintToStdout)
-}
-
-// N.B. The format and args arguments to the outLog are only valid
-// until outLog returns as they are forced to be allocated on the stack.
-// If a client wishes to read them after outLog returns, it must make a
-// copy for itself.
-
-func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
-	outLog func(format string, args ...interface{}) error) (*Qlog, error) {
-
-	if sharedMemLen == 0 {
-		return nil, fmt.Errorf("Invalid shared memory length provided: %d\n",
-			sharedMemLen)
-	}
-
-	q := Qlog{
-		LogLevels: 0,
-		Write:     outLog,
-		maxLevel:  255,
-	}
-	var err error
-	q.logBuffer, err = newSharedMemory(ramfsPath, defaultMmapFile,
-		int(sharedMemLen), daemonVersion, &q)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// check that our logLevel container is large enough for our subsystems
-	if (uint8(logSubsystemMax) * maxLogLevels) >
-		uint8(unsafe.Sizeof(q.LogLevels))*8 {
-
-		return nil, fmt.Errorf("Log level structure not large enough " +
-			"for given subsystems")
-	}
-
-	q.SetLogLevels(os.Getenv(logEnvTag))
-
-	return &q, nil
-}
-
-func (q *Qlog) SetWriter(w func(format string, args ...interface{}) error) {
-	q.Write = w
-}
-
-func (q *Qlog) SetMaxLevel(level uint8) {
-	q.maxLevel = level
-}
-
-// Only for tests - causes all logs starting with prefix to be incompletely written
-func (q *Qlog) EnterTestMode(dropPrefix string) {
-	q.logBuffer.testDropStr = dropPrefix
-	q.logBuffer.testMode = true
-}
-
 func formatString(idx LogSubsystem, reqId uint64, t time.Time,
 	format string) string {
 
 	var front string
 	if reqId < MinSpecialReqId {
 		const frontFmt = "%s | %12s %7d: "
-		front = fmt.Sprintf(frontFmt, t.Format(TimeFormat),
+		front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
 			idx, reqId)
 	} else {
 		const frontFmt = "%s | %12s % 7s: "
-		front = fmt.Sprintf(frontFmt, t.Format(TimeFormat),
-			idx, SpecialReq(reqId))
+		front = fmt.Sprintf(frontFmt, t.Format(timeFormat),
+			idx, specialReq(reqId))
 	}
 
 	return front + format
-}
-
-func (q *Qlog) Sync() int {
-	return q.logBuffer.Sync()
-}
-
-func (q *Qlog) Close() error {
-	return q.logBuffer.Close()
-}
-
-func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
-	args ...interface{}) {
-
-	if level <= q.maxLevel {
-		t := time.Now()
-		q.Log_(t, idx, reqId, level, format, args...)
-	}
-}
-
-// Should only be used by tests
-func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
-	format string, args ...interface{}) {
-
-	// Put into the shared circular buffer, UnixNano will work until year 2262
-	unixNano := t.UnixNano()
-	if q.logBuffer != nil {
-		q.logBuffer.logEntry(idx, reqId, level, unixNano, format, args...)
-	}
-
-	if q.getLogLevel(idx, level) {
-		argsCopy := make([]interface{}, 0, len(args))
-		for _, arg := range args {
-			argsCopy = append(argsCopy, dangerous.NoescapeInterface(arg))
-		}
-		q.Write(formatString(idx, reqId, t, format), argsCopy...)
-	}
-}
-
-type Qlogger struct {
-	RequestId uint64
-	qlog      *Qlog
-	subsystem LogSubsystem
 }
 
 // This is just a placeholder for now:
@@ -395,65 +168,4 @@ func newLogSubsystem(sys string) LogSubsystem {
 	logSubsystemList = append(logSubsystemList, logSubsystemPair{sys, l})
 	addLogSubsystem(sys, l)
 	return l
-}
-
-// TODO: Add support for registering subsystems dynamically,
-//       and record the subsystem in qlog file, for qparse to be able to
-//       parse the logs.
-func NewQlogger(subsystem string, ramfsPath string) *Qlogger {
-	return NewQloggerWithSize(subsystem, ramfsPath, uint64(DefaultMmapSize))
-}
-
-func NewQloggerWithSize(subsystem string, ramfsPath string, size uint64) *Qlogger {
-	sub, err := getSubsystem(subsystem)
-	if err != nil {
-		sub = newLogSubsystem(subsystem)
-	}
-
-	log, err := NewQlogExt(ramfsPath, size, subsystem, PrintToStdout)
-	utils.AssertNoErr(err)
-	qlogger := &Qlogger{
-		RequestId: 0,
-		qlog:      log,
-		subsystem: sub,
-	}
-	return qlogger
-}
-
-func (q *Qlogger) SetWriter(w func(format string, args ...interface{}) error) {
-	q.qlog.SetWriter(w)
-}
-
-func (q *Qlogger) wrapQlog(level uint8, format string, args ...interface{}) {
-	q.qlog.Log(q.subsystem, q.RequestId, level, format, args...)
-}
-
-// Log an Error message
-func (q *Qlogger) Elog(format string, args ...interface{}) {
-	q.wrapQlog(0, format, args...)
-}
-
-// Log a Warning message
-func (q *Qlogger) Wlog(format string, args ...interface{}) {
-	q.wrapQlog(1, format, args...)
-}
-
-// Log a Debug message
-func (q *Qlogger) Dlog(format string, args ...interface{}) {
-	q.wrapQlog(2, format, args...)
-}
-
-// Log a Verbose tracing message
-func (q *Qlogger) Vlog(format string, args ...interface{}) {
-	q.wrapQlog(3, format, args...)
-}
-
-var uniqueQloggerRequestId uint64
-
-func (q *Qlogger) NewContext() *Qlogger {
-	return &Qlogger{
-		RequestId: atomic.AddUint64(&uniqueQloggerRequestId, 1),
-		qlog:      q.qlog,
-		subsystem: q.subsystem,
-	}
 }

@@ -40,7 +40,7 @@ type Reader struct {
 
 func NewReader(qlogFile string) *Reader {
 	rtn := Reader{
-		headerSize: uint64(unsafe.Sizeof(MmapHeader{})),
+		headerSize: uint64(unsafe.Sizeof(mmapHeader{})),
 	}
 
 	file, err := os.Open(qlogFile)
@@ -59,7 +59,7 @@ func NewReader(qlogFile string) *Reader {
 		rtn.daemonVersion = rtn.daemonVersion[:terminatorIdx]
 	}
 
-	rtn.lastPastEndIdx = header.CircBuf.EndIndex()
+	rtn.lastPastEndIdx = header.CircBuf.endIndex()
 	return &rtn
 }
 
@@ -85,7 +85,7 @@ func (read *Reader) RefreshStrMap() {
 			break
 		}
 
-		mapEntry := (*LogStr)(unsafe.Pointer(&buf[0]))
+		mapEntry := (*logStr)(unsafe.Pointer(&buf[0]))
 		if mapEntry.Text[0] == '\x00' {
 			// No more strMap entries filled, stop looping
 			break
@@ -108,7 +108,7 @@ func (read *Reader) RefreshStrMap() {
 	}
 }
 
-func (read *Reader) ReadHeader() *MmapHeader {
+func (read *Reader) ReadHeader() *mmapHeader {
 	headerData := make([]byte, read.headerSize)
 	_, err := read.file.ReadAt(headerData, 0)
 	if err != nil {
@@ -134,7 +134,7 @@ func (read *Reader) DaemonVersion() string {
 func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(*LogOutput)) {
 	if mode == ReadThenTail || mode == ReadOnly {
 		freshHeader := read.ReadHeader()
-		newLogs, newIdx := read.parseOld(freshHeader.CircBuf.EndIndex())
+		newLogs, newIdx := read.parseOld(freshHeader.CircBuf.endIndex())
 
 		read.lastPastEndIdx = newIdx
 		for _, v := range newLogs {
@@ -150,9 +150,9 @@ func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(*LogOutput)) {
 	// Run indefinitely
 	for {
 		freshHeader := read.ReadHeader()
-		if freshHeader.CircBuf.EndIndex() != read.lastPastEndIdx {
+		if freshHeader.CircBuf.endIndex() != read.lastPastEndIdx {
 			newLogs, newPastEndIdx := read.parse(read.lastPastEndIdx,
-				freshHeader.CircBuf.EndIndex())
+				freshHeader.CircBuf.endIndex())
 
 			read.lastPastEndIdx = newPastEndIdx
 			for _, v := range newLogs {
@@ -203,7 +203,7 @@ func (read *Reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
 
 		// Read the header to see if the log end just passed us as we parsed
 		freshHeader := read.ReadHeader()
-		newDistanceToEnd := wrapMinus(readTo, freshHeader.CircBuf.EndIndex(),
+		newDistanceToEnd := wrapMinus(readTo, freshHeader.CircBuf.endIndex(),
 			read.circBufSize)
 
 		// Distance to the moving end of logs should be decreasing. The

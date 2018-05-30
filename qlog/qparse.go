@@ -182,13 +182,13 @@ func (s *SequenceTracker) Process(log LogOutput) error {
 	}
 
 	top, err := s.stack.Peek()
-	if len(s.stack) == 1 && IsLogFnPair(top.Format, log.Format) {
+	if len(s.stack) == 1 && isLogFnPair(top.Format, log.Format) {
 		// We've found our pair, and have our sequence. Finalize
 		s.ready = true
-	} else if IsFunctionIn(log.Format) {
+	} else if isFunctionIn(log.Format) {
 		s.stack.Push(log)
-	} else if IsFunctionOut(log.Format) {
-		if err != nil || !IsLogFnPair(top.Format, log.Format) {
+	} else if isFunctionOut(log.Format) {
+		if err != nil || !isLogFnPair(top.Format, log.Format) {
 			return errors.New(fmt.Sprintf("Error: Mismatched '%s' in "+
 				"requestId %d log. ||%s|||%s||%s\n",
 				FnExitStr, log.ReqId, top.Format, log.Format, err))
@@ -253,7 +253,7 @@ func ProcessTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []LogOutput,
 		}
 
 		// Start a new subsequence if we need to
-		if IsFunctionIn(log.Format) {
+		if isFunctionIn(log.Format) {
 			trackers = append(trackers, newSequenceTracker(i))
 		}
 
@@ -610,24 +610,24 @@ func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn writeFn) {
 	}
 }
 
-func ExtractHeader(data []byte) *MmapHeader {
-	header := (*MmapHeader)(unsafe.Pointer(&data[0]))
+func ExtractHeader(data []byte) *mmapHeader {
+	header := (*mmapHeader)(unsafe.Pointer(&data[0]))
 
-	if header.Version != QlogVersion {
+	if header.Version != qlogVersion {
 		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
-			header.Version, QlogVersion))
+			header.Version, qlogVersion))
 	}
 
 	return header
 }
 
 func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
-	strMapRtn []LogStr) {
+	strMapRtn []logStr) {
 
 	data := grabMemory(filepath)
 	header := ExtractHeader(data)
 
-	mmapHeaderSize := uint64(unsafe.Sizeof(MmapHeader{}))
+	mmapHeaderSize := uint64(unsafe.Sizeof(mmapHeader{}))
 
 	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
 		mmapHeaderSize {
@@ -637,16 +637,16 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 
 	// create a safer map to use
 	strMapData := data[mmapHeaderSize+header.CircBuf.Size:]
-	strMap := make([]LogStr, len(strMapData)/LogStrSize)
+	strMap := make([]logStr, len(strMapData)/LogStrSize)
 	idx := 0
 	for i := 0; i+LogStrSize <= len(strMapData); i += LogStrSize {
-		mapEntry := (*LogStr)(unsafe.Pointer(&strMapData[i]))
+		mapEntry := (*logStr)(unsafe.Pointer(&strMapData[i]))
 		strMap[idx] = *mapEntry
 
 		idx++
 	}
 
-	return header.CircBuf.EndIndex(),
+	return header.CircBuf.endIndex(),
 		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap
 }
 
@@ -675,9 +675,9 @@ func extractStrMapData(filepath string) []byte {
 	}
 	defer file.Close()
 
-	headerLen := int64(unsafe.Sizeof(MmapHeader{}))
+	headerLen := int64(unsafe.Sizeof(mmapHeader{}))
 	headerRaw := readOrPanic(0, headerLen, file)
-	header := (*MmapHeader)(unsafe.Pointer(&headerRaw[0]))
+	header := (*mmapHeader)(unsafe.Pointer(&headerRaw[0]))
 
 	return readOrPanic(headerLen+int64(header.CircBuf.Size),
 		int64(header.StrMapSize), file)
@@ -926,7 +926,7 @@ func (l *LogStatus) Process(newPct float32) {
 	l.lastPixShown = pixDone
 }
 
-func OutputLogs(pastEndIdx uint64, data []byte, strMap []LogStr,
+func OutputLogs(pastEndIdx uint64, data []byte, strMap []logStr,
 	maxWorkers int) []LogOutput {
 
 	return OutputLogsExt(pastEndIdx, data, strMap, maxWorkers, false)
@@ -1006,11 +1006,11 @@ func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
 
 type logJob struct {
 	packetData []byte
-	strMap     []LogStr
+	strMap     []logStr
 	out        *LogOutput
 }
 
-func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers int,
+func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers int,
 	printStatus bool) []*LogOutput {
 
 	var logPtrs []*LogOutput
@@ -1093,7 +1093,7 @@ func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers i
 	return logPtrs
 }
 
-func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []LogStr, maxWorkers int,
+func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers int,
 	printStatus bool) []LogOutput {
 
 	logPtrs := OutputLogPtrs(pastEndIdx, data, strMap, maxWorkers, printStatus)
