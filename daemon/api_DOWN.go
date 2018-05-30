@@ -10,7 +10,7 @@ import "github.com/hanwen/go-fuse/fuse"
 func (api *ApiInode) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Link on ApiInode")
+	c.wlog("Invalid Link on ApiInode")
 	return fuse.ENOTDIR
 }
 

@@ -10,7 +10,7 @@ import "github.com/hanwen/go-fuse/fuse"
 func (wsl *WorkspaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Link on WorkspaceList")
+	c.wlog("Invalid Link on WorkspaceList")
 	return fuse.ENOTDIR
 }
 
@@ -21,7 +21,7 @@ func (wsl *WorkspaceList) Sync_DOWN(c *ctx) fuse.Status {
 func (nsl *NamespaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Link on NamespaceList")
+	c.wlog("Invalid Link on NamespaceList")
 	return fuse.ENOTDIR
 }
 
@@ -32,7 +32,7 @@ func (nsl *NamespaceList) Sync_DOWN(c *ctx) fuse.Status {
 func (tsl *TypespaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Link on TypespaceList")
+	c.wlog("Invalid Link on TypespaceList")
 	return fuse.ENOTDIR
 }
 
