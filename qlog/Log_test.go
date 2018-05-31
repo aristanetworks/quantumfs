@@ -565,7 +565,7 @@ func TestQlogWrapAround(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "")
 	utils.AssertNoErr(err)
 
-	logger, err := NewQlogExt(tmpDir, 10000 + mmapStrMapSize, "noVersion",
+	logger, err := NewQlogExt(tmpDir, 10000+mmapStrMapSize, "noVersion",
 		PrintToStdout)
 	utils.AssertNoErr(err)
 
