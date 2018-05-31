@@ -510,61 +510,49 @@ func TestQParse(t *testing.T) {
 	}
 }
 
-/*
 func TestQParsePartials_test(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		// Before we enable logs, let's cause all File logs to be
-		// partially written
-		test.qfs.c.Qlog.EnterTestMode("---In File::")
+	logger, tmpDir := setupQlog()
 
-		// Enable *all* logs
-		test.qfs.c.Qlog.LogLevels = 0
-		test.qfs.c.Qlog.LogLevels--
+	// Before we enable logs, let's cause all File logs to be
+	// partially written
+	prefixToBreak := "BREAKTHIS: "
+	logger.EnterTestMode(prefixToBreak)
 
-		// Do some stuff that should generate some logs
-		workspace := test.NewWorkspace()
-		testFilename := workspace + "/" + "test"
-		fd, err := syscall.Creat(testFilename, 0124)
-		test.Assert(err == nil, "Error creating file: %v", err)
-		syscall.Close(fd)
+	// Enable *all* logs
+	logger.LogLevels = 0
+	logger.LogLevels--
 
-		data := genData(1024)
-		err = testutils.PrintToFile(testFilename, string(data))
-		test.Assert(err == nil, "Couldn't write 1KB data to file")
+	// Generate some logs
+	for i := 0; i < 10; i++ {
+		wlog(logger, "Log shouldn't be broken")
+		wlog(logger, prefixToBreak+"Msc log")
+	}
 
-		test.Log("This is a test string, %d", 12345)
+	testLogs := parseLogs(logger, tmpDir)
 
-		err = os.Truncate(testFilename, 0)
-		test.Assert(err == nil, "Couldn't truncate file to zero")
+	testLogLines := strings.Split(testLogs, "\n")
+	droppedEntry := false
+	count := 0
+	// Check to see if we see dropped packets interspersed with good ones
+	for i := 0; i < len(testLogLines); i++ {
+		utils.Assert(len(testLogLines[i]) < 6 ||
+			strings.Compare(testLogLines[i][:6], "File::") != 0,
+			"Not all File:: packets are broken")
 
-		_, err = ioutil.ReadFile(testFilename)
-		test.Assert(err == nil, "Unable to read file contents")
-
-		testLogs := test.parseLogs()
-
-		testLogLines := strings.Split(testLogs, "\n")
-		droppedEntry := false
-		count := 0
-		// Check to see if we see dropped packets interspersed with good ones
-		for i := 0; i < len(testLogLines); i++ {
-			test.Assert(len(testLogLines[i]) < 6 ||
-				strings.Compare(testLogLines[i][:6], "File::") != 0,
-				"Not all File:: packets are broken")
-
-			// Count the number of times we go from a good to broken log
-			isPartial := strings.Contains(testLogLines[i],
-				"incomplete packet")
-			if isPartial && !droppedEntry {
-				count++
-			}
-			droppedEntry = isPartial
+		// Count the number of times we go from a good to broken log
+		isPartial := strings.Contains(testLogLines[i],
+			"incomplete packet")
+		if isPartial && !droppedEntry {
+			count++
 		}
+		droppedEntry = isPartial
+	}
 
-		test.Assert(count >= 5,
-			"Unable to confidently prove partial packet reading")
-	})
+	utils.Assert(count >= 5,
+		"Unable to confidently prove partial packet reading")
 }
 
+/*
 func TestBooleanLogType(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
