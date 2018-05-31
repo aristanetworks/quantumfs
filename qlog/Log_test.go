@@ -552,36 +552,33 @@ func TestQParsePartials_test(t *testing.T) {
 		"Unable to confidently prove partial packet reading")
 }
 
-/*
 func TestBooleanLogType(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	logger, tmpDir := setupQlog()
 
-		test.qfs.c.wlog("booleans %t %t", true, false)
-		testLogs := test.parseLogs()
-		test.Assert(strings.Contains(testLogs, "booleans true false"),
-			"boolean log types incorrectly output: %s", testLogs)
-	})
+	wlog(logger, "booleans %t %t", true, false)
+	testLogs := parseLogs(logger, tmpDir)
+	utils.Assert(strings.Contains(testLogs, "booleans true false"),
+		"boolean log types incorrectly output: %s", testLogs)
 }
 
 func TestQlogWrapAround(t *testing.T) {
-	runTestNoQfs(t, func(test *testHelper) {
-		test.ShouldFailLogscan = true
+	tmpDir, err := ioutil.TempDir("", "")
+	utils.AssertNoErr(err)
 
-		// Overflow the qlog file
-		for i := 0; i < 100000000; i++ {
-			test.Logger.Log(qlog.LogTest, qlog.TestReqId, 3,
-				"Filler %s", "12345678901234567890")
-		}
+	logger, err := NewQlogExt(tmpDir, 10000 + mmapStrMapSize, "noVersion",
+		PrintToStdout)
+	utils.AssertNoErr(err)
 
-		// At this point the qlog file should have wrapped around several
-		// times. When the test harness goes to parse it, it will panic if
-		// the offset isn't properly adjusted with respect to the file size
-		// with a "bounds out of range" failure in readBack().
+	// Overflow the qlog file
+	for i := 0; i < 10000; i++ {
+		logger.Log(LogTest, TestReqId, 3,
+			"Filler %s", "12345678901234567890")
+	}
 
-		// Processing all these logs takes too long. Instead return an error
-		// an expect this test to fail. This moves the log parsing outside of
-		// the timed portion of the test.
-		test.Log("ERROR: Test fill complete")
-	})
+	// At this point the qlog file should have wrapped around several
+	// times. When the test harness goes to parse it, it will panic if
+	// the offset isn't properly adjusted with respect to the file size
+	// with a "bounds out of range" failure in readBack().
+	// If we can parse the logs then this passed.
+	parseLogs(logger, tmpDir)
 }
-*/
