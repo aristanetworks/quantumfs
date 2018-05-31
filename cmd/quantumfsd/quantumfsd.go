@@ -5,6 +5,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -37,63 +38,79 @@ var version string
 var cacheSizeString string
 var cacheTimeNsecs uint
 var memLogMegabytes uint
-var config daemon.QuantumFsConfig
 var showMaxSizes bool
+var configFile string
+
 var qflag *flag.FlagSet
-var dirtyFlushDelay uint
+var config daemon.QuantumFsConfig
 
 func init() {
+	// Defaults
+	config = daemon.QuantumFsConfig{
+		CachePath:        "/dev/shm/quantumfs",
+		CacheSize:        24 * 1024 * 1024 * 1024,
+		MountPath:        "/qfs",
+		DataStoreName:    "processlocal",
+		DataStoreConf:    "",
+		WorkspaceDbName:  "processlocal",
+		WorkspaceDbConf:  "",
+		CacheTimeSeconds: 3600,
+		CacheTimeNsecs:   0,
+		DirtyFlushDelay:  30,
+		MemLogBytes:      500 * 1024 * 1024,
+		VerboseTracing:   true,
+	}
+
 	const (
-		defaultCachePath        = "/dev/shm/quantumfs"
-		defaultCacheSize        = "24G"
-		defaultMountPath        = "/qfs"
-		defaultCacheTimeSeconds = 3600
-		defaultCacheTimeNsecs   = 0
-		defaultDirtyFlushDelay  = 30
-		defaultMemLogMegabytes  = 500
+		defaultCacheSize = "24G"
 	)
 
 	fmt.Printf("QuantumFS version %s\n", version)
 
 	qflag = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
-	qflag.StringVar(&config.CachePath, "cachePath", defaultCachePath,
-		"Default location of the internal cache. Should be on a ramfs or "+
+	qflag.StringVar(&configFile, "config", "",
+		"JSON file to load configuration from")
+
+	qflag.StringVar(&config.CachePath, "cachePath", config.CachePath,
+		"Location of the internal cache. Should be on a ramfs or "+
 			"tmpfs filesystem to avoid random 1 second lag spikes")
 
 	qflag.StringVar(&cacheSizeString, "cacheSize", defaultCacheSize,
 		"Size of the local cache, e.g. 8G or 512M")
 
-	qflag.StringVar(&config.MountPath, "mountpath", defaultMountPath,
+	qflag.StringVar(&config.MountPath, "mountpath", config.MountPath,
 		"Path to mount quantumfs at")
 
 	qflag.Uint64Var(&config.CacheTimeSeconds, "cacheTimeSeconds",
-		defaultCacheTimeSeconds,
+		config.CacheTimeSeconds,
 		"Number of seconds the kernel will cache response data")
-	qflag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", defaultCacheTimeNsecs,
+	qflag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", uint(config.CacheTimeNsecs),
 		"Number of nanoseconds the kernel will cache response data")
 
-	qflag.UintVar(&dirtyFlushDelay, "dirtyFlushDelay", defaultDirtyFlushDelay,
+	qflag.DurationVar(&config.DirtyFlushDelay, "dirtyFlushDelay",
+		config.DirtyFlushDelay,
 		"Number of seconds to delay flushing dirty inodes")
 
-	qflag.UintVar(&memLogMegabytes, "memLogMegabytes", defaultMemLogMegabytes,
+	qflag.UintVar(&memLogMegabytes, "memLogMegabytes",
+		uint(config.MemLogBytes/(1024*1024)),
 		"The number of MB to allocate, total, to the shared memory log.")
 
-	qflag.StringVar(&config.DataStoreName, "datastore", "processlocal",
+	qflag.StringVar(&config.DataStoreName, "datastore", config.DataStoreName,
 		"Name of the datastore to use")
-	qflag.StringVar(&config.DataStoreConf, "datastoreconf", "",
+	qflag.StringVar(&config.DataStoreConf, "datastoreconf", config.DataStoreConf,
 		"Options to pass to datastore")
 
-	qflag.StringVar(&config.WorkspaceDbName, "workspaceDB", "processlocal",
-		"Name of the WorkspaceDB to use")
-	qflag.StringVar(&config.WorkspaceDbConf, "workspaceDBconf", "",
-		"Options to pass to workspaceDB")
+	qflag.StringVar(&config.WorkspaceDbName, "workspaceDB",
+		config.WorkspaceDbName, "Name of the WorkspaceDB to use")
+	qflag.StringVar(&config.WorkspaceDbConf, "workspaceDBconf",
+		config.WorkspaceDbConf, "Options to pass to workspaceDB")
 
 	qflag.BoolVar(&showMaxSizes, "showMaxSizes", false,
 		"Show max block counts, metadata entries and max file sizes")
 
-	qflag.BoolVar(&config.VerboseTracing, "verboseTracing", true,
-		"Enable verbose qlog tracing")
+	qflag.BoolVar(&config.VerboseTracing, "verboseTracing",
+		config.VerboseTracing, "Enable verbose qlog tracing")
 }
 
 func maxSizes() {
@@ -121,14 +138,26 @@ func maxSizes() {
 }
 
 func loadDatastore() {
-	ds, err := thirdparty_backends.ConnectDatastore(config.DataStoreName,
-		config.DataStoreConf)
-	if err != nil {
-		fmt.Printf("Datastore load failed\n")
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(exitDataStoreInitFail)
+	retryDelay := 100 * time.Millisecond
+	maxRetryDelay := 5 * time.Second
+
+	for {
+		ds, err := thirdparty_backends.ConnectDatastore(config.DataStoreName,
+			config.DataStoreConf)
+		if err != nil {
+			fmt.Printf("Datastore load failed, error: %v\n", err)
+			fmt.Printf("Retrying in %s...\n", retryDelay.String())
+
+			time.Sleep(retryDelay)
+			retryDelay *= 2
+			if retryDelay > maxRetryDelay {
+				retryDelay = maxRetryDelay
+			}
+		} else {
+			config.DurableStore = ds
+			break
+		}
 	}
-	config.DurableStore = ds
 }
 
 func loadWorkspaceDB() {
@@ -142,11 +171,50 @@ func loadWorkspaceDB() {
 	config.WorkspaceDB = wsdb
 }
 
+func parseConfigFile() {
+	confFlag := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	confFlag.Usage = func() {} // Be silent
+	confFlag.StringVar(&configFile, "config", "", "")
+	confFlag.Parse(os.Args[1:])
+
+	if configFile != "" {
+		file, err := os.Open(configFile)
+		if err != nil {
+			fmt.Printf("Error opening configuration file: %v\n", err)
+			os.Exit(1)
+		}
+		defer file.Close()
+
+		info, err := file.Stat()
+		if err != nil {
+			fmt.Printf("Error getting file size: %v\n", err)
+			os.Exit(1)
+		}
+
+		conf := make([]byte, info.Size())
+		_, err = file.Read(conf)
+		if err != nil {
+			fmt.Printf("Error reading config file: %v\n", err)
+			os.Exit(1)
+		}
+
+		err = json.Unmarshal(conf, &config)
+		if err != nil {
+			fmt.Printf("Error parsing config file: %v\n", err)
+			os.Exit(1)
+		}
+	}
+}
+
 // Process the command arguments. Will show the command usage if no arguments are
 // given since the mount point is mandatory.
 //
 // Exit if processing failed
 func processArgs() {
+	// First load any configuration file so the command line arguments can
+	// override those values if available.
+	parseConfigFile()
+
 	qflag.Parse(os.Args[1:])
 
 	if showMaxSizes {
@@ -161,11 +229,6 @@ func processArgs() {
 	}
 	config.CacheTimeNsecs = uint32(cacheTimeNsecs)
 	config.MemLogBytes = uint64(memLogMegabytes) * 1024 * 1024
-
-	duration, err := time.ParseDuration(fmt.Sprintf("%ds", dirtyFlushDelay))
-	utils.Assert(err == nil, "Failed to parse dirty flush delay: %d",
-		dirtyFlushDelay)
-	config.DirtyFlushDelay = duration
 
 	loadDatastore()
 	loadWorkspaceDB()
