@@ -1,6 +1,8 @@
 // Copyright (c) 2018 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
+// Package qlog provides a logging infrastructure with fast and compact writes to
+// file and log levels.
 package qlog
 
 // This file contains all public functions and constants
@@ -21,53 +23,122 @@ import (
 	"github.com/aristanetworks/quantumfs/utils/dangerous"
 )
 
-type LogSubsystem uint8
+// Constants
 
+// WriteFn is a function that qlog could use to output logs
 type WriteFn func(string, ...interface{}) (int, error)
 
+// EntryCompleteBit is the bit flag used in each log packet header to indicate the
+// log has been completely written and is ready to be read
 const EntryCompleteBit = uint16(1 << 15)
 
+// LogStrSize is the maximum length allowed for a format string in a log
 const LogStrSize = 64
 
-// Strmap size allows for up to ~10000 unique logs
+// MmapStrMapSize is the fixed size of the string map in the qlog. 500K allows
+// for roughly 10000 unique format log strings
 const MmapStrMapSize = 512 * 1024
 
-// We need a static array sized upper bound on our memory. Increase this as needed.
+// DefaultMmapSize is the default total shared memory size, which includes both
+// the string map and the space for actual log packets.
 const DefaultMmapSize = (360000 * 24) + MmapStrMapSize
 
-// These should be short to save space, visually different to aid in reading
+// FnEnterStr is the recommended prefix to use when logging the entry to functions
 const FnEnterStr = "---In "
+
+// FnExitStr is the recommended prefix to use when logging the exit from functions
 const FnExitStr = "Out-- "
 
-const (
-	LogDaemon LogSubsystem = iota
-	LogDatastore
-	LogWorkspaceDb
-	LogTest
-	LogQlog
-	LogQuark
-	LogSpin
-	LogTool
-	logSubsystemMax = LogTool
-)
+// Global Functions
 
-const (
-	MuxReqId uint64 = math.MaxUint64 - iota
-	FlushReqId
-	QlogReqId
-	TestReqId
-	RefreshReqId
-	MinFixedReqId
-)
+// ParseLogs reads logs from a qlog file and returns them as one large string
+func ParseLogs(filepath string) string {
+	rtn := ""
 
-const (
-	MinSpecialReqId     = uint64(0xb) << 48
-	FlusherRequestIdMin = uint64(0xb) << 48
-	RefreshRequestIdMin = uint64(0xc) << 48
-	ForgetRequstIdMin   = uint64(0xd) << 48
-	UnusedRequestIdMin  = uint64(0xe) << 48
-)
+	ParseLogsExt(filepath, 0, defaultParseThreads, false,
+		func(format string, args ...interface{}) (int, error) {
+			rtn += fmt.Sprintf(format, args...)
+			return len(format), nil
+		})
 
+	return rtn
+}
+
+// ParseLogsExt reads logs from a qlog file, formats them, optionally outputs a
+// statusBar to stdout, and applies a WriteFn to each
+func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
+	statusBar bool, fn WriteFn) {
+
+	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+
+	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
+	FormatLogs(logs, tabSpaces, statusBar, fn)
+}
+
+// ParseLogsRaw is a faster parse without any flair: logs may be out of order,
+// no tabbing. Returns LogOutput* which need to be Sprintf'd
+func ParseLogsRaw(filepath string) []*LogOutput {
+
+	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+
+	return outputLogPtrs(pastEndIdx, dataArray, strMap, defaultParseThreads,
+		false)
+}
+
+// LogscanSkim returns true if the log file string map given failed the logscan
+func LogscanSkim(filepath string) bool {
+	strMapData := extractStrMapData(filepath)
+
+	// This takes too much time, so only count one string as failing
+	if bytes.Contains(strMapData, []byte("ERROR")) {
+		return true
+	}
+
+	return false
+}
+
+// PrintToStdout is a premade, commonly used WriteFn for Qlog to output through
+func PrintToStdout(format string, args ...interface{}) error {
+	format += "\n"
+	_, err := fmt.Printf(format, args...)
+	return err
+}
+
+// IsLogFnPair returns whether the strings are a function in/out log pair
+func IsLogFnPair(formatIn string, formatOut string) bool {
+	if strings.Index(formatIn, FnEnterStr) != 0 {
+		return false
+	}
+
+	if strings.Index(formatOut, FnExitStr) != 0 {
+		return false
+	}
+
+	formatIn = strings.Trim(formatIn, "\n ")
+	formatOut = strings.Trim(formatOut, "\n ")
+
+	minLength := len(formatIn) - len(FnEnterStr)
+	outLength := len(formatOut) - len(FnExitStr)
+	if outLength < minLength {
+		minLength = outLength
+	}
+
+	tokenA := formatIn[len(FnEnterStr) : len(FnEnterStr)+minLength]
+	tokenB := formatOut[len(FnExitStr) : len(FnExitStr)+minLength]
+
+	if strings.Compare(tokenA, tokenB) != 0 {
+		return false
+	}
+
+	return true
+}
+
+// Types
+
+// LogSubsystem is an identifier to allow logs to be categorized by code location
+type LogSubsystem uint8
+
+// String is used to convert a LogSubsystem enum into a human readable string
 func (enum LogSubsystem) String() string {
 	if 0 <= enum && enum <= logSubsystemMax {
 		return logSubsystem[enum]
@@ -75,7 +146,67 @@ func (enum LogSubsystem) String() string {
 	return ""
 }
 
-// Load desired log levels from the environment variable
+// Qlog is a shared memory logging object, which implements a circular buffer and
+// allows concurrent read/write between processes.
+type Qlog struct {
+	// This is the logging system level store. Increase size as the number of
+	// LogSubsystems increases past your capacity
+	LogLevels uint32
+
+	// N.B. The format and args arguments are only valid until Write returns as
+	// they are forced to be allocated on the stack.
+	Write     func(format string, args ...interface{}) error
+	logBuffer *sharedMemory
+
+	// Maximum level to log to the qlog file
+	maxLevel uint8
+}
+
+// NewQlog is a shortened, simplified Qlog constructor. Ramfs should be a memory
+// based filesystem due to the number of writes that will be made to it.
+func NewQlog(ramfsPath string) (*Qlog, error) {
+	return NewQlogExt(ramfsPath, uint64(DefaultMmapSize), "noVersion",
+		PrintToStdout)
+}
+
+// NewQlogExt is the full Qlog constructor. Ramfs should be a memory based fs.
+// sharedMemLen must be large enough to fit MmapStrMapSize and the small qlog
+// header.
+func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
+	outLog func(format string, args ...interface{}) error) (*Qlog, error) {
+
+	if sharedMemLen == 0 {
+		return nil, fmt.Errorf("Invalid shared memory length provided: %d\n",
+			sharedMemLen)
+	}
+
+	q := Qlog{
+		LogLevels: 0,
+		Write:     outLog,
+		maxLevel:  255,
+	}
+	var err error
+	q.logBuffer, err = newSharedMemory(ramfsPath, defaultMmapFile,
+		int(sharedMemLen), daemonVersion, &q)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// check that our logLevel container is large enough for our subsystems
+	if (uint8(logSubsystemMax) * maxLogLevels) >
+		uint8(unsafe.Sizeof(q.LogLevels))*8 {
+
+		return nil, fmt.Errorf("Log level structure not large enough " +
+			"for given subsystems")
+	}
+
+	q.SetLogLevels(os.Getenv(logEnvTag))
+
+	return &q, nil
+}
+
+// SetLogLevels stores the provided log level string in the qlog object
 func (q *Qlog) SetLogLevels(levels string) {
 	// reset all levels
 	defaultSetting := uint8(1)
@@ -132,92 +263,35 @@ func (q *Qlog) SetLogLevels(levels string) {
 	}
 }
 
-type Qlog struct {
-	// This is the logging system level store. Increase size as the number of
-	// LogSubsystems increases past your capacity
-	LogLevels uint32
-
-	// N.B. The format and args arguments are only valid until Write returns as
-	// they are forced to be allocated on the stack.
-	Write     func(format string, args ...interface{}) error
-	logBuffer *sharedMemory
-
-	// Maximum level to log to the qlog file
-	maxLevel uint8
-}
-
-func PrintToStdout(format string, args ...interface{}) error {
-	format += "\n"
-	_, err := fmt.Printf(format, args...)
-	return err
-}
-
-func NewQlog(ramfsPath string) (*Qlog, error) {
-	return NewQlogExt(ramfsPath, uint64(DefaultMmapSize), "noVersion",
-		PrintToStdout)
-}
-
-// N.B. The format and args arguments to the outLog are only valid
-// until outLog returns as they are forced to be allocated on the stack.
-// If a client wishes to read them after outLog returns, it must make a
-// copy for itself.
-
-func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
-	outLog func(format string, args ...interface{}) error) (*Qlog, error) {
-
-	if sharedMemLen == 0 {
-		return nil, fmt.Errorf("Invalid shared memory length provided: %d\n",
-			sharedMemLen)
-	}
-
-	q := Qlog{
-		LogLevels: 0,
-		Write:     outLog,
-		maxLevel:  255,
-	}
-	var err error
-	q.logBuffer, err = newSharedMemory(ramfsPath, defaultMmapFile,
-		int(sharedMemLen), daemonVersion, &q)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// check that our logLevel container is large enough for our subsystems
-	if (uint8(logSubsystemMax) * maxLogLevels) >
-		uint8(unsafe.Sizeof(q.LogLevels))*8 {
-
-		return nil, fmt.Errorf("Log level structure not large enough " +
-			"for given subsystems")
-	}
-
-	q.SetLogLevels(os.Getenv(logEnvTag))
-
-	return &q, nil
-}
-
+// SetWriter sets the "stdout" writer that qlog echos logs to
 func (q *Qlog) SetWriter(w func(format string, args ...interface{}) error) {
 	q.Write = w
 }
 
+// SetMaxLevel sets the level at which logs start being thrown away and neither
+// echoed to WriteFn nor written to the qlog file.
 func (q *Qlog) SetMaxLevel(level uint8) {
 	q.maxLevel = level
 }
 
-// Only for tests - causes all logs starting with prefix to be incompletely written
+// EnterTestMode is only for tests. It causes all logs starting with prefix to be
+// incompletely written
 func (q *Qlog) EnterTestMode(dropPrefix string) {
 	q.logBuffer.testDropStr = dropPrefix
 	q.logBuffer.testMode = true
 }
 
+// Sync causes any logs currently buffered and not written to the ramfs to be flushed
 func (q *Qlog) Sync() int {
 	return q.logBuffer.sync()
 }
 
+// Close closes the file descriptor to the qlog file
 func (q *Qlog) Close() error {
 	return q.logBuffer.close()
 }
 
+// Log sends a new log to the Qlog object
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
@@ -246,6 +320,7 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	}
 }
 
+// LogProcessMode specifies how a qlog reader should read a qlog file
 type LogProcessMode int
 
 const (
@@ -254,6 +329,7 @@ const (
 	ReadThenTail
 )
 
+// NewReader creates a new qlog reader, attached to the qlog file given
 func NewReader(qlogFile string) *reader {
 	rtn := reader{
 		headerSize: uint64(unsafe.Sizeof(mmapHeader{})),
@@ -279,10 +355,14 @@ func NewReader(qlogFile string) *reader {
 	return &rtn
 }
 
+// DaemonVersion returns the version of qlog used to create the given qlog file
 func (read *reader) DaemonVersion() string {
 	return read.daemonVersion
 }
 
+// ProcessLogs reads logs according to the reader's LogProcessMode, and uses fxn
+// on each log in the file. If LogProcessMode involves tail, this function will
+// continue indefinitely
 func (read *reader) ProcessLogs(mode LogProcessMode, fxn func(*LogOutput)) {
 	if mode == ReadThenTail || mode == ReadOnly {
 		freshHeader := read.readHeader()
@@ -316,35 +396,7 @@ func (read *reader) ProcessLogs(mode LogProcessMode, fxn func(*LogOutput)) {
 	}
 }
 
-// Returns whether the strings are a function in/out log pair
-func IsLogFnPair(formatIn string, formatOut string) bool {
-	if strings.Index(formatIn, FnEnterStr) != 0 {
-		return false
-	}
-
-	if strings.Index(formatOut, FnExitStr) != 0 {
-		return false
-	}
-
-	formatIn = strings.Trim(formatIn, "\n ")
-	formatOut = strings.Trim(formatOut, "\n ")
-
-	minLength := len(formatIn) - len(FnEnterStr)
-	outLength := len(formatOut) - len(FnExitStr)
-	if outLength < minLength {
-		minLength = outLength
-	}
-
-	tokenA := formatIn[len(FnEnterStr) : len(FnEnterStr)+minLength]
-	tokenB := formatOut[len(FnExitStr) : len(FnExitStr)+minLength]
-
-	if strings.Compare(tokenA, tokenB) != 0 {
-		return false
-	}
-
-	return true
-}
-
+// LogOutput is a parsed log from a qlog file
 type LogOutput struct {
 	Subsystem LogSubsystem
 	ReqId     uint64
@@ -353,55 +405,14 @@ type LogOutput struct {
 	Args      []interface{}
 }
 
+// ToString turns a LogOutput into a human readable string
 func (rawlog *LogOutput) ToString() string {
 	t := time.Unix(0, rawlog.T)
 	return fmt.Sprintf(formatString(rawlog.Subsystem, rawlog.ReqId, t,
 		rawlog.Format), rawlog.Args...)
 }
 
-func ParseLogs(filepath string) string {
-	rtn := ""
-
-	ParseLogsExt(filepath, 0, defaultParseThreads, false,
-		func(format string, args ...interface{}) (int, error) {
-			rtn += fmt.Sprintf(format, args...)
-			return len(format), nil
-		})
-
-	return rtn
-}
-
-func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
-	statusBar bool, fn WriteFn) {
-
-	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
-
-	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
-	FormatLogs(logs, tabSpaces, statusBar, fn)
-}
-
-// A faster parse without any flair: logs may be out of order, no tabbing. For use
-// in the test suite predominantly. Returns LogOutput* which need to be Sprintf'd
-func ParseLogsRaw(filepath string) []*LogOutput {
-
-	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
-
-	return outputLogPtrs(pastEndIdx, dataArray, strMap, defaultParseThreads,
-		false)
-}
-
-// Returns true if the log file string map given failed the logscan
-func LogscanSkim(filepath string) bool {
-	strMapData := extractStrMapData(filepath)
-
-	// This takes too much time, so only count one string as failing
-	if bytes.Contains(strMapData, []byte("ERROR")) {
-		return true
-	}
-
-	return false
-}
-
+// sortString is a sorting function for strings
 type sortString []string
 
 func (s sortString) Len() int {
@@ -416,6 +427,7 @@ func (s sortString) Less(i, j int) bool {
 	return s[i] < s[j]
 }
 
+// SortByTime is a sorting function for LogOutputs by time
 type SortByTime []LogOutput
 
 func (s SortByTime) Len() int {
