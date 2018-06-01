@@ -10,9 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -96,35 +94,35 @@ func TestLogLevels(t *testing.T) {
 }
 
 func TestLogFnPair(t *testing.T) {
-	if !isLogFnPair(FnEnterStr+"String A1234", FnExitStr+"String A1234") {
+	if !IsLogFnPair(FnEnterStr+"String A1234", FnExitStr+"String A1234") {
 		t.Fatalf("Easy string match doesn't match")
 	}
 
-	if !isLogFnPair(FnEnterStr+"String A1234Extra1234",
+	if !IsLogFnPair(FnEnterStr+"String A1234Extra1234",
 		FnExitStr+"String A1234") {
 
 		t.Fatal("Extra suffix on first string breaks matching")
 	}
 
-	if !isLogFnPair(FnEnterStr+"String A1234",
+	if !IsLogFnPair(FnEnterStr+"String A1234",
 		FnExitStr+"String A1234Extra4321") {
 
 		t.Fatal("Extra suffix on second string breaks matching")
 	}
 
-	if isLogFnPair(FnEnterStr+"String A1234", FnEnterStr+"String A1234") {
+	if IsLogFnPair(FnEnterStr+"String A1234", FnEnterStr+"String A1234") {
 		t.Fatal("Two enter functions matching")
 	}
 
-	if isLogFnPair(FnExitStr+"String A1234", FnExitStr+"String A1234") {
+	if IsLogFnPair(FnExitStr+"String A1234", FnExitStr+"String A1234") {
 		t.Fatal("Two exit functions matching")
 	}
 
-	if isLogFnPair(FnEnterStr+"asdlkj234", FnExitStr+"kjl23") {
+	if IsLogFnPair(FnEnterStr+"asdlkj234", FnExitStr+"kjl23") {
 		t.Fatal("Obvious mismatch matches")
 	}
 
-	if !isLogFnPair("---In Mux::ReleaseDirEnter Fh %d\n",
+	if !IsLogFnPair("---In Mux::ReleaseDirEnter Fh %d\n",
 		"Out-- Mux::ReleaseDir\n") {
 
 		t.Fatal("Real example mismatch")
