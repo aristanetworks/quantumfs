@@ -13,10 +13,8 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
-	"time"
 	"unsafe"
 )
 
@@ -28,14 +26,6 @@ var clippedError error
 
 func init() {
 	clippedError = errors.New(clippedMsg)
-}
-
-type LogOutput struct {
-	Subsystem LogSubsystem
-	ReqId     uint64
-	T         int64
-	Format    string
-	Args      []interface{}
 }
 
 func newLog(s LogSubsystem, r uint64, t int64, f string,
@@ -50,243 +40,7 @@ func newLog(s LogSubsystem, r uint64, t int64, f string,
 	}
 }
 
-func (rawlog *LogOutput) ToString() string {
-	t := time.Unix(0, rawlog.T)
-	return fmt.Sprintf(formatString(rawlog.Subsystem, rawlog.ReqId, t,
-		rawlog.Format), rawlog.Args...)
-}
-
-type SortString []string
-
-func (s SortString) Len() int {
-	return len(s)
-}
-
-func (s SortString) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s SortString) Less(i, j int) bool {
-	return s[i] < s[j]
-}
-
-type SortByTime []LogOutput
-
-func (s SortByTime) Len() int {
-	return len(s)
-}
-
-func (s SortByTime) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s SortByTime) Less(i, j int) bool {
-	return s[i].T < s[j].T
-}
-
-type SortByTimePtr []*LogOutput
-
-func (s SortByTimePtr) Len() int {
-	return len(s)
-}
-
-func (s SortByTimePtr) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s SortByTimePtr) Less(i, j int) bool {
-	return s[i].T < s[j].T
-}
-
-// Returns true if the log file string map given failed the logscan
-func LogscanSkim(filepath string) bool {
-	strMapData := extractStrMapData(filepath)
-
-	// This takes too much time, so only count one string as failing
-	if bytes.Contains(strMapData, []byte("ERROR")) {
-		return true
-	}
-
-	return false
-}
-
-// A faster parse without any flair: logs may be out of order, no tabbing. For use
-// in the test suite predominantly. Returns LogOutput* which need to be Sprintf'd
-func ParseLogsRaw(filepath string) []*LogOutput {
-
-	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
-
-	return OutputLogPtrs(pastEndIdx, dataArray, strMap, defaultParseThreads,
-		false)
-}
-
-func ParseLogs(filepath string) string {
-	rtn := ""
-
-	ParseLogsExt(filepath, 0, defaultParseThreads, false,
-		func(format string, args ...interface{}) (int, error) {
-			rtn += fmt.Sprintf(format, args...)
-			return len(format), nil
-		})
-
-	return rtn
-}
-
-type writeFn func(string, ...interface{}) (int, error)
-
-func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
-	statusBar bool, fn writeFn) {
-
-	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
-
-	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
-	FormatLogs(logs, tabSpaces, statusBar, fn)
-}
-
-func PacketStats(filepath string, statusBar bool, fn writeFn) {
-	pastEndIdx, data, _ := ExtractFields(filepath)
-
-	histogram := make(map[uint16]uint64)
-	maxPacketLen := uint16(0)
-
-	var status LogStatus
-	readCount := uint64(0)
-
-	if statusBar {
-		status = NewLogStatus(50)
-		fmt.Println("Grabbing sizes from log file...")
-	}
-
-	for readCount < uint64(len(data)) {
-		var packetLen uint16
-		readBack(&pastEndIdx, data, packetLen, &packetLen)
-
-		// If we read a packet of zero length, that means our buffer wasn't
-		// full and we've hit the unused area
-		if packetLen == 0 {
-			break
-		}
-
-		// clear the completion bit
-		packetLen &= ^(uint16(entryCompleteBit))
-
-		wrapMinusEquals(&pastEndIdx, uint64(packetLen), uint64(len(data)))
-		readCount += uint64(packetLen) + 2
-
-		if statusBar {
-			readCountClip := uint64(readCount)
-			if readCountClip > uint64(len(data)) {
-				readCountClip = uint64(len(data))
-			}
-			status.Process(float32(readCountClip) / float32(len(data)))
-		}
-
-		histogram[packetLen] = histogram[packetLen] + 1
-		if packetLen > maxPacketLen {
-			maxPacketLen = packetLen
-		}
-
-		if readCount > uint64(len(data)) {
-			// We've read everything, and this last packet isn't valid
-			break
-		}
-	}
-	if statusBar {
-		status.Process(1)
-	}
-
-	for i := 0; i < int(maxPacketLen); i++ {
-		fn("%d, %d\n", i, histogram[uint16(i)])
-	}
-}
-
-func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn writeFn) {
-	indentMap := make(map[uint64]int)
-	// Now that we have the logs in correct order, we can indent them
-
-	var status LogStatus
-	if statusBar {
-		fmt.Println("Formatting log output...")
-		status = NewLogStatus(50)
-	}
-	for i := 0; i < len(logs); i++ {
-		if statusBar {
-			status.Process(float32(i) / float32(len(logs)))
-		}
-
-		// Add any indents necessary
-		if tabSpaces > 0 {
-			indents := indentMap[logs[i].ReqId]
-
-			if strings.Index(logs[i].Format, FnExitStr) == 0 {
-				indents--
-			}
-
-			// Add the spaces we need
-			spaceStr := ""
-			for j := 0; j < indents*tabSpaces; j++ {
-				spaceStr += " "
-			}
-
-			if strings.Index(logs[i].Format, FnEnterStr) == 0 {
-				indents++
-			}
-
-			logs[i].Format = spaceStr + logs[i].Format
-			indentMap[logs[i].ReqId] = indents
-		}
-
-		// Convert timestamp back into something useful
-		t := time.Unix(0, logs[i].T)
-
-		outStr := formatString(logs[i].Subsystem, logs[i].ReqId, t,
-			logs[i].Format)
-		fn(outStr, logs[i].Args...)
-	}
-	if statusBar {
-		status.Process(1)
-	}
-}
-
-func ExtractHeader(data []byte) *mmapHeader {
-	header := (*mmapHeader)(unsafe.Pointer(&data[0]))
-
-	if header.Version != qlogVersion {
-		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
-			header.Version, qlogVersion))
-	}
-
-	return header
-}
-
-func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
-	strMapRtn []logStr) {
-
-	data := grabMemory(filepath)
-	header := ExtractHeader(data)
-
-	mmapHeaderSize := uint64(unsafe.Sizeof(mmapHeader{}))
-
-	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
-		mmapHeaderSize {
-		fmt.Println("Data length inconsistent with expectations. ",
-			len(data))
-	}
-
-	// create a safer map to use
-	strMapData := data[mmapHeaderSize+header.CircBuf.Size:]
-	strMap := make([]logStr, len(strMapData)/LogStrSize)
-	idx := 0
-	for i := 0; i+LogStrSize <= len(strMapData); i += LogStrSize {
-		mapEntry := (*logStr)(unsafe.Pointer(&strMapData[i]))
-		strMap[idx] = *mapEntry
-
-		idx++
-	}
-
-	return header.CircBuf.endIndex(),
-		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap
-}
+type WriteFn func(string, ...interface{}) (int, error)
 
 func readOrPanic(offset int64, len int64, fd *os.File) []byte {
 	raw := make([]byte, len)
@@ -487,7 +241,7 @@ func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen uint64) {
 // outputType is an instance of that same type as output, output *must* be a pointer
 // to a variable of that type for the data to be placed into.
 // PastIdx is the index of the element just *past* what we want to read
-func readBack(pastIdx *uint64, data []byte, outputType interface{},
+func ReadBack(pastIdx *uint64, data []byte, outputType interface{},
 	output interface{}) {
 
 	dataLen := uint64(reflect.TypeOf(outputType).Size())
@@ -529,48 +283,7 @@ type LogStatus struct {
 	lastPixShown int
 }
 
-func NewLogStatus(displayWidth int) LogStatus {
-	return LogStatus{
-		shownHeader:  false,
-		pixWidth:     displayWidth,
-		lastPixShown: 0,
-	}
-}
-
-func (l *LogStatus) Process(newPct float32) {
-	if !l.shownHeader {
-		leftHeader := "Processing: ||"
-		nextHeader := "             |"
-		fmt.Printf(leftHeader)
-		for i := 0; i < l.pixWidth; i++ {
-			fmt.Printf(" ")
-		}
-		fmt.Printf("||\n")
-		fmt.Printf(nextHeader)
-		l.shownHeader = true
-	}
-
-	// Calculate the amount of pixels to output in the loading bar
-	pixDone := int(float32(l.pixWidth) * newPct)
-	for i := l.lastPixShown + 1; i <= pixDone; i++ {
-		// Each pixel in the bar is a period
-		fmt.Printf(".")
-	}
-
-	if pixDone == l.pixWidth && pixDone != l.lastPixShown {
-		fmt.Printf("| Done.\n")
-	}
-
-	l.lastPixShown = pixDone
-}
-
-func OutputLogs(pastEndIdx uint64, data []byte, strMap []logStr,
-	maxWorkers int) []LogOutput {
-
-	return OutputLogsExt(pastEndIdx, data, strMap, maxWorkers, false)
-}
-
-func ProcessJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
+func processJobs(jobs <-chan logJob, wg *sync.WaitGroup) {
 	for j := range jobs {
 		packetData := j.packetData
 		strMap := j.strMap
@@ -648,7 +361,7 @@ type logJob struct {
 	out        *LogOutput
 }
 
-func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers int,
+func outputLogPtrs(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers int,
 	printStatus bool) []*LogOutput {
 
 	var logPtrs []*LogOutput
@@ -659,7 +372,7 @@ func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers i
 
 	wg.Add(maxWorkers)
 	for w := 0; w < maxWorkers; w++ {
-		go ProcessJobs(jobs, &wg)
+		go processJobs(jobs, &wg)
 	}
 
 	if printStatus {
@@ -670,7 +383,7 @@ func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers i
 
 	for readCount < uint64(len(data)) {
 		var packetLen uint16
-		readBack(&pastEndIdx, data, packetLen, &packetLen)
+		ReadBack(&pastEndIdx, data, packetLen, &packetLen)
 
 		// If we read a packet of zero length, that means our buffer wasn't
 		// full and we've hit the unused area
@@ -680,10 +393,10 @@ func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers i
 
 		// If the packet's uppermost len bit isn't set, that means it's not
 		// fully written and needs to be discarded
-		completeEntry := (packetLen&entryCompleteBit != 0)
+		completeEntry := (packetLen&EntryCompleteBit != 0)
 
 		// Now clear the upper bit so it doesn't mess up our packetLen
-		packetLen &= ^(uint16(entryCompleteBit))
+		packetLen &= ^(uint16(EntryCompleteBit))
 
 		// Prepare the pastEndIdx and readCount variables to allow us to skip
 		wrapMinusEquals(&pastEndIdx, uint64(packetLen), uint64(len(data)))
@@ -729,46 +442,4 @@ func OutputLogPtrs(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers i
 	}
 
 	return logPtrs
-}
-
-func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers int,
-	printStatus bool) []LogOutput {
-
-	logPtrs := OutputLogPtrs(pastEndIdx, data, strMap, maxWorkers, printStatus)
-
-	// Go through the logs and fix any missing timestamps. Use the last entry's,
-	// and de-pointer-ify them.
-	rtn := make([]LogOutput, len(logPtrs))
-	var lastTimestamp int64
-
-	if printStatus {
-		fmt.Println("Fixing missing timestamps...")
-	}
-	status := NewLogStatus(50)
-	for i := 0; i < len(logPtrs); i++ {
-		if printStatus {
-			status.Process(float32(i) / float32(len(logPtrs)))
-		}
-
-		if logPtrs[i].T == 0 {
-			logPtrs[i].T = lastTimestamp
-		} else {
-			lastTimestamp = logPtrs[i].T
-		}
-
-		rtn[i] = *logPtrs[i]
-	}
-
-	if printStatus {
-		status.Process(1)
-		fmt.Printf("Sorting parsed logs...")
-	}
-
-	sort.Sort(SortByTime(rtn))
-
-	if printStatus {
-		fmt.Printf("done\n")
-	}
-
-	return rtn
 }

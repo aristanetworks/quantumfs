@@ -6,9 +6,11 @@ package qlog
 // This file contains all public functions and constants
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -308,3 +310,301 @@ func (read *reader) ProcessLogs(mode LogProcessMode, fxn func(*LogOutput)) {
 	}
 }
 
+// Returns whether the strings are a function in/out log pair
+func IsLogFnPair(formatIn string, formatOut string) bool {
+	if strings.Index(formatIn, FnEnterStr) != 0 {
+		return false
+	}
+
+	if strings.Index(formatOut, FnExitStr) != 0 {
+		return false
+	}
+
+	formatIn = strings.Trim(formatIn, "\n ")
+	formatOut = strings.Trim(formatOut, "\n ")
+
+	minLength := len(formatIn) - len(FnEnterStr)
+	outLength := len(formatOut) - len(FnExitStr)
+	if outLength < minLength {
+		minLength = outLength
+	}
+
+	tokenA := formatIn[len(FnEnterStr) : len(FnEnterStr)+minLength]
+	tokenB := formatOut[len(FnExitStr) : len(FnExitStr)+minLength]
+
+	if strings.Compare(tokenA, tokenB) != 0 {
+		return false
+	}
+
+	return true
+}
+
+type LogOutput struct {
+	Subsystem LogSubsystem
+	ReqId     uint64
+	T         int64
+	Format    string
+	Args      []interface{}
+}
+
+func ParseLogs(filepath string) string {
+	rtn := ""
+
+	ParseLogsExt(filepath, 0, defaultParseThreads, false,
+		func(format string, args ...interface{}) (int, error) {
+			rtn += fmt.Sprintf(format, args...)
+			return len(format), nil
+		})
+
+	return rtn
+}
+
+func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
+	statusBar bool, fn WriteFn) {
+
+	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+
+	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
+	FormatLogs(logs, tabSpaces, statusBar, fn)
+}
+
+// A faster parse without any flair: logs may be out of order, no tabbing. For use
+// in the test suite predominantly. Returns LogOutput* which need to be Sprintf'd
+func ParseLogsRaw(filepath string) []*LogOutput {
+
+	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+
+	return outputLogPtrs(pastEndIdx, dataArray, strMap, defaultParseThreads,
+		false)
+}
+
+// Returns true if the log file string map given failed the logscan
+func LogscanSkim(filepath string) bool {
+	strMapData := extractStrMapData(filepath)
+
+	// This takes too much time, so only count one string as failing
+	if bytes.Contains(strMapData, []byte("ERROR")) {
+		return true
+	}
+
+	return false
+}
+
+func (rawlog *LogOutput) ToString() string {
+	t := time.Unix(0, rawlog.T)
+	return fmt.Sprintf(formatString(rawlog.Subsystem, rawlog.ReqId, t,
+		rawlog.Format), rawlog.Args...)
+}
+
+type sortString []string
+
+func (s sortString) Len() int {
+	return len(s)
+}
+
+func (s sortString) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s sortString) Less(i, j int) bool {
+	return s[i] < s[j]
+}
+
+type SortByTime []LogOutput
+
+func (s SortByTime) Len() int {
+	return len(s)
+}
+
+func (s SortByTime) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s SortByTime) Less(i, j int) bool {
+	return s[i].T < s[j].T
+}
+
+type SortByTimePtr []*LogOutput
+
+func (s SortByTimePtr) Len() int {
+	return len(s)
+}
+
+func (s SortByTimePtr) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s SortByTimePtr) Less(i, j int) bool {
+	return s[i].T < s[j].T
+}
+
+func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn WriteFn) {
+	indentMap := make(map[uint64]int)
+	// Now that we have the logs in correct order, we can indent them
+
+	var status LogStatus
+	if statusBar {
+		fmt.Println("Formatting log output...")
+		status = NewLogStatus(50)
+	}
+	for i := 0; i < len(logs); i++ {
+		if statusBar {
+			status.Process(float32(i) / float32(len(logs)))
+		}
+
+		// Add any indents necessary
+		if tabSpaces > 0 {
+			indents := indentMap[logs[i].ReqId]
+
+			if strings.Index(logs[i].Format, FnExitStr) == 0 {
+				indents--
+			}
+
+			// Add the spaces we need
+			spaceStr := ""
+			for j := 0; j < indents*tabSpaces; j++ {
+				spaceStr += " "
+			}
+
+			if strings.Index(logs[i].Format, FnEnterStr) == 0 {
+				indents++
+			}
+
+			logs[i].Format = spaceStr + logs[i].Format
+			indentMap[logs[i].ReqId] = indents
+		}
+
+		// Convert timestamp back into something useful
+		t := time.Unix(0, logs[i].T)
+
+		outStr := formatString(logs[i].Subsystem, logs[i].ReqId, t,
+			logs[i].Format)
+		fn(outStr, logs[i].Args...)
+	}
+	if statusBar {
+		status.Process(1)
+	}
+}
+
+func ExtractHeader(data []byte) *mmapHeader {
+	header := (*mmapHeader)(unsafe.Pointer(&data[0]))
+
+	if header.Version != qlogVersion {
+		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
+			header.Version, qlogVersion))
+	}
+
+	return header
+}
+
+func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
+	strMapRtn []logStr) {
+
+	data := grabMemory(filepath)
+	header := ExtractHeader(data)
+
+	mmapHeaderSize := uint64(unsafe.Sizeof(mmapHeader{}))
+
+	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
+		mmapHeaderSize {
+		fmt.Println("Data length inconsistent with expectations. ",
+			len(data))
+	}
+
+	// create a safer map to use
+	strMapData := data[mmapHeaderSize+header.CircBuf.Size:]
+	strMap := make([]logStr, len(strMapData)/LogStrSize)
+	idx := 0
+	for i := 0; i+LogStrSize <= len(strMapData); i += LogStrSize {
+		mapEntry := (*logStr)(unsafe.Pointer(&strMapData[i]))
+		strMap[idx] = *mapEntry
+
+		idx++
+	}
+
+	return header.CircBuf.endIndex(),
+		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap
+}
+
+func NewLogStatus(displayWidth int) LogStatus {
+	return LogStatus{
+		shownHeader:  false,
+		pixWidth:     displayWidth,
+		lastPixShown: 0,
+	}
+}
+
+func (l *LogStatus) Process(newPct float32) {
+	if !l.shownHeader {
+		leftHeader := "Processing: ||"
+		nextHeader := "             |"
+		fmt.Printf(leftHeader)
+		for i := 0; i < l.pixWidth; i++ {
+			fmt.Printf(" ")
+		}
+		fmt.Printf("||\n")
+		fmt.Printf(nextHeader)
+		l.shownHeader = true
+	}
+
+	// Calculate the amount of pixels to output in the loading bar
+	pixDone := int(float32(l.pixWidth) * newPct)
+	for i := l.lastPixShown + 1; i <= pixDone; i++ {
+		// Each pixel in the bar is a period
+		fmt.Printf(".")
+	}
+
+	if pixDone == l.pixWidth && pixDone != l.lastPixShown {
+		fmt.Printf("| Done.\n")
+	}
+
+	l.lastPixShown = pixDone
+}
+
+func OutputLogs(pastEndIdx uint64, data []byte, strMap []logStr,
+	maxWorkers int) []LogOutput {
+
+	return OutputLogsExt(pastEndIdx, data, strMap, maxWorkers, false)
+}
+
+func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers int,
+	printStatus bool) []LogOutput {
+
+	logPtrs := outputLogPtrs(pastEndIdx, data, strMap, maxWorkers, printStatus)
+
+	// Go through the logs and fix any missing timestamps. Use the last entry's,
+	// and de-pointer-ify them.
+	rtn := make([]LogOutput, len(logPtrs))
+	var lastTimestamp int64
+
+	if printStatus {
+		fmt.Println("Fixing missing timestamps...")
+	}
+	status := NewLogStatus(50)
+	for i := 0; i < len(logPtrs); i++ {
+		if printStatus {
+			status.Process(float32(i) / float32(len(logPtrs)))
+		}
+
+		if logPtrs[i].T == 0 {
+			logPtrs[i].T = lastTimestamp
+		} else {
+			lastTimestamp = logPtrs[i].T
+		}
+
+		rtn[i] = *logPtrs[i]
+	}
+
+	if printStatus {
+		status.Process(1)
+		fmt.Printf("Sorting parsed logs...")
+	}
+
+	sort.Sort(SortByTime(rtn))
+
+	if printStatus {
+		fmt.Printf("done\n")
+	}
+
+	return rtn
+}

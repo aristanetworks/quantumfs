@@ -12,35 +12,6 @@ import (
 	"time"
 )
 
-// Returns whether the strings are a function in/out log pair
-func IsLogFnPair(formatIn string, formatOut string) bool {
-	if strings.Index(formatIn, FnEnterStr) != 0 {
-		return false
-	}
-
-	if strings.Index(formatOut, FnExitStr) != 0 {
-		return false
-	}
-
-	formatIn = strings.Trim(formatIn, "\n ")
-	formatOut = strings.Trim(formatOut, "\n ")
-
-	minLength := len(formatIn) - len(FnEnterStr)
-	outLength := len(formatOut) - len(FnExitStr)
-	if outLength < minLength {
-		minLength = outLength
-	}
-
-	tokenA := formatIn[len(FnEnterStr) : len(FnEnterStr)+minLength]
-	tokenB := formatOut[len(FnExitStr) : len(FnExitStr)+minLength]
-
-	if strings.Compare(tokenA, tokenB) != 0 {
-		return false
-	}
-
-	return true
-}
-
 const timeFormat = "2006-01-02T15:04:05.000000000"
 
 func specialReq(reqId uint64) string {
@@ -121,7 +92,7 @@ func getSubsystem(sys string) (LogSubsystem, error) {
 const logEnvTag = "TRACE"
 const maxLogLevels = 4
 const defaultMmapFile = "qlog"
-const entryCompleteBit = uint16(1 << 15)
+const EntryCompleteBit = uint16(1 << 15)
 
 // Get whether, given the subsystem, the given level is active for logs
 func (q *Qlog) getLogLevel(idx LogSubsystem, level uint8) bool {

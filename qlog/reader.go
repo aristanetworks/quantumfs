@@ -107,7 +107,7 @@ func (read *reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
 		// Read the packet size from file
 		lengthData := read.wrapRead(readTo-2, 2)
 		packetLen := *(*uint16)(unsafe.Pointer(&lengthData[0]))
-		packetLen &= ^(uint16(entryCompleteBit))
+		packetLen &= ^(uint16(EntryCompleteBit))
 
 		// If we reach a packet of insufficient length, then we're done
 		if packetLen == 0 {
@@ -228,10 +228,10 @@ func (read *reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, *LogOutpu
 	}
 
 	var packetLen uint16
-	readBack(&pastEndIdx, data, packetLen, &packetLen)
+	ReadBack(&pastEndIdx, data, packetLen, &packetLen)
 
-	packetReady := ((packetLen & uint16(entryCompleteBit)) != 0)
-	packetLen &= ^(uint16(entryCompleteBit))
+	packetReady := ((packetLen & uint16(EntryCompleteBit)) != 0)
+	packetLen &= ^(uint16(EntryCompleteBit))
 
 	if uint64(len(data)) < pastEndIdx || pastEndIdx < uint64(packetLen) ||
 		packetLen < PacketHeaderLen {

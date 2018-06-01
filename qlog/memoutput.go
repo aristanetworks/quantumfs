@@ -140,7 +140,7 @@ func (circ *circMemLogs) writePacket(partialWrite bool, format string,
 
 	// Write the length field without the completion bit
 	lenOffset := (dataOffset + length) % circ.length
-	flagAndLength := length & ^uint64(entryCompleteBit)
+	flagAndLength := length & ^uint64(EntryCompleteBit)
 
 	offset := dataOffset
 	buf := circ.buffer
@@ -182,7 +182,7 @@ func (circ *circMemLogs) writePacket(partialWrite bool, format string,
 
 	// Now that the entry is written completely, mark the packet as safe to read,
 	utils.MemFence(timestamp)
-	flagAndLength |= uint64(entryCompleteBit)
+	flagAndLength |= uint64(EntryCompleteBit)
 
 	if fastpath {
 		insertUint16(buf, lenOffset, uint16(flagAndLength))

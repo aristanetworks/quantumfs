@@ -345,7 +345,7 @@ func main() {
 
 		if outFile == "" {
 			// Print to stdout, no status bar
-			qlog.PacketStats(inFile, false, fmt.Printf)
+			packetStats(inFile, false, fmt.Printf)
 		} else {
 			outFh, err := os.Create(outFile)
 			if err != nil {
@@ -354,7 +354,7 @@ func main() {
 			}
 			defer outFh.Close()
 
-			qlog.PacketStats(inFile, true, func(format string,
+			packetStats(inFile, true, func(format string,
 				args ...interface{}) (int, error) {
 
 				toWrite := fmt.Sprintf(format, args...)
@@ -829,4 +829,69 @@ func showLogs(reqId uint64, logs []qlog.LogOutput) {
 	}
 
 	qlog.FormatLogs(filteredLogs, tabSpaces, false, fmt.Printf)
+}
+
+func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen uint64) {
+	if *lhs < rhs {
+		*lhs += uint64(bufLen)
+	}
+
+	*lhs -= rhs
+}
+
+func packetStats(filepath string, statusBar bool, fn qlog.WriteFn) {
+	pastEndIdx, data, _ := qlog.ExtractFields(filepath)
+
+	histogram := make(map[uint16]uint64)
+	maxPacketLen := uint16(0)
+
+	var status qlog.LogStatus
+	readCount := uint64(0)
+
+	if statusBar {
+		status = qlog.NewLogStatus(50)
+		fmt.Println("Grabbing sizes from log file...")
+	}
+
+	for readCount < uint64(len(data)) {
+		var packetLen uint16
+		qlog.ReadBack(&pastEndIdx, data, packetLen, &packetLen)
+
+		// If we read a packet of zero length, that means our buffer wasn't
+		// full and we've hit the unused area
+		if packetLen == 0 {
+			break
+		}
+
+		// clear the completion bit
+		packetLen &= ^(uint16(qlog.EntryCompleteBit))
+
+		wrapMinusEquals(&pastEndIdx, uint64(packetLen), uint64(len(data)))
+		readCount += uint64(packetLen) + 2
+
+		if statusBar {
+			readCountClip := uint64(readCount)
+			if readCountClip > uint64(len(data)) {
+				readCountClip = uint64(len(data))
+			}
+			status.Process(float32(readCountClip) / float32(len(data)))
+		}
+
+		histogram[packetLen] = histogram[packetLen] + 1
+		if packetLen > maxPacketLen {
+			maxPacketLen = packetLen
+		}
+
+		if readCount > uint64(len(data)) {
+			// We've read everything, and this last packet isn't valid
+			break
+		}
+	}
+	if statusBar {
+		status.Process(1)
+	}
+
+	for i := 0; i < int(maxPacketLen); i++ {
+		fn("%d, %d\n", i, histogram[uint16(i)])
+	}
 }
