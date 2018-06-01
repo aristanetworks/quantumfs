@@ -402,20 +402,6 @@ func LogscanSkim(filepath string) bool {
 	return false
 }
 
-type sortString []string
-
-func (s sortString) Len() int {
-	return len(s)
-}
-
-func (s sortString) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s sortString) Less(i, j int) bool {
-	return s[i] < s[j]
-}
-
 type SortByTime []LogOutput
 
 func (s SortByTime) Len() int {
