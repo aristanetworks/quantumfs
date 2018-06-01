@@ -2,35 +2,36 @@
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // qparse is the shared memory log parser for the qlog quantumfs subsystem
-package qlog
+package main
 
 import (
 	"crypto/md5"
 	"encoding/binary"
+	"encoding/gob"
+	"errors"
 	"fmt"
+	"io"
 	"math"
+	"os"
 	"runtime"
 	"strconv"
+	"strings"
+	"sync"
+
+	"github.com/aristanetworks/quantumfs/qlog"
 )
 
-var wildcardStr string
+const defaultChunkSize = 4
 
-func init() {
-	// The wildcard character / string needs to be something that would never
-	// show in a log so that we can use strings as map keys
-	wildcardStr = string([]byte{7})
-
-}
-
-func collectData(wildcards []bool, seq []LogOutput,
+func collectData(wildcards []bool, seq []qlog.LogOutput,
 	sequences []SequenceData) SequenceData {
 
 	var rtn SequenceData
-	rtn.Seq = make([]LogOutput, len(seq), len(seq))
+	rtn.Seq = make([]qlog.LogOutput, len(seq), len(seq))
 	copy(rtn.Seq, seq)
 
 	for i := 0; i < len(sequences); i++ {
-		if PatternMatches(seq, wildcards, sequences[i].Seq) {
+		if patternMatches(seq, wildcards, sequences[i].Seq) {
 			rtn.Times = append(rtn.Times, sequences[i].Times...)
 		}
 	}
@@ -39,7 +40,7 @@ func collectData(wildcards []bool, seq []LogOutput,
 }
 
 // countConsecutive is false if we should count consecutive wildcards as one
-func CountWildcards(mask []bool, countConsecutive bool) int {
+func countWildcards(mask []bool, countConsecutive bool) int {
 	count := 0
 	inWildcard := false
 	for i := 0; i < len(mask); i++ {
@@ -56,7 +57,7 @@ func CountWildcards(mask []bool, countConsecutive bool) int {
 }
 
 // Returns true if a is a superset of b
-func Superset(a []TimeData, b []TimeData) bool {
+func superset(a []TimeData, b []TimeData) bool {
 	union := make(map[int]bool)
 
 	if len(b) > len(a) {
@@ -75,14 +76,14 @@ func Superset(a []TimeData, b []TimeData) bool {
 }
 
 type wildcardedSequence struct {
-	sequence  []LogOutput
+	sequence  []qlog.LogOutput
 	wildcards []bool
 }
 
-func newWildcardedSeq(seq []LogOutput, wc []bool) wildcardedSequence {
+func newWildcardedSeq(seq []qlog.LogOutput, wc []bool) wildcardedSequence {
 
 	var rtn wildcardedSequence
-	rtn.sequence = make([]LogOutput, len(seq), len(seq))
+	rtn.sequence = make([]qlog.LogOutput, len(seq), len(seq))
 	rtn.wildcards = make([]bool, len(wc), len(wc))
 	copy(rtn.sequence, seq)
 	copy(rtn.wildcards, wc)
@@ -120,7 +121,7 @@ func (l *PatternMap) Set(newKey string, newListKey string,
 	l.strToList[newKey] = newListKey
 }
 
-func (l *PatternMap) recurseGenPatterns(seq []LogOutput,
+func (l *PatternMap) recurseGenPatterns(seq []qlog.LogOutput,
 	sequences []SequenceData, maxLenWildcards int) {
 
 	if len(seq) > maxLenWildcards {
@@ -141,7 +142,7 @@ func (l *PatternMap) recurseGenPatterns(seq []LogOutput,
 // and if only one sequence matches then we know that no others will (since as we
 // recurse deeper, we remove wildcards and only become more specific) and escape
 func (l *PatternMap) recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
-	seq []LogOutput, sequences []SequenceData) {
+	seq []qlog.LogOutput, sequences []SequenceData) {
 
 	// If we've already got a result for this sequence, then this has
 	// been generated and we can skip it. This would not be safe if we didn't
@@ -156,7 +157,7 @@ func (l *PatternMap) recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 	matches := 0
 	matchStr := ""
 	for i := 0; i < len(sequences); i++ {
-		if PatternMatches(seq, curMask, sequences[i].Seq) {
+		if patternMatches(seq, curMask, sequences[i].Seq) {
 			matches++
 			matchStr += strconv.Itoa(i) + "|"
 		} else if len(seq) == len(sequences[i].Seq) {
@@ -185,8 +186,8 @@ func (l *PatternMap) recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 	}
 
 	setEntry := false
-	if oldEntry == nil || (CountWildcards(curMask, false) <
-		CountWildcards(oldEntry.wildcards, false)) {
+	if oldEntry == nil || (countWildcards(curMask, false) <
+		countWildcards(oldEntry.wildcards, false)) {
 
 		setEntry = true
 	}
@@ -226,13 +227,63 @@ func SeqMapToList(sequenceMap map[string]SequenceData) []SequenceData {
 	return sequences
 }
 
-func GetTrackerMap(inFile string, maxThreads int) (int,
+// Because Golang is a horrible language and doesn't support maps with slice keys,
+// we need to construct long string keys and save the slices in the value for later
+func extractTrackerMap(logs []qlog.LogOutput, maxThreads int) (count int,
+	rtnMap map[uint64][]SequenceTracker) {
+
+	trackerMap := make(map[uint64][]SequenceTracker)
+	trackerCount := 0
+	var outputMutex sync.Mutex
+
+	// we need one channel per thread. Each thread accepts a disjoint subset of
+	// all possible request IDs, so we can use channels to preserve log order
+	var wg sync.WaitGroup
+	wg.Add(maxThreads)
+
+	var jobChannels []chan int
+	for i := 0; i < maxThreads; i++ {
+		jobChannels = append(jobChannels, make(chan int, 2))
+	}
+
+	for i := 0; i < maxThreads; i++ {
+		go ProcessTrackers(jobChannels[i], &wg, logs, trackerMap,
+			&trackerCount, &outputMutex)
+	}
+
+	fmt.Printf("Extracting sub-sequences from %d logs...\n", len(logs))
+	status := qlog.NewLogStatus(50)
+
+	// Go through all the logs in one pass, constructing all subsequences
+	for i := 0; i < len(logs); i++ {
+		status.Process(float32(i) / float32(len(logs)))
+
+		reqId := logs[i].ReqId
+
+		// Skip it if its a special id since they're not self contained
+		if reqId >= qlog.MinSpecialReqId {
+			continue
+		}
+
+		channelIdx := reqId % uint64(maxThreads)
+		jobChannels[channelIdx] <- i
+	}
+	for i := 0; i < maxThreads; i++ {
+		close(jobChannels[i])
+	}
+	wg.Wait()
+	status.Process(1)
+
+	return trackerCount, trackerMap
+}
+
+func getTrackerMap(inFile string, maxThreads int) (int,
 	map[uint64][]SequenceTracker) {
 
-	var logs []LogOutput
+	var logs []qlog.LogOutput
 	{
-		pastEndIdx, dataArray, strMap := ExtractFields(inFile)
-		logs = OutputLogsExt(pastEndIdx, dataArray, strMap,
+		pastEndIdx, dataArray, strMap := qlog.ExtractFields(inFile)
+		logs = qlog.OutputLogsExt(pastEndIdx, dataArray, strMap,
 			maxThreads, true)
 
 		dataArray = nil
@@ -244,7 +295,7 @@ func GetTrackerMap(inFile string, maxThreads int) (int,
 	var trackerMap map[uint64][]SequenceTracker
 	var trackerCount int
 	{
-		trackerCount, trackerMap = ExtractTrackerMap(logs, maxThreads)
+		trackerCount, trackerMap = extractTrackerMap(logs, maxThreads)
 		logs = nil
 	}
 	fmt.Println("Garbage Collecting...")
@@ -253,15 +304,90 @@ func GetTrackerMap(inFile string, maxThreads int) (int,
 	return trackerCount, trackerMap
 }
 
-func GetStatPatterns(inFile string, maxThreads int,
+type TimeData struct {
+	// how long the sequence took
+	Delta int64
+	// when it started in Unix time
+	StartTime int64
+	// where it started in the logs
+	LogIdxLoc int
+}
+
+type SequenceData struct {
+	Times []TimeData
+	Seq   []qlog.LogOutput
+}
+
+type PatternData struct {
+	SeqStrRaw string // No wildcards in this string, just seq
+	Data      SequenceData
+	Wildcards []bool
+	Avg       int64
+	Sum       int64
+	Stddev    int64
+	Id        uint64
+}
+
+func extractSeqMap(trackerCount int,
+	trackerMap map[uint64][]SequenceTracker) map[string]SequenceData {
+
+	fmt.Printf("Collating subsequence time data into map with %d entries...\n",
+		trackerCount)
+	status := qlog.NewLogStatus(50)
+
+	// After going through the logs, add all our sequences to the rtn map
+	rtn := make(map[string]SequenceData)
+	trackerIdx := 0
+	for reqId, trackers := range trackerMap {
+		// Skip any requests marked as bad
+		if len(trackers) == 0 {
+			continue
+		}
+
+		// Go through each tracker
+		for k := 0; k < len(trackers); k++ {
+			status.Process(float32(trackerIdx) / float32(trackerCount))
+			trackerIdx++
+
+			// If the tracker isn't ready, that means there was a fnIn
+			// that missed its fnOut. That's an error
+			if trackers[k].ready == false {
+				fmt.Printf("Error: Mismatched '%s' in requestId %d"+
+					" log\n", qlog.FnEnterStr, reqId)
+				break
+			}
+
+			rawSeq := trackers[k].seq
+			seq := GenSeqStr(rawSeq)
+			data := rtn[seq]
+			// For this sequence, append the time it took
+			if data.Seq == nil {
+				data.Seq = rawSeq
+			}
+			data.Times = append(data.Times,
+				TimeData{
+					Delta: rawSeq[len(rawSeq)-1].T -
+						rawSeq[0].T,
+					StartTime: rawSeq[0].T,
+					LogIdxLoc: trackers[k].startLogIdx,
+				})
+			rtn[seq] = data
+		}
+	}
+	status.Process(1)
+
+	return rtn
+}
+
+func getStatPatterns(inFile string, maxThreads int,
 	maxLenWildcards int) []PatternData {
 
 	// Structures during this process can be massive. Throw them away asap
-	trackerCount, trackerMap := GetTrackerMap(inFile, maxThreads)
+	trackerCount, trackerMap := getTrackerMap(inFile, maxThreads)
 
 	var sequenceMap map[string]SequenceData
 	{
-		sequenceMap = ExtractSeqMap(trackerCount, trackerMap)
+		sequenceMap = extractSeqMap(trackerCount, trackerMap)
 		trackerMap = nil
 	}
 	fmt.Println("Garbage Collecting...")
@@ -282,7 +408,7 @@ func GetStatPatterns(inFile string, maxThreads int,
 }
 
 func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData {
-	status := NewLogStatus(50)
+	status := qlog.NewLogStatus(50)
 
 	// Now generate all combinations of the sequences with wildcards in them, but
 	// start with an almost completely wildcarded sequence and recurse towards
@@ -329,7 +455,7 @@ func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData 
 	// Now collect all the data for the sequences, allowing wildcards
 	fmt.Printf("Collecting data for each of %d wildcard-ed subsequences...\n",
 		len(patterns.dataByList))
-	status = NewLogStatus(50)
+	status = qlog.NewLogStatus(50)
 	mapIdx := 0
 	for _, wcseq := range patterns.dataByList {
 		status.Process(float32(mapIdx) / float32(len(patterns.dataByList)))
@@ -388,7 +514,7 @@ func newMatchState(p int, m bool) matchState {
 
 // Determine whether pattern, using wildcards, exists within data. We do this instead
 // of regex because we have a simple enough case and regex is super slow
-func PatternMatches(pattern []LogOutput, wildcards []bool, data []LogOutput) bool {
+func patternMatches(pattern []qlog.LogOutput, wildcards []bool, data []qlog.LogOutput) bool {
 	stateStack := make([]matchState, 0, len(pattern))
 	stateStack = append(stateStack, newMatchState(0, false))
 
@@ -472,3 +598,246 @@ func PatternMatches(pattern []LogOutput, wildcards []bool, data []LogOutput) boo
 	// so there's no match
 	return false
 }
+
+func ProcessTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []qlog.LogOutput,
+	trackerMap map[uint64][]SequenceTracker, trackerCount *int,
+	mutex *sync.Mutex) {
+
+	for i := range jobs {
+		log := logs[i]
+		reqId := log.ReqId
+
+		// Grab the SequenceTracker list for this request.
+		// Note: it is safe for us to not lock the entire region only
+		// because we're guaranteed that we're the only thread for this
+		// request Id, and hence this tracker is only ours
+		var trackers []SequenceTracker
+		mutex.Lock()
+		trackers, exists := trackerMap[reqId]
+		mutex.Unlock()
+
+		// If there's an empty entry that already exists, that means
+		// this request had an error and was aborted. Leave it alone.
+		if len(trackers) == 0 && exists {
+			continue
+		}
+
+		// Start a new subsequence if we need to
+		if isFunctionIn(log.Format) {
+			trackers = append(trackers, newSequenceTracker(i))
+		}
+
+		abortRequest := false
+		// Inform all the trackers of the new token
+		for k := 0; k < len(trackers); k++ {
+			err := trackers[k].Process(log)
+			if err != nil {
+				fmt.Println(err)
+				abortRequest = true
+				break
+			}
+		}
+
+		if abortRequest {
+			// Mark the request as bad
+			mutex.Lock()
+			trackerMap[reqId] = make([]SequenceTracker, 0)
+			mutex.Unlock()
+			continue
+		}
+
+		// Only update entry if it won't be empty
+		if exists || len(trackers) > 0 {
+			mutex.Lock()
+			if len(trackers) != len(trackerMap[reqId]) {
+				*trackerCount++
+			}
+			trackerMap[reqId] = trackers
+			mutex.Unlock()
+		}
+	}
+	wg.Done()
+}
+type SequenceTracker struct {
+	stack LogStack
+
+	ready       bool
+	seq         []qlog.LogOutput
+	startLogIdx int
+}
+
+func (s *SequenceTracker) Ready() bool {
+	return s.ready
+}
+
+func (s *SequenceTracker) Seq() []qlog.LogOutput {
+	return s.seq
+}
+
+func newSequenceTracker(startIdx int) SequenceTracker {
+	return SequenceTracker{
+		stack:       newLogStack(),
+		ready:       false,
+		seq:         make([]qlog.LogOutput, 0),
+		startLogIdx: startIdx,
+	}
+}
+
+func (s *SequenceTracker) Process(log qlog.LogOutput) error {
+	// Nothing more to do
+	if s.ready {
+		return nil
+	}
+
+	top, err := s.stack.Peek()
+	if len(s.stack) == 1 && qlog.IsLogFnPair(top.Format, log.Format) {
+		// We've found our pair, and have our sequence. Finalize
+		s.ready = true
+	} else if isFunctionIn(log.Format) {
+		s.stack.Push(log)
+	} else if isFunctionOut(log.Format) {
+		if err != nil || !qlog.IsLogFnPair(top.Format, log.Format) {
+			return errors.New(fmt.Sprintf("Error: Mismatched '%s' in "+
+				"requestId %d log. ||%s|||%s||%s\n",
+				qlog.FnExitStr, log.ReqId, top.Format, log.Format, err))
+		}
+		s.stack.Pop()
+	}
+
+	// Add to the sequence we're tracking
+	s.seq = append(s.seq, log)
+	return nil
+}
+
+type LogStack []qlog.LogOutput
+
+func newLogStack() LogStack {
+	return make([]qlog.LogOutput, 0)
+}
+
+func (s *LogStack) Push(n qlog.LogOutput) {
+	*s = append(*s, n)
+}
+
+func (s *LogStack) Pop() {
+	if len(*s) > 0 {
+		*s = (*s)[:len(*s)-1]
+	}
+}
+
+func (s *LogStack) Peek() (qlog.LogOutput, error) {
+	if len(*s) == 0 {
+		return qlog.LogOutput{},
+			errors.New("Cannot peek on an empty LogStack")
+	}
+
+	return (*s)[len(*s)-1], nil
+}
+
+func SaveToStat(file *os.File, patterns []PatternData) {
+	encoder := gob.NewEncoder(file)
+
+	// Encode the length so we can have a progress bar on load
+	patternLen := int(len(patterns))
+	encoder.Encode(patternLen)
+
+	// The gob package has an annoying and poorly thought out const cap on
+	// Encode data max length. So, we have to encode in chunks we a new encoder
+	// each time
+	status := qlog.NewLogStatus(50)
+	for i := 0; i < len(patterns); {
+		// if a chunk is too large, Encode() will take disproportionally long
+		for chunkSize := defaultChunkSize; chunkSize >= 1; chunkSize /= 2 {
+			chunkPastEnd := i + chunkSize
+			if chunkPastEnd > len(patterns) {
+				chunkPastEnd = len(patterns)
+			}
+
+			err := encoder.Encode(patterns[i:chunkPastEnd])
+			if err == nil {
+				i = chunkPastEnd
+				break
+			}
+
+			if chunkSize <= 1 {
+				fmt.Printf("Unable to encode stat data into file: "+
+					"%s\n", err)
+				os.Exit(1)
+			}
+		}
+
+		status.Process(float32(i) / float32(len(patterns)))
+	}
+}
+
+func LoadFromStat(file *os.File) []PatternData {
+	decoder := gob.NewDecoder(file)
+	var rtn []PatternData
+
+	var patternLen int
+	decoder.Decode(&patternLen)
+	totalDecoded := 0
+
+	status := qlog.NewLogStatus(50)
+	// We have to encode in chunks, so keep going until we're out of data
+	for {
+		var chunk []PatternData
+		err := decoder.Decode(&chunk)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			fmt.Printf("Unable to decode stat contents: %s\n", err)
+			os.Exit(1)
+		}
+		rtn = append(rtn, chunk...)
+
+		totalDecoded += len(chunk)
+		status.Process(float32(totalDecoded) / float32(patternLen))
+	}
+	status.Process(1)
+	if totalDecoded != patternLen {
+		panic(fmt.Sprintf("Statistics length mismatch in file: %d vs %d\n",
+			totalDecoded, patternLen))
+	}
+
+	fmt.Printf("Loaded %d pattern results\n", len(rtn))
+	return rtn
+}
+
+func GenSeqStr(seq []qlog.LogOutput) string {
+	return genSeqStrExt(seq, []bool{}, false)
+}
+
+// consecutiveWc specifies whether the output should contain more than one wildcard
+// in sequence when they are back to back in wildcardMsdk
+func genSeqStrExt(seq []qlog.LogOutput, wildcardMask []bool,
+	consecutiveWc bool) string {
+
+	rtn := ""
+	outputWildcard := false
+	for n := 0; n < len(seq); n++ {
+		if n < len(wildcardMask) && wildcardMask[n] {
+			// This is a wildcard in the sequence, but ensure that we
+			// include consecutive wildcards if we need to
+			if consecutiveWc || !outputWildcard {
+				rtn += string([]byte{7})
+				outputWildcard = true
+			}
+		} else {
+			rtn += seq[n].Format
+			outputWildcard = false
+		}
+	}
+
+	return rtn
+}
+
+
+func isFunctionIn(test string) bool {
+	return strings.Index(test, qlog.FnEnterStr) == 0
+}
+
+func isFunctionOut(test string) bool {
+	return strings.Index(test, qlog.FnExitStr) == 0
+}
+

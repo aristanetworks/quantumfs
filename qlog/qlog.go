@@ -12,16 +12,8 @@ import (
 	"time"
 )
 
-func isFunctionIn(test string) bool {
-	return strings.Index(test, FnEnterStr) == 0
-}
-
-func isFunctionOut(test string) bool {
-	return strings.Index(test, FnExitStr) == 0
-}
-
 // Returns whether the strings are a function in/out log pair
-func isLogFnPair(formatIn string, formatOut string) bool {
+func IsLogFnPair(formatIn string, formatOut string) bool {
 	if strings.Index(formatIn, FnEnterStr) != 0 {
 		return false
 	}

@@ -65,7 +65,7 @@ var maxLen int
 var wildcardStr string
 
 // -- worker structures
-type SortResultsAverage []qlog.PatternData
+type SortResultsAverage []PatternData
 
 func (s SortResultsAverage) Len() int {
 	return len(s)
@@ -83,7 +83,7 @@ func (s SortResultsAverage) Less(i, j int) bool {
 	}
 }
 
-type SortResultsTotal []qlog.PatternData
+type SortResultsTotal []PatternData
 
 func (s SortResultsTotal) Len() int {
 	return len(s)
@@ -239,7 +239,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := qlog.LoadFromStat(file)
+		patterns := LoadFromStat(file)
 
 		outputCsvCover(patterns)
 	case logOut:
@@ -294,7 +294,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := qlog.LoadFromStat(file)
+		patterns := LoadFromStat(file)
 
 		filterMap := make(map[uint64]bool)
 		for i := 0; i < len(filterId); i++ {
@@ -325,7 +325,7 @@ func main() {
 			outFilename = outFile
 		}
 
-		patterns := qlog.GetStatPatterns(inFile, maxThreads, maxLenWildcards)
+		patterns := getStatPatterns(inFile, maxThreads, maxLenWildcards)
 
 		fmt.Println("Saving to stat file...")
 		file, err := os.Create(outFilename)
@@ -335,7 +335,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		qlog.SaveToStat(file, patterns)
+		SaveToStat(file, patterns)
 		fmt.Printf("Stats file created: %s\n", outFilename)
 	case sizeStats:
 		if inFile == "" {
@@ -375,7 +375,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := qlog.LoadFromStat(file)
+		patterns := LoadFromStat(file)
 
 		// Now sort by total time usage
 		fmt.Println("Sorting data by total time usage...")
@@ -398,7 +398,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := qlog.LoadFromStat(file)
+		patterns := LoadFromStat(file)
 
 		// Now sort by average time usage
 		fmt.Println("Sorting data by average time usage...")
@@ -419,7 +419,7 @@ type bucket struct {
 }
 
 func fillTimeline(out map[int64]bucket, seqId uint64,
-	pattern qlog.PatternData) (minStartTime int64) {
+	pattern PatternData) (minStartTime int64) {
 
 	times := pattern.Data.Times
 	var minTime int64
@@ -489,13 +489,13 @@ func filterLogOut(inFile string, patternFile string, showStatus bool,
 		}
 	}
 
-	trackerCount, trackerMap := qlog.GetTrackerMap(inFile, maxThreads)
+	trackerCount, trackerMap := getTrackerMap(inFile, maxThreads)
 
 	// now we just need to output the contents of the tracker maps we match
 	trackerIdx := 0
 	fmt.Println("Filtering for relevant subsequences...")
 	status := qlog.NewLogStatus(50)
-	sequences := make([]*qlog.SequenceTracker, 0)
+	sequences := make([]*SequenceTracker, 0)
 	for reqId, trackers := range trackerMap {
 		if len(trackers) == 0 {
 			continue
@@ -513,7 +513,7 @@ func filterLogOut(inFile string, patternFile string, showStatus bool,
 				break
 			}
 
-			if qlog.PatternMatches(pattern, wildcards,
+			if patternMatches(pattern, wildcards,
 				trackers[k].Seq()) {
 
 				sequences = append(sequences, &trackers[k])
@@ -534,7 +534,7 @@ func filterLogOut(inFile string, patternFile string, showStatus bool,
 	}
 }
 
-func outputCsvCover(patterns []qlog.PatternData) {
+func outputCsvCover(patterns []PatternData) {
 	file, err := os.Create(outFile)
 	if err != nil {
 		fmt.Printf("Unable to create %s for new data: %s\n", outFile, err)
@@ -654,9 +654,9 @@ func outputCsvCover(patterns []qlog.PatternData) {
 	status.Process(1)
 }
 
-func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
+func filterPatterns(patterns []PatternData, minStdDev float64,
 	maxStdDev float64, minWildcards int, maxWildcards int, minSamples int,
-	maxLen int, maxResults int) (filtered []qlog.PatternData, firstLog int64,
+	maxLen int, maxResults int) (filtered []PatternData, firstLog int64,
 	lastLog int64) {
 
 	minStdDevNano := int64(minStdDev * 1000)
@@ -665,8 +665,8 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 	earliestLog := patterns[0].Data.Times[0].StartTime
 	latestLog := earliestLog
 
-	var lastTimes []qlog.TimeData
-	funcResults := make([]qlog.PatternData, 0)
+	var lastTimes []TimeData
+	funcResults := make([]PatternData, 0)
 	for i := 0; i < len(patterns); i++ {
 		// check the times for earliest / latest time
 		for j := 0; j < len(patterns[i].Data.Times); j++ {
@@ -684,13 +684,13 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 			continue
 		}
 
-		wildcards := qlog.CountWildcards(patterns[i].Wildcards, false)
+		wildcards := countWildcards(patterns[i].Wildcards, false)
 		if wildcards > maxWildcards || wildcards < minWildcards {
 			continue
 		}
 
 		if len(patterns[i].Data.Seq)-
-			(qlog.CountWildcards(patterns[i].Wildcards, true)-
+			(countWildcards(patterns[i].Wildcards, true)-
 				wildcards) > maxLen {
 
 			continue
@@ -700,7 +700,7 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 			// If this dataset is a subset of the last, then we've
 			// already output the most wildcarded version of this
 			// sequence so let's not print redundant information
-			if qlog.Superset(lastTimes, patterns[i].Data.Times) {
+			if superset(lastTimes, patterns[i].Data.Times) {
 				continue
 			}
 		}
@@ -722,7 +722,7 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 	return funcResults, earliestLog, latestLog
 }
 
-func printPatternDataTotal(pattern qlog.PatternData, firstLog int64, lastLog int64) {
+func printPatternDataTotal(pattern PatternData, firstLog int64, lastLog int64) {
 	logTime := lastLog - firstLog
 	logPct := float64(pattern.Sum) / float64(logTime)
 
@@ -735,7 +735,7 @@ func printPatternDataTotal(pattern qlog.PatternData, firstLog int64, lastLog int
 	fmt.Println("")
 }
 
-func printPatternData(pattern qlog.PatternData) {
+func printPatternData(pattern PatternData) {
 	fmt.Println("------------PATTERN SECTION ABOVE-----")
 	fmt.Printf("Total sequence time: %12s\n",
 		time.Duration(pattern.Sum).String())
@@ -744,7 +744,7 @@ func printPatternData(pattern qlog.PatternData) {
 	fmt.Println("")
 }
 
-func printPatternCommon(pattern qlog.PatternData) {
+func printPatternCommon(pattern PatternData) {
 	fmt.Printf("Average sequence time: %12s\n",
 		time.Duration(pattern.Avg).String())
 	fmt.Printf("Number of samples: %d\n", len(pattern.Data.Times))
@@ -754,7 +754,7 @@ func printPatternCommon(pattern qlog.PatternData) {
 }
 
 // stddev units are microseconds
-func showStats(patterns []qlog.PatternData, minStdDev float64,
+func showStats(patterns []PatternData, minStdDev float64,
 	maxStdDev float64, minWildcards int, maxWildcards int, minSamples int,
 	maxLen int, maxResults int) {
 
