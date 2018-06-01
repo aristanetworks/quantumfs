@@ -1,0 +1,6 @@
+{
+        "DataStoreName": "ether.cql",
+        "DataStoreConf": "/etc/ether.conf",
+        "WorkspaceDbName": "grpc",
+        "WorkspaceDbConf": "qubit-wsdbservice",
+}
