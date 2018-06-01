@@ -40,8 +40,6 @@ func newLog(s LogSubsystem, r uint64, t int64, f string,
 	}
 }
 
-type WriteFn func(string, ...interface{}) (int, error)
-
 func readOrPanic(offset int64, len int64, fd *os.File) []byte {
 	raw := make([]byte, len)
 	readCount := int64(0)
@@ -238,24 +236,6 @@ func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen uint64) {
 	*lhs -= rhs
 }
 
-// outputType is an instance of that same type as output, output *must* be a pointer
-// to a variable of that type for the data to be placed into.
-// PastIdx is the index of the element just *past* what we want to read
-func ReadBack(pastIdx *uint64, data []byte, outputType interface{},
-	output interface{}) {
-
-	dataLen := uint64(reflect.TypeOf(outputType).Size())
-
-	wrapMinusEquals(pastIdx, dataLen, uint64(len(data)))
-	rawData := wrapRead(*pastIdx, dataLen, data)
-
-	buf := bytes.NewReader(rawData)
-	err := binary.Read(buf, binary.LittleEndian, output)
-	if err != nil {
-		panic("Unable to binary read from data")
-	}
-}
-
 // Returns the number of bytes read
 func readPacket(idx *uint64, data []byte, output reflect.Value) error {
 
@@ -275,12 +255,6 @@ func readPacket(idx *uint64, data []byte, output reflect.Value) error {
 	*idx += dataLen
 
 	return nil
-}
-
-type LogStatus struct {
-	shownHeader  bool
-	pixWidth     int
-	lastPixShown int
 }
 
 func processJobs(jobs <-chan logJob, wg *sync.WaitGroup) {

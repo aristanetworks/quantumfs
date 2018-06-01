@@ -7,9 +7,11 @@ package qlog
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"os"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +22,10 @@ import (
 )
 
 type LogSubsystem uint8
+
+type WriteFn func(string, ...interface{}) (int, error)
+
+const EntryCompleteBit = uint16(1 << 15)
 
 const LogStrSize = 64
 
@@ -240,6 +246,14 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	}
 }
 
+type LogProcessMode int
+
+const (
+	TailOnly LogProcessMode = iota
+	ReadOnly
+	ReadThenTail
+)
+
 func NewReader(qlogFile string) *reader {
 	rtn := reader{
 		headerSize: uint64(unsafe.Sizeof(mmapHeader{})),
@@ -264,14 +278,6 @@ func NewReader(qlogFile string) *reader {
 	rtn.lastPastEndIdx = header.CircBuf.endIndex()
 	return &rtn
 }
-
-type LogProcessMode int
-
-const (
-	TailOnly LogProcessMode = iota
-	ReadOnly
-	ReadThenTail
-)
 
 func (read *reader) DaemonVersion() string {
 	return read.daemonVersion
@@ -347,6 +353,12 @@ type LogOutput struct {
 	Args      []interface{}
 }
 
+func (rawlog *LogOutput) ToString() string {
+	t := time.Unix(0, rawlog.T)
+	return fmt.Sprintf(formatString(rawlog.Subsystem, rawlog.ReqId, t,
+		rawlog.Format), rawlog.Args...)
+}
+
 func ParseLogs(filepath string) string {
 	rtn := ""
 
@@ -388,12 +400,6 @@ func LogscanSkim(filepath string) bool {
 	}
 
 	return false
-}
-
-func (rawlog *LogOutput) ToString() string {
-	t := time.Unix(0, rawlog.T)
-	return fmt.Sprintf(formatString(rawlog.Subsystem, rawlog.ReqId, t,
-		rawlog.Format), rawlog.Args...)
 }
 
 type sortString []string
@@ -526,41 +532,6 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap
 }
 
-func NewLogStatus(displayWidth int) LogStatus {
-	return LogStatus{
-		shownHeader:  false,
-		pixWidth:     displayWidth,
-		lastPixShown: 0,
-	}
-}
-
-func (l *LogStatus) Process(newPct float32) {
-	if !l.shownHeader {
-		leftHeader := "Processing: ||"
-		nextHeader := "             |"
-		fmt.Printf(leftHeader)
-		for i := 0; i < l.pixWidth; i++ {
-			fmt.Printf(" ")
-		}
-		fmt.Printf("||\n")
-		fmt.Printf(nextHeader)
-		l.shownHeader = true
-	}
-
-	// Calculate the amount of pixels to output in the loading bar
-	pixDone := int(float32(l.pixWidth) * newPct)
-	for i := l.lastPixShown + 1; i <= pixDone; i++ {
-		// Each pixel in the bar is a period
-		fmt.Printf(".")
-	}
-
-	if pixDone == l.pixWidth && pixDone != l.lastPixShown {
-		fmt.Printf("| Done.\n")
-	}
-
-	l.lastPixShown = pixDone
-}
-
 func OutputLogs(pastEndIdx uint64, data []byte, strMap []logStr,
 	maxWorkers int) []LogOutput {
 
@@ -608,3 +579,63 @@ func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers i
 
 	return rtn
 }
+
+// outputType is an instance of that same type as output, output *must* be a pointer
+// to a variable of that type for the data to be placed into.
+// PastIdx is the index of the element just *past* what we want to read
+func ReadBack(pastIdx *uint64, data []byte, outputType interface{},
+	output interface{}) {
+
+	dataLen := uint64(reflect.TypeOf(outputType).Size())
+
+	wrapMinusEquals(pastIdx, dataLen, uint64(len(data)))
+	rawData := wrapRead(*pastIdx, dataLen, data)
+
+	buf := bytes.NewReader(rawData)
+	err := binary.Read(buf, binary.LittleEndian, output)
+	if err != nil {
+		panic("Unable to binary read from data")
+	}
+}
+
+type LogStatus struct {
+	shownHeader  bool
+	pixWidth     int
+	lastPixShown int
+}
+
+func NewLogStatus(displayWidth int) LogStatus {
+	return LogStatus{
+		shownHeader:  false,
+		pixWidth:     displayWidth,
+		lastPixShown: 0,
+	}
+}
+
+func (l *LogStatus) Process(newPct float32) {
+	if !l.shownHeader {
+		leftHeader := "Processing: ||"
+		nextHeader := "             |"
+		fmt.Printf(leftHeader)
+		for i := 0; i < l.pixWidth; i++ {
+			fmt.Printf(" ")
+		}
+		fmt.Printf("||\n")
+		fmt.Printf(nextHeader)
+		l.shownHeader = true
+	}
+
+	// Calculate the amount of pixels to output in the loading bar
+	pixDone := int(float32(l.pixWidth) * newPct)
+	for i := l.lastPixShown + 1; i <= pixDone; i++ {
+		// Each pixel in the bar is a period
+		fmt.Printf(".")
+	}
+
+	if pixDone == l.pixWidth && pixDone != l.lastPixShown {
+		fmt.Printf("| Done.\n")
+	}
+
+	l.lastPixShown = pixDone
+}
+
