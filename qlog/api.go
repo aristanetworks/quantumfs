@@ -638,4 +638,3 @@ func (l *LogStatus) Process(newPct float32) {
 
 	l.lastPixShown = pixDone
 }
-

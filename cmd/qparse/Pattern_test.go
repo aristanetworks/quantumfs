@@ -253,4 +253,3 @@ func TestFileReload(t *testing.T) {
 		t.Fatalf("Loaded has more entries than in original data")
 	}
 }
-

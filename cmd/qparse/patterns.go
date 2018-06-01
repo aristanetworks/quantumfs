@@ -658,6 +658,7 @@ func ProcessTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []qlog.LogOutput,
 	}
 	wg.Done()
 }
+
 type SequenceTracker struct {
 	stack LogStack
 
@@ -832,7 +833,6 @@ func genSeqStrExt(seq []qlog.LogOutput, wildcardMask []bool,
 	return rtn
 }
 
-
 func isFunctionIn(test string) bool {
 	return strings.Index(test, qlog.FnEnterStr) == 0
 }
@@ -840,4 +840,3 @@ func isFunctionIn(test string) bool {
 func isFunctionOut(test string) bool {
 	return strings.Index(test, qlog.FnExitStr) == 0
 }
-
