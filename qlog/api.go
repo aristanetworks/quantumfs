@@ -237,3 +237,74 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 		q.Write(formatString(idx, reqId, t, format), argsCopy...)
 	}
 }
+
+func NewReader(qlogFile string) *reader {
+	rtn := reader{
+		headerSize: uint64(unsafe.Sizeof(mmapHeader{})),
+	}
+
+	file, err := os.Open(qlogFile)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to read from qlog file %s: %s",
+			qlogFile, err))
+	}
+
+	rtn.file = file
+	header := rtn.readHeader()
+	rtn.circBufSize = header.CircBuf.Size
+
+	rtn.daemonVersion = string(header.DaemonVersion[:])
+	terminatorIdx := strings.Index(rtn.daemonVersion, "\x00")
+	if terminatorIdx != -1 {
+		rtn.daemonVersion = rtn.daemonVersion[:terminatorIdx]
+	}
+
+	rtn.lastPastEndIdx = header.CircBuf.endIndex()
+	return &rtn
+}
+
+type LogProcessMode int
+
+const (
+	TailOnly LogProcessMode = iota
+	ReadOnly
+	ReadThenTail
+)
+
+func (read *reader) DaemonVersion() string {
+	return read.daemonVersion
+}
+
+func (read *reader) ProcessLogs(mode LogProcessMode, fxn func(*LogOutput)) {
+	if mode == ReadThenTail || mode == ReadOnly {
+		freshHeader := read.readHeader()
+		newLogs, newIdx := read.parseOld(freshHeader.CircBuf.endIndex())
+
+		read.lastPastEndIdx = newIdx
+		for _, v := range newLogs {
+			fxn(v)
+		}
+
+		// we may be done
+		if mode == ReadOnly {
+			return
+		}
+	}
+
+	// Run indefinitely
+	for {
+		freshHeader := read.readHeader()
+		if freshHeader.CircBuf.endIndex() != read.lastPastEndIdx {
+			newLogs, newPastEndIdx := read.parse(read.lastPastEndIdx,
+				freshHeader.CircBuf.endIndex())
+
+			read.lastPastEndIdx = newPastEndIdx
+			for _, v := range newLogs {
+				fxn(v)
+			}
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+

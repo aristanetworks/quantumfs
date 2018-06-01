@@ -10,8 +10,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"strings"
-	"time"
 	"unsafe"
 )
 
@@ -38,31 +36,6 @@ type reader struct {
 	strMapLastRead uint64
 }
 
-func NewReader(qlogFile string) *reader {
-	rtn := reader{
-		headerSize: uint64(unsafe.Sizeof(mmapHeader{})),
-	}
-
-	file, err := os.Open(qlogFile)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to read from qlog file %s: %s",
-			qlogFile, err))
-	}
-
-	rtn.file = file
-	header := rtn.ReadHeader()
-	rtn.circBufSize = header.CircBuf.Size
-
-	rtn.daemonVersion = string(header.DaemonVersion[:])
-	terminatorIdx := strings.Index(rtn.daemonVersion, "\x00")
-	if terminatorIdx != -1 {
-		rtn.daemonVersion = rtn.daemonVersion[:terminatorIdx]
-	}
-
-	rtn.lastPastEndIdx = header.CircBuf.endIndex()
-	return &rtn
-}
-
 func (read *reader) readDataBlock(pos uint64, len uint64, outbuf []byte) {
 	_, err := read.file.ReadAt(outbuf[:len], int64(pos+read.headerSize))
 	if err != nil {
@@ -70,7 +43,7 @@ func (read *reader) readDataBlock(pos uint64, len uint64, outbuf []byte) {
 	}
 }
 
-func (read *reader) RefreshStrMap() {
+func (read *reader) refreshStrMap() {
 	fileOffset := read.headerSize + read.circBufSize
 	if read.strMap == nil {
 		read.strMap = make([]logStrTrim, 0)
@@ -108,7 +81,7 @@ func (read *reader) RefreshStrMap() {
 	}
 }
 
-func (read *reader) ReadHeader() *mmapHeader {
+func (read *reader) readHeader() *mmapHeader {
 	headerData := make([]byte, read.headerSize)
 	_, err := read.file.ReadAt(headerData, 0)
 	if err != nil {
@@ -117,51 +90,6 @@ func (read *reader) ReadHeader() *mmapHeader {
 	}
 
 	return ExtractHeader(headerData)
-}
-
-type LogProcessMode int
-
-const (
-	TailOnly LogProcessMode = iota
-	ReadOnly
-	ReadThenTail
-)
-
-func (read *reader) DaemonVersion() string {
-	return read.daemonVersion
-}
-
-func (read *reader) ProcessLogs(mode LogProcessMode, fxn func(*LogOutput)) {
-	if mode == ReadThenTail || mode == ReadOnly {
-		freshHeader := read.ReadHeader()
-		newLogs, newIdx := read.parseOld(freshHeader.CircBuf.endIndex())
-
-		read.lastPastEndIdx = newIdx
-		for _, v := range newLogs {
-			fxn(v)
-		}
-
-		// we may be done
-		if mode == ReadOnly {
-			return
-		}
-	}
-
-	// Run indefinitely
-	for {
-		freshHeader := read.ReadHeader()
-		if freshHeader.CircBuf.endIndex() != read.lastPastEndIdx {
-			newLogs, newPastEndIdx := read.parse(read.lastPastEndIdx,
-				freshHeader.CircBuf.endIndex())
-
-			read.lastPastEndIdx = newPastEndIdx
-			for _, v := range newLogs {
-				fxn(v)
-			}
-		}
-
-		time.Sleep(10 * time.Millisecond)
-	}
 }
 
 func (read *reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
@@ -202,7 +130,7 @@ func (read *reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
 		wrapMinusEquals(&readTo, uint64(packetLen), read.circBufSize)
 
 		// Read the header to see if the log end just passed us as we parsed
-		freshHeader := read.ReadHeader()
+		freshHeader := read.readHeader()
 		newDistanceToEnd := wrapMinus(readTo, freshHeader.CircBuf.endIndex(),
 			read.circBufSize)
 
@@ -360,7 +288,7 @@ func (read *reader) dataToLog(packetData []byte) *LogOutput {
 
 	// Grab the string and output
 	if int(strMapId) >= len(read.strMap) {
-		read.RefreshStrMap()
+		read.refreshStrMap()
 
 		if int(strMapId) >= len(read.strMap) {
 			rtn = newLog(LogQlog, QlogReqId, 0,
