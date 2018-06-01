@@ -514,7 +514,9 @@ func newMatchState(p int, m bool) matchState {
 
 // Determine whether pattern, using wildcards, exists within data. We do this instead
 // of regex because we have a simple enough case and regex is super slow
-func patternMatches(pattern []qlog.LogOutput, wildcards []bool, data []qlog.LogOutput) bool {
+func patternMatches(pattern []qlog.LogOutput, wildcards []bool,
+	data []qlog.LogOutput) bool {
+
 	stateStack := make([]matchState, 0, len(pattern))
 	stateStack = append(stateStack, newMatchState(0, false))
 
@@ -699,8 +701,8 @@ func (s *SequenceTracker) Process(log qlog.LogOutput) error {
 	} else if isFunctionOut(log.Format) {
 		if err != nil || !qlog.IsLogFnPair(top.Format, log.Format) {
 			return errors.New(fmt.Sprintf("Error: Mismatched '%s' in "+
-				"requestId %d log. ||%s|||%s||%s\n",
-				qlog.FnExitStr, log.ReqId, top.Format, log.Format, err))
+				"requestId %d log. ||%s|||%s||%s\n", qlog.FnExitStr,
+				log.ReqId, top.Format, log.Format, err))
 		}
 		s.stack.Pop()
 	}
