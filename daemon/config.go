@@ -66,4 +66,9 @@ type QuantumFsConfig struct {
 	// Whether to do verbose tracing or not. This adds ~20% overhead, but makes
 	// debugging _much_ easier.
 	VerboseTracing bool
+
+	// Should magical user ownership be used? Magical ownership causes all files
+	// and directories owned by a non-system ID to appear as owned by the current
+	// user. This adds some overhead to open heavy workloads.
+	MagicOwnership bool
 }

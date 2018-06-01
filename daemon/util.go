@@ -301,6 +301,11 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 	checkGid uint32, pid uint32, checkFlags uint32,
 	stickyAltOwner int32) fuse.Status {
 
+	if !c.config.MagicOwnership {
+		// Assume the kernel has already checked permissions for us
+		return fuse.OK
+	}
+
 	defer c.FuncIn("hasPermissionIds", "%d %d %d %d %o", checkUid, checkGid,
 		pid, stickyAltOwner, checkFlags).Out()
 

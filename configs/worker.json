@@ -5,4 +5,5 @@
         "WorkspaceDbConf": "qubit-wsdbservice",
         "DirtyFlushDelay": "1h",
         "VerboseTracing": false,
+        "MagicOwnership": false
 }

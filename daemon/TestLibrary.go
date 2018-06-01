@@ -249,6 +249,7 @@ func (th *TestHelper) defaultConfig() QuantumFsConfig {
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(""),
 		DurableStore:     processlocal.NewDataStore(""),
+		MagicOwnership:   true,
 	}
 	return config
 }
