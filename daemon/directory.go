@@ -254,8 +254,15 @@ func fillAttrWithDirectoryRecord(c *ctx, attr *fuse.Attr, inodeNum InodeId,
 	attr.Mtimensec = entry.ModificationTime().Nanoseconds()
 	attr.Ctimensec = entry.ContentTime().Nanoseconds()
 	attr.Mode = fileType | permissionsToMode(entry.Permissions())
-	attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
-	attr.Owner.Gid = quantumfs.SystemGid(entry.Group(), owner.Gid)
+	if c.config.MagicOwnership {
+		attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(), owner.Uid)
+		attr.Owner.Gid = quantumfs.SystemGid(entry.Group(), owner.Gid)
+	} else {
+		attr.Owner.Uid = quantumfs.SystemUid(entry.Owner(),
+			quantumfs.UniversalUID)
+		attr.Owner.Gid = quantumfs.SystemGid(entry.Group(),
+			quantumfs.UniversalGID)
+	}
 	attr.Blksize = uint32(qfsBlockSize)
 }
 

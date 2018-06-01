@@ -26,12 +26,12 @@ type HardlinkTableEntry struct {
 	// the workspaceroot that is getting published
 	delta int
 
-	// deltas is the total number of deltas still bubbling up to the root. If
+	// numDeltas is the total number of deltas still bubbling up to the root. If
 	// this is zero then the effective and publishable views are identical,
 	// otherwise the two views are different, even if delta is zero. This is to
 	// handle the case where a hardlink is created and deleted in several
 	// directories in such a way that the deltas happen to cancel out to zero.
-	deltas int
+	numDeltas int
 }
 
 func (hte *HardlinkTableEntry) record() quantumfs.DirectoryRecord {
@@ -159,7 +159,7 @@ func (ht *HardlinkTableImpl) hardlinkInc(fileId quantumfs.FileId) {
 	entry.record().SetContentTime(quantumfs.NewTime(time.Now()))
 
 	entry.delta++
-	entry.deltas++
+	entry.numDeltas++
 }
 
 func (ht *HardlinkTableImpl) hardlinkDec(
@@ -172,7 +172,7 @@ func (ht *HardlinkTableImpl) hardlinkDec(
 		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", fileId))
 	}
 
-	entry.deltas++
+	entry.numDeltas++
 	if entry.effectiveNlink() > 0 {
 		entry.delta--
 	} else {
@@ -459,14 +459,14 @@ func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
 			return
 		}
 		c.vlog("Updating nlink of %d: nlink %d + entry deltas %d "+
-			"(delta +%d -%d)", fileId, entry.nlink, entry.deltas,
+			"(delta +%d -%d)", fileId, entry.nlink, entry.numDeltas,
 			delta.additions, delta.deletions)
 
 		entry.nlink = int64(int(entry.nlink) + delta.additions -
 			delta.deletions)
 		entry.delta = entry.delta - delta.additions + delta.deletions
-		entry.deltas -= delta.additions + delta.deletions
-		if entry.nlink == 0 && entry.deltas == 0 {
+		entry.numDeltas -= delta.additions + delta.deletions
+		if entry.nlink == 0 && entry.numDeltas == 0 {
 			ht.removeHardlink_(fileId, entry.inodeId)
 		}
 	})
@@ -485,7 +485,7 @@ func (ht *HardlinkTableImpl) getNormalized(
 	}
 
 	// Only normalize if there are no more legs or deltas inbound
-	if link.nlink == 1 && link.deltas == 0 {
+	if link.nlink == 1 && link.numDeltas == 0 {
 		return link.publishableRecord, link.effectiveRecord
 	}
 

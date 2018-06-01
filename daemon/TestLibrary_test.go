@@ -410,7 +410,7 @@ func cacheTimeout100Ms(test *testHelper, config *QuantumFsConfig) {
 
 // Modify the QuantumFS flush delay to 100 milliseconds
 func dirtyDelay100Ms(test *testHelper, config *QuantumFsConfig) {
-	config.DirtyFlushDelay = 100 * time.Millisecond
+	config.DirtyFlushDelay = Duration{100 * time.Millisecond}
 }
 
 // Extract namespace and workspace path from the absolute path of
