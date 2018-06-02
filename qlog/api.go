@@ -412,22 +412,6 @@ func (rawlog *LogOutput) ToString() string {
 		rawlog.Format), rawlog.Args...)
 }
 
-// sortString is a sorting function for strings
-type sortString []string
-
-func (s sortString) Len() int {
-	return len(s)
-}
-
-func (s sortString) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s sortString) Less(i, j int) bool {
-	return s[i] < s[j]
-}
-
-// SortByTime is a sorting function for LogOutputs by time
 type SortByTime []LogOutput
 
 func (s SortByTime) Len() int {
