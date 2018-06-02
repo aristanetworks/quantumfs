@@ -606,12 +606,14 @@ func (s SortByTimePtr) Less(i, j int) bool {
 	return s[i].T < s[j].T
 }
 
+// LogStatus is used for showing a progress bar during qlog operations
 type LogStatus struct {
 	shownHeader  bool
 	pixWidth     int
 	lastPixShown int
 }
 
+// NewLogStatus creates a new progress bar
 func NewLogStatus(displayWidth int) LogStatus {
 	return LogStatus{
 		shownHeader:  false,
@@ -620,6 +622,8 @@ func NewLogStatus(displayWidth int) LogStatus {
 	}
 }
 
+// Process takes a new float, indicating the overall progress, and outputs more of
+// the progress bar if needed.
 func (l *LogStatus) Process(newPct float32) {
 	if !l.shownHeader {
 		leftHeader := "Processing: ||"
