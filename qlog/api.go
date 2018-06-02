@@ -11,7 +11,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"math"
 	"os"
 	"reflect"
 	"sort"
@@ -50,6 +49,170 @@ const FnEnterStr = "---In "
 const FnExitStr = "Out-- "
 
 // Global Functions
+
+// ExtractHeader takes the data from a qlog file and extracts the header from it
+func ExtractHeader(data []byte) *mmapHeader {
+	header := (*mmapHeader)(unsafe.Pointer(&data[0]))
+
+	if header.Version != qlogVersion {
+		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
+			header.Version, qlogVersion))
+	}
+
+	return header
+}
+
+// ExtractFields takes a qlog file path and extracts the components: end of log
+// offset, circular log buffer, string map
+func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
+	strMapRtn []logStr) {
+
+	data := grabMemory(filepath)
+	header := ExtractHeader(data)
+
+	mmapHeaderSize := uint64(unsafe.Sizeof(mmapHeader{}))
+
+	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
+		mmapHeaderSize {
+		fmt.Println("Data length inconsistent with expectations. ",
+			len(data))
+	}
+
+	// create a safer map to use
+	strMapData := data[mmapHeaderSize+header.CircBuf.Size:]
+	strMap := make([]logStr, len(strMapData)/LogStrSize)
+	idx := 0
+	for i := 0; i+LogStrSize <= len(strMapData); i += LogStrSize {
+		mapEntry := (*logStr)(unsafe.Pointer(&strMapData[i]))
+		strMap[idx] = *mapEntry
+
+		idx++
+	}
+
+	return header.CircBuf.endIndex(),
+		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap
+}
+
+// OutputLogs is a simple interface to, given the components of a qlog that have
+// been extracted, return the logs in a slice
+func OutputLogs(pastEndIdx uint64, data []byte, strMap []logStr,
+	maxWorkers int) []LogOutput {
+
+	return OutputLogsExt(pastEndIdx, data, strMap, maxWorkers, false)
+}
+
+// OutputLogsExt allows you to parse a qlog, given its components, and return a slice
+// of the logs. Parallel threads and status bar output to stdout are configurable.
+func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers int,
+	printStatus bool) []LogOutput {
+
+	logPtrs := outputLogPtrs(pastEndIdx, data, strMap, maxWorkers, printStatus)
+
+	// Go through the logs and fix any missing timestamps. Use the last entry's,
+	// and de-pointer-ify them.
+	rtn := make([]LogOutput, len(logPtrs))
+	var lastTimestamp int64
+
+	if printStatus {
+		fmt.Println("Fixing missing timestamps...")
+	}
+	status := NewLogStatus(50)
+	for i := 0; i < len(logPtrs); i++ {
+		if printStatus {
+			status.Process(float32(i) / float32(len(logPtrs)))
+		}
+
+		if logPtrs[i].T == 0 {
+			logPtrs[i].T = lastTimestamp
+		} else {
+			lastTimestamp = logPtrs[i].T
+		}
+
+		rtn[i] = *logPtrs[i]
+	}
+
+	if printStatus {
+		status.Process(1)
+		fmt.Printf("Sorting parsed logs...")
+	}
+
+	sort.Sort(SortByTime(rtn))
+
+	if printStatus {
+		fmt.Printf("done\n")
+	}
+
+	return rtn
+}
+
+// ReadBack reads another packet log, and modifies pastIdx to point to the next
+// packet's offset in the data buffer. outputType should be the same type as output,
+// just a generic instance will do, and output *must* point to valid memory.
+// PastIdx is the index of the element just *past* what we want to read
+func ReadBack(pastIdx *uint64, data []byte, outputType interface{},
+	output interface{}) {
+
+	dataLen := uint64(reflect.TypeOf(outputType).Size())
+
+	wrapMinusEquals(pastIdx, dataLen, uint64(len(data)))
+	rawData := wrapRead(*pastIdx, dataLen, data)
+
+	buf := bytes.NewReader(rawData)
+	err := binary.Read(buf, binary.LittleEndian, output)
+	if err != nil {
+		panic("Unable to binary read from data")
+	}
+}
+
+// FormatLogs takes logs and applies the WriteFn given to them, allowing for
+// formatting, status bar to stdout, and sorting the logs by time
+func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn WriteFn) {
+	indentMap := make(map[uint64]int)
+	// Now that we have the logs in correct order, we can indent them
+
+	var status LogStatus
+	if statusBar {
+		fmt.Println("Formatting log output...")
+		status = NewLogStatus(50)
+	}
+	for i := 0; i < len(logs); i++ {
+		if statusBar {
+			status.Process(float32(i) / float32(len(logs)))
+		}
+
+		// Add any indents necessary
+		if tabSpaces > 0 {
+			indents := indentMap[logs[i].ReqId]
+
+			if strings.Index(logs[i].Format, FnExitStr) == 0 {
+				indents--
+			}
+
+			// Add the spaces we need
+			spaceStr := ""
+			for j := 0; j < indents*tabSpaces; j++ {
+				spaceStr += " "
+			}
+
+			if strings.Index(logs[i].Format, FnEnterStr) == 0 {
+				indents++
+			}
+
+			logs[i].Format = spaceStr + logs[i].Format
+			indentMap[logs[i].ReqId] = indents
+		}
+
+		// Convert timestamp back into something useful
+		t := time.Unix(0, logs[i].T)
+
+		outStr := formatString(logs[i].Subsystem, logs[i].ReqId, t,
+			logs[i].Format)
+		fn(outStr, logs[i].Args...)
+	}
+	if statusBar {
+		status.Process(1)
+	}
+}
 
 // ParseLogs reads logs from a qlog file and returns them as one large string
 func ParseLogs(filepath string) string {
@@ -301,7 +464,8 @@ func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	}
 }
 
-// Should only be used by tests
+// Log_ should only be used by tests which need the same functionality as Log, but
+// also need to manufacture the timestamp
 func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	format string, args ...interface{}) {
 
@@ -412,6 +576,7 @@ func (rawlog *LogOutput) ToString() string {
 		rawlog.Format), rawlog.Args...)
 }
 
+// SortByTime allows LogOutputs to be sorted by their time field
 type SortByTime []LogOutput
 
 func (s SortByTime) Len() int {
@@ -426,6 +591,7 @@ func (s SortByTime) Less(i, j int) bool {
 	return s[i].T < s[j].T
 }
 
+// SortByTimePtr allows an array of LogOutput pointers to be sorted by their time
 type SortByTimePtr []*LogOutput
 
 func (s SortByTimePtr) Len() int {
@@ -438,160 +604,6 @@ func (s SortByTimePtr) Swap(i, j int) {
 
 func (s SortByTimePtr) Less(i, j int) bool {
 	return s[i].T < s[j].T
-}
-
-func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn WriteFn) {
-	indentMap := make(map[uint64]int)
-	// Now that we have the logs in correct order, we can indent them
-
-	var status LogStatus
-	if statusBar {
-		fmt.Println("Formatting log output...")
-		status = NewLogStatus(50)
-	}
-	for i := 0; i < len(logs); i++ {
-		if statusBar {
-			status.Process(float32(i) / float32(len(logs)))
-		}
-
-		// Add any indents necessary
-		if tabSpaces > 0 {
-			indents := indentMap[logs[i].ReqId]
-
-			if strings.Index(logs[i].Format, FnExitStr) == 0 {
-				indents--
-			}
-
-			// Add the spaces we need
-			spaceStr := ""
-			for j := 0; j < indents*tabSpaces; j++ {
-				spaceStr += " "
-			}
-
-			if strings.Index(logs[i].Format, FnEnterStr) == 0 {
-				indents++
-			}
-
-			logs[i].Format = spaceStr + logs[i].Format
-			indentMap[logs[i].ReqId] = indents
-		}
-
-		// Convert timestamp back into something useful
-		t := time.Unix(0, logs[i].T)
-
-		outStr := formatString(logs[i].Subsystem, logs[i].ReqId, t,
-			logs[i].Format)
-		fn(outStr, logs[i].Args...)
-	}
-	if statusBar {
-		status.Process(1)
-	}
-}
-
-func ExtractHeader(data []byte) *mmapHeader {
-	header := (*mmapHeader)(unsafe.Pointer(&data[0]))
-
-	if header.Version != qlogVersion {
-		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
-			header.Version, qlogVersion))
-	}
-
-	return header
-}
-
-func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
-	strMapRtn []logStr) {
-
-	data := grabMemory(filepath)
-	header := ExtractHeader(data)
-
-	mmapHeaderSize := uint64(unsafe.Sizeof(mmapHeader{}))
-
-	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
-		mmapHeaderSize {
-		fmt.Println("Data length inconsistent with expectations. ",
-			len(data))
-	}
-
-	// create a safer map to use
-	strMapData := data[mmapHeaderSize+header.CircBuf.Size:]
-	strMap := make([]logStr, len(strMapData)/LogStrSize)
-	idx := 0
-	for i := 0; i+LogStrSize <= len(strMapData); i += LogStrSize {
-		mapEntry := (*logStr)(unsafe.Pointer(&strMapData[i]))
-		strMap[idx] = *mapEntry
-
-		idx++
-	}
-
-	return header.CircBuf.endIndex(),
-		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap
-}
-
-func OutputLogs(pastEndIdx uint64, data []byte, strMap []logStr,
-	maxWorkers int) []LogOutput {
-
-	return OutputLogsExt(pastEndIdx, data, strMap, maxWorkers, false)
-}
-
-func OutputLogsExt(pastEndIdx uint64, data []byte, strMap []logStr, maxWorkers int,
-	printStatus bool) []LogOutput {
-
-	logPtrs := outputLogPtrs(pastEndIdx, data, strMap, maxWorkers, printStatus)
-
-	// Go through the logs and fix any missing timestamps. Use the last entry's,
-	// and de-pointer-ify them.
-	rtn := make([]LogOutput, len(logPtrs))
-	var lastTimestamp int64
-
-	if printStatus {
-		fmt.Println("Fixing missing timestamps...")
-	}
-	status := NewLogStatus(50)
-	for i := 0; i < len(logPtrs); i++ {
-		if printStatus {
-			status.Process(float32(i) / float32(len(logPtrs)))
-		}
-
-		if logPtrs[i].T == 0 {
-			logPtrs[i].T = lastTimestamp
-		} else {
-			lastTimestamp = logPtrs[i].T
-		}
-
-		rtn[i] = *logPtrs[i]
-	}
-
-	if printStatus {
-		status.Process(1)
-		fmt.Printf("Sorting parsed logs...")
-	}
-
-	sort.Sort(SortByTime(rtn))
-
-	if printStatus {
-		fmt.Printf("done\n")
-	}
-
-	return rtn
-}
-
-// outputType is an instance of that same type as output, output *must* be a pointer
-// to a variable of that type for the data to be placed into.
-// PastIdx is the index of the element just *past* what we want to read
-func ReadBack(pastIdx *uint64, data []byte, outputType interface{},
-	output interface{}) {
-
-	dataLen := uint64(reflect.TypeOf(outputType).Size())
-
-	wrapMinusEquals(pastIdx, dataLen, uint64(len(data)))
-	rawData := wrapRead(*pastIdx, dataLen, data)
-
-	buf := bytes.NewReader(rawData)
-	err := binary.Read(buf, binary.LittleEndian, output)
-	if err != nil {
-		panic("Unable to binary read from data")
-	}
 }
 
 type LogStatus struct {

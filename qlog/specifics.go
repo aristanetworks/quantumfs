@@ -6,6 +6,11 @@ package qlog
 // This file contains specifics that shouldn't be part of qlog, but aren't nicely
 // factored out for the time being.
 
+import (
+	"fmt"
+	"math"
+)
+
 const (
 	LogDaemon LogSubsystem = iota
 	LogDatastore
