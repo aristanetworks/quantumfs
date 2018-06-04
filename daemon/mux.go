@@ -961,7 +961,7 @@ func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 
 		inode := qfs.inodeNoInstantiate(c, inodeId)
 		if inode != nil {
-			inode.addRef()
+			inode.addRef(c)
 		}
 	} else {
 		qfs.lookupCounts[inodeId] = prev + 1

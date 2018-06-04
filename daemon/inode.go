@@ -191,7 +191,7 @@ type Inode interface {
 	cleanup(c *ctx)
 
 	// Reference counting to determine when an Inode may become uninstantiated.
-	addRef()
+	addRef(c *ctx)
 	delRef(c *ctx)
 }
 
@@ -502,7 +502,7 @@ func (inode *InodeCommon) setParent(c *ctx, newParent Inode) {
 
 // Must be called with parentLock locked for writing
 func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
-	newParent.addRef()
+	newParent.addRef(c)
 
 	if inode.parentId != quantumfs.InodeIdInvalid {
 		oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
@@ -755,15 +755,16 @@ func (inode *InodeCommon) cleanup(c *ctx) {
 	// Most inodes have nothing to do here
 }
 
-func (inode *InodeCommon) addRef() {
+func (inode *InodeCommon) addRef(c *ctx) {
 	if inode.inodeNum() == quantumfs.InodeIdRoot ||
 		inode.inodeNum() == quantumfs.InodeIdApi {
 
 		// These Inodes always exist
 		return
 	}
-
-	utils.Assert(atomic.AddInt32(&inode.refcount, 1) > 1,
+	refs := atomic.AddInt32(&inode.refcount, 1)
+	c.vlog("A: %d refs on inode %d", refs, inode.inodeNum())
+	utils.Assert(refs > 1,
 		"Increased from zero refcount!")
 }
 
@@ -777,6 +778,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 
 	refs := atomic.AddInt32(&inode.refcount, ^int32(0))
 
+	c.vlog("D: %d refs on inode %d", refs, inode.inodeNum())
 	if refs != 0 {
 		return
 	}
