@@ -732,6 +732,11 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	c.qfs.setInode(c, inodeNum, newEntity)
 	c.qfs.incrementLookupCount(c, inodeNum)
 
+	// See the comment above delRef() in QuantumFs.inode_(). Because we aren't
+	// instantiating we end up adding an extra reference when we add the
+	// first lookup.. Remove it now.
+	newEntity.delRef(c)
+
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner, entry)
