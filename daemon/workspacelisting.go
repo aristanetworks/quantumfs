@@ -401,7 +401,7 @@ func (tsl *TypespaceList) Create(c *ctx, input *fuse.CreateIn, name string,
 func (tsl *TypespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	c.elog("Invalid SetAttr on TypespaceList")
+	c.wlog("Invalid SetAttr on TypespaceList")
 	return fuse.ENOSYS
 }
 
@@ -419,31 +419,31 @@ func (tsl *TypespaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 }
 
 func (tsl *TypespaceList) Unlink(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Unlink on TypespaceList")
+	c.wlog("Invalid Unlink on TypespaceList")
 	return fuse.ENOTDIR
 }
 
 func (tsl *TypespaceList) Rmdir(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Rmdir on TypespaceList")
+	c.wlog("Invalid Rmdir on TypespaceList")
 	return fuse.EACCES
 }
 
 func (tsl *TypespaceList) Symlink(c *ctx, pointedTo string, linkName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Symlink on TypespaceList")
+	c.wlog("Invalid Symlink on TypespaceList")
 	return fuse.EACCES
 }
 
 func (tsl *TypespaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
-	c.elog("Invalid Readlink on TypespaceList")
+	c.wlog("Invalid Readlink on TypespaceList")
 	return nil, fuse.EINVAL
 }
 
 func (tsl *TypespaceList) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Mknod on TypespaceList")
+	c.wlog("Invalid Mknod on TypespaceList")
 	return fuse.ENOSYS
 }
 
@@ -724,7 +724,7 @@ func (nsl *NamespaceList) Create(c *ctx, input *fuse.CreateIn, name string,
 func (nsl *NamespaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	c.elog("Invalid SetAttr on NamespaceList")
+	c.wlog("Invalid SetAttr on NamespaceList")
 	return fuse.ENOSYS
 }
 
@@ -742,31 +742,31 @@ func (nsl *NamespaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 }
 
 func (nsl *NamespaceList) Unlink(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Unlink on NamespaceList")
+	c.wlog("Invalid Unlink on NamespaceList")
 	return fuse.ENOTDIR
 }
 
 func (nsl *NamespaceList) Rmdir(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Rmdir on NamespaceList")
+	c.wlog("Invalid Rmdir on NamespaceList")
 	return fuse.EACCES
 }
 
 func (nsl *NamespaceList) Symlink(c *ctx, pointedTo string, linkName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Symlink on NamespaceList")
+	c.wlog("Invalid Symlink on NamespaceList")
 	return fuse.EACCES
 }
 
 func (nsl *NamespaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
-	c.elog("Invalid Readlink on NamespaceList")
+	c.wlog("Invalid Readlink on NamespaceList")
 	return nil, fuse.EINVAL
 }
 
 func (nsl *NamespaceList) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Mknod on NamespaceList")
+	c.wlog("Invalid Mknod on NamespaceList")
 	return fuse.ENOSYS
 }
 
@@ -1111,7 +1111,7 @@ func (wsl *WorkspaceList) Create(c *ctx, input *fuse.CreateIn, name string,
 func (wsl *WorkspaceList) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	c.elog("Invalid SetAttr on WorkspaceList")
+	c.wlog("Invalid SetAttr on WorkspaceList")
 	return fuse.ENOSYS
 }
 
@@ -1129,31 +1129,31 @@ func (wsl *WorkspaceList) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 }
 
 func (wsl *WorkspaceList) Unlink(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Unlink on WorkspaceList")
+	c.wlog("Invalid Unlink on WorkspaceList")
 	return fuse.ENOTDIR
 }
 
 func (wsl *WorkspaceList) Rmdir(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Rmdir on WorkspaceList")
+	c.wlog("Invalid Rmdir on WorkspaceList")
 	return fuse.EACCES
 }
 
 func (wsl *WorkspaceList) Symlink(c *ctx, pointedTo string, linkName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Symlink on WorkspaceList")
+	c.wlog("Invalid Symlink on WorkspaceList")
 	return fuse.EACCES
 }
 
 func (wsl *WorkspaceList) Readlink(c *ctx) ([]byte, fuse.Status) {
-	c.elog("Invalid Readlink on WorkspaceList")
+	c.wlog("Invalid Readlink on WorkspaceList")
 	return nil, fuse.EINVAL
 }
 
 func (wsl *WorkspaceList) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Mknod on WorkspaceList")
+	c.wlog("Invalid Mknod on WorkspaceList")
 	return fuse.ENOSYS
 }
 

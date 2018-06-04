@@ -132,12 +132,12 @@ func (api *ApiInode) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 }
 
 func (api *ApiInode) Unlink(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Unlink on ApiInode")
+	c.wlog("Invalid Unlink on ApiInode")
 	return fuse.ENOTDIR
 }
 
 func (api *ApiInode) Rmdir(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Rmdir on ApiInode")
+	c.wlog("Invalid Rmdir on ApiInode")
 	return fuse.ENOTDIR
 }
 
@@ -165,7 +165,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 func (api *ApiInode) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Lookup on ApiInode")
+	c.wlog("Invalid Lookup on ApiInode")
 	return fuse.ENOSYS
 }
 
@@ -178,26 +178,26 @@ func (api *ApiInode) Create(c *ctx, input *fuse.CreateIn, name string,
 func (api *ApiInode) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	c.elog("Invalid SetAttr on ApiInode")
+	c.wlog("Invalid SetAttr on ApiInode")
 	return fuse.ENOSYS
 }
 
 func (api *ApiInode) Symlink(c *ctx, pointedTo string, linkName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Symlink on ApiInode")
+	c.wlog("Invalid Symlink on ApiInode")
 	return fuse.ENOTDIR
 }
 
 func (api *ApiInode) Readlink(c *ctx) ([]byte, fuse.Status) {
-	c.elog("Invalid Readlink on ApiInode")
+	c.wlog("Invalid Readlink on ApiInode")
 	return nil, fuse.EINVAL
 }
 
 func (api *ApiInode) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Mknod on ApiInode")
+	c.wlog("Invalid Mknod on ApiInode")
 	return fuse.ENOSYS
 }
 
@@ -323,7 +323,7 @@ type ApiHandle struct {
 func (api *ApiHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	c.elog("Invalid ReadDirPlus against ApiHandle")
+	c.wlog("Invalid ReadDirPlus against ApiHandle")
 	return fuse.ENOSYS
 }
 

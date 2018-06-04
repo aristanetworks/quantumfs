@@ -113,12 +113,12 @@ func (lm *LowMemFile) getChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 }
 
 func (lm *LowMemFile) Unlink(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Unlink on LowMemFile")
+	c.wlog("Invalid Unlink on LowMemFile")
 	return fuse.ENOTDIR
 }
 
 func (lm *LowMemFile) Rmdir(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Rmdir on LowMemFile")
+	c.wlog("Invalid Rmdir on LowMemFile")
 	return fuse.ENOTDIR
 }
 
@@ -137,40 +137,40 @@ func (lm *LowMemFile) Open(c *ctx, flags uint32, mode uint32,
 func (lm *LowMemFile) Lookup(c *ctx, name string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Lookup on LowMemFile")
+	c.wlog("Invalid Lookup on LowMemFile")
 	return fuse.ENOSYS
 }
 
 func (lm *LowMemFile) Create(c *ctx, input *fuse.CreateIn, name string,
 	out *fuse.CreateOut) fuse.Status {
 
-	c.elog("Invalid Create on LowMemFile")
+	c.wlog("Invalid Create on LowMemFile")
 	return fuse.ENOTDIR
 }
 
 func (lm *LowMemFile) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut) fuse.Status {
 
-	c.elog("Invalid SetAttr on LowMemFile")
+	c.wlog("Invalid SetAttr on LowMemFile")
 	return fuse.ENOSYS
 }
 
 func (lm *LowMemFile) Symlink(c *ctx, pointedTo string, linkName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Symlink on LowMemFile")
+	c.wlog("Invalid Symlink on LowMemFile")
 	return fuse.ENOTDIR
 }
 
 func (lm *LowMemFile) Readlink(c *ctx) ([]byte, fuse.Status) {
-	c.elog("Invalid Readlink on LowMemFile")
+	c.wlog("Invalid Readlink on LowMemFile")
 	return nil, fuse.EINVAL
 }
 
 func (lm *LowMemFile) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Mknod on LowMemFile")
+	c.wlog("Invalid Mknod on LowMemFile")
 	return fuse.ENOSYS
 }
 
@@ -292,7 +292,7 @@ type LowMemFileHandle struct {
 func (lmh *LowMemFileHandle) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	c.elog("Invalid ReadDirPlus against LowMemFileHandle")
+	c.wlog("Invalid ReadDirPlus against LowMemFileHandle")
 	return fuse.ENOSYS
 }
 
@@ -313,7 +313,7 @@ func (lmh *LowMemFileHandle) Read(c *ctx, offset uint64, size uint32, buf []byte
 func (lmh *LowMemFileHandle) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	c.elog("Invalid Write against LowMemFileHandle")
+	c.wlog("Invalid Write against LowMemFileHandle")
 
 	return 0, fuse.EPERM
 }
