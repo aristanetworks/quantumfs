@@ -1731,7 +1731,6 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-
 	defer c.FuncIn("Directory::instantiateChild", "Inode %d of %d", inodeNum,
 		dir.inodeNum()).Out()
 	defer dir.childRecordLock.Lock().Unlock()

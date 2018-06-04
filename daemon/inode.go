@@ -514,6 +514,7 @@ func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
 	}
 
 	inode.parentId = newParent.inodeNum()
+	utils.Assert(inode.id != inode.parentId, "Orphaned via setParent_()")
 }
 
 func (inode *InodeCommon) getParentLock() *utils.DeferableRwMutex {
@@ -534,6 +535,9 @@ func (inode *InodeCommon) orphan(c *ctx, record quantumfs.DirectoryRecord) {
 // parentLock must be Locked
 func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
+
+	oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
+	oldParent.delRef(c)
 
 	inode.parentId = inode.id
 	inode.setChildRecord(c, record)
