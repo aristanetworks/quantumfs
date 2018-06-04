@@ -1040,7 +1040,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 }
 
 func (dir *Directory) Readlink(c *ctx) ([]byte, fuse.Status) {
-	c.elog("Invalid Readlink on Directory")
+	c.wlog("Invalid Readlink on Directory")
 	return nil, fuse.EINVAL
 }
 
@@ -2046,13 +2046,13 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 func (ds *directorySnapshot) Read(c *ctx, offset uint64, size uint32, buf []byte,
 	nonblocking bool) (fuse.ReadResult, fuse.Status) {
 
-	c.elog("Invalid read on directorySnapshot")
+	c.wlog("Invalid read on directorySnapshot")
 	return nil, fuse.ENOSYS
 }
 
 func (ds *directorySnapshot) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	buf []byte) (uint32, fuse.Status) {
 
-	c.elog("Invalid write on directorySnapshot")
+	c.wlog("Invalid write on directorySnapshot")
 	return 0, fuse.ENOSYS
 }

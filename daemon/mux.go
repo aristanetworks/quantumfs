@@ -2343,7 +2343,7 @@ func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (result fuse.Status) {
 	defer logRequestPanic(c)
 	defer c.statsFuncIn(FallocateLog).Out()
 
-	c.elog("Unhandled request Fallocate")
+	c.wlog("Unhandled request Fallocate")
 	return fuse.ENOSYS
 }
 
