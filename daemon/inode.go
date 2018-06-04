@@ -162,10 +162,6 @@ type Inode interface {
 	// Undo marking the inode as clean
 	markUnclean_(dirtyElement *list.Element) bool
 
-	// The kernel has forgotten about this Inode. Add yourself to the list to be
-	// flushed and forgotten.
-	queueToForget(c *ctx)
-
 	// Returns this inode's place in the dirtyQueue
 	dirtyElement_() *list.Element
 
@@ -572,7 +568,7 @@ func (inode *InodeCommon) dirty(c *ctx) {
 func (inode *InodeCommon) dirty_(c *ctx) {
 	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
-		inode.dirtyElement__ = c.qfs.queueDirtyInode_(c, inode.self)
+		inode.dirtyElement__ = c.qfs.flusher.queueDirtyInode_(c, inode.self)
 	}
 }
 
@@ -603,14 +599,6 @@ func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 
 func (inode *InodeCommon) finishInit(c *ctx) []inodePair {
 	return nil
-}
-
-func (inode *InodeCommon) queueToForget(c *ctx) {
-	defer c.funcIn("InodeCommon::queueToForget").Out()
-
-	defer c.qfs.flusher.lock.Lock().Unlock()
-	de := c.qfs.queueInodeToForget_(c, inode.self)
-	inode.dirtyElement__ = de
 }
 
 // flusher lock must be locked when calling this function

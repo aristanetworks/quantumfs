@@ -9,7 +9,6 @@ package daemon
 // requests and forwards them to the correct Inode.
 
 import (
-	"container/list"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -608,18 +607,6 @@ func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode) bool {
 		return true
 	}
 	return inode.flush(c).IsValid()
-}
-
-// Queue an Inode to be flushed because it is dirty
-// flusher lock must be locked when calling this function
-func (qfs *QuantumFs) queueDirtyInode_(c *ctx, inode Inode) *list.Element {
-	return qfs.flusher.queue_(c, inode, false)
-}
-
-// Queue an Inode because the kernel has forgotten about it
-// flusher lock must be locked when calling this function
-func (qfs *QuantumFs) queueInodeToForget_(c *ctx, inode Inode) *list.Element {
-	return qfs.flusher.queue_(c, inode, true)
 }
 
 // There are several configuration knobs in the kernel which can affect FUSE
