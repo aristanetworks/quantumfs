@@ -75,7 +75,7 @@ func newFile_(c *ctx, name string, inodeNum InodeId,
 		accessor: accessor,
 	}
 	file.self = &file
-	file.setParent(parent.inodeNum())
+	file.setParent(c, parent)
 
 	utils.Assert(file.treeState() != nil, "File treeState nil at init")
 

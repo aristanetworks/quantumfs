@@ -29,7 +29,7 @@ func newSymlink(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 		key: key,
 	}
 	symlink.self = &symlink
-	symlink.setParent(parent.inodeNum())
+	symlink.setParent(c, parent)
 	utils.Assert(symlink.treeState() != nil, "Symlink treeState nil at init")
 
 	if dirRecord != nil {

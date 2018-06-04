@@ -120,8 +120,8 @@ type Inode interface {
 	// parent Inode returned must only be used while that lock is held
 	parentId_() InodeId
 	parent_(c *ctx) Inode
-	setParent(newParent InodeId)
-	setParent_(newParent InodeId)
+	setParent(c *ctx, newParent Inode)
+	setParent_(c *ctx, newParent Inode)
 	getParentLock() *utils.DeferableRwMutex
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
@@ -193,6 +193,10 @@ type Inode interface {
 	// cleanup which is necessary, but it is possible for the Inode to be
 	// accessed after cleanup() has completed.
 	cleanup(c *ctx)
+
+	// Reference counting to determine when an Inode may become uninstantiated.
+	addRef()
+	delRef(c *ctx)
 }
 
 type inodeHolder interface {
@@ -217,6 +221,8 @@ type InodeCommon struct {
 	// These fields are constant once instantiated
 	self Inode // Leaf subclass instance
 	id   InodeId
+
+	refcount int32
 
 	nameLock sync.Mutex
 	name_    string // '/' if WorkspaceRoot
@@ -492,15 +498,22 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	}
 }
 
-func (inode *InodeCommon) setParent(newParent InodeId) {
+func (inode *InodeCommon) setParent(c *ctx, newParent Inode) {
 	defer inode.parentLock.Lock().Unlock()
+	inode.setParent_(c, newParent)
 
-	inode.parentId = newParent
 }
 
 // Must be called with parentLock locked for writing
-func (inode *InodeCommon) setParent_(newParent InodeId) {
-	inode.parentId = newParent
+func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
+	newParent.addRef()
+
+	if inode.parentId != quantumfs.InodeIdInvalid {
+		oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
+		oldParent.delRef(c)
+	}
+
+	inode.parentId = newParent.inodeNum()
 }
 
 func (inode *InodeCommon) getParentLock() *utils.DeferableRwMutex {
@@ -748,6 +761,57 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 func (inode *InodeCommon) cleanup(c *ctx) {
 	defer c.funcIn("InodeCommon::cleanup").Out()
 	// Most inodes have nothing to do here
+}
+
+func (inode *InodeCommon) addRef() {
+	if inode.inodeNum() == quantumfs.InodeIdRoot ||
+		inode.inodeNum() == quantumfs.InodeIdApi {
+
+		// These Inodes always exist
+		return
+	}
+
+	utils.Assert(atomic.AddInt32(&inode.refcount, 1) > 1,
+		"Increased from zero refcount!")
+}
+
+func (inode *InodeCommon) delRef(c *ctx) {
+	if inode.inodeNum() == quantumfs.InodeIdRoot ||
+		inode.inodeNum() == quantumfs.InodeIdApi {
+
+		// These Inodes always exist
+		return
+	}
+
+	refs := atomic.AddInt32(&inode.refcount, ^int32(0))
+
+	if refs != 0 {
+		return
+	}
+
+	c.qfs.setInode(c, inode.inodeNum(), nil)
+	// This Inode is now unlisted and unreachable
+
+	if dir, isDir := inode.self.(inodeHolder); isDir {
+		inodeChildren := make([]InodeId, 0, 200)
+		dir.foreachDirectInode(c, func(i InodeId) bool {
+			inodeChildren = append(inodeChildren, i)
+			return true
+		})
+		c.qfs.removeUninstantiated(c, inodeChildren)
+	}
+
+	inode.cleanup(c)
+
+	// Release reference to parent
+	defer inode.parentLock.Lock().Unlock()
+	if inode.isOrphaned_() {
+		return
+	}
+
+	c.qfs.addUninstantiated(c, []inodePair{
+		newInodePair(inode.inodeNum(), inode.parentId_())})
+	inode.parent_(c).delRef(c)
 }
 
 func reload(c *ctx, hardlinkTable HardlinkTable, rc *RefreshContext, inode Inode,

@@ -76,7 +76,7 @@ func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 func initDirectory(c *ctx, name string, dir *Directory,
 	hardlinkTable HardlinkTable,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
-	parent InodeId, treeState *TreeState) {
+	parent Inode, treeState *TreeState) {
 
 	defer c.FuncIn("initDirectory",
 		"baselayer from %s", baseLayerId.String()).Out()
@@ -86,7 +86,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.InodeCommon.id = inodeNum
 	dir.InodeCommon.name_ = name
 	dir.InodeCommon.accessed_ = 0
-	dir.setParent(parent)
+	dir.setParent(c, parent)
 	dir.treeState_ = treeState
 	dir.hardlinkTable = hardlinkTable
 	dir.baseLayerId = baseLayerId
@@ -131,8 +131,8 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 			"Directory nor WorkspaceRoot", inodeNum))
 	}
 
-	initDirectory(c, name, &dir, hardlinkTable,
-		baseLayerId, inodeNum, parent.inodeNum(), parent.treeState())
+	initDirectory(c, name, &dir, hardlinkTable, baseLayerId, inodeNum, parent,
+		parent.treeState())
 	return &dir
 }
 
@@ -439,7 +439,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 			c.vlog("Setting parent of inode %d from %d to %d",
 				inodeId, inode.parentId_(), dir.inodeNum())
 			inode.setName(name)
-			inode.setParent_(dir.inodeNum())
+			inode.setParent_(c, dir)
 		} else {
 			c.qfs.addUninstantiated(c, []inodePair{
 				newInodePair(inodeId, dir.inodeNum()),
@@ -1328,7 +1328,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			utils.Assert(dst.inodeNum() != childInode.inodeNum(),
 				"Cannot orphan child by renaming %s %d",
 				newName, dst.inodeNum())
-			childInode.setParent_(dst.inodeNum())
+			childInode.setParent_(c, dst)
 			childInode.setName(newName)
 			childInode.clearAccessedCache()
 		}

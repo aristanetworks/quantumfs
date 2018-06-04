@@ -580,7 +580,7 @@ func newNamespaceList(c *ctx, typespace string, namespace string, workspace stri
 		},
 	}
 	nsl.self = &nsl
-	nsl.setParent(parent.inodeNum())
+	nsl.setParent(c, parent)
 	nsl.InodeCommon.treeState_ = nsl.realTreeState
 	utils.Assert(nsl.treeState() != nil, "NamespaceList treeState nil at init")
 	return &nsl
@@ -911,7 +911,7 @@ func newWorkspaceList(c *ctx, typespace string, namespace string,
 		},
 	}
 	wsl.self = &wsl
-	wsl.setParent(parent.inodeNum())
+	wsl.setParent(c, parent)
 	wsl.InodeCommon.treeState_ = wsl.realTreeState
 	utils.Assert(wsl.treeState() != nil, "WorkspaceList treeState nil at init")
 	return &wsl

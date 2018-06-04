@@ -21,10 +21,8 @@ import (
 const flusherSanityTimeout = time.Minute
 
 type dirtyInode struct {
-	inode               Inode
-	shouldUninstantiate bool
-	shouldFlush         bool
-	expiryTime          time.Time
+	inode      Inode
+	expiryTime time.Time
 }
 
 type triggerCmd struct {
@@ -213,20 +211,9 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	inode := dirtyInode.inode
 	var dirtyElement *list.Element
 
-	flushSuccess, shouldForget := func() (bool, bool) {
-		// Increment the lookup count to prevent the inode from
-		// getting uninstantiated.
-		c.qfs.incrementLookupCount(c, inode.inodeNum())
-		forgetCalled := false
-		forget := func() bool {
-			if !forgetCalled {
-				forgetCalled = true
-				return c.qfs.shouldForget(c, inode.inodeNum(), 1)
-			}
-			return false
-		}
-		defer forget()
+	inode.addRef()
 
+	flushSuccess := func() bool {
 		// the inode should be marked clean before flushing so that any new
 		// attemps to write to the inode dirties it again. Even though the
 		// inode is clean, it cannot be uninstantiated as the lookupCount is
@@ -236,16 +223,13 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		if dq.treeState.skipFlush {
 			// Don't waste time flushing inodes in deleted workspaces
 			c.vlog("Skipping flush as workspace is deleted")
-			return true, forget()
+			return true
 		}
 
-		flushSuccess := true
-		if dirtyInode.shouldFlush {
-			c.qfs.flusher.lock.Unlock()
-			defer c.qfs.flusher.lock.Lock()
-			flushSuccess = c.qfs.flushInode_(c, inode)
-		}
-		return flushSuccess, forget()
+		c.qfs.flusher.lock.Unlock()
+		defer c.qfs.flusher.lock.Lock()
+		flushSuccess := c.qfs.flushInode_(c, inode)
+		return flushSuccess
 	}()
 	if !flushSuccess {
 		// flushing the inode has failed, if the inode has been dirtied in
@@ -254,11 +238,9 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		return inode.markUnclean_(dirtyElement)
 	}
 
-	if dirtyInode.shouldUninstantiate || shouldForget {
-		c.qfs.flusher.lock.Unlock()
-		defer c.qfs.flusher.lock.Lock()
-		c.qfs.uninstantiateInode(c, inode.inodeNum())
-	}
+	inode.delRef(c) // Dirty queue reference
+	inode.delRef(c) // addRef() above
+
 	return true
 }
 
@@ -574,8 +556,7 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 	if dirtyElement == nil {
 		// This inode wasn't in the dirtyQueue so add it now
 		dirtyNode = &dirtyInode{
-			inode:               inode,
-			shouldUninstantiate: shouldUninstantiate,
+			inode: inode,
 		}
 
 		treeState := inode.treeState()
@@ -586,30 +567,20 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 			launch = true
 		}
 
-		if shouldUninstantiate {
-			// There is not much point in delaying the uninstantiation,
-			// do it as soon as possible.
-			dirtyNode.expiryTime = time.Now()
-			dirtyElement = dq.PushFront_(dirtyNode)
-		} else {
-			// Delay the flushing of dirty inode so as to potentially
-			// absorb more writes and consolidate them into a single
-			// write into durable storage.
-			dirtyNode.expiryTime =
-				time.Now().Add(c.qfs.config.DirtyFlushDelay.Duration)
+		// Delay the flushing of dirty inode so as to potentially
+		// absorb more writes and consolidate them into a single
+		// write into durable storage.
+		dirtyNode.expiryTime =
+			time.Now().Add(c.qfs.config.DirtyFlushDelay.Duration)
 
-			dirtyElement = dq.PushBack_(dirtyNode)
-		}
+		dirtyElement = dq.PushBack_(dirtyNode)
+
+		inode.addRef()
 	} else {
 		dirtyNode = dirtyElement.Value.(*dirtyInode)
 		c.vlog("Inode was already in the dirty queue %s",
 			dirtyNode.expiryTime.String())
 		dirtyNode.expiryTime = time.Now()
-	}
-	if shouldUninstantiate {
-		dirtyNode.shouldUninstantiate = true
-	} else {
-		dirtyNode.shouldFlush = true
 	}
 
 	treeState := inode.treeState()

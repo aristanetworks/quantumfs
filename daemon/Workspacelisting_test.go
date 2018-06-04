@@ -6,7 +6,6 @@ package daemon
 // Test some special properties of workspacelisting type
 
 import (
-	"fmt"
 	"os"
 	"syscall"
 	"testing"
@@ -141,7 +140,6 @@ func TestWorkspaceDeletionManualForget(t *testing.T) {
 		test.AssertNoErr(err)
 		defer fileHandle.Close()
 
-		workspaceInodeId := test.getInodeNum(test.AbsPath(workspaceName))
 		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx,
 			"testA", "testB", "testC")
 		test.AssertNoErr(err)
@@ -157,12 +155,6 @@ func TestWorkspaceDeletionManualForget(t *testing.T) {
 		_, err = fileHandle.Stat()
 		// We should still be able to stat our orphaned file
 		test.AssertNoErr(err)
-
-		// Check to ensure that the kernel is still able to Forget it
-		test.qfs.Forget(uint64(workspaceInodeId), 1)
-		test.TestLogDoesNotContain(fmt.Sprintf(skipForgetLog,
-			workspaceInodeId))
-		defer test.qfs.incrementLookupCount(test.newCtx(), workspaceInodeId)
 	})
 }
 
