@@ -1811,9 +1811,10 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 		return nil, errors.New("Not Required Type")
 	}
 	c.vlog("Directory::lookupInternal found inode %d Name %s", inodeNum, name)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	child = c.qfs.inode(c, inodeNum)
-	if child != nil {
-		c.qfs.incrementLookupCount(c, inodeNum)
+	if child == nil {
+		c.qfs.shouldForget(c, inodeNum, 1)
 	}
 	return child, nil
 }
