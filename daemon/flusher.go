@@ -544,8 +544,9 @@ func (flusher *Flusher) syncWorkspace_(c *ctx, workspace string) error {
 }
 
 // flusher lock must be locked when calling this function
-func (flusher *Flusher) queueDirtyQueue_(c *ctx, inode Inode) *list.Element {
-	defer c.FuncIn("Flusher::queue_", "inode %d", inode.inodeNum()).Out()
+func (flusher *Flusher) queueDirtyInode_(c *ctx, inode Inode) *list.Element {
+	defer c.FuncIn("Flusher::queueDirtyInode_", "inode %d",
+		inode.inodeNum()).Out()
 
 	var dirtyNode *dirtyInode
 	dirtyElement := inode.dirtyElement_()
