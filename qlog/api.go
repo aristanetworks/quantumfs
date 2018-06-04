@@ -309,22 +309,6 @@ func (enum LogSubsystem) String() string {
 	return ""
 }
 
-// Qlog is a shared memory logging object, which implements a circular buffer and
-// allows concurrent read/write between processes.
-type Qlog struct {
-	// This is the logging system level store. Increase size as the number of
-	// LogSubsystems increases past your capacity
-	LogLevels uint32
-
-	// N.B. The format and args arguments are only valid until Write returns as
-	// they are forced to be allocated on the stack.
-	Write     func(format string, args ...interface{}) error
-	logBuffer *sharedMemory
-
-	// Maximum level to log to the qlog file
-	maxLevel uint8
-}
-
 // NewQlog is a shortened, simplified Qlog constructor. Ramfs should be a memory
 // based filesystem due to the number of writes that will be made to it.
 func NewQlog(ramfsPath string) (*Qlog, error) {
@@ -332,12 +316,9 @@ func NewQlog(ramfsPath string) (*Qlog, error) {
 		PrintToStdout)
 }
 
-<<<<<<< HEAD
 // NewQlogExt is the full Qlog constructor. Ramfs should be a memory based fs.
 // sharedMemLen must be large enough to fit MmapStrMapSize and the small qlog
 // header.
-=======
->>>>>>> exportTrans
 func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 	outLog func(format string, args ...interface{}) error) (*Qlog, error) {
 
@@ -370,6 +351,22 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 	q.SetLogLevels(os.Getenv(logEnvTag))
 
 	return &q, nil
+}
+
+// Qlog is a shared memory logging object, which implements a circular buffer and
+// allows concurrent read/write between processes.
+type Qlog struct {
+	// This is the logging system level store. Increase size as the number of
+	// LogSubsystems increases past your capacity
+	LogLevels uint32
+
+	// N.B. The format and args arguments are only valid until Write returns as
+	// they are forced to be allocated on the stack.
+	Write     func(format string, args ...interface{}) error
+	logBuffer *sharedMemory
+
+	// Maximum level to log to the qlog file
+	maxLevel uint8
 }
 
 // SetLogLevels stores the provided log level string in the qlog object
@@ -457,15 +454,11 @@ func (q *Qlog) Close() error {
 	return q.logBuffer.close()
 }
 
-<<<<<<< HEAD
 // Log sends a new log to the Qlog object
-=======
 // N.B. The format and args arguments to the outLog are only valid
 // until outLog returns as they are forced to be allocated on the stack.
 // If a client wishes to read them after outLog returns, it must make a
 // copy for itself.
-
->>>>>>> exportTrans
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 
@@ -617,13 +610,6 @@ func (s SortByTimePtr) Less(i, j int) bool {
 	return s[i].T < s[j].T
 }
 
-// LogStatus is used for showing a progress bar during qlog operations
-type LogStatus struct {
-	shownHeader  bool
-	pixWidth     int
-	lastPixShown int
-}
-
 // NewLogStatus creates a new progress bar
 func NewLogStatus(displayWidth int) LogStatus {
 	return LogStatus{
@@ -631,6 +617,13 @@ func NewLogStatus(displayWidth int) LogStatus {
 		pixWidth:     displayWidth,
 		lastPixShown: 0,
 	}
+}
+
+// LogStatus is used for showing a progress bar during qlog operations
+type LogStatus struct {
+	shownHeader  bool
+	pixWidth     int
+	lastPixShown int
 }
 
 // Process takes a new float, indicating the overall progress, and outputs more of
