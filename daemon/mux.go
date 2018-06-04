@@ -893,6 +893,9 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 				// default to having a refcount for the lookupCounts
 				// and remove it if it shouldn't exist.
 				inode.delRef(c)
+				c.vlog("Removing speculative lookup reference")
+			} else {
+				c.vlog("Retaining speculative lookup reference")
 			}
 		}()
 		if inode != nil {
