@@ -783,6 +783,8 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		return
 	}
 
+	c.vlog("Uninstantiating inode %d", inode.inodeNum())
+
 	c.qfs.setInode(c, inode.inodeNum(), nil)
 	// This Inode is now unlisted and unreachable
 
