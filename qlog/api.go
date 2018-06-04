@@ -332,9 +332,12 @@ func NewQlog(ramfsPath string) (*Qlog, error) {
 		PrintToStdout)
 }
 
+<<<<<<< HEAD
 // NewQlogExt is the full Qlog constructor. Ramfs should be a memory based fs.
 // sharedMemLen must be large enough to fit MmapStrMapSize and the small qlog
 // header.
+=======
+>>>>>>> exportTrans
 func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 	outLog func(format string, args ...interface{}) error) (*Qlog, error) {
 
@@ -454,7 +457,15 @@ func (q *Qlog) Close() error {
 	return q.logBuffer.close()
 }
 
+<<<<<<< HEAD
 // Log sends a new log to the Qlog object
+=======
+// N.B. The format and args arguments to the outLog are only valid
+// until outLog returns as they are forced to be allocated on the stack.
+// If a client wishes to read them after outLog returns, it must make a
+// copy for itself.
+
+>>>>>>> exportTrans
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
 

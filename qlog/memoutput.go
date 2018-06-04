@@ -45,27 +45,25 @@ func (cbh *circBufHeader) endIndex() uint64 {
 	return cbh.PastEndIdx % cbh.Size
 }
 
-type sharedMemory struct {
-	fd       *os.File
-	mapSize  int
-	circBuf  circMemLogs
-	strIdMap idStrMap
-	buffer   []byte
-
-	// This is dangerous as Qlog also owns sharedMemory. sharedMemory must
-	// ensure that any call it makes to Qlog doesn't result in infinite recursion
-	errOut *Qlog
-
-	// For testing only
-	testDropStr string
-	testMode    bool
-}
-
 type logEntry struct {
 	strIdx    uint16
 	reqId     uint64
 	timestamp int64
 	vars      []interface{}
+}
+
+func newCircBuf(mapHeader *circBufHeader,
+	mapBuffer []byte) circMemLogs {
+
+	rtn := circMemLogs{
+		header: mapHeader,
+		length: uint64(len(mapBuffer)),
+		buffer: mapBuffer,
+	}
+
+	rtn.header.Size = uint64(len(mapBuffer))
+
+	return rtn
 }
 
 /*
@@ -194,22 +192,6 @@ func (circ *circMemLogs) writePacket(partialWrite bool, format string,
 
 const logTextMax = 62
 
-type logStr struct {
-	Text         [logTextMax]byte
-	LogSubsystem uint8
-	LogLevel     uint8
-}
-
-func checkRecursion(errorPrefix string, format string) {
-	// Ensure log isn't ourselves
-	if len(format) >= len(errorPrefix) &&
-		errorPrefix == format[:len(errorPrefix)] {
-
-		panic(fmt.Sprintf("Stuck in infinite recursion: %s",
-			dangerous.NoescapeInterface(format)))
-	}
-}
-
 func newLogStr(idx LogSubsystem, level uint8, format string) (logStr, error) {
 	var err error
 	var rtn logStr
@@ -226,6 +208,33 @@ func newLogStr(idx LogSubsystem, level uint8, format string) (logStr, error) {
 	copy(rtn.Text[:], format[:copyLen])
 
 	return rtn, err
+}
+
+type logStr struct {
+	Text         [logTextMax]byte
+	LogSubsystem uint8
+	LogLevel     uint8
+}
+
+func checkRecursion(errorPrefix string, format string) {
+	// Ensure log isn't ourselves
+	if len(format) >= len(errorPrefix) &&
+		errorPrefix == format[:len(errorPrefix)] {
+
+		panic(fmt.Sprintf("Stuck in infinite recursion: %s",
+			dangerous.NoescapeInterface(format)))
+	}
+}
+
+func newIdStrMap(buf []byte, offset int) *idStrMap {
+	var rtn idStrMap
+	ids := make(map[string]uint16)
+	atomic.StorePointer(&rtn.currentMapPtr, unsafe.Pointer(&ids))
+	rtn.freeIdx = 0
+	rtn.buffer = (*[MmapStrMapSize /
+		LogStrSize]logStr)(unsafe.Pointer(&buf[offset]))
+
+	return &rtn
 }
 
 type idStrMap struct {
@@ -254,113 +263,6 @@ type idStrMap struct {
 
 	buffer  *[MmapStrMapSize / LogStrSize]logStr
 	freeIdx uint16
-}
-
-func newCircBuf(mapHeader *circBufHeader,
-	mapBuffer []byte) circMemLogs {
-
-	rtn := circMemLogs{
-		header: mapHeader,
-		length: uint64(len(mapBuffer)),
-		buffer: mapBuffer,
-	}
-
-	rtn.header.Size = uint64(len(mapBuffer))
-
-	return rtn
-}
-
-func newIdStrMap(buf []byte, offset int) *idStrMap {
-	var rtn idStrMap
-	ids := make(map[string]uint16)
-	atomic.StorePointer(&rtn.currentMapPtr, unsafe.Pointer(&ids))
-	rtn.freeIdx = 0
-	rtn.buffer = (*[MmapStrMapSize /
-		LogStrSize]logStr)(unsafe.Pointer(&buf[offset]))
-
-	return &rtn
-}
-
-func newSharedMemory(dir string, filename string, mmapTotalSize int,
-	daemonVersion string, errOut *Qlog) (*sharedMemory, error) {
-
-	if dir == "" || filename == "" {
-		return nil, nil
-	}
-
-	// Create a file and its path to be mmap'd
-	err := os.MkdirAll(dir, 0777)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to ensure log file path exists: %s",
-			dir)
-	}
-
-	filepath := dir + string(os.PathSeparator) + filename
-
-	// Unlink any existing qlog file so we don't risk two processes both writing
-	// to the same log.
-	os.Remove(filepath)
-
-	mapFile, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
-	if mapFile == nil || err != nil {
-		return nil,
-			fmt.Errorf("Unable to create shared memory log file %s: %v",
-				filepath, err)
-	}
-
-	circBufSize := mmapTotalSize - (MmapStrMapSize +
-		int(unsafe.Sizeof(mmapHeader{})))
-	// Size the file to fit the shared memory requirements
-	_, err = mapFile.Seek(int64(mmapTotalSize-1), 0)
-	if err != nil {
-		mapFile.Close()
-		return nil, fmt.Errorf("Unable to seek to shared memory end in file")
-	}
-
-	_, err = mapFile.Write([]byte(" "))
-	if err != nil {
-		return nil, fmt.Errorf("Unable to expand file to fit " +
-			"shared memory requirement")
-	}
-
-	// Map the file to memory
-	mmap, err := syscall.Mmap(int(mapFile.Fd()), 0, mmapTotalSize,
-		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
-
-	if err != nil {
-		return nil,
-			fmt.Errorf("Unable to map shared memory file for logging")
-	}
-
-	// Make sure we touch every byte to ensure that the mmap isn't sparse
-	for i := 0; i < mmapTotalSize; i++ {
-		mmap[i] = 0
-	}
-
-	var rtn sharedMemory
-	rtn.fd = mapFile
-	rtn.mapSize = mmapTotalSize
-	rtn.buffer = mmap
-	header := (*mmapHeader)(unsafe.Pointer(&mmap[0]))
-	header.Version = qlogVersion
-
-	versionLen := len(daemonVersion)
-	if versionLen > len(header.DaemonVersion) {
-		versionLen = len(header.DaemonVersion)
-	}
-	copy(header.DaemonVersion[:], daemonVersion[:versionLen])
-	if versionLen < len(header.DaemonVersion) {
-		header.DaemonVersion[versionLen] = '\x00'
-	}
-
-	header.StrMapSize = MmapStrMapSize
-	headerOffset := int(unsafe.Sizeof(mmapHeader{}))
-	rtn.circBuf = newCircBuf(&header.CircBuf,
-		mmap[headerOffset:headerOffset+circBufSize])
-	rtn.strIdMap = *newIdStrMap(mmap, headerOffset+circBufSize)
-	rtn.errOut = errOut
-
-	return &rtn, nil
 }
 
 func (strMap *idStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
@@ -569,6 +471,104 @@ func expandBuffer(buf []byte, howMuch int) []byte {
 
 const sliceOfBytesKind = (reflect.Slice << 16) | reflect.Uint8
 
+func newSharedMemory(dir string, filename string, mmapTotalSize int,
+	daemonVersion string, errOut *Qlog) (*sharedMemory, error) {
+
+	if dir == "" || filename == "" {
+		return nil, nil
+	}
+
+	// Create a file and its path to be mmap'd
+	err := os.MkdirAll(dir, 0777)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to ensure log file path exists: %s",
+			dir)
+	}
+
+	filepath := dir + string(os.PathSeparator) + filename
+
+	// Unlink any existing qlog file so we don't risk two processes both writing
+	// to the same log.
+	os.Remove(filepath)
+
+	mapFile, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+	if mapFile == nil || err != nil {
+		return nil,
+			fmt.Errorf("Unable to create shared memory log file %s: %v",
+				filepath, err)
+	}
+
+	circBufSize := mmapTotalSize - (MmapStrMapSize +
+		int(unsafe.Sizeof(mmapHeader{})))
+	// Size the file to fit the shared memory requirements
+	_, err = mapFile.Seek(int64(mmapTotalSize-1), 0)
+	if err != nil {
+		mapFile.Close()
+		return nil, fmt.Errorf("Unable to seek to shared memory end in file")
+	}
+
+	_, err = mapFile.Write([]byte(" "))
+	if err != nil {
+		return nil, fmt.Errorf("Unable to expand file to fit " +
+			"shared memory requirement")
+	}
+
+	// Map the file to memory
+	mmap, err := syscall.Mmap(int(mapFile.Fd()), 0, mmapTotalSize,
+		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+
+	if err != nil {
+		return nil,
+			fmt.Errorf("Unable to map shared memory file for logging")
+	}
+
+	// Make sure we touch every byte to ensure that the mmap isn't sparse
+	for i := 0; i < mmapTotalSize; i++ {
+		mmap[i] = 0
+	}
+
+	var rtn sharedMemory
+	rtn.fd = mapFile
+	rtn.mapSize = mmapTotalSize
+	rtn.buffer = mmap
+	header := (*mmapHeader)(unsafe.Pointer(&mmap[0]))
+	header.Version = qlogVersion
+
+	versionLen := len(daemonVersion)
+	if versionLen > len(header.DaemonVersion) {
+		versionLen = len(header.DaemonVersion)
+	}
+	copy(header.DaemonVersion[:], daemonVersion[:versionLen])
+	if versionLen < len(header.DaemonVersion) {
+		header.DaemonVersion[versionLen] = '\x00'
+	}
+
+	header.StrMapSize = MmapStrMapSize
+	headerOffset := int(unsafe.Sizeof(mmapHeader{}))
+	rtn.circBuf = newCircBuf(&header.CircBuf,
+		mmap[headerOffset:headerOffset+circBufSize])
+	rtn.strIdMap = *newIdStrMap(mmap, headerOffset+circBufSize)
+	rtn.errOut = errOut
+
+	return &rtn, nil
+}
+
+type sharedMemory struct {
+	fd       *os.File
+	mapSize  int
+	circBuf  circMemLogs
+	strIdMap idStrMap
+	buffer   []byte
+
+	// This is dangerous as Qlog also owns sharedMemory. sharedMemory must
+	// ensure that any call it makes to Qlog doesn't result in infinite recursion
+	errOut *Qlog
+
+	// For testing only
+	testDropStr string
+	testMode    bool
+}
+
 func (mem *sharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 	args ...interface{}) uint64 {
 
@@ -647,31 +647,6 @@ func (mem *sharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 	return uint64(size)
 }
 
-// Don't use interfaces where possible because they're slow
-func insertUint8(buf []byte, offset uint64, input uint8) uint64 {
-	bufPtr := (*uint8)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 1
-}
-
-func insertUint16(buf []byte, offset uint64, input uint16) uint64 {
-	bufPtr := (*uint16)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 2
-}
-
-func insertUint32(buf []byte, offset uint64, input uint32) uint64 {
-	bufPtr := (*uint32)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 4
-}
-
-func insertUint64(buf []byte, offset uint64, input uint64) uint64 {
-	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 8
-}
-
 func (mem *sharedMemory) sync() int {
 	_, _, err := syscall.Syscall(syscall.SYS_MSYNC,
 		uintptr(unsafe.Pointer(&mem.buffer[0])), // *addr
@@ -729,4 +704,29 @@ func (mem *sharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 
 	mem.circBuf.writePacket(partialWrite, format, formatId, reqId, timestamp,
 		packetSize, argumentKinds, args...)
+}
+
+// Don't use interfaces where possible because they're slow
+func insertUint8(buf []byte, offset uint64, input uint8) uint64 {
+	bufPtr := (*uint8)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 1
+}
+
+func insertUint16(buf []byte, offset uint64, input uint16) uint64 {
+	bufPtr := (*uint16)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 2
+}
+
+func insertUint32(buf []byte, offset uint64, input uint32) uint64 {
+	bufPtr := (*uint32)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 4
+}
+
+func insertUint64(buf []byte, offset uint64, input uint64) uint64 {
+	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 8
 }
