@@ -86,6 +86,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.InodeCommon.id = inodeNum
 	dir.InodeCommon.name_ = name
 	dir.InodeCommon.accessed_ = 0
+	dir.InodeCommon.refcount = 1
 	dir.setParent(c, parent)
 	dir.treeState_ = treeState
 	dir.hardlinkTable = hardlinkTable
