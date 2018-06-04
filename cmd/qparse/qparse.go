@@ -65,17 +65,17 @@ var maxLen int
 var wildcardStr string
 
 // -- worker structures
-type SortResultsAverage []PatternData
+type sortResultsAverage []patternData
 
-func (s SortResultsAverage) Len() int {
+func (s sortResultsAverage) Len() int {
 	return len(s)
 }
 
-func (s SortResultsAverage) Swap(i, j int) {
+func (s sortResultsAverage) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s SortResultsAverage) Less(i, j int) bool {
+func (s sortResultsAverage) Less(i, j int) bool {
 	if s[i].Avg == s[j].Avg {
 		return (s[i].SeqStrRaw > s[j].SeqStrRaw)
 	} else {
@@ -83,17 +83,17 @@ func (s SortResultsAverage) Less(i, j int) bool {
 	}
 }
 
-type SortResultsTotal []PatternData
+type sortResultsTotal []patternData
 
-func (s SortResultsTotal) Len() int {
+func (s sortResultsTotal) Len() int {
 	return len(s)
 }
 
-func (s SortResultsTotal) Swap(i, j int) {
+func (s sortResultsTotal) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s SortResultsTotal) Less(i, j int) bool {
+func (s sortResultsTotal) Less(i, j int) bool {
 	if s[i].Sum == s[j].Sum {
 		return (s[i].SeqStrRaw > s[j].SeqStrRaw)
 	} else {
@@ -239,7 +239,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := LoadFromStat(file)
+		patterns := loadFromStat(file)
 
 		outputCsvCover(patterns)
 	case logOut:
@@ -294,7 +294,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := LoadFromStat(file)
+		patterns := loadFromStat(file)
 
 		filterMap := make(map[uint64]bool)
 		for i := 0; i < len(filterId); i++ {
@@ -312,7 +312,7 @@ func main() {
 
 			printIndexedLogExt(i, patterns[i].Data.Seq,
 				patterns[i].Wildcards, true)
-			printPatternData(patterns[i])
+			printpatternData(patterns[i])
 			count++
 		}
 	case stats:
@@ -335,7 +335,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		SaveToStat(file, patterns)
+		saveToStat(file, patterns)
 		fmt.Printf("Stats file created: %s\n", outFilename)
 	case sizeStats:
 		if inFile == "" {
@@ -375,11 +375,11 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := LoadFromStat(file)
+		patterns := loadFromStat(file)
 
 		// Now sort by total time usage
 		fmt.Println("Sorting data by total time usage...")
-		sort.Sort(SortResultsTotal(patterns))
+		sort.Sort(sortResultsTotal(patterns))
 
 		fmt.Println("Top function patterns by total time used:")
 		showStats(patterns, stdDevMin, stdDevMax, wildMin,
@@ -398,11 +398,11 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := LoadFromStat(file)
+		patterns := loadFromStat(file)
 
 		// Now sort by average time usage
 		fmt.Println("Sorting data by average time usage...")
-		sort.Sort(SortResultsAverage(patterns))
+		sort.Sort(sortResultsAverage(patterns))
 
 		fmt.Println("Top function patterns by average time used:")
 		showStats(patterns, stdDevMin, stdDevMax, wildMin,
@@ -419,7 +419,7 @@ type bucket struct {
 }
 
 func fillTimeline(out map[int64]bucket, seqId uint64,
-	pattern PatternData) (minStartTime int64) {
+	pattern patternData) (minStartTime int64) {
 
 	times := pattern.Data.Times
 	var minTime int64
@@ -495,7 +495,7 @@ func filterLogOut(inFile string, patternFile string, showStatus bool,
 	trackerIdx := 0
 	fmt.Println("Filtering for relevant subsequences...")
 	status := qlog.NewLogStatus(50)
-	sequences := make([]*SequenceTracker, 0)
+	sequences := make([]*sequenceTracker, 0)
 	for reqId, trackers := range trackerMap {
 		if len(trackers) == 0 {
 			continue
@@ -534,7 +534,7 @@ func filterLogOut(inFile string, patternFile string, showStatus bool,
 	}
 }
 
-func outputCsvCover(patterns []PatternData) {
+func outputCsvCover(patterns []patternData) {
 	file, err := os.Create(outFile)
 	if err != nil {
 		fmt.Printf("Unable to create %s for new data: %s\n", outFile, err)
@@ -654,9 +654,9 @@ func outputCsvCover(patterns []PatternData) {
 	status.Process(1)
 }
 
-func filterPatterns(patterns []PatternData, minStdDev float64,
+func filterPatterns(patterns []patternData, minStdDev float64,
 	maxStdDev float64, minWildcards int, maxWildcards int, minSamples int,
-	maxLen int, maxResults int) (filtered []PatternData, firstLog int64,
+	maxLen int, maxResults int) (filtered []patternData, firstLog int64,
 	lastLog int64) {
 
 	minStdDevNano := int64(minStdDev * 1000)
@@ -665,8 +665,8 @@ func filterPatterns(patterns []PatternData, minStdDev float64,
 	earliestLog := patterns[0].Data.Times[0].StartTime
 	latestLog := earliestLog
 
-	var lastTimes []TimeData
-	funcResults := make([]PatternData, 0)
+	var lastTimes []timeData
+	funcResults := make([]patternData, 0)
 	for i := 0; i < len(patterns); i++ {
 		// check the times for earliest / latest time
 		for j := 0; j < len(patterns[i].Data.Times); j++ {
@@ -722,7 +722,7 @@ func filterPatterns(patterns []PatternData, minStdDev float64,
 	return funcResults, earliestLog, latestLog
 }
 
-func printPatternDataTotal(pattern PatternData, firstLog int64, lastLog int64) {
+func printpatternDataTotal(pattern patternData, firstLog int64, lastLog int64) {
 	logTime := lastLog - firstLog
 	logPct := float64(pattern.Sum) / float64(logTime)
 
@@ -735,7 +735,7 @@ func printPatternDataTotal(pattern PatternData, firstLog int64, lastLog int64) {
 	fmt.Println("")
 }
 
-func printPatternData(pattern PatternData) {
+func printpatternData(pattern patternData) {
 	fmt.Println("------------PATTERN SECTION ABOVE-----")
 	fmt.Printf("Total sequence time: %12s\n",
 		time.Duration(pattern.Sum).String())
@@ -744,7 +744,7 @@ func printPatternData(pattern PatternData) {
 	fmt.Println("")
 }
 
-func printPatternCommon(pattern PatternData) {
+func printPatternCommon(pattern patternData) {
 	fmt.Printf("Average sequence time: %12s\n",
 		time.Duration(pattern.Avg).String())
 	fmt.Printf("Number of samples: %d\n", len(pattern.Data.Times))
@@ -754,7 +754,7 @@ func printPatternCommon(pattern PatternData) {
 }
 
 // stddev units are microseconds
-func showStats(patterns []PatternData, minStdDev float64,
+func showStats(patterns []patternData, minStdDev float64,
 	maxStdDev float64, minWildcards int, maxWildcards int, minSamples int,
 	maxLen int, maxResults int) {
 
@@ -767,7 +767,7 @@ func showStats(patterns []PatternData, minStdDev float64,
 		result := funcResults[i]
 
 		printIndexedLogExt(count+1, result.Data.Seq, result.Wildcards, true)
-		printPatternDataTotal(result, firstLog, lastLog)
+		printpatternDataTotal(result, firstLog, lastLog)
 		count++
 	}
 }

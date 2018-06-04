@@ -165,12 +165,12 @@ func TestFileReload(t *testing.T) {
 	}
 
 	const seqLen = 13
-	data := make([]PatternData, defaultChunkSize*300, defaultChunkSize*300)
+	data := make([]patternData, defaultChunkSize*300, defaultChunkSize*300)
 	for i := 0; i < len(data); i++ {
 		data[i].SeqStrRaw = "Pattern" + strconv.Itoa(i)
 		data[i].Wildcards = make([]bool, seqLen, seqLen)
 		for j := i; j < i+seqLen; j++ {
-			var newTimeData TimeData
+			var newTimeData timeData
 			newTimeData.Delta = int64(12345 + j)
 			newTimeData.StartTime = int64(j)
 			newTimeData.LogIdxLoc = i
@@ -191,12 +191,12 @@ func TestFileReload(t *testing.T) {
 		data[i].Stddev = int64(seqLen - i)
 	}
 
-	SaveToStat(file, data)
+	saveToStat(file, data)
 	_, err = file.Seek(0, 0)
 	if err != nil {
 		t.Fatalf("Unable to seek to beginning of temporary file")
 	}
-	loaded := LoadFromStat(file)
+	loaded := loadFromStat(file)
 
 	for i := 0; i < len(data); i++ {
 		if i >= len(loaded) {

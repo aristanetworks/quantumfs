@@ -24,9 +24,9 @@ import (
 const defaultChunkSize = 4
 
 func collectData(wildcards []bool, seq []qlog.LogOutput,
-	sequences []SequenceData) SequenceData {
+	sequences []sequenceData) sequenceData {
 
-	var rtn SequenceData
+	var rtn sequenceData
 	rtn.Seq = make([]qlog.LogOutput, len(seq), len(seq))
 	copy(rtn.Seq, seq)
 
@@ -57,7 +57,7 @@ func countWildcards(mask []bool, countConsecutive bool) int {
 }
 
 // Returns true if a is a superset of b
-func superset(a []TimeData, b []TimeData) bool {
+func superset(a []timeData, b []timeData) bool {
 	union := make(map[int]bool)
 
 	if len(b) > len(a) {
@@ -122,7 +122,7 @@ func (l *PatternMap) Set(newKey string, newListKey string,
 }
 
 func (l *PatternMap) recurseGenPatterns(seq []qlog.LogOutput,
-	sequences []SequenceData, maxLenWildcards int) {
+	sequences []sequenceData, maxLenWildcards int) {
 
 	if len(seq) > maxLenWildcards {
 		return
@@ -142,7 +142,7 @@ func (l *PatternMap) recurseGenPatterns(seq []qlog.LogOutput,
 // and if only one sequence matches then we know that no others will (since as we
 // recurse deeper, we remove wildcards and only become more specific) and escape
 func (l *PatternMap) recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
-	seq []qlog.LogOutput, sequences []SequenceData) {
+	seq []qlog.LogOutput, sequences []sequenceData) {
 
 	// If we've already got a result for this sequence, then this has
 	// been generated and we can skip it. This would not be safe if we didn't
@@ -216,8 +216,8 @@ func (l *PatternMap) recurseGenPatterns_(curMask []bool, wildcardStartIdx int,
 	}
 }
 
-func SeqMapToList(sequenceMap map[string]SequenceData) []SequenceData {
-	sequences := make([]SequenceData, len(sequenceMap), len(sequenceMap))
+func SeqMapToList(sequenceMap map[string]sequenceData) []sequenceData {
+	sequences := make([]sequenceData, len(sequenceMap), len(sequenceMap))
 	idx := 0
 	for _, v := range sequenceMap {
 		sequences[idx] = v
@@ -230,9 +230,9 @@ func SeqMapToList(sequenceMap map[string]SequenceData) []SequenceData {
 // Because Golang is a horrible language and doesn't support maps with slice keys,
 // we need to construct long string keys and save the slices in the value for later
 func extractTrackerMap(logs []qlog.LogOutput, maxThreads int) (count int,
-	rtnMap map[uint64][]SequenceTracker) {
+	rtnMap map[uint64][]sequenceTracker) {
 
-	trackerMap := make(map[uint64][]SequenceTracker)
+	trackerMap := make(map[uint64][]sequenceTracker)
 	trackerCount := 0
 	var outputMutex sync.Mutex
 
@@ -247,7 +247,7 @@ func extractTrackerMap(logs []qlog.LogOutput, maxThreads int) (count int,
 	}
 
 	for i := 0; i < maxThreads; i++ {
-		go ProcessTrackers(jobChannels[i], &wg, logs, trackerMap,
+		go processTrackers(jobChannels[i], &wg, logs, trackerMap,
 			&trackerCount, &outputMutex)
 	}
 
@@ -278,7 +278,7 @@ func extractTrackerMap(logs []qlog.LogOutput, maxThreads int) (count int,
 }
 
 func getTrackerMap(inFile string, maxThreads int) (int,
-	map[uint64][]SequenceTracker) {
+	map[uint64][]sequenceTracker) {
 
 	var logs []qlog.LogOutput
 	{
@@ -292,7 +292,7 @@ func getTrackerMap(inFile string, maxThreads int) (int,
 	fmt.Println("Garbage Collecting...")
 	runtime.GC()
 
-	var trackerMap map[uint64][]SequenceTracker
+	var trackerMap map[uint64][]sequenceTracker
 	var trackerCount int
 	{
 		trackerCount, trackerMap = extractTrackerMap(logs, maxThreads)
@@ -304,7 +304,7 @@ func getTrackerMap(inFile string, maxThreads int) (int,
 	return trackerCount, trackerMap
 }
 
-type TimeData struct {
+type timeData struct {
 	// how long the sequence took
 	Delta int64
 	// when it started in Unix time
@@ -313,14 +313,14 @@ type TimeData struct {
 	LogIdxLoc int
 }
 
-type SequenceData struct {
-	Times []TimeData
+type sequenceData struct {
+	Times []timeData
 	Seq   []qlog.LogOutput
 }
 
-type PatternData struct {
+type patternData struct {
 	SeqStrRaw string // No wildcards in this string, just seq
-	Data      SequenceData
+	Data      sequenceData
 	Wildcards []bool
 	Avg       int64
 	Sum       int64
@@ -329,14 +329,14 @@ type PatternData struct {
 }
 
 func extractSeqMap(trackerCount int,
-	trackerMap map[uint64][]SequenceTracker) map[string]SequenceData {
+	trackerMap map[uint64][]sequenceTracker) map[string]sequenceData {
 
 	fmt.Printf("Collating subsequence time data into map with %d entries...\n",
 		trackerCount)
 	status := qlog.NewLogStatus(50)
 
 	// After going through the logs, add all our sequences to the rtn map
-	rtn := make(map[string]SequenceData)
+	rtn := make(map[string]sequenceData)
 	trackerIdx := 0
 	for reqId, trackers := range trackerMap {
 		// Skip any requests marked as bad
@@ -358,14 +358,14 @@ func extractSeqMap(trackerCount int,
 			}
 
 			rawSeq := trackers[k].seq
-			seq := GenSeqStr(rawSeq)
+			seq := genSeqStr(rawSeq)
 			data := rtn[seq]
 			// For this sequence, append the time it took
 			if data.Seq == nil {
 				data.Seq = rawSeq
 			}
 			data.Times = append(data.Times,
-				TimeData{
+				timeData{
 					Delta: rawSeq[len(rawSeq)-1].T -
 						rawSeq[0].T,
 					StartTime: rawSeq[0].T,
@@ -380,12 +380,12 @@ func extractSeqMap(trackerCount int,
 }
 
 func getStatPatterns(inFile string, maxThreads int,
-	maxLenWildcards int) []PatternData {
+	maxLenWildcards int) []patternData {
 
 	// Structures during this process can be massive. Throw them away asap
 	trackerCount, trackerMap := getTrackerMap(inFile, maxThreads)
 
-	var sequenceMap map[string]SequenceData
+	var sequenceMap map[string]sequenceData
 	{
 		sequenceMap = extractSeqMap(trackerCount, trackerMap)
 		trackerMap = nil
@@ -393,7 +393,7 @@ func getStatPatterns(inFile string, maxThreads int,
 	fmt.Println("Garbage Collecting...")
 	runtime.GC()
 
-	var sequences []SequenceData
+	var sequences []sequenceData
 	{
 		sequences = SeqMapToList(sequenceMap)
 		sequenceMap = nil
@@ -407,7 +407,7 @@ func getStatPatterns(inFile string, maxThreads int,
 	return patterns
 }
 
-func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData {
+func SeqToPatterns(sequences []sequenceData, maxLenWildcards int) []patternData {
 	status := qlog.NewLogStatus(50)
 
 	// Now generate all combinations of the sequences with wildcards in them, but
@@ -435,7 +435,7 @@ func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData 
 		// recurseGenPatterns will overlook the "no wildcards" sequence,
 		// so we must add that ourselves
 		newEntry := newWildcardedSeq(seq, []bool{})
-		patterns.Set(GenSeqStr(seq), matchStr, &newEntry)
+		patterns.Set(genSeqStr(seq), matchStr, &newEntry)
 
 		// make sure that we at least call the "wrapper" pattern
 		wildcardFilled := make([]bool, len(seq), len(seq))
@@ -449,7 +449,7 @@ func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData 
 
 	// we MUST preallocate here. I had been using append with just a size hint,
 	// and for some reason it resulted in a number of zero entries here. Go bug?
-	rawResults := make([]PatternData, len(patterns.dataByList),
+	rawResults := make([]patternData, len(patterns.dataByList),
 		len(patterns.dataByList))
 
 	// Now collect all the data for the sequences, allowing wildcards
@@ -460,8 +460,8 @@ func SeqToPatterns(sequences []SequenceData, maxLenWildcards int) []PatternData 
 	for _, wcseq := range patterns.dataByList {
 		status.Process(float32(mapIdx) / float32(len(patterns.dataByList)))
 
-		var newResult PatternData
-		newResult.SeqStrRaw = GenSeqStr(wcseq.sequence)
+		var newResult patternData
+		newResult.SeqStrRaw = genSeqStr(wcseq.sequence)
 		newResult.Wildcards = wcseq.wildcards
 		newResult.Data = collectData(wcseq.wildcards, wcseq.sequence,
 			sequences)
@@ -601,19 +601,19 @@ func patternMatches(pattern []qlog.LogOutput, wildcards []bool,
 	return false
 }
 
-func ProcessTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []qlog.LogOutput,
-	trackerMap map[uint64][]SequenceTracker, trackerCount *int,
+func processTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []qlog.LogOutput,
+	trackerMap map[uint64][]sequenceTracker, trackerCount *int,
 	mutex *sync.Mutex) {
 
 	for i := range jobs {
 		log := logs[i]
 		reqId := log.ReqId
 
-		// Grab the SequenceTracker list for this request.
+		// Grab the sequenceTracker list for this request.
 		// Note: it is safe for us to not lock the entire region only
 		// because we're guaranteed that we're the only thread for this
 		// request Id, and hence this tracker is only ours
-		var trackers []SequenceTracker
+		var trackers []sequenceTracker
 		mutex.Lock()
 		trackers, exists := trackerMap[reqId]
 		mutex.Unlock()
@@ -643,7 +643,7 @@ func ProcessTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []qlog.LogOutput,
 		if abortRequest {
 			// Mark the request as bad
 			mutex.Lock()
-			trackerMap[reqId] = make([]SequenceTracker, 0)
+			trackerMap[reqId] = make([]sequenceTracker, 0)
 			mutex.Unlock()
 			continue
 		}
@@ -661,24 +661,24 @@ func ProcessTrackers(jobs <-chan int, wg *sync.WaitGroup, logs []qlog.LogOutput,
 	wg.Done()
 }
 
-type SequenceTracker struct {
-	stack LogStack
+type sequenceTracker struct {
+	stack logStack
 
 	ready       bool
 	seq         []qlog.LogOutput
 	startLogIdx int
 }
 
-func (s *SequenceTracker) Ready() bool {
+func (s *sequenceTracker) Ready() bool {
 	return s.ready
 }
 
-func (s *SequenceTracker) Seq() []qlog.LogOutput {
+func (s *sequenceTracker) Seq() []qlog.LogOutput {
 	return s.seq
 }
 
-func newSequenceTracker(startIdx int) SequenceTracker {
-	return SequenceTracker{
+func newSequenceTracker(startIdx int) sequenceTracker {
+	return sequenceTracker{
 		stack:       newLogStack(),
 		ready:       false,
 		seq:         make([]qlog.LogOutput, 0),
@@ -686,7 +686,7 @@ func newSequenceTracker(startIdx int) SequenceTracker {
 	}
 }
 
-func (s *SequenceTracker) Process(log qlog.LogOutput) error {
+func (s *sequenceTracker) Process(log qlog.LogOutput) error {
 	// Nothing more to do
 	if s.ready {
 		return nil
@@ -712,32 +712,32 @@ func (s *SequenceTracker) Process(log qlog.LogOutput) error {
 	return nil
 }
 
-type LogStack []qlog.LogOutput
+type logStack []qlog.LogOutput
 
-func newLogStack() LogStack {
+func newLogStack() logStack {
 	return make([]qlog.LogOutput, 0)
 }
 
-func (s *LogStack) Push(n qlog.LogOutput) {
+func (s *logStack) Push(n qlog.LogOutput) {
 	*s = append(*s, n)
 }
 
-func (s *LogStack) Pop() {
+func (s *logStack) Pop() {
 	if len(*s) > 0 {
 		*s = (*s)[:len(*s)-1]
 	}
 }
 
-func (s *LogStack) Peek() (qlog.LogOutput, error) {
+func (s *logStack) Peek() (qlog.LogOutput, error) {
 	if len(*s) == 0 {
 		return qlog.LogOutput{},
-			errors.New("Cannot peek on an empty LogStack")
+			errors.New("Cannot peek on an empty logStack")
 	}
 
 	return (*s)[len(*s)-1], nil
 }
 
-func SaveToStat(file *os.File, patterns []PatternData) {
+func saveToStat(file *os.File, patterns []patternData) {
 	encoder := gob.NewEncoder(file)
 
 	// Encode the length so we can have a progress bar on load
@@ -773,9 +773,9 @@ func SaveToStat(file *os.File, patterns []PatternData) {
 	}
 }
 
-func LoadFromStat(file *os.File) []PatternData {
+func loadFromStat(file *os.File) []patternData {
 	decoder := gob.NewDecoder(file)
-	var rtn []PatternData
+	var rtn []patternData
 
 	var patternLen int
 	decoder.Decode(&patternLen)
@@ -784,7 +784,7 @@ func LoadFromStat(file *os.File) []PatternData {
 	status := qlog.NewLogStatus(50)
 	// We have to encode in chunks, so keep going until we're out of data
 	for {
-		var chunk []PatternData
+		var chunk []patternData
 		err := decoder.Decode(&chunk)
 		if err == io.EOF {
 			break
@@ -807,7 +807,7 @@ func LoadFromStat(file *os.File) []PatternData {
 	return rtn
 }
 
-func GenSeqStr(seq []qlog.LogOutput) string {
+func genSeqStr(seq []qlog.LogOutput) string {
 	return genSeqStrExt(seq, []bool{}, false)
 }
 

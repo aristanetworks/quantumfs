@@ -157,11 +157,6 @@ func NewQlog(ramfsPath string) (*Qlog, error) {
 		PrintToStdout)
 }
 
-// N.B. The format and args arguments to the outLog are only valid
-// until outLog returns as they are forced to be allocated on the stack.
-// If a client wishes to read them after outLog returns, it must make a
-// copy for itself.
-
 func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 	outLog func(format string, args ...interface{}) error) (*Qlog, error) {
 
@@ -217,6 +212,11 @@ func (q *Qlog) Sync() int {
 func (q *Qlog) Close() error {
 	return q.logBuffer.close()
 }
+
+// N.B. The format and args arguments to the outLog are only valid
+// until outLog returns as they are forced to be allocated on the stack.
+// If a client wishes to read them after outLog returns, it must make a
+// copy for itself.
 
 func (q *Qlog) Log(idx LogSubsystem, reqId uint64, level uint8, format string,
 	args ...interface{}) {
