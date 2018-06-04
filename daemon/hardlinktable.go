@@ -20,10 +20,18 @@ type HardlinkTableEntry struct {
 
 	// delta shows the changes made to the nlink in the tree that
 	// have not been published yet.
+	//
 	// The invariant for each entry is that nlink+delta is always
 	// coherent a user perspective and nlink is always consistent with
 	// the workspaceroot that is getting published
 	delta int
+
+	// numDeltas is the total number of deltas still bubbling up to the root. If
+	// this is zero then the effective and publishable views are identical,
+	// otherwise the two views are different, even if delta is zero. This is to
+	// handle the case where a hardlink is created and deleted in several
+	// directories in such a way that the deltas happen to cancel out to zero.
+	numDeltas int
 }
 
 func (hte *HardlinkTableEntry) record() quantumfs.DirectoryRecord {
@@ -151,6 +159,7 @@ func (ht *HardlinkTableImpl) hardlinkInc(fileId quantumfs.FileId) {
 	entry.record().SetContentTime(quantumfs.NewTime(time.Now()))
 
 	entry.delta++
+	entry.numDeltas++
 }
 
 func (ht *HardlinkTableImpl) hardlinkDec(
@@ -163,6 +172,7 @@ func (ht *HardlinkTableImpl) hardlinkDec(
 		panic(fmt.Sprintf("Hardlink fetch on invalid ID %d", fileId))
 	}
 
+	entry.numDeltas++
 	if entry.effectiveNlink() > 0 {
 		entry.delta--
 	} else {
@@ -441,19 +451,22 @@ func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
 	defer c.funcIn("HardlinkTableImpl::apply").Out()
 
 	defer ht.linkLock.Lock().Unlock()
-	hardlinkDelta.foreach(func(fileId quantumfs.FileId, delta int) {
+	hardlinkDelta.foreach(func(fileId quantumfs.FileId, delta deltaTuple) {
 		entry, exists := ht.hardlinks[fileId]
 		if !exists {
-			c.elog("Did not find %d. Dropping delta %d",
-				fileId, delta)
+			c.elog("Did not find %d. Dropping delta +%d -%d",
+				fileId, delta.additions, delta.deletions)
 			return
 		}
-		c.vlog("Updating nlink of %d: %d+%d (delta %d)", fileId,
-			entry.nlink, delta, entry.delta)
+		c.vlog("Updating nlink of %d: nlink %d + entry deltas %d "+
+			"(delta +%d -%d)", fileId, entry.nlink, entry.numDeltas,
+			delta.additions, delta.deletions)
 
-		entry.nlink = int64(int(entry.nlink) + delta)
-		entry.delta -= delta
-		if entry.nlink == 0 {
+		entry.nlink = int64(int(entry.nlink) + delta.additions -
+			delta.deletions)
+		entry.delta = entry.delta - delta.additions + delta.deletions
+		entry.numDeltas -= delta.additions + delta.deletions
+		if entry.nlink == 0 && entry.numDeltas == 0 {
 			ht.removeHardlink_(fileId, entry.inodeId)
 		}
 	})
@@ -472,7 +485,7 @@ func (ht *HardlinkTableImpl) getNormalized(
 	}
 
 	// Only normalize if there are no more legs or deltas inbound
-	if link.nlink == 1 && link.delta == 0 {
+	if link.nlink == 1 && link.numDeltas == 0 {
 		return link.publishableRecord, link.effectiveRecord
 	}
 
