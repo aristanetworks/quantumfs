@@ -48,7 +48,6 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
 		toBeReleased:           make(chan uint64, 1000000),
-		toBeForgotten:          make(chan uint64, 1000000),
 		toNotifyFuse:           make(chan FuseNotification, 10000),
 		stopWaitingForSignals:  make(chan struct{}),
 		syncAllRetries:         -1,
@@ -172,8 +171,7 @@ type QuantumFs struct {
 	mutabilityLock      utils.DeferableRwMutex
 	workspaceMutability map[string]workspaceState
 
-	toBeReleased  chan uint64 // FileHandleId
-	toBeForgotten chan uint64 // InodeId
+	toBeReleased chan uint64 // FileHandleId
 
 	// FUSE notification requests cannot be made from the same goroutine handling
 	// any FUSE request or a deadlock inside the kernel may result. Instead we
@@ -208,7 +206,6 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 
 	go qfs.adjustKernelKnobs()
 	go batchProcessor(qfs.toBeReleased, qfs.fileHandleReleaser)
-	go batchProcessor(qfs.toBeForgotten, qfs.inodeForgetter)
 	go qfs.fuseNotifier()
 	go qfs.waitForSignals()
 
@@ -216,33 +213,6 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 
 	qfs.server = server
 	return nil
-}
-
-const InodeForgetter = "Mux::inodeForgetter"
-
-func (qfs *QuantumFs) inodeForgetter(ids []uint64) {
-	c := qfs.c.forgetCtx()
-	defer c.funcIn(InodeForgetter).Out()
-
-	parents := make(map[InodeId]struct{})
-
-	func() {
-		defer qfs.instantiationLock.Lock().Unlock()
-		for _, id := range ids {
-			inodeId := InodeId(id)
-			inode := qfs.inodeNoInstantiate(c, inodeId)
-			if inode != nil {
-				inode.queueToForget(c)
-			} else {
-				c.vlog("Forgetting uninstantiated Inode %d", inodeId)
-				func() {
-					defer qfs.mapMutex.Lock().Unlock()
-					parent := qfs.parentOfUninstantiated[inodeId]
-					parents[parent] = struct{}{}
-				}()
-			}
-		}
-	}()
 }
 
 const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
@@ -424,7 +394,6 @@ func (qfs *QuantumFs) Shutdown() error {
 		qfs.c.elog("Syncing log file failed with %d. Closing it.", err)
 	}
 	close(qfs.toBeReleased)
-	close(qfs.toBeForgotten)
 	close(qfs.toNotifyFuse)
 	return qfs.c.Qlog.Close()
 }
@@ -1482,9 +1451,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	inodeId := InodeId(nodeID)
 
-	if qfs.shouldForget(c, inodeId, nlookup) {
-		qfs.toBeForgotten <- uint64(inodeId)
-	} else {
+	if !qfs.shouldForget(c, inodeId, nlookup) {
 		c.vlog("inode %d lookup not zero yet", inodeId)
 	}
 }
