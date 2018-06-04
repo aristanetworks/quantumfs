@@ -842,9 +842,6 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 		defer qfs.instantiationLock.Lock().Unlock()
 		defer qfs.mapMutex.Lock().Unlock()
 		inode, instantiated = qfs.inode_(c, id)
-		if instantiated {
-			inode.addRef() // For lookup count TODO
-		}
 	}()
 
 	if instantiated {
@@ -888,6 +885,15 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 			// without mapMutex the child could move underneath this
 			// parent, in such cases, find the new parent
 			inode = parent.instantiateChild(c, id)
+
+			if _, exists := qfs.lookupCounts[id]; !exists {
+				// We can't use addRef() here because we start with a
+				// zero refcount and we want to catch that case
+				// normally. Instead we have the Inode constructor
+				// default to having a refcount for the lookupCounts
+				// and remove it if it shouldn't exist.
+				inode.delRef(c)
+			}
 		}()
 		if inode != nil {
 			break
