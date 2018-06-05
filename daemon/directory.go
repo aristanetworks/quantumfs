@@ -734,7 +734,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	// See the comment above delRef() in QuantumFs.inode_(). Because we aren't
 	// instantiating we end up adding an extra reference when we add the
-	// first lookup.. Remove it now.
+	// first lookup. Remove it now.
 	newEntity.delRef(c)
 
 	fillEntryOutCacheData(c, out)
