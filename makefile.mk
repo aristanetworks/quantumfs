@@ -8,6 +8,7 @@ PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/grpc
 PKGS_TO_TEST+=quantumfs/grpc/server quantumfs/qlogstats
 PKGS_TO_TEST+=quantumfs/cmd/qupload
+TO_CLEAN=libqfs.a libqfs.h
 
 # It's common practice to use a 'v' prefix on tags, but the prefix should be
 # removed when making the RPM version string.
@@ -28,7 +29,7 @@ RPM_RELEASE := 1
 all: lockcheck cppstyle vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) wsdbservice qfsclient
 
 clean:
-	rm -f $(COMMANDS) $(COMMANDS386) $(COMMANDS_STATIC)
+	rm -f $(COMMANDS) $(COMMANDS386) $(COMMANDS_STATIC) $(TO_CLEAN)
 
 # Vendored dependency management
 #
@@ -79,6 +80,11 @@ encoding/metadata.capnp.go: encoding/metadata.capnp
 
 grpc/rpc/rpc.pb.go: grpc/rpc/rpc.proto
 	protoc -I grpc/rpc/ grpc/rpc/rpc.proto --go_out=plugins=grpc:grpc/rpc
+
+libqfs.go:
+
+libqfs.a: cmd/libqfs/libqfs.go
+	go build -buildmode=c-archive -o libqfs.a cmd/libqfs/libqfs.go
 
 $(COMMANDS): encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@

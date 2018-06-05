@@ -15,6 +15,7 @@
 #include <ios>
 #include <vector>
 
+#include "libqfs.h"
 #include "QFSClient/qfs_client.h"
 #include "QFSClient/qfs_client_data.h"
 #include "QFSClient/qfs_client_test.h"
@@ -294,55 +295,13 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 }
 
 Error ApiImpl::DeterminePath() {
-	// getcwd() with a NULL first parameter results in a buffer of whatever size
-	// is required being allocated, which we must then free. PATH_MAX isn't
-	// known at compile time (and it is possible for paths to be longer than
-	// PATH_MAX anyway)
-	char *cwd = getcwd(NULL, 0);
-	if (!cwd) {
-		return util::getError(kDontKnowCwd);
+	FindApiPath_return apiPath = FindApiPath();
+	if (apiPath.r1.n != 0) {
+		return util::getError(kCantFindApiFile, std::string(apiPath.r1.p,
+			apiPath.r1.n));
 	}
 
-	std::vector<std::string> directories;
-	std::string path;
-	std::string currentDir(cwd);
-
-	free(cwd);
-
-	util::Split(currentDir, "/", &directories);
-
-	while (true) {
-		util::Join(directories, "/", &path);
-		path = "/" + path + "/" + kApiPath;
-
-		struct stat path_status;
-
-		if (lstat(path.c_str(), &path_status) == 0) {
-			if (((S_ISREG(path_status.st_mode)) ||
-			     (S_ISLNK(path_status.st_mode))) &&
-			    (path_status.st_ino == this->api_inode_id)) {
-				// we found an API *file* with the correct
-				// inode ID: success
-				this->path = path;
-				return util::getError(kSuccess, this->path);
-			}
-
-			// Note: it's valid to have a file *or* directory called
-			// 'api' that isn't the actual api file: in that case we
-			// should just keep walking up the tree towards the root
-		}
-
-		if (directories.size() == 0) {
-			// We got to / without finding the api file: fail
-			return util::getError(kCantFindApiFile, currentDir);
-		}
-
-		// Remove last entry from directories and continue moving up
-		// the directory tree by one level
-		directories.pop_back();
-	}
-
-	return util::getError(kCantFindApiFile, currentDir);
+	this->path = std::string(apiPath.r0.p, apiPath.r0.n);
 }
 
 Error ApiImpl::CheckWorkspaceNameValid(const char *workspace_name) {

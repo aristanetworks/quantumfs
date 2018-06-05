@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs/encoding"
+	"github.com/aristanetworks/quantumfs/libqfs"
 	"github.com/aristanetworks/quantumfs/utils"
 	capn "github.com/glycerine/go-capnproto"
 )
@@ -83,7 +84,7 @@ func MaxVeryLargeFileSize() uint64 {
 
 // Special reserved file paths
 const (
-	ApiPath = "api" // File used for the qfs api
+	ApiPath = libqfs.ApiPath // File used for the qfs api
 
 	// The reserved typespace/namespace/workspace name for the empty workspace,
 	// ie. _/_/_.
@@ -98,10 +99,10 @@ const (
 
 // Special reserved inode numbers
 const (
-	InodeIdInvalid      = 0 // Invalid
-	InodeIdRoot         = 1 // Same as fuse.FUSE_ROOT_ID
-	InodeIdApi          = 2 // /api file
-	InodeIdLowMemMarker = 3 // /QUANTUMFS_IS_IN_LOW_MEMORY_MODE file
+	InodeIdInvalid      = 0                 // Invalid
+	InodeIdRoot         = 1                 // Same as fuse.FUSE_ROOT_ID
+	InodeIdApi          = libqfs.InodeIdApi // /api file
+	InodeIdLowMemMarker = 3                 // /QUANTUMFS_IS_IN_LOW_MEMORY_MODE file
 
 	InodeIdReservedEnd = 3 // End of the reserved range
 )
