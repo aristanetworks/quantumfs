@@ -458,9 +458,9 @@ func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
 				fileId, delta.additions, delta.deletions)
 			return
 		}
-		c.vlog("Updating nlink of %d: nlink %d + entry deltas %d "+
-			"(delta +%d -%d)", fileId, entry.nlink, entry.numDeltas,
-			delta.additions, delta.deletions)
+		c.vlog("Updating nlink of %d: %d + d (delta +%d -%d)", fileId,
+			entry.nlink, entry.numDeltas, delta.additions,
+			delta.deletions)
 
 		entry.nlink = int64(int(entry.nlink) + delta.additions -
 			delta.deletions)
