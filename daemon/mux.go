@@ -40,6 +40,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
+		inodeRefcounts:         make(map[InodeId]int32),
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
@@ -126,8 +127,9 @@ type QuantumFs struct {
 
 	// This is a leaf lock for protecting the instantiation maps
 	// Do not grab other locks while holding this
-	mapMutex utils.DeferableRwMutex
-	inodes   map[InodeId]Inode
+	mapMutex       utils.DeferableRwMutex
+	inodes         map[InodeId]Inode
+	inodeRefcounts map[InodeId]int32
 
 	fileHandles sync.Map // map[FileHandleId]FileHandle
 
@@ -841,18 +843,6 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 			// without mapMutex the child could move underneath this
 			// parent, in such cases, find the new parent
 			inode = parent.instantiateChild(c, id)
-
-			if _, exists := qfs.lookupCounts[id]; !exists {
-				// We can't use addRef() here because we start with a
-				// zero refcount and we want to catch that case
-				// normally. Instead we have the Inode constructor
-				// default to having a refcount for the lookupCounts
-				// and remove it if it shouldn't exist.
-				inode.delRef(c)
-				c.vlog("Removing speculative lookup reference")
-			} else {
-				c.vlog("Retaining speculative lookup reference")
-			}
 		}()
 		if inode != nil {
 			break
@@ -872,6 +862,11 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = inode
 
+	if _, exists := qfs.lookupCounts[id]; exists {
+		c.vlog("Adding pre-existing lookup reference")
+		qfs.inodeRefcounts[id] = 1
+	}
+
 	return inode, true
 }
 
@@ -879,6 +874,11 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 	defer qfs.mapMutex.Lock().Unlock()
 
+	qfs.setInode_(c, id, inode)
+}
+
+// Must hold mapMutex exclusively
+func (qfs *QuantumFs) setInode_(c *ctx, id InodeId, inode Inode) {
 	if inode != nil {
 		qfs.inodes[id] = inode
 	} else {

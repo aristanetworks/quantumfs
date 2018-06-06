@@ -19,7 +19,6 @@ func NewLowMemFile(c *ctx, treeState *TreeState, parent Inode) Inode {
 	lm := LowMemFile{
 		InodeCommon: InodeCommon{
 			id:         quantumfs.InodeIdLowMemMarker,
-			refcount:   1,
 			name_:      quantumfs.LowMemFileName,
 			treeState_: treeState,
 		},

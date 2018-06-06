@@ -44,10 +44,7 @@ func interpretListingError(c *ctx, err error, cmd string) fuse.Status {
 
 func NewTypespaceList() Inode {
 	tsl := TypespaceList{
-		InodeCommon: InodeCommon{
-			id:       quantumfs.InodeIdRoot,
-			refcount: 1,
-		},
+		InodeCommon:      InodeCommon{id: quantumfs.InodeIdRoot},
 		typespacesByName: make(map[string]InodeId),
 		typespacesById:   make(map[InodeId]string),
 		realTreeState: &TreeState{
@@ -574,10 +571,7 @@ func newNamespaceList(c *ctx, typespace string, namespace string, workspace stri
 	defer c.FuncIn("newNamespaceList", "typespace %s", typespace).Out()
 
 	nsl := NamespaceList{
-		InodeCommon: InodeCommon{
-			id:       inodeNum,
-			refcount: 1,
-		},
+		InodeCommon:      InodeCommon{id: inodeNum},
 		typespaceName:    typespace,
 		namespacesByName: make(map[string]InodeId),
 		namespacesById:   make(map[InodeId]string),
@@ -907,10 +901,7 @@ func newWorkspaceList(c *ctx, typespace string, namespace string,
 		typespace, namespace).Out()
 
 	wsl := WorkspaceList{
-		InodeCommon: InodeCommon{
-			id:       inodeNum,
-			refcount: 1,
-		},
+		InodeCommon:      InodeCommon{id: inodeNum},
 		typespaceName:    typespace,
 		namespaceName:    namespace,
 		workspacesByName: make(map[string]workspaceInfo),

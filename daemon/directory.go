@@ -86,7 +86,6 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.InodeCommon.id = inodeNum
 	dir.InodeCommon.name_ = name
 	dir.InodeCommon.accessed_ = 0
-	dir.InodeCommon.refcount = 1
 	dir.setParent(c, parent)
 	dir.treeState_ = treeState
 	dir.hardlinkTable = hardlinkTable
@@ -730,11 +729,16 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	}()
 
 	c.qfs.setInode(c, inodeNum, newEntity)
+	func() {
+		defer c.qfs.mapMutex.Lock().Unlock()
+		c.qfs.inodeRefcounts[inodeNum] = 1
+	}()
 	c.qfs.incrementLookupCount(c, inodeNum)
 
-	// See the comment above delRef() in QuantumFs.inode_(). Because we aren't
-	// instantiating we end up adding an extra reference when we add the
-	// first lookup. Remove it now.
+	// We want to ensure that we panic if we attempt to increment the refcount of
+	// an Inode with a zero refcount as that indicates a counting issue. To do so
+	// we must initialize with a non-zero refcount to incrementLookupCount()
+	// above will succeed. Give back the temporary reference count here.
 	newEntity.delRef(c)
 
 	fillEntryOutCacheData(c, out)

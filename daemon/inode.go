@@ -218,8 +218,6 @@ type InodeCommon struct {
 	self Inode // Leaf subclass instance
 	id   InodeId
 
-	refcount int32
-
 	nameLock sync.Mutex
 	name_    string // '/' if WorkspaceRoot
 
@@ -762,7 +760,12 @@ func (inode *InodeCommon) addRef(c *ctx) {
 		// These Inodes always exist
 		return
 	}
-	refs := atomic.AddInt32(&inode.refcount, 1)
+
+	defer c.qfs.mapMutex.Lock().Unlock()
+
+	refs := c.qfs.inodeRefcounts[inode.inodeNum()] + 1
+	c.qfs.inodeRefcounts[inode.inodeNum()] = refs
+
 	c.vlog("A: %d refs on inode %d", refs, inode.inodeNum())
 	utils.Assert(refs > 1,
 		"Increased from zero refcount!")
@@ -776,16 +779,26 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		return
 	}
 
-	refs := atomic.AddInt32(&inode.refcount, ^int32(0))
+	release := func() bool {
+		defer c.qfs.mapMutex.Lock().Unlock()
 
-	c.vlog("D: %d refs on inode %d", refs, inode.inodeNum())
-	if refs != 0 {
+		refs := c.qfs.inodeRefcounts[inode.inodeNum()] - 1
+		c.qfs.inodeRefcounts[inode.inodeNum()] = refs
+
+		c.vlog("D: %d refs on inode %d", refs, inode.inodeNum())
+		if refs != 0 {
+			return false
+		}
+
+		c.vlog("Uninstantiating inode %d", inode.inodeNum())
+
+		c.qfs.setInode_(c, inode.inodeNum(), nil)
+		delete(c.qfs.inodeRefcounts, inode.inodeNum())
+		return true
+	}()
+	if !release {
 		return
 	}
-
-	c.vlog("Uninstantiating inode %d", inode.inodeNum())
-
-	c.qfs.setInode(c, inode.inodeNum(), nil)
 	// This Inode is now unlisted and unreachable
 
 	if dir, isDir := inode.self.(inodeHolder); isDir {

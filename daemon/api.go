@@ -22,7 +22,6 @@ func NewApiInode(c *ctx, treeState *TreeState, parent Inode) Inode {
 	api := ApiInode{
 		InodeCommon: InodeCommon{
 			id:         quantumfs.InodeIdApi,
-			refcount:   1,
 			name_:      quantumfs.ApiPath,
 			treeState_: treeState,
 		},
