@@ -24,8 +24,9 @@ TEST_OBJS := $(TEST_SRCS:.cc=.o)
 TEST_HDRS := $(d)/qfs_client_test.h
 
 CXX_FLAGS      := -xc++ -I.. -I. -fPIC -g -Werror -std=c++11
-LD_FLAGS       := -L . -lpthread -lqfs -shared -Wl,-rpath,.
-TEST_LD_FLAGS  := -Wl,-rpath,. -L . -L$(d) -lqfsclient -lpthread -lqfs -lgtest -ljansson -lcrypto
+LD_FLAGS       := -L . -shared -Wl,-rpath,.
+TEST_LD_FLAGS  := -Wl,-rpath,. -L . -L$(d) -lqfsclient -lgtest -ljansson -lcrypto
+LIBS           := -Wl,-Bstatic -lqfs -Wl,-Bdynamic
 
 all: $(TARGET) test
 
@@ -46,7 +47,7 @@ $(OBJS): $(HDRS) libqfs.a
 $(TEST_OBJS): $(TEST_HDRS)
 
 $(TARGET): $(OBJS)
-	$(CXX) $(LD_FLAGS) -o $@ $^
+	$(CXX) $(LD_FLAGS) -o $@ $^ $(LIBS)
 
 gotests: qfsclient
 	sudo LD_LIBRARY_PATH="$(d)" CGO_LDFLAGS="-L$(d) -L$(d)/.." CGO_CFLAGS="-I$(d)" \
