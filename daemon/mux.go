@@ -998,6 +998,8 @@ func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
 	return lookupCount, true
 }
 
+const alreadyUninstantiatedLog = "inode %d wasn't instantiated"
+
 // Returns true if the count became zero or was previously zero
 func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 	defer c.FuncIn("Mux::shouldForget", "inode %d count %d", inodeId,
@@ -1038,6 +1040,8 @@ func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 		inode := qfs.inodeNoInstantiate(c, inodeId)
 		if inode != nil {
 			inode.delRef(c)
+		} else {
+			c.vlog(alreadyUninstantiatedLog, inodeId)
 		}
 	}
 	return forgotten
