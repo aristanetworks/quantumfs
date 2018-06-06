@@ -739,6 +739,8 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	// an Inode with a zero refcount as that indicates a counting issue. To do so
 	// we must initialize with a non-zero refcount to incrementLookupCount()
 	// above will succeed. Give back the temporary reference count here.
+	//
+	// See QuantumFs.inode_(), QuantumFs.inode()
 	newEntity.delRef(c)
 
 	fillEntryOutCacheData(c, out)
