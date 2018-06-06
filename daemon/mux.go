@@ -982,7 +982,8 @@ func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 		defer qfs.mapMutex.Lock().Unlock()
 		inode, _ := qfs.getInode_(c, inodeId)
 		if inode != nil {
-			qfs.inodeRefcounts[inodeId] = qfs.inodeRefcounts[inodeId] + 1
+			qfs.inodeRefcounts[inodeId] = qfs.inodeRefcounts[inodeId] +
+				int32(refLookups)
 		} else {
 			c.vlog("Inode isn't instantiated")
 		}
