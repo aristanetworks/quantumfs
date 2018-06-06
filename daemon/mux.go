@@ -802,6 +802,18 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 		inode, instantiated = qfs.inode_(c, id)
 	}()
 
+	func() {
+		if instantiated {
+			defer qfs.lookupCountLock.Lock().Unlock()
+			if _, exists := qfs.lookupCounts[id]; !exists {
+				c.vlog("Removing speculative lookup reference")
+				inode.delRef(c)
+			} else {
+				c.vlog("Retaining speculative lookup reference")
+			}
+		}
+	}()
+
 	if instantiated {
 		uninstantiated := inode.finishInit(c)
 		if len(uninstantiated) > 0 {
@@ -863,10 +875,12 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = inode
 
-	if _, exists := qfs.lookupCounts[id]; exists {
-		c.vlog("Adding pre-existing lookup reference")
-		qfs.inodeRefcounts[id] = 1
-	}
+	// We need to start an Inode with some initial reference count and we would
+	// like to be able to catch increments from zero. Therefore we speculatively
+	// provide a reference for lookupCounts here. In inode() after returning
+	// from here we will get the lookupCountLock and remove the reference if we
+	// speculated incorrectly.
+	qfs.inodeRefcounts[id] = 1
 
 	return inode, true
 }
