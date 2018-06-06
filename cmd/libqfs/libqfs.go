@@ -4,14 +4,12 @@
 // package name: libqfs
 package main
 
-import (
-	"C"
+import "C"
 
+import (
 	"github.com/aristanetworks/quantumfs/libqfs"
 )
 
-//FindApiPath returns the api path, if found, and an error string which is the
-//empty string if there are no errors.
 //export FindApiPath
 func FindApiPath() (string, string) {
 	errStr := ""

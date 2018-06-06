@@ -18,7 +18,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/libqfs"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -394,7 +394,7 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 		return fmt.Errorf("Stating / error: %s", err.Error())
 	}
 
-	quantumFsMount := quantumfs.FindQuantumFsMountPath()
+	quantumFsMount := libqfs.FindQuantumFsMountPath()
 
 	if !os.SameFile(rootdirInfo, fsrootInfo) {
 		// pivot_root will only work when root directory is a mountpoint
