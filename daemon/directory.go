@@ -731,7 +731,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	c.qfs.setInode(c, inodeNum, newEntity)
 	func() {
 		defer c.qfs.mapMutex.Lock().Unlock()
-		c.qfs.inodeRefcounts[inodeNum] = 1
+		c.qfs.inodeRefcounts[inodeNum] = int32(refTransient)
 	}()
 	c.qfs.incrementLookupCount(c, inodeNum)
 
@@ -741,7 +741,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	// above will succeed. Give back the temporary reference count here.
 	//
 	// See QuantumFs.inode_(), QuantumFs.inode()
-	newEntity.delRef(c)
+	newEntity.delRef(c, refTransient)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
