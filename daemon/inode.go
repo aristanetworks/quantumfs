@@ -779,6 +779,8 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		return
 	}
 
+	defer inode.parentLock.Lock().Unlock()
+
 	release := func() bool {
 		defer c.qfs.mapMutex.Lock().Unlock()
 
@@ -794,12 +796,20 @@ func (inode *InodeCommon) delRef(c *ctx) {
 
 		c.qfs.setInode_(c, inode.inodeNum(), nil)
 		delete(c.qfs.inodeRefcounts, inode.inodeNum())
+
+		c.qfs.addUninstantiated_(c, []inodePair{
+			newInodePair(inode.inodeNum(), inode.parentId_())})
 		return true
 	}()
 	if !release {
 		return
 	}
+
 	// This Inode is now unlisted and unreachable
+
+	if !inode.isOrphaned_() {
+		inode.parent_(c).delRef(c)
+	}
 
 	if dir, isDir := inode.self.(inodeHolder); isDir {
 		inodeChildren := make([]InodeId, 0, 200)
@@ -811,16 +821,6 @@ func (inode *InodeCommon) delRef(c *ctx) {
 	}
 
 	inode.cleanup(c)
-
-	// Release reference to parent
-	defer inode.parentLock.Lock().Unlock()
-	if inode.isOrphaned_() {
-		return
-	}
-
-	c.qfs.addUninstantiated(c, []inodePair{
-		newInodePair(inode.inodeNum(), inode.parentId_())})
-	inode.parent_(c).delRef(c)
 }
 
 func reload(c *ctx, hardlinkTable HardlinkTable, rc *RefreshContext, inode Inode,
