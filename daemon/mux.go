@@ -827,6 +827,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	parentId, uninstantiated := qfs.parentOfUninstantiated[id]
 	if !uninstantiated {
 		// We don't know anything about this Inode
+		c.vlog("Inode not in parentOfUninstantiated")
 		return nil, false
 	}
 
@@ -964,6 +965,8 @@ func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 		if inode != nil {
 			qfs.inodeRefcounts[inodeId] = qfs.inodeRefcounts[inodeId] + 1
 
+		} else {
+			c.vlog("Inode isn't instantiated")
 		}
 	} else {
 		qfs.lookupCounts[inodeId] = prev + 1
