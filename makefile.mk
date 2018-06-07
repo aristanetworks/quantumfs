@@ -84,7 +84,7 @@ grpc/rpc/rpc.pb.go: grpc/rpc/rpc.proto
 libqfs.go:
 
 libqfs.a: cmd/libqfs/libqfs.go
-	go build -buildmode=c-archive -o libqfs.a cmd/libqfs/libqfs.go
+	go build -buildmode=c-shared -o libqfs.so cmd/libqfs/libqfs.go
 
 $(COMMANDS): encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@

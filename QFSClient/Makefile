@@ -26,7 +26,7 @@ TEST_HDRS := $(d)/qfs_client_test.h
 CXX_FLAGS      := -xc++ -I.. -I. -fPIC -g -Werror -std=c++11
 LD_FLAGS       := -L . -shared -Wl,-rpath,.
 TEST_LD_FLAGS  := -Wl,-rpath,. -L . -L$(d) -lqfsclient -lgtest -ljansson -lcrypto
-LIBS           := -Wl,-Bstatic -lqfs -Wl,-Bdynamic
+LIBS           := -Wl,-Bdynamic -lqfs
 
 all: $(TARGET) test
 
@@ -50,8 +50,8 @@ $(TARGET): $(OBJS)
 	$(CXX) $(LD_FLAGS) -o $@ $^ $(LIBS)
 
 gotests: qfsclient
-	sudo LD_LIBRARY_PATH="$(d)" CGO_LDFLAGS="-L$(d) -L$(d)/.." CGO_CFLAGS="-I$(d)" \
-		go test -x github.com/aristanetworks/quantumfs/qfsclientc
+	sudo LD_LIBRARY_PATH="$(d):$(d)/.." CGO_LDFLAGS="-L$(d) -L$(d)/.." CGO_CFLAGS="-I$(d)" \
+		go test github.com/aristanetworks/quantumfs/qfsclientc
 
 # Use the ramfs root container as the temp dir for the client tests when
 # run from this Makefile.
