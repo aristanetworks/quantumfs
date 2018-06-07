@@ -989,7 +989,6 @@ func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 	} else {
 		qfs.lookupCounts[inodeId] = prev + 1
 	}
-
 }
 
 func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
