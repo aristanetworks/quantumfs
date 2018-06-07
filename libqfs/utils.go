@@ -141,20 +141,19 @@ func findApiPathUpwards() (string, error) {
 
 	for {
 		path = strings.Join(directories, "/") + "/" + ApiPath
-		stat, err := os.Lstat(path)
-		if err != nil {
-			if len(directories) == 1 {
-				// We didn't find anything and hit the root, give up
-				return "", fmt.Errorf("Couldn't find api file")
-			}
-			directories = directories[:len(directories)-1]
-			continue
-		}
-		if !stat.IsDir() {
+		stat, _ := os.Lstat(path)
+		if stat != nil && !stat.IsDir() {
 			if fileIsApi(stat) {
 				return path, nil
 			}
 		}
+
+		// We need to keep iterating up regardless of whether Lstat errors
+		if len(directories) == 1 {
+			// We didn't find anything and hit the root, give up
+			return "", fmt.Errorf("Couldn't find api file")
+		}
+		directories = directories[:len(directories)-1]
 	}
 }
 

@@ -11,14 +11,14 @@ import (
 )
 
 //export FindApiPath
-func FindApiPath() (string, string) {
+func FindApiPath() (*C.char, *C.char) {
 	errStr := ""
 	rtn, err := libqfs.FindApiPath()
 	if err != nil {
 		errStr = err.Error()
 	}
 
-	return rtn, errStr
+	return C.CString(rtn), C.CString(errStr)
 }
 
 func main() {

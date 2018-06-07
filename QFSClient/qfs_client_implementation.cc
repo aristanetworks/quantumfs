@@ -157,17 +157,22 @@ ApiImpl::~ApiImpl() {
 }
 
 Error ApiImpl::Open() {
-	return this->OpenCommon(true);
-}
-
-Error ApiImpl::TestOpen() {
 	return this->OpenCommon(false);
 }
 
-Error ApiImpl::OpenCommon(bool directIo) {
+Error ApiImpl::TestOpen() {
+	return this->OpenCommon(true);
+}
+
+Error ApiImpl::OpenCommon(bool inTest) {
 	if (this->path.length() == 0) {
 		// Path was not passed to constructor: determine path
-		Error err = this->DeterminePath();
+		Error err;
+		if (inTest) {
+			err = this->DeterminePathInTest();
+		} else {
+			err = this->DeterminePath();
+		}
 		if (err.code != kSuccess) {
 			return err;
 		}
@@ -176,7 +181,7 @@ Error ApiImpl::OpenCommon(bool directIo) {
 	if (this->fd == -1) {
 		int flags = O_RDWR | O_CLOEXEC;
 #if defined(O_DIRECT)
-		if (directIo) {
+		if (!inTest) {
 			flags |= O_DIRECT;
 		}
 #endif
@@ -296,14 +301,64 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 
 Error ApiImpl::DeterminePath() {
 	FindApiPath_return apiPath = FindApiPath();
-	if (apiPath.r1.n != 0) {
-		return util::getError(kCantFindApiFile, std::string(apiPath.r1.p,
-			apiPath.r1.n));
+	if (strlen(apiPath.r1) != 0) {
+		return util::getError(kCantFindApiFile, std::string(apiPath.r1));
 	}
 
-	this->path = std::string(apiPath.r0.p, apiPath.r0.n);
+	this->path = std::string(apiPath.r0);
 }
 
+Error ApiImpl::DeterminePathInTest() {
+	// getcwd() with a NULL first parameter results in a buffer of whatever size
+	// is required being allocated, which we must then free. PATH_MAX isn't
+	// known at compile time (and it is possible for paths to be longer than
+	// PATH_MAX anyway)
+	char *cwd = getcwd(NULL, 0);
+	if (!cwd) {
+		return util::getError(kDontKnowCwd);
+	}
+
+	std::vector<std::string> directories;
+	std::string path;
+	std::string currentDir(cwd);
+
+	free(cwd);
+
+	util::Split(currentDir, "/", &directories);
+
+	while (true) {
+		util::Join(directories, "/", &path);
+		path = "/" + path + "/" + kApiPath;
+
+		struct stat path_status;
+
+		if (lstat(path.c_str(), &path_status) == 0) {
+			if (((S_ISREG(path_status.st_mode)) ||
+			     (S_ISLNK(path_status.st_mode))) &&
+			    (path_status.st_ino == this->api_inode_id)) {
+				// we found an API *file* with the correct
+				// inode ID: success
+				this->path = path;
+				return util::getError(kSuccess, this->path);
+			}
+
+			// Note: it's valid to have a file *or* directory called
+			// 'api' that isn't the actual api file: in that case we
+			// should just keep walking up the tree towards the root
+		}
+
+		if (directories.size() == 0) {
+			// We got to / without finding the api file: fail
+			return util::getError(kCantFindApiFile, currentDir);
+		}
+
+		// Remove last entry from directories and continue moving up
+		// the directory tree by one level
+		directories.pop_back();
+	}
+
+	return util::getError(kCantFindApiFile, currentDir);
+}
 Error ApiImpl::CheckWorkspaceNameValid(const char *workspace_name) {
 	std::string str(workspace_name);
 	std::vector<std::string> tokens;
