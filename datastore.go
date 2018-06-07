@@ -102,7 +102,7 @@ const (
 	InodeIdInvalid      = 0                 // Invalid
 	InodeIdRoot         = 1                 // Same as fuse.FUSE_ROOT_ID
 	InodeIdApi          = libqfs.InodeIdApi // /api file
-	InodeIdLowMemMarker = 3                 // /QUANTUMFS_IS_IN_LOW_MEMORY_MODE file
+	InodeIdLowMemMarker = 3                 // /QUANTUMFS_IS_IN_LOW_MEMORY_MODE
 
 	InodeIdReservedEnd = 3 // End of the reserved range
 )
