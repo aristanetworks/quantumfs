@@ -396,7 +396,7 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 			remoteRecord, inodeId)
 
 		if inode != nil {
-			wsr.hardlinkTable.claimAsChild(inode)
+			wsr.hardlinkTable.claimAsChild(c, inode)
 		}
 		wsr.hardlinkTable.updateHardlinkInodeId(c, remoteRecord.FileId(),
 			inodeId)
@@ -405,7 +405,7 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 			asDirectory(srcInode).moveHardlinkLeg_DOWN(c, newParent,
 				oldName, remoteRecord, inodeId)
 			if inode != nil {
-				inode.setParent(newParent.inodeNum())
+				inode.setParent(c, newParent)
 			}
 		} else if parentId == newParent.inodeNum() {
 			srcInode.RenameChild(c, oldName, remoteRecord.Filename())

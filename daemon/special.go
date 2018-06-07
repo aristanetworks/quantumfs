@@ -50,7 +50,7 @@ func newSpecial(c *ctx, name string, key quantumfs.ObjectKey, size uint64,
 		device:   device,
 	}
 	special.self = &special
-	special.setParent(parent.inodeNum())
+	special.setParent(c, parent)
 	utils.Assert(special.treeState() != nil, "Special treeState nil at init")
 
 	if dirRecord != nil {

@@ -120,8 +120,8 @@ type Inode interface {
 	// parent Inode returned must only be used while that lock is held
 	parentId_() InodeId
 	parent_(c *ctx) Inode
-	setParent(newParent InodeId)
-	setParent_(newParent InodeId)
+	setParent(c *ctx, newParent Inode)
+	setParent_(c *ctx, newParent Inode)
 	getParentLock() *utils.DeferableRwMutex
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
@@ -492,15 +492,15 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	}
 }
 
-func (inode *InodeCommon) setParent(newParent InodeId) {
+func (inode *InodeCommon) setParent(c *ctx, newParent Inode) {
 	defer inode.parentLock.Lock().Unlock()
+	inode.setParent_(c, newParent)
 
-	inode.parentId = newParent
 }
 
 // Must be called with parentLock locked for writing
-func (inode *InodeCommon) setParent_(newParent InodeId) {
-	inode.parentId = newParent
+func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
+	inode.parentId = newParent.inodeNum()
 }
 
 func (inode *InodeCommon) getParentLock() *utils.DeferableRwMutex {

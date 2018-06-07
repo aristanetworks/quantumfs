@@ -51,7 +51,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		}
 
 		// We need to reparent under the srcInode lock
-		dir.hardlinkTable.claimAsChild_(srcInode)
+		dir.hardlinkTable.claimAsChild_(c, srcInode)
 
 		return newRecord, needsSync, fuse.OK
 	}()
@@ -256,7 +256,7 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
 		if inode != nil {
-			inode.setParent(dir.inodeNum())
+			inode.setParent(c, dir)
 		}
 		return remoteRecord
 	}
@@ -268,7 +268,7 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 	if inode != nil {
 		func() {
 			defer inode.getParentLock().Lock().Unlock()
-			dir.hardlinkTable.claimAsChild_(inode)
+			dir.hardlinkTable.claimAsChild_(c, inode)
 		}()
 	}
 	return newHardlinkLeg(localRecord.Filename(), fileId,
