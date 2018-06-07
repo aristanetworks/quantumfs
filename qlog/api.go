@@ -248,7 +248,8 @@ func ParseLogsRaw(filepath string) []*LogOutput {
 		false)
 }
 
-// LogscanSkim returns true if the log file string map given failed the logscan
+// LogscanSkim returns true if the log file string map given contains the substring
+// "ERROR"
 func LogscanSkim(filepath string) bool {
 	strMapData := extractStrMapData(filepath)
 
@@ -260,7 +261,7 @@ func LogscanSkim(filepath string) bool {
 	return false
 }
 
-// PrintToStdout is a premade, commonly used WriteFn for Qlog to output through
+// PrintToStdout is a premade, commonly used WriteFn for Qlog to output to stdout
 func PrintToStdout(format string, args ...interface{}) error {
 	format += "\n"
 	_, err := fmt.Printf(format, args...)
@@ -353,11 +354,12 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 	return &q, nil
 }
 
-// Qlog is a shared memory logging object, which implements a circular buffer and
-// allows concurrent read/write between processes.
+// Qlog is a shared memory, binary logging subsytem. It implements a circular buffer
+// and allows concurrent read/write between processes.
 type Qlog struct {
-	// This is the logging system level store. Increase size as the number of
-	// LogSubsystems increases past your capacity
+	// LogLevels stores, for each LogSubsystem, a bit for each possible log
+	// level. If the number of log levels is 4, for example, then every four bits
+	// represents the enabled log levels for a different LogSubsystem.
 	LogLevels uint32
 
 	// N.B. The format and args arguments are only valid until Write returns as
@@ -369,7 +371,14 @@ type Qlog struct {
 	maxLevel uint8
 }
 
-// SetLogLevels stores the provided log level string in the qlog object
+// SetLogLevels stores the provided log level string in the qlog object.
+// The string allows settings of two kinds, cumulative "/" and bitmask "|".
+// Each token in the string is separated by a comma, and contains a subsystem
+// on the left, then exactly one setting specifier "/" or "|", and then a value.
+// The value can either be "*" for all logs to be enabled, or a number.
+// If the setting specifier is cumulative, the value means enable all logs up to and
+// including the level value given. If the setting specifier is bitmask, then each
+// bit will correspond to a bit in the LogLevels variable at the subsystem offset.
 func (q *Qlog) SetLogLevels(levels string) {
 	// reset all levels
 	defaultSetting := uint8(1)
@@ -573,8 +582,8 @@ type LogOutput struct {
 	Args      []interface{}
 }
 
-// ToString turns a LogOutput into a human readable string
-func (rawlog *LogOutput) ToString() string {
+// String turns a LogOutput into a human readable string
+func (rawlog *LogOutput) String() string {
 	t := time.Unix(0, rawlog.T)
 	return fmt.Sprintf(formatString(rawlog.Subsystem, rawlog.ReqId, t,
 		rawlog.Format), rawlog.Args...)

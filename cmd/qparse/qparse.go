@@ -266,7 +266,7 @@ func main() {
 
 			reader.ProcessLogs(qlog.TailOnly,
 				func(log *qlog.LogOutput) {
-					fmt.Fprintf(outFh, log.ToString())
+					fmt.Fprintf(outFh, log.String())
 				})
 		} else if patternFile != "" {
 			filterLogOut(inFile, patternFile, true, tabSpaces)
