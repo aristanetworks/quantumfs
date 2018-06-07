@@ -1012,33 +1012,33 @@ func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 		return false
 	}
 
-	forgotten := func() bool {
-		defer qfs.lookupCountLock.Lock().Unlock()
-		lookupCount, exists := qfs.lookupCounts[inodeId]
-		if !exists {
-			c.vlog("inode %d has not been instantiated", inodeId)
-			return true
-		}
+	forgotten := false
 
-		if lookupCount < count {
-			c.elog("lookupCount less than zero %d %d", lookupCount,
-				count)
-		}
+	defer qfs.lookupCountLock.Lock().Unlock()
+	lookupCount, exists := qfs.lookupCounts[inodeId]
+	if !exists {
+		c.vlog("inode %d has not been instantiated", inodeId)
+		forgotten = true
+		goto maybeReleaseRef
+	}
 
-		lookupCount -= count
-		qfs.lookupCounts[inodeId] = lookupCount
-		if lookupCount == 0 {
-			if count > 1 {
-				c.vlog("Forgetting inode with lookupCount of %d",
-					count)
-			}
-			delete(qfs.lookupCounts, inodeId)
-			return true
-		} else {
-			return false
-		}
-	}()
+	if lookupCount < count {
+		c.elog("lookupCount less than zero %d %d", lookupCount, count)
+	}
 
+	lookupCount -= count
+	qfs.lookupCounts[inodeId] = lookupCount
+	if lookupCount == 0 {
+		if count > 1 {
+			c.vlog("Forgetting inode with lookupCount of %d", count)
+		}
+		delete(qfs.lookupCounts, inodeId)
+		forgotten = true
+	} else {
+		forgotten = false
+	}
+
+maybeReleaseRef:
 	if forgotten {
 		inode := qfs.inodeNoInstantiate(c, inodeId)
 		if inode != nil {
