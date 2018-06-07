@@ -4,7 +4,7 @@
 package qfsclientc
 
 /*
-#cgo LDFLAGS: -ljansson -lcrypto -lqfsclient
+#cgo LDFLAGS: -lqfsclient -ljansson -lcrypto
 #cgo CXXFLAGS: -std=c++11
 
 #include <stdint.h>
