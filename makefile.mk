@@ -217,9 +217,10 @@ clientRPM32:
 		trap 'rm -f $$MOCKLOCK' EXIT ; \
 		(flock 9 || exit 1 ; \
 			mock -r fedora-18-i386 --init ; \
-			mock -r fedora-18-i386 --install sudo procps-ng git gtest-devel jansson-devel openssl-devel ruby-devel rubygems ; \
+			mock -r fedora-18-i386 --install sudo procps-ng git gtest-devel jansson-devel openssl-devel ruby-devel rubygems golang ; \
 			mock -r fedora-18-i386 --shell "sudo gem install --no-ri --no-rdoc fpm" ; \
 			mock -r fedora-18-i386 --copyin . /quantumfs ; \
+mock -r fedora-18-i386 --shell "go version" ; \
 			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clean clientRPM RPM_LIBDIR=/usr/lib" ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT).i686.rpm . ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT_DEVEL).i686.rpm . ; \
