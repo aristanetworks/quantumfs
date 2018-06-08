@@ -8,7 +8,7 @@ PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/grpc
 PKGS_TO_TEST+=quantumfs/grpc/server quantumfs/qlogstats
 PKGS_TO_TEST+=quantumfs/cmd/qupload
-TO_CLEAN=libqfs.a libqfs.h
+TO_CLEAN=libqfs.so libqfs.h
 
 # It's common practice to use a 'v' prefix on tags, but the prefix should be
 # removed when making the RPM version string.
@@ -83,8 +83,8 @@ grpc/rpc/rpc.pb.go: grpc/rpc/rpc.proto
 
 libqfs.go:
 
-libqfs.a: cmd/libqfs/libqfs.go
-	go build -buildmode=c-shared -o libqfs.so cmd/libqfs/libqfs.go
+libqfs.so: libqfs/wrapper/libqfs.go
+	go build -buildmode=c-shared -o libqfs.so libqfs/wrapper/libqfs.go
 
 $(COMMANDS): encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
@@ -197,7 +197,11 @@ RPM_FILES_TOOLSV2_I686 += $(RPM_FILE_PREFIX_CLIENT).i686.rpm $(RPM_FILE_PREFIX_C
 RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_PREFIX_CLIENT).x86_64.rpm $(RPM_FILE_PREFIX_CLIENT_DEVEL).x86_64.rpm
 RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_QUPLOAD).x86_64.rpm
 
-clientRPM: check-fpm qfsclient
+clientRPM: check-fpm qfsclient clientRPM-work
+
+clientRPM-nogo: check-fpm qfsclientnogo clientRPM-work
+
+clientRPM-work:
 	$(FPM) -n $(RPM_BASENAME_CLIENT) \
 		--description='QuantumFS client API' \
 		--depends jansson \
@@ -209,7 +213,7 @@ clientRPM: check-fpm qfsclient
 		--depends $(RPM_BASENAME_CLIENT) \
 		QFSClient/qfs_client.h=/usr/include/qfs_client.h
 
-clientRPM32:
+clientRPM32: qfsclient
 	@echo "Building i686 RPMs using mock. This can take several minutes"
 	{ \
 		set -e ; \
@@ -217,11 +221,10 @@ clientRPM32:
 		trap 'rm -f $$MOCKLOCK' EXIT ; \
 		(flock 9 || exit 1 ; \
 			mock -r fedora-18-i386 --init ; \
-			mock -r fedora-18-i386 --install sudo procps-ng git gtest-devel jansson-devel openssl-devel ruby-devel rubygems golang ; \
+			mock -r fedora-18-i386 --install sudo procps-ng git gtest-devel jansson-devel openssl-devel ruby-devel rubygems ; \
 			mock -r fedora-18-i386 --shell "sudo gem install --no-ri --no-rdoc fpm" ; \
-			mock -r fedora-18-i386 --copyin . /quantumfs ; \
-mock -r fedora-18-i386 --shell "go version" ; \
-			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clean clientRPM RPM_LIBDIR=/usr/lib" ; \
+			mock -r fedora-18-i386 --copyin . /quantumfs libqfs.so ; \
+			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clean clientRPM-nogo RPM_LIBDIR=/usr/lib" ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT).i686.rpm . ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT_DEVEL).i686.rpm . ; \
 			mock -r fedora-18-i386 --clean ; \

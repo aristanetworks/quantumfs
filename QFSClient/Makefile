@@ -30,9 +30,11 @@ LIBS           := -Wl,-Bdynamic -lqfs
 
 all: $(TARGET) test
 
-qfsclient: $(TARGET)
+qfsclientnogo: $(TARGET)
 
-qfsclienttest: $(TEST_TARGET)
+qfsclient: libqfs.so $(TARGET)
+
+qfsclienttest: libqfs.so $(TEST_TARGET)
 
 clean: qfsc-clean
 
@@ -42,7 +44,7 @@ qfsc-clean:
 %.o: %.cc
 	$(CXX) $(CXX_FLAGS) -c -o $@ $<
 
-$(OBJS): $(HDRS) libqfs.a
+$(OBJS): $(HDRS)
 
 $(TEST_OBJS): $(TEST_HDRS)
 

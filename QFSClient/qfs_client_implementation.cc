@@ -359,6 +359,7 @@ Error ApiImpl::DeterminePathInTest() {
 
 	return util::getError(kCantFindApiFile, currentDir);
 }
+
 Error ApiImpl::CheckWorkspaceNameValid(const char *workspace_name) {
 	std::string str(workspace_name);
 	std::vector<std::string> tokens;
