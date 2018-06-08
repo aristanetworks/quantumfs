@@ -15,7 +15,7 @@
 #include <ios>
 #include <vector>
 
-#include "./libqfs.h"
+#include "libqfs.h"
 #include "QFSClient/qfs_client.h"
 #include "QFSClient/qfs_client_data.h"
 #include "QFSClient/qfs_client_test.h"

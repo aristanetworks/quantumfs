@@ -24,17 +24,15 @@ TEST_OBJS := $(TEST_SRCS:.cc=.o)
 TEST_HDRS := $(d)/qfs_client_test.h
 
 CXX_FLAGS      := -xc++ -I.. -I. -fPIC -g -Werror -std=c++11
-LD_FLAGS       := -L . -shared -Wl,-rpath,.
-TEST_LD_FLAGS  := -Wl,-rpath,. -L . -L$(d) -lqfsclient -lgtest -ljansson -lcrypto
+LD_FLAGS       := -L$(d)/.. -shared -Wl,-rpath,.
+TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -L$(d)/.. -lqfsclient -lgtest -ljansson -lcrypto
 LIBS           := -Wl,-Bdynamic -lqfs
 
 all: $(TARGET) test
 
-qfsclientnogo: $(TARGET)
+qfsclient: $(TARGET)
 
-qfsclient: libqfs.so $(TARGET)
-
-qfsclienttest: libqfs.so $(TEST_TARGET)
+qfsclienttest: $(TEST_TARGET)
 
 clean: qfsc-clean
 
