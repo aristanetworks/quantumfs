@@ -20,7 +20,7 @@ TO_CLEAN=libqfs.a libqfs.h
 # Include "-dirty" on the end if there are any uncommitted changes.
 #
 # Replace hyphens with underscores; RPM uses them to separate version/release.
-version := $(shell git describe --dirty --match "v[0-9]*" 2>/dev/null || echo "v0-`git rev-list --count HEAD`-g`git describe --dirty --always`")
+version := $(shell git describe --dirty --abbrev=8 --match "v[0-9]*" 2>/dev/null || echo "v0-`git rev-list --count HEAD`-g`git describe --dirty --always`")
 RPM_VERSION := $(shell echo "$(version)" | sed -e "s/^v//" -e "s/-/_/g")
 RPM_RELEASE := 1
 
