@@ -20,7 +20,7 @@ PKGS_TO_TEST+=quantumfs/cmd/qupload
 #
 # Replace hyphens with underscores; RPM uses them to separate version/release.
 version := $(shell git describe --dirty --match "v[0-9]*" 2>/dev/null || echo "v0-`git rev-list --count HEAD`-g`git describe --dirty --always`")
-RPM_VERSION := $(shell echo "$(version)" | sed -e "s/^v//" -e "s/-/_/g")
+RPM_VERSION := $(shell echo "$(version)" | sed -e "s/-/_/g")
 RPM_RELEASE := 1
 
 .PHONY: all clean check-dep-installed fetch update vet lockcheck cppstyle $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) $(COMMANDS_STATIC)
