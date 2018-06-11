@@ -83,8 +83,11 @@ grpc/rpc/rpc.pb.go: grpc/rpc/rpc.proto
 
 libqfs.go:
 
+libqfs32:
+	CGO_ENABLED=1 GOARCH=386 go build -buildmode=c-shared -o libqfs.so libqfs/wrapper/libqfs.go
+
 libqfs.so: libqfs/wrapper/libqfs.go
-	go build -buildmode=c-shared -o libqfs.so libqfs/wrapper/libqfs.go
+	CGO_ENABLED=1 go build -buildmode=c-shared -o libqfs.so libqfs/wrapper/libqfs.go
 
 $(COMMANDS): encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
@@ -197,7 +200,10 @@ RPM_FILES_TOOLSV2_I686 += $(RPM_FILE_PREFIX_CLIENT).i686.rpm $(RPM_FILE_PREFIX_C
 RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_PREFIX_CLIENT).x86_64.rpm $(RPM_FILE_PREFIX_CLIENT_DEVEL).x86_64.rpm
 RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_QUPLOAD).x86_64.rpm
 
-clientRPM: check-fpm qfsclient
+clientRPM: check-fpm libqfs.so
+	$(MAKE) clientRPM-work
+
+clientRPM-work: qfsclient-nogo
 	$(FPM) -n $(RPM_BASENAME_CLIENT) \
 		--description='QuantumFS client API' \
 		--depends jansson \
@@ -209,7 +215,8 @@ clientRPM: check-fpm qfsclient
 		--depends $(RPM_BASENAME_CLIENT) \
 		QFSClient/qfs_client.h=/usr/include/qfs_client.h
 
-clientRPM32: qfsclient
+clientRPM32:
+	$(MAKE) libqfs32
 	@echo "Building i686 RPMs using mock. This can take several minutes"
 	{ \
 		set -e ; \
@@ -221,9 +228,9 @@ clientRPM32: qfsclient
 			mock -r fedora-18-i386 --shell "sudo gem install --no-ri --no-rdoc fpm" ; \
 			mock -r fedora-18-i386 --copyin . /quantumfs ; \
 			mock -r fedora-18-i386 --shell "cd /quantumfs && make clean" ; \
-			mock -r fedora-18-i386 --copyin . /quantumfs/libqfs.a ; \
-			mock -r fedora-18-i386 --copyin . /quantumfs/libqfs.h ; \
-			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clientRPM RPM_LIBDIR=/usr/lib" ; \
+			mock -r fedora-18-i386 --copyin ./libqfs.so /quantumfs/ ; \
+			mock -r fedora-18-i386 --copyin ./libqfs.h /quantumfs/ ; \
+			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clientRPM-work RPM_LIBDIR=/usr/lib" ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT).i686.rpm . ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT_DEVEL).i686.rpm . ; \
 			mock -r fedora-18-i386 --clean ; \

@@ -30,9 +30,13 @@ LIBS           := -Wl,-Bdynamic -lqfs
 
 all: $(TARGET) test
 
-qfsclient: $(TARGET)
+qfsclient: libqfs.so
+	$(MAKE) $(TARGET)
 
-qfsclienttest: $(TEST_TARGET)
+qfsclient-nogo: $(TARGET)
+
+qfsclienttest: libqfs.so
+	$(MAKE) $(TEST_TARGET)
 
 clean: qfsc-clean
 
