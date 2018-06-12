@@ -24,7 +24,8 @@ import (
 
 // Constants
 
-// WriteFn is a function that qlog could use to output logs
+// WriteFn is a function that qlog will echo logs to if a given log's level
+// is currently enabled
 type WriteFn func(string, ...interface{}) (int, error)
 
 // EntryCompleteBit is the bit flag used in each log packet header to indicate the
@@ -379,6 +380,11 @@ type Qlog struct {
 // If the setting specifier is cumulative, the value means enable all logs up to and
 // including the level value given. If the setting specifier is bitmask, then each
 // bit will correspond to a bit in the LogLevels variable at the subsystem offset.
+// */* - Enables all logs in all subsystems
+// Daemon/2 - Enables all logs at or below level 2 for a subsystem called Daemon
+// LogTest|5 - Enables logs of level 0 and level 2 for a subsystem called LogTest
+// Note that no matter how log levels are configured, a log level must be <= maxLevel
+// in order to be used and not discarded.
 func (q *Qlog) SetLogLevels(levels string) {
 	// reset all levels
 	defaultSetting := uint8(1)
