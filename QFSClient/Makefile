@@ -28,7 +28,7 @@ LD_FLAGS       := -L$(d)/.. -shared -Wl,-rpath,.
 TEST_LD_FLAGS  := -Wl,-rpath,. -L$(d) -L$(d)/.. -lqfsclient -lgtest -ljansson -lcrypto
 LIBS           := -Wl,-Bdynamic -lqfs
 
-all: $(TARGET) test
+all: test
 
 qfsclient: libqfs.so
 	$(MAKE) $(TARGET)
@@ -61,7 +61,8 @@ gotests: qfsclient
 # run from this Makefile.
 # If the tests are run in some other way (eg on macOS for stand-alone
 # client library testing), the tests will use the system tempdir instead.
-test: cleanuplocal $(TEST_TARGET) gotests
+test: cleanuplocal gotests
+	$(MAKE) $(TEST_TARGET)
 	mkdir -p /dev/shm/$(ROOTDIRNAME)
 	LD_LIBRARY_PATH=$(d) TMPDIR=/dev/shm/$(ROOTDIRNAME) $(TEST_TARGET)
 
