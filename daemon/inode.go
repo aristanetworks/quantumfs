@@ -21,10 +21,10 @@ type InodeId uint64
 type refType int
 
 const (
-	refChild     = refType(1 << 0)
-	refTransient = refType(1 << 28)
-	refDirty     = refType(1 << 29)
-	refLookups   = refType(1 << 30)
+	refChild     = refType(1 << 0)  // References from children
+	refTransient = refType(1 << 28) // Transient function refs
+	refDirty     = refType(1 << 29) // Reference from dirty queue
+	refLookups   = refType(1 << 30) // LookupCount > 0
 )
 
 // Inode represents a specific path in the tree which updates as the tree itself
