@@ -885,7 +885,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	// speculated incorrectly.
 	//
 	// See Directory.create_(), QuantumFs.inode()
-	qfs.inodeRefcounts[id] = int32(refLookups)
+	addInodeRef_(c, id, refLookups)
 
 	return inode, true
 }
@@ -982,8 +982,7 @@ func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 		defer qfs.mapMutex.Lock().Unlock()
 		inode, _ := qfs.getInode_(c, inodeId)
 		if inode != nil {
-			qfs.inodeRefcounts[inodeId] = qfs.inodeRefcounts[inodeId] +
-				int32(refLookups)
+			addInodeRef_(c, inodeId, refLookups)
 		} else {
 			c.vlog("Inode isn't instantiated")
 		}

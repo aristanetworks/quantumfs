@@ -731,7 +731,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	c.qfs.setInode(c, inodeNum, newEntity)
 	func() {
 		defer c.qfs.mapMutex.Lock().Unlock()
-		c.qfs.inodeRefcounts[inodeNum] = int32(refTransient)
+		addInodeRef_(c, inodeNum, refTransient)
 	}()
 	c.qfs.incrementLookupCount(c, inodeNum)
 

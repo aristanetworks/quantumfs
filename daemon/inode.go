@@ -762,6 +762,22 @@ func (inode *InodeCommon) cleanup(c *ctx) {
 	// Most inodes have nothing to do here
 }
 
+// Must hold mapMutex for write.
+func addInodeRef_(c *ctx, inodeId InodeId, owner refType) {
+	refs := c.qfs.inodeRefcounts[inodeId]
+
+	if owner != refChild {
+		if utils.BitFlagsSet(uint(refs), uint(owner)) {
+			c.elog("Special refcount %x already set on inode %d", owner,
+				inodeId)
+			owner = refChild
+		}
+	}
+	c.qfs.inodeRefcounts[inodeId] = refs + int32(owner)
+
+	c.vlog("A: %x refs on inode %d", refs, inodeId)
+}
+
 func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
 		// These Inodes always exist
@@ -769,19 +785,9 @@ func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 	}
 
 	defer c.qfs.mapMutex.Lock().Unlock()
+	addInodeRef_(c, inode.inodeNum(), owner)
 
 	refs := c.qfs.inodeRefcounts[inode.inodeNum()]
-
-	if owner != refChild {
-		if utils.BitFlagsSet(uint(refs), uint(owner)) {
-			c.elog("Special refcount %x already set on inode %d", owner,
-				inode.inodeNum())
-			owner = refChild
-		}
-	}
-	c.qfs.inodeRefcounts[inode.inodeNum()] = refs + int32(owner)
-
-	c.vlog("A: %x refs on inode %d", refs, inode.inodeNum())
 	utils.Assert(refs > 0,
 		"Increased from zero refcount!")
 }
