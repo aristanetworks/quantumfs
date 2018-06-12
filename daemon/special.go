@@ -73,14 +73,14 @@ func (special *Special) Access(c *ctx, mask uint32, uid uint32,
 }
 
 func (special *Special) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Status {
-	c.elog("Invalid Lookup call on Special")
+	c.wlog("Invalid Lookup call on Special")
 	return fuse.ENOSYS
 }
 
 func (special *Special) Open(c *ctx, flags uint32, mode uint32,
 	out *fuse.OpenOut) fuse.Status {
 
-	c.elog("Invalid Open call on Special")
+	c.wlog("Invalid Open call on Special")
 	return fuse.ENOSYS
 }
 
@@ -114,74 +114,74 @@ func (special *Special) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (special *Special) Unlink(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Unlink on Special")
+	c.wlog("Invalid Unlink on Special")
 	return fuse.ENOTDIR
 }
 
 func (special *Special) Rmdir(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Rmdir on Special")
+	c.wlog("Invalid Rmdir on Special")
 	return fuse.ENOTDIR
 }
 
 func (special *Special) Symlink(c *ctx, pointedTo string, specialName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Symlink on Special")
+	c.wlog("Invalid Symlink on Special")
 	return fuse.ENOTDIR
 }
 
 func (special *Special) Readlink(c *ctx) ([]byte, fuse.Status) {
-	c.elog("Invalid Readlink on Special")
+	c.wlog("Invalid Readlink on Special")
 	return nil, fuse.EINVAL
 }
 
 func (special *Special) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Mknod on Special")
+	c.wlog("Invalid Mknod on Special")
 	return fuse.ENOSYS
 }
 
 func (special *Special) RenameChild(c *ctx, oldName string,
 	newName string) fuse.Status {
 
-	c.elog("Invalid RenameChild on Special")
+	c.wlog("Invalid RenameChild on Special")
 	return fuse.ENOSYS
 }
 
 func (special *Special) MvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) fuse.Status {
 
-	c.elog("Invalid MvChild on Special")
+	c.wlog("Invalid MvChild on Special")
 	return fuse.ENOSYS
 }
 
 func (special *Special) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
-	c.vlog("Invalid GetXAttrSize on Special")
+	c.wlog("Invalid GetXAttrSize on Special")
 	return 0, fuse.ENODATA
 }
 
 func (special *Special) GetXAttrData(c *ctx,
 	attr string) (data []byte, result fuse.Status) {
 
-	c.elog("Invalid GetXAttrData on Special")
+	c.wlog("Invalid GetXAttrData on Special")
 	return nil, fuse.ENODATA
 }
 
 func (special *Special) ListXAttr(c *ctx) (attributes []byte, result fuse.Status) {
-	c.vlog("Invalid ListXAttr on Special")
+	c.wlog("Invalid ListXAttr on Special")
 	return []byte{}, fuse.OK
 }
 
 func (special *Special) SetXAttr(c *ctx, attr string, data []byte) fuse.Status {
-	c.elog("Invalid SetXAttr on Special")
+	c.wlog("Invalid SetXAttr on Special")
 	return fuse.Status(syscall.ENOSPC)
 }
 
 func (special *Special) RemoveXAttr(c *ctx, attr string) fuse.Status {
-	c.elog("Invalid RemoveXAttr on Special")
+	c.wlog("Invalid RemoveXAttr on Special")
 	return fuse.ENODATA
 }
 

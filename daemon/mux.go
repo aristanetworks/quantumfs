@@ -195,6 +195,11 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	mountOptions.FsName = "QuantumFS"
 	mountOptions.Options = append(mountOptions.Options, "suid", "dev")
 
+	if !qfs.config.MagicOwnership {
+		mountOptions.Options = append(mountOptions.Options,
+			"default_permissions")
+	}
+
 	server, err := fuse.NewServer(qfs, qfs.config.MountPath, &mountOptions)
 	if err != nil {
 		qfs.c.elog("Failed to create new server %s", err.Error())
@@ -2338,7 +2343,7 @@ func (qfs *QuantumFs) Fallocate(input *fuse.FallocateIn) (result fuse.Status) {
 	defer logRequestPanic(c)
 	defer c.statsFuncIn(FallocateLog).Out()
 
-	c.elog("Unhandled request Fallocate")
+	c.wlog("Unhandled request Fallocate")
 	return fuse.ENOSYS
 }
 

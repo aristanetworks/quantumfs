@@ -56,9 +56,10 @@ func init() {
 		WorkspaceDbConf:  "",
 		CacheTimeSeconds: 3600,
 		CacheTimeNsecs:   0,
-		DirtyFlushDelay:  30,
+		DirtyFlushDelay:  daemon.Duration{Duration: 30 * time.Second},
 		MemLogBytes:      500 * 1024 * 1024,
 		VerboseTracing:   true,
+		MagicOwnership:   true,
 	}
 
 	const (
@@ -88,8 +89,8 @@ func init() {
 	qflag.UintVar(&cacheTimeNsecs, "cacheTimeNsecs", uint(config.CacheTimeNsecs),
 		"Number of nanoseconds the kernel will cache response data")
 
-	qflag.DurationVar(&config.DirtyFlushDelay, "dirtyFlushDelay",
-		config.DirtyFlushDelay,
+	qflag.DurationVar(&config.DirtyFlushDelay.Duration, "dirtyFlushDelay",
+		config.DirtyFlushDelay.Duration,
 		"Number of seconds to delay flushing dirty inodes")
 
 	qflag.UintVar(&memLogMegabytes, "memLogMegabytes",
@@ -111,6 +112,9 @@ func init() {
 
 	qflag.BoolVar(&config.VerboseTracing, "verboseTracing",
 		config.VerboseTracing, "Enable verbose qlog tracing")
+
+	qflag.BoolVar(&config.MagicOwnership, "magicOwnership",
+		config.MagicOwnership, "Enable magic ownership")
 }
 
 func maxSizes() {

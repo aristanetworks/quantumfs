@@ -211,31 +211,31 @@ func (fi *File) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 }
 
 func (fi *File) Unlink(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Unlink on File")
+	c.wlog("Invalid Unlink on File")
 	return fuse.ENOTDIR
 }
 
 func (fi *File) Rmdir(c *ctx, name string) fuse.Status {
-	c.elog("Invalid Rmdir on File")
+	c.wlog("Invalid Rmdir on File")
 	return fuse.ENOTDIR
 }
 
 func (fi *File) Symlink(c *ctx, pointedTo string, linkName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Symlink on File")
+	c.wlog("Invalid Symlink on File")
 	return fuse.ENOTDIR
 }
 
 func (fi *File) Readlink(c *ctx) ([]byte, fuse.Status) {
-	c.elog("Invalid Readlink on File")
+	c.wlog("Invalid Readlink on File")
 	return nil, fuse.EINVAL
 }
 
 func (fi *File) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Mknod on File")
+	c.wlog("Invalid Mknod on File")
 	return fuse.ENOSYS
 }
 
@@ -550,7 +550,7 @@ func (fd *FileDescriptor) dirty(c *ctx) {
 func (fd *FileDescriptor) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 	out *fuse.DirEntryList) fuse.Status {
 
-	c.elog("Invalid ReadDirPlus against FileDescriptor")
+	c.wlog("Invalid ReadDirPlus against FileDescriptor")
 	return fuse.ENOSYS
 }
 

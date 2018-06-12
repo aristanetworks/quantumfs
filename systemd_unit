@@ -6,9 +6,7 @@ After=network-online.target
 [Service]
 Type=simple
 ExecStartPre=/bin/mkdir -p /dev/shm/quantumfs /qfs
-ExecStart=/usr/sbin/quantumfsd \
-	  -datastore ether.cql -datastoreconf /etc/quantumfsd.conf \
-	  -workspaceDB grpc -workspaceDBconf qubit-wsdbservice
+ExecStart=/usr/sbin/quantumfsd -config /etc/quantumfs.conf
 ExecStop=/usr/bin/umount -l /qfs
 ExecStop=/usr/bin/umount -l /share/qfs
 ExecStop=/usr/bin/killall -SIGUSR1 quantumfsd
