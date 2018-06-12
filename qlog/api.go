@@ -376,10 +376,12 @@ type Qlog struct {
 // The string allows settings of two kinds, cumulative "/" and bitmask "|".
 // Each token in the string is separated by a comma, and contains a subsystem
 // on the left, then exactly one setting specifier "/" or "|", and then a value.
+//
 // The value can either be "*" for all logs to be enabled, or a number.
 // If the setting specifier is cumulative, the value means enable all logs up to and
 // including the level value given. If the setting specifier is bitmask, then each
 // bit will correspond to a bit in the LogLevels variable at the subsystem offset.
+//
 // */* - Enables all logs in all subsystems
 // Daemon/2 - Enables all logs at or below level 2 for a subsystem called Daemon
 // LogTest|5 - Enables logs of level 0 and level 2 for a subsystem called LogTest
