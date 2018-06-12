@@ -10,7 +10,7 @@ import "github.com/hanwen/go-fuse/fuse"
 func (lm *LowMemFile) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Link on LowMemFile")
+	c.wlog("Invalid Link on LowMemFile")
 	return fuse.ENOTDIR
 }
 

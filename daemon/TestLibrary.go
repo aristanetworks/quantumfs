@@ -244,11 +244,12 @@ func (th *TestHelper) defaultConfig() QuantumFsConfig {
 		CacheSize:        64 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
-		DirtyFlushDelay:  30 * time.Second,
+		DirtyFlushDelay:  Duration{30 * time.Second},
 		MemLogBytes:      uint64(qlog.DefaultMmapSize),
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(""),
 		DurableStore:     processlocal.NewDataStore(""),
+		MagicOwnership:   true,
 	}
 	return config
 }
@@ -272,7 +273,7 @@ func (th *TestHelper) etherFilesystemConfig() QuantumFsConfig {
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
-		DirtyFlushDelay:  30 * time.Second,
+		DirtyFlushDelay:  Duration{30 * time.Second},
 		MountPath:        mountPath,
 		WorkspaceDB:      processlocal.NewWorkspaceDB(""),
 		DurableStore:     datastore,
