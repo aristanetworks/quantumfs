@@ -810,7 +810,7 @@ func (inode *InodeCommon) delRef(c *ctx, owner refType) {
 		c.qfs.inodeRefcounts[inode.inodeNum()] = refs - int32(owner)
 
 		c.vlog("D: %x refs on inode %d", refs, inode.inodeNum())
-		if refs != 0 {
+		if refs != int32(owner) {
 			return false
 		}
 
