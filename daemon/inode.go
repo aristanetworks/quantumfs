@@ -772,8 +772,16 @@ func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 
 	defer c.qfs.mapMutex.Lock().Unlock()
 
-	refs := c.qfs.inodeRefcounts[inode.inodeNum()] + int32(owner)
-	c.qfs.inodeRefcounts[inode.inodeNum()] = refs
+	refs := c.qfs.inodeRefcounts[inode.inodeNum()]
+
+	if owner != refChild {
+		if utils.BitFlagsSet(uint(refs), uint(owner)) {
+			c.elog("Special refcount %x already set on inode %d", owner,
+				inode.inodeNum())
+			owner = refChild
+		}
+	}
+	c.qfs.inodeRefcounts[inode.inodeNum()] = refs + int32(owner)
 
 	c.vlog("A: %x refs on inode %d", refs, inode.inodeNum())
 	utils.Assert(refs > 1,
@@ -793,8 +801,17 @@ func (inode *InodeCommon) delRef(c *ctx, owner refType) {
 	release := func() bool {
 		defer c.qfs.mapMutex.Lock().Unlock()
 
-		refs := c.qfs.inodeRefcounts[inode.inodeNum()] - int32(owner)
-		c.qfs.inodeRefcounts[inode.inodeNum()] = refs
+		refs := c.qfs.inodeRefcounts[inode.inodeNum()]
+
+		if owner != refChild {
+			if !utils.BitFlagsSet(uint(refs), uint(owner)) {
+				c.elog("Special refcount %x not set on inode %d",
+					owner, inode.inodeNum())
+				owner = refChild
+			}
+		}
+
+		c.qfs.inodeRefcounts[inode.inodeNum()] = refs - int32(owner)
 
 		c.vlog("D: %x refs on inode %d", refs, inode.inodeNum())
 		if refs != 0 {
