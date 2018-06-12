@@ -10,7 +10,7 @@ import "github.com/hanwen/go-fuse/fuse"
 func (link *Symlink) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Link on Symlink")
+	c.wlog("Invalid Link on Symlink")
 	return fuse.ENOTDIR
 }
 

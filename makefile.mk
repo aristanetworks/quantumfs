@@ -19,7 +19,7 @@ PKGS_TO_TEST+=quantumfs/cmd/qupload
 # Include "-dirty" on the end if there are any uncommitted changes.
 #
 # Replace hyphens with underscores; RPM uses them to separate version/release.
-version := $(shell git describe --dirty --match "v[0-9]*" 2>/dev/null || echo "v0-`git rev-list --count HEAD`-g`git describe --dirty --always`")
+version := $(shell git describe --dirty --abbrev=8 --match "v[0-9]*" 2>/dev/null || echo "v0-`git rev-list --count HEAD`-g`git describe --dirty --always`")
 RPM_VERSION := $(shell echo "$(version)" | sed -e "s/^v//" -e "s/-/_/g")
 RPM_RELEASE := 1
 
@@ -61,7 +61,7 @@ update: check-dep-installed
 	@echo "Please review and commit any changes to Gopkg.toml and Gopkg.lock"
 
 vet: $(PKGS_TO_TEST) $(COMMANDS)
-	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./cmd -true -o -type d -print`
+	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./cmd -true -o -type d -print`
 
 lockcheck:
 	./lockcheck.sh

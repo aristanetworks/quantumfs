@@ -784,7 +784,6 @@ func TestHardlinkRenameCreation(t *testing.T) {
 }
 
 func TestRemoveHardlinkBeforeSync(t *testing.T) {
-	t.Skip() // BUG224729
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 

@@ -62,12 +62,14 @@ func printUsage() {
 	fmt.Println("         - make <workspace> irreversibly immutable")
 	fmt.Println("  advanceWSDB <workspace> <referenceWorkspace>")
 	fmt.Println("  refresh <workspace>")
-	fmt.Println("  merge [-nlr] <base> <remote> <local> [[path/to/skip] ...]")
+	fmt.Println("  merge [-nlr] [[-exclude=path/to/skip] ...] <base> <remote> " +
+		"<local>")
 	fmt.Println("          - Three-way workspace merge")
 	fmt.Println("          -n - Prefer newer in conflicts (default)")
 	fmt.Println("          -l - Prefer local in conflicts")
 	fmt.Println("          -r - Prefer remote in conflicts")
-	fmt.Println("          dir/to/skip - List of paths to not merge")
+	fmt.Println("          -exclude dir/to/skip - List of paths to not merge")
+	fmt.Println("               May be supplied multiple times")
 	fmt.Println("  syncWorkspace <workspace>")
 	fmt.Println("  workspaceFinished <workspace>")
 }
@@ -230,45 +232,62 @@ func refresh() {
 	}
 }
 
+type accumulateStrings []string
+
+var excludes accumulateStrings
+
+func (as *accumulateStrings) Set(value string) error {
+	excludes = append(excludes, value)
+	return nil
+}
+
+func (as *accumulateStrings) String() string {
+	return fmt.Sprintf("%v", []string(*as))
+}
+
 func merge() {
-	if flag.NArg() < 4 {
-		fmt.Println("Too few arguments for merge command")
+	mergeflag := flag.NewFlagSet("qfs merge", flag.ExitOnError)
+	var preferNewer bool
+	var preferLocal bool
+	var preferRemote bool
+
+	mergeflag.BoolVar(&preferNewer, "n", false, "Prefer newer in conflicts")
+	mergeflag.BoolVar(&preferLocal, "l", false, "Prefer local in conflicts")
+	mergeflag.BoolVar(&preferRemote, "r", false, "Prefer remove in conflicts")
+	mergeflag.Var(&excludes, "exclude", "Path to exclude, may appear several "+
+		"times")
+
+	mergeflag.Parse(flag.Args()[1:])
+
+	if mergeflag.NArg() != 3 {
+		fmt.Println("Incorrect number of arguments for merge command")
 		os.Exit(exitBadArgs)
 	}
 
+	preferences := 0
 	prefer := quantumfs.PreferNewer
-
-	base := flag.Arg(1)
-	remote := flag.Arg(2)
-	local := flag.Arg(3)
-	skipPathStart := 4
-
-	if flag.NArg() > 4 && flag.Arg(1)[0] == '-' {
-		base = flag.Arg(2)
-		remote = flag.Arg(3)
-		local = flag.Arg(4)
-		skipPathStart = 5
-
-		for _, char := range flag.Arg(1)[1:] {
-			switch char {
-			default:
-				fmt.Printf("Unknown flag %c\n", char)
-				os.Exit(exitBadArgs)
-			case 'n':
-				prefer = quantumfs.PreferNewer
-			case 'l':
-				prefer = quantumfs.PreferLocal
-			case 'r':
-				prefer = quantumfs.PreferRemote
-			}
-		}
+	if preferNewer {
+		preferences++
+		prefer = quantumfs.PreferNewer
+	}
+	if preferLocal {
+		preferences++
+		prefer = quantumfs.PreferLocal
+	}
+	if preferRemote {
+		preferences++
+		prefer = quantumfs.PreferRemote
 	}
 
-	skipPaths := make([]string, 0, flag.NArg()-3)
-
-	for i := skipPathStart; i < flag.NArg(); i++ {
-		skipPaths = append(skipPaths, flag.Arg(i))
+	if preferences > 1 {
+		fmt.Println("Must specify precisely one conflict preference")
+		os.Exit(exitBadArgs)
 	}
+
+	base := mergeflag.Arg(0)
+	remote := mergeflag.Arg(1)
+	local := mergeflag.Arg(2)
+	skipPaths := excludes
 
 	api, err := quantumfs.NewApi()
 	if err != nil {

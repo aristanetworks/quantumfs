@@ -299,7 +299,7 @@ func (dq *DirtyQueue) flushQueue_(c *ctx, flushAll bool) (done bool, err error) 
 
 		if !dq.flushCandidate_(c, candidate) {
 			candidate.expiryTime = time.Now().Add(
-				c.qfs.config.DirtyFlushDelay)
+				c.qfs.config.DirtyFlushDelay.Duration)
 			if flushAll {
 				return false, fmt.Errorf("Flushing inode %d failed",
 					candidate.inode.inodeNum())
@@ -596,7 +596,7 @@ func (flusher *Flusher) queue_(c *ctx, inode Inode,
 			// absorb more writes and consolidate them into a single
 			// write into durable storage.
 			dirtyNode.expiryTime =
-				time.Now().Add(c.qfs.config.DirtyFlushDelay)
+				time.Now().Add(c.qfs.config.DirtyFlushDelay.Duration)
 
 			dirtyElement = dq.PushBack_(dirtyNode)
 		}

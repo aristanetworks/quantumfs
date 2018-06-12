@@ -10,7 +10,7 @@ import "github.com/hanwen/go-fuse/fuse"
 func (special *Special) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
-	c.elog("Invalid Link on Special")
+	c.wlog("Invalid Link on Special")
 	return fuse.ENOTDIR
 }
 
