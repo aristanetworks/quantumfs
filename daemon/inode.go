@@ -782,7 +782,7 @@ func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 	c.qfs.inodeRefcounts[inode.inodeNum()] = refs + int32(owner)
 
 	c.vlog("A: %x refs on inode %d", refs, inode.inodeNum())
-	utils.Assert(refs > 1,
+	utils.Assert(refs > 0,
 		"Increased from zero refcount!")
 }
 
