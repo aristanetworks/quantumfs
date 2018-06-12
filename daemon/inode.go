@@ -775,7 +775,7 @@ func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 	refs := c.qfs.inodeRefcounts[inode.inodeNum()] + int32(owner)
 	c.qfs.inodeRefcounts[inode.inodeNum()] = refs
 
-	c.vlog("A: %d refs on inode %d", refs, inode.inodeNum())
+	c.vlog("A: %x refs on inode %d", refs, inode.inodeNum())
 	utils.Assert(refs > 1,
 		"Increased from zero refcount!")
 }
@@ -796,7 +796,7 @@ func (inode *InodeCommon) delRef(c *ctx, owner refType) {
 		refs := c.qfs.inodeRefcounts[inode.inodeNum()] - int32(owner)
 		c.qfs.inodeRefcounts[inode.inodeNum()] = refs
 
-		c.vlog("D: %d refs on inode %d", refs, inode.inodeNum())
+		c.vlog("D: %x refs on inode %d", refs, inode.inodeNum())
 		if refs != 0 {
 			return false
 		}
