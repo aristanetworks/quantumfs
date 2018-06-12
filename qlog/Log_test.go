@@ -225,7 +225,7 @@ func TestQParse(t *testing.T) {
 	// There's nothing ensuring the order is the same, so we have to sort
 	testLogLines := strings.Split(testLogs, "\n")
 	logOutLines := strings.Split(logOutCopy, "\n")
-	sort.Sort(sortString(logOutLines))
+	sort.Strings(logOutLines)
 
 	// Trim any lines outside of our "comparison boundaries"
 	testLogLines = trimToStr(testLogLines, testLogBoundary)
