@@ -763,9 +763,7 @@ func (inode *InodeCommon) cleanup(c *ctx) {
 }
 
 func (inode *InodeCommon) addRef(c *ctx, owner refType) {
-	if inode.inodeNum() == quantumfs.InodeIdRoot ||
-		inode.inodeNum() == quantumfs.InodeIdApi {
-
+	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
 		// These Inodes always exist
 		return
 	}
@@ -789,9 +787,7 @@ func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 }
 
 func (inode *InodeCommon) delRef(c *ctx, owner refType) {
-	if inode.inodeNum() == quantumfs.InodeIdRoot ||
-		inode.inodeNum() == quantumfs.InodeIdApi {
-
+	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
 		// These Inodes always exist
 		return
 	}
