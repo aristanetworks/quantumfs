@@ -200,23 +200,28 @@ RPM_FILES_TOOLSV2_I686 += $(RPM_FILE_PREFIX_CLIENT).i686.rpm $(RPM_FILE_PREFIX_C
 RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_PREFIX_CLIENT).x86_64.rpm $(RPM_FILE_PREFIX_CLIENT_DEVEL).x86_64.rpm
 RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_QUPLOAD).x86_64.rpm
 
-clientRPM: check-fpm libqfs.so
-	$(MAKE) clientRPM-work
+clientRPM: check-fpm qfsclient
+	$(clientRPM-work)
 
-clientRPM-work: qfsclient-nogo
+clientRPM-nogo: qfsclient-nogo
+	$(clientRPM-work)
+
+define clientRPM-work=
 	$(FPM) -n $(RPM_BASENAME_CLIENT) \
 		--description='QuantumFS client API' \
 		--depends jansson \
 		--depends openssl \
 		--depends libstdc++ \
-		QFSClient/libqfsclient.so=$(RPM_LIBDIR)/libqfsclient.so
+		QFSClient/libqfsclient.so=$(RPM_LIBDIR)/libqfsclient.so \
+		libqfs.so
 	$(FPM) -n $(RPM_BASENAME_CLIENT_DEVEL) \
 		--description='Development files for QuantumFS client API' \
 		--depends $(RPM_BASENAME_CLIENT) \
-		QFSClient/qfs_client.h=/usr/include/qfs_client.h
+		QFSClient/qfs_client.h=/usr/include/qfs_client.h \
+		libqfs.h
+endef
 
-clientRPM32:
-	$(MAKE) libqfs32
+clientRPM32: check-fpm libqfs32
 	@echo "Building i686 RPMs using mock. This can take several minutes"
 	{ \
 		set -e ; \
@@ -230,7 +235,7 @@ clientRPM32:
 			mock -r fedora-18-i386 --shell "cd /quantumfs && make clean" ; \
 			mock -r fedora-18-i386 --copyin ./libqfs.so /quantumfs/ ; \
 			mock -r fedora-18-i386 --copyin ./libqfs.h /quantumfs/ ; \
-			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clientRPM-work RPM_LIBDIR=/usr/lib" ; \
+			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clientRPM-nogo RPM_LIBDIR=/usr/lib" ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT).i686.rpm . ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT_DEVEL).i686.rpm . ; \
 			mock -r fedora-18-i386 --clean ; \
