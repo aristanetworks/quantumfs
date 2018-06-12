@@ -65,17 +65,17 @@ var maxLen int
 var wildcardStr string
 
 // -- worker structures
-type SortResultsAverage []qlog.PatternData
+type sortResultsAverage []patternData
 
-func (s SortResultsAverage) Len() int {
+func (s sortResultsAverage) Len() int {
 	return len(s)
 }
 
-func (s SortResultsAverage) Swap(i, j int) {
+func (s sortResultsAverage) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s SortResultsAverage) Less(i, j int) bool {
+func (s sortResultsAverage) Less(i, j int) bool {
 	if s[i].Avg == s[j].Avg {
 		return (s[i].SeqStrRaw > s[j].SeqStrRaw)
 	} else {
@@ -83,17 +83,17 @@ func (s SortResultsAverage) Less(i, j int) bool {
 	}
 }
 
-type SortResultsTotal []qlog.PatternData
+type sortResultsTotal []patternData
 
-func (s SortResultsTotal) Len() int {
+func (s sortResultsTotal) Len() int {
 	return len(s)
 }
 
-func (s SortResultsTotal) Swap(i, j int) {
+func (s sortResultsTotal) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s SortResultsTotal) Less(i, j int) bool {
+func (s sortResultsTotal) Less(i, j int) bool {
 	if s[i].Sum == s[j].Sum {
 		return (s[i].SeqStrRaw > s[j].SeqStrRaw)
 	} else {
@@ -239,7 +239,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := qlog.LoadFromStat(file)
+		patterns := loadFromStat(file)
 
 		outputCsvCover(patterns)
 	case logOut:
@@ -294,7 +294,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := qlog.LoadFromStat(file)
+		patterns := loadFromStat(file)
 
 		filterMap := make(map[uint64]bool)
 		for i := 0; i < len(filterId); i++ {
@@ -312,7 +312,7 @@ func main() {
 
 			printIndexedLogExt(i, patterns[i].Data.Seq,
 				patterns[i].Wildcards, true)
-			printPatternData(patterns[i])
+			printpatternData(patterns[i])
 			count++
 		}
 	case stats:
@@ -325,7 +325,7 @@ func main() {
 			outFilename = outFile
 		}
 
-		patterns := qlog.GetStatPatterns(inFile, maxThreads, maxLenWildcards)
+		patterns := getStatPatterns(inFile, maxThreads, maxLenWildcards)
 
 		fmt.Println("Saving to stat file...")
 		file, err := os.Create(outFilename)
@@ -335,7 +335,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		qlog.SaveToStat(file, patterns)
+		saveToStat(file, patterns)
 		fmt.Printf("Stats file created: %s\n", outFilename)
 	case sizeStats:
 		if inFile == "" {
@@ -345,7 +345,7 @@ func main() {
 
 		if outFile == "" {
 			// Print to stdout, no status bar
-			qlog.PacketStats(inFile, false, fmt.Printf)
+			packetStats(inFile, false, fmt.Printf)
 		} else {
 			outFh, err := os.Create(outFile)
 			if err != nil {
@@ -354,7 +354,7 @@ func main() {
 			}
 			defer outFh.Close()
 
-			qlog.PacketStats(inFile, true, func(format string,
+			packetStats(inFile, true, func(format string,
 				args ...interface{}) (int, error) {
 
 				toWrite := fmt.Sprintf(format, args...)
@@ -375,11 +375,11 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := qlog.LoadFromStat(file)
+		patterns := loadFromStat(file)
 
 		// Now sort by total time usage
 		fmt.Println("Sorting data by total time usage...")
-		sort.Sort(SortResultsTotal(patterns))
+		sort.Sort(sortResultsTotal(patterns))
 
 		fmt.Println("Top function patterns by total time used:")
 		showStats(patterns, stdDevMin, stdDevMax, wildMin,
@@ -398,11 +398,11 @@ func main() {
 			os.Exit(1)
 		}
 		defer file.Close()
-		patterns := qlog.LoadFromStat(file)
+		patterns := loadFromStat(file)
 
 		// Now sort by average time usage
 		fmt.Println("Sorting data by average time usage...")
-		sort.Sort(SortResultsAverage(patterns))
+		sort.Sort(sortResultsAverage(patterns))
 
 		fmt.Println("Top function patterns by average time used:")
 		showStats(patterns, stdDevMin, stdDevMax, wildMin,
@@ -419,7 +419,7 @@ type bucket struct {
 }
 
 func fillTimeline(out map[int64]bucket, seqId uint64,
-	pattern qlog.PatternData) (minStartTime int64) {
+	pattern patternData) (minStartTime int64) {
 
 	times := pattern.Data.Times
 	var minTime int64
@@ -489,13 +489,13 @@ func filterLogOut(inFile string, patternFile string, showStatus bool,
 		}
 	}
 
-	trackerCount, trackerMap := qlog.GetTrackerMap(inFile, maxThreads)
+	trackerCount, trackerMap := getTrackerMap(inFile, maxThreads)
 
 	// now we just need to output the contents of the tracker maps we match
 	trackerIdx := 0
 	fmt.Println("Filtering for relevant subsequences...")
 	status := qlog.NewLogStatus(50)
-	sequences := make([]*qlog.SequenceTracker, 0)
+	sequences := make([]*sequenceTracker, 0)
 	for reqId, trackers := range trackerMap {
 		if len(trackers) == 0 {
 			continue
@@ -513,7 +513,7 @@ func filterLogOut(inFile string, patternFile string, showStatus bool,
 				break
 			}
 
-			if qlog.PatternMatches(pattern, wildcards,
+			if patternMatches(pattern, wildcards,
 				trackers[k].Seq()) {
 
 				sequences = append(sequences, &trackers[k])
@@ -534,7 +534,7 @@ func filterLogOut(inFile string, patternFile string, showStatus bool,
 	}
 }
 
-func outputCsvCover(patterns []qlog.PatternData) {
+func outputCsvCover(patterns []patternData) {
 	file, err := os.Create(outFile)
 	if err != nil {
 		fmt.Printf("Unable to create %s for new data: %s\n", outFile, err)
@@ -654,9 +654,9 @@ func outputCsvCover(patterns []qlog.PatternData) {
 	status.Process(1)
 }
 
-func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
+func filterPatterns(patterns []patternData, minStdDev float64,
 	maxStdDev float64, minWildcards int, maxWildcards int, minSamples int,
-	maxLen int, maxResults int) (filtered []qlog.PatternData, firstLog int64,
+	maxLen int, maxResults int) (filtered []patternData, firstLog int64,
 	lastLog int64) {
 
 	minStdDevNano := int64(minStdDev * 1000)
@@ -665,8 +665,8 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 	earliestLog := patterns[0].Data.Times[0].StartTime
 	latestLog := earliestLog
 
-	var lastTimes []qlog.TimeData
-	funcResults := make([]qlog.PatternData, 0)
+	var lastTimes []timeData
+	funcResults := make([]patternData, 0)
 	for i := 0; i < len(patterns); i++ {
 		// check the times for earliest / latest time
 		for j := 0; j < len(patterns[i].Data.Times); j++ {
@@ -684,13 +684,13 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 			continue
 		}
 
-		wildcards := qlog.CountWildcards(patterns[i].Wildcards, false)
+		wildcards := countWildcards(patterns[i].Wildcards, false)
 		if wildcards > maxWildcards || wildcards < minWildcards {
 			continue
 		}
 
 		if len(patterns[i].Data.Seq)-
-			(qlog.CountWildcards(patterns[i].Wildcards, true)-
+			(countWildcards(patterns[i].Wildcards, true)-
 				wildcards) > maxLen {
 
 			continue
@@ -700,7 +700,7 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 			// If this dataset is a subset of the last, then we've
 			// already output the most wildcarded version of this
 			// sequence so let's not print redundant information
-			if qlog.Superset(lastTimes, patterns[i].Data.Times) {
+			if superset(lastTimes, patterns[i].Data.Times) {
 				continue
 			}
 		}
@@ -722,7 +722,7 @@ func filterPatterns(patterns []qlog.PatternData, minStdDev float64,
 	return funcResults, earliestLog, latestLog
 }
 
-func printPatternDataTotal(pattern qlog.PatternData, firstLog int64, lastLog int64) {
+func printpatternDataTotal(pattern patternData, firstLog int64, lastLog int64) {
 	logTime := lastLog - firstLog
 	logPct := float64(pattern.Sum) / float64(logTime)
 
@@ -735,7 +735,7 @@ func printPatternDataTotal(pattern qlog.PatternData, firstLog int64, lastLog int
 	fmt.Println("")
 }
 
-func printPatternData(pattern qlog.PatternData) {
+func printpatternData(pattern patternData) {
 	fmt.Println("------------PATTERN SECTION ABOVE-----")
 	fmt.Printf("Total sequence time: %12s\n",
 		time.Duration(pattern.Sum).String())
@@ -744,7 +744,7 @@ func printPatternData(pattern qlog.PatternData) {
 	fmt.Println("")
 }
 
-func printPatternCommon(pattern qlog.PatternData) {
+func printPatternCommon(pattern patternData) {
 	fmt.Printf("Average sequence time: %12s\n",
 		time.Duration(pattern.Avg).String())
 	fmt.Printf("Number of samples: %d\n", len(pattern.Data.Times))
@@ -754,7 +754,7 @@ func printPatternCommon(pattern qlog.PatternData) {
 }
 
 // stddev units are microseconds
-func showStats(patterns []qlog.PatternData, minStdDev float64,
+func showStats(patterns []patternData, minStdDev float64,
 	maxStdDev float64, minWildcards int, maxWildcards int, minSamples int,
 	maxLen int, maxResults int) {
 
@@ -767,7 +767,7 @@ func showStats(patterns []qlog.PatternData, minStdDev float64,
 		result := funcResults[i]
 
 		printIndexedLogExt(count+1, result.Data.Seq, result.Wildcards, true)
-		printPatternDataTotal(result, firstLog, lastLog)
+		printpatternDataTotal(result, firstLog, lastLog)
 		count++
 	}
 }
@@ -829,4 +829,69 @@ func showLogs(reqId uint64, logs []qlog.LogOutput) {
 	}
 
 	qlog.FormatLogs(filteredLogs, tabSpaces, false, fmt.Printf)
+}
+
+func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen uint64) {
+	if *lhs < rhs {
+		*lhs += uint64(bufLen)
+	}
+
+	*lhs -= rhs
+}
+
+func packetStats(filepath string, statusBar bool, fn qlog.WriteFn) {
+	pastEndIdx, data, _ := qlog.ExtractFields(filepath)
+
+	histogram := make(map[uint16]uint64)
+	maxPacketLen := uint16(0)
+
+	var status qlog.LogStatus
+	readCount := uint64(0)
+
+	if statusBar {
+		status = qlog.NewLogStatus(50)
+		fmt.Println("Grabbing sizes from log file...")
+	}
+
+	for readCount < uint64(len(data)) {
+		var packetLen uint16
+		qlog.ReadBack(&pastEndIdx, data, packetLen, &packetLen)
+
+		// If we read a packet of zero length, that means our buffer wasn't
+		// full and we've hit the unused area
+		if packetLen == 0 {
+			break
+		}
+
+		// clear the completion bit
+		packetLen &= ^(uint16(qlog.EntryCompleteBit))
+
+		wrapMinusEquals(&pastEndIdx, uint64(packetLen), uint64(len(data)))
+		readCount += uint64(packetLen) + 2
+
+		if statusBar {
+			readCountClip := uint64(readCount)
+			if readCountClip > uint64(len(data)) {
+				readCountClip = uint64(len(data))
+			}
+			status.Process(float32(readCountClip) / float32(len(data)))
+		}
+
+		histogram[packetLen] = histogram[packetLen] + 1
+		if packetLen > maxPacketLen {
+			maxPacketLen = packetLen
+		}
+
+		if readCount > uint64(len(data)) {
+			// We've read everything, and this last packet isn't valid
+			break
+		}
+	}
+	if statusBar {
+		status.Process(1)
+	}
+
+	for i := 0; i < int(maxPacketLen); i++ {
+		fn("%d, %d\n", i, histogram[uint16(i)])
+	}
 }

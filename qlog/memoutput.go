@@ -19,21 +19,15 @@ import (
 	"github.com/aristanetworks/quantumfs/utils/dangerous"
 )
 
-// We need a static array sized upper bound on our memory. Increase this as needed.
-const DefaultMmapSize = (360000 * 24) + mmapStrMapSize + unsafe.Sizeof(MmapHeader{})
-
-// Strmap size allows for up to ~10000 unique logs
-const mmapStrMapSize = 512 * 1024
-
 // This header will be at the beginning of the shared memory region, allowing
 // this spec to change over time, but still ensuring a memory dump is self contained
-const QlogVersion = 5
+const qlogVersion = 5
 
 // We use the upper-most bit of the length field to indicate the packet is ready,
 // so the max packet length is 15 bits long
-const MaxPacketLen = 32767
+const maxPacketLength = 32767
 
-type MmapHeader struct {
+type mmapHeader struct {
 	DaemonVersion [128]byte
 	Version       uint32
 	StrMapSize    uint32
@@ -47,31 +41,29 @@ type circBufHeader struct {
 	PastEndIdx uint64
 }
 
-func (cbh *circBufHeader) EndIndex() uint64 {
+func (cbh *circBufHeader) endIndex() uint64 {
 	return cbh.PastEndIdx % cbh.Size
 }
 
-type SharedMemory struct {
-	fd       *os.File
-	mapSize  int
-	circBuf  CircMemLogs
-	strIdMap IdStrMap
-	buffer   []byte
-
-	// This is dangerous as Qlog also owns SharedMemory. SharedMemory must
-	// ensure that any call it makes to Qlog doesn't result in infinite recursion
-	errOut *Qlog
-
-	// For testing only
-	testDropStr string
-	testMode    bool
-}
-
-type LogEntry struct {
+type logEntry struct {
 	strIdx    uint16
 	reqId     uint64
 	timestamp int64
 	vars      []interface{}
+}
+
+func newCircBuf(mapHeader *circBufHeader,
+	mapBuffer []byte) circMemLogs {
+
+	rtn := circMemLogs{
+		header: mapHeader,
+		length: uint64(len(mapBuffer)),
+		buffer: mapBuffer,
+	}
+
+	rtn.header.Size = uint64(len(mapBuffer))
+
+	return rtn
 }
 
 /*
@@ -81,7 +73,7 @@ without any locks. To do so requires that readers and the writer adhere to the
 following rules...
 
 Writer:
-- The CircMemLogs must only have one writer at a time, and must modify the front
+- The circMemLogs must only have one writer at a time, and must modify the front
 	pointer if it needs to make space before writing any data. It needs to update
 	the end pointer *after* all data is written, to prevent any reader from
 	reading invalid data in a race
@@ -102,18 +94,18 @@ Readers:
 	around to copying that section of the buffer. That's why we sample the front
 	afterwards, since it most probably points to valid packets.
 */
-type CircMemLogs struct {
+type circMemLogs struct {
 	header *circBufHeader
 	length uint64
 	buffer []byte
 }
 
-func (circ *CircMemLogs) Size() int {
-	return int(circ.length + uint64(unsafe.Sizeof(MmapHeader{})))
+func (circ *circMemLogs) size() int {
+	return int(circ.length + uint64(unsafe.Sizeof(mmapHeader{})))
 }
 
 // Must only be called on a section of data where nobody else is writing to it
-func (circ *CircMemLogs) wrapWrite_(idx uint64, data []byte) {
+func (circ *circMemLogs) wrapWrite_(idx uint64, data []byte) {
 	numWrite := uint64(len(data))
 	if idx+numWrite > circ.length {
 		secondNum := (idx + numWrite) - circ.length
@@ -124,13 +116,13 @@ func (circ *CircMemLogs) wrapWrite_(idx uint64, data []byte) {
 	copy(circ.buffer[idx:idx+numWrite], data[:numWrite])
 }
 
-func (circ *CircMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
+func (circ *circMemLogs) reserveMem(dataLen uint64) (dataStartIdx uint64) {
 	dataEnd := atomic.AddUint64(&circ.header.PastEndIdx, uint64(dataLen))
 	return (dataEnd - dataLen) % circ.length
 }
 
 // Note: in development code, you should never provide a True partialWrite
-func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
+func (circ *circMemLogs) writePacket(partialWrite bool, format string,
 	formatId uint16, reqId uint64, timestamp int64, length uint64,
 	argKinds []reflect.Kind, args ...interface{}) {
 
@@ -146,7 +138,7 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 
 	// Write the length field without the completion bit
 	lenOffset := (dataOffset + length) % circ.length
-	flagAndLength := length & ^uint64(entryCompleteBit)
+	flagAndLength := length & ^uint64(EntryCompleteBit)
 
 	offset := dataOffset
 	buf := circ.buffer
@@ -188,7 +180,7 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 
 	// Now that the entry is written completely, mark the packet as safe to read,
 	utils.MemFence(timestamp)
-	flagAndLength |= uint64(entryCompleteBit)
+	flagAndLength |= uint64(EntryCompleteBit)
 
 	if fastpath {
 		insertUint16(buf, lenOffset, uint16(flagAndLength))
@@ -198,28 +190,11 @@ func (circ *CircMemLogs) writePacket(partialWrite bool, format string,
 	}
 }
 
-const LogStrSize = 64
 const logTextMax = 62
 
-type LogStr struct {
-	Text         [logTextMax]byte
-	LogSubsystem uint8
-	LogLevel     uint8
-}
-
-func checkRecursion(errorPrefix string, format string) {
-	// Ensure log isn't ourselves
-	if len(format) >= len(errorPrefix) &&
-		errorPrefix == format[:len(errorPrefix)] {
-
-		panic(fmt.Sprintf("Stuck in infinite recursion: %s",
-			dangerous.NoescapeInterface(format)))
-	}
-}
-
-func newLogStr(idx LogSubsystem, level uint8, format string) (LogStr, error) {
+func newLogStr(idx LogSubsystem, level uint8, format string) (logStr, error) {
 	var err error
-	var rtn LogStr
+	var rtn logStr
 	rtn.LogSubsystem = uint8(idx)
 	rtn.LogLevel = level
 	copyLen := len(format)
@@ -235,7 +210,34 @@ func newLogStr(idx LogSubsystem, level uint8, format string) (LogStr, error) {
 	return rtn, err
 }
 
-type IdStrMap struct {
+type logStr struct {
+	Text         [logTextMax]byte
+	LogSubsystem uint8
+	LogLevel     uint8
+}
+
+func checkRecursion(errorPrefix string, format string) {
+	// Ensure log isn't ourselves
+	if len(format) >= len(errorPrefix) &&
+		errorPrefix == format[:len(errorPrefix)] {
+
+		panic(fmt.Sprintf("Stuck in infinite recursion: %s",
+			dangerous.NoescapeInterface(format)))
+	}
+}
+
+func newIdStrMap(buf []byte, offset int) *idStrMap {
+	var rtn idStrMap
+	ids := make(map[string]uint16)
+	atomic.StorePointer(&rtn.currentMapPtr, unsafe.Pointer(&ids))
+	rtn.freeIdx = 0
+	rtn.buffer = (*[MmapStrMapSize /
+		LogStrSize]logStr)(unsafe.Pointer(&buf[offset]))
+
+	return &rtn
+}
+
+type idStrMap struct {
 	// The map from format strings to format index is a read heavy datastructure.
 	// Once the daemon has warmed up it is unlikely a new format will be added.
 	// Therefore we optimize heavily for the read-only case.
@@ -259,118 +261,11 @@ type IdStrMap struct {
 
 	lock utils.DeferableMutex // Protects everything below here
 
-	buffer  *[mmapStrMapSize / LogStrSize]LogStr
+	buffer  *[MmapStrMapSize / LogStrSize]logStr
 	freeIdx uint16
 }
 
-func newCircBuf(mapHeader *circBufHeader,
-	mapBuffer []byte) CircMemLogs {
-
-	rtn := CircMemLogs{
-		header: mapHeader,
-		length: uint64(len(mapBuffer)),
-		buffer: mapBuffer,
-	}
-
-	rtn.header.Size = uint64(len(mapBuffer))
-
-	return rtn
-}
-
-func newIdStrMap(buf []byte, offset int) *IdStrMap {
-	var rtn IdStrMap
-	ids := make(map[string]uint16)
-	atomic.StorePointer(&rtn.currentMapPtr, unsafe.Pointer(&ids))
-	rtn.freeIdx = 0
-	rtn.buffer = (*[mmapStrMapSize /
-		LogStrSize]LogStr)(unsafe.Pointer(&buf[offset]))
-
-	return &rtn
-}
-
-func newSharedMemory(dir string, filename string, mmapTotalSize int,
-	daemonVersion string, errOut *Qlog) (*SharedMemory, error) {
-
-	if dir == "" || filename == "" {
-		return nil, nil
-	}
-
-	// Create a file and its path to be mmap'd
-	err := os.MkdirAll(dir, 0777)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to ensure log file path exists: %s",
-			dir)
-	}
-
-	filepath := dir + string(os.PathSeparator) + filename
-
-	// Unlink any existing qlog file so we don't risk two processes both writing
-	// to the same log.
-	os.Remove(filepath)
-
-	mapFile, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
-	if mapFile == nil || err != nil {
-		return nil,
-			fmt.Errorf("Unable to create shared memory log file %s: %v",
-				filepath, err)
-	}
-
-	circBufSize := mmapTotalSize - (mmapStrMapSize +
-		int(unsafe.Sizeof(MmapHeader{})))
-	// Size the file to fit the shared memory requirements
-	_, err = mapFile.Seek(int64(mmapTotalSize-1), 0)
-	if err != nil {
-		mapFile.Close()
-		return nil, fmt.Errorf("Unable to seek to shared memory end in file")
-	}
-
-	_, err = mapFile.Write([]byte(" "))
-	if err != nil {
-		return nil, fmt.Errorf("Unable to expand file to fit " +
-			"shared memory requirement")
-	}
-
-	// Map the file to memory
-	mmap, err := syscall.Mmap(int(mapFile.Fd()), 0, mmapTotalSize,
-		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
-
-	if err != nil {
-		return nil,
-			fmt.Errorf("Unable to map shared memory file for logging")
-	}
-
-	// Make sure we touch every byte to ensure that the mmap isn't sparse
-	for i := 0; i < mmapTotalSize; i++ {
-		mmap[i] = 0
-	}
-
-	var rtn SharedMemory
-	rtn.fd = mapFile
-	rtn.mapSize = mmapTotalSize
-	rtn.buffer = mmap
-	header := (*MmapHeader)(unsafe.Pointer(&mmap[0]))
-	header.Version = QlogVersion
-
-	versionLen := len(daemonVersion)
-	if versionLen > len(header.DaemonVersion) {
-		versionLen = len(header.DaemonVersion)
-	}
-	copy(header.DaemonVersion[:], daemonVersion[:versionLen])
-	if versionLen < len(header.DaemonVersion) {
-		header.DaemonVersion[versionLen] = '\x00'
-	}
-
-	header.StrMapSize = mmapStrMapSize
-	headerOffset := int(unsafe.Sizeof(MmapHeader{}))
-	rtn.circBuf = newCircBuf(&header.CircBuf,
-		mmap[headerOffset:headerOffset+circBufSize])
-	rtn.strIdMap = *newIdStrMap(mmap, headerOffset+circBufSize)
-	rtn.errOut = errOut
-
-	return &rtn, nil
-}
-
-func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
+func (strMap *idStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
 	ids := (*map[string]uint16)(atomic.LoadPointer(&strMap.currentMapPtr))
 	entry, ok := (*ids)[format]
 
@@ -381,7 +276,7 @@ func (strMap *IdStrMap) mapGetLogIdx(format string) (idx uint16, valid bool) {
 	return 0, false
 }
 
-func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
+func (strMap *idStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	_format string) (uint16, error) {
 
 	// the _format argument is allocated on the stack, therefore we have to
@@ -417,7 +312,7 @@ func (strMap *IdStrMap) createLogIdx(idx LogSubsystem, level uint8,
 	return newIdx, err
 }
 
-func (strMap *IdStrMap) fetchLogIdx(idx LogSubsystem, level uint8,
+func (strMap *idStrMap) fetchLogIdx(idx LogSubsystem, level uint8,
 	format string) (uint16, error) {
 
 	existingId, idValid := strMap.mapGetLogIdx(format)
@@ -494,7 +389,7 @@ func writeArg(buf []byte, offset uint64, format string, arg interface{},
 	argKind reflect.Kind) uint64 {
 
 	// The structure and sizes written here must match
-	// SharedMemory.computePacketSize() to ensure the size is computed correctly.
+	// sharedMemory.computePacketSize() to ensure the size is computed correctly.
 	switch argKind {
 	case reflect.Int8:
 		offset = insertUint16(buf, offset, TypeInt8)
@@ -576,18 +471,116 @@ func expandBuffer(buf []byte, howMuch int) []byte {
 
 const sliceOfBytesKind = (reflect.Slice << 16) | reflect.Uint8
 
-func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
+func newSharedMemory(dir string, filename string, mmapTotalSize int,
+	daemonVersion string, errOut *Qlog) (*sharedMemory, error) {
+
+	if dir == "" || filename == "" {
+		return nil, nil
+	}
+
+	// Create a file and its path to be mmap'd
+	err := os.MkdirAll(dir, 0777)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to ensure log file path exists: %s",
+			dir)
+	}
+
+	filepath := dir + string(os.PathSeparator) + filename
+
+	// Unlink any existing qlog file so we don't risk two processes both writing
+	// to the same log.
+	os.Remove(filepath)
+
+	mapFile, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+	if mapFile == nil || err != nil {
+		return nil,
+			fmt.Errorf("Unable to create shared memory log file %s: %v",
+				filepath, err)
+	}
+
+	circBufSize := mmapTotalSize - (MmapStrMapSize +
+		int(unsafe.Sizeof(mmapHeader{})))
+	// Size the file to fit the shared memory requirements
+	_, err = mapFile.Seek(int64(mmapTotalSize-1), 0)
+	if err != nil {
+		mapFile.Close()
+		return nil, fmt.Errorf("Unable to seek to shared memory end in file")
+	}
+
+	_, err = mapFile.Write([]byte(" "))
+	if err != nil {
+		return nil, fmt.Errorf("Unable to expand file to fit " +
+			"shared memory requirement")
+	}
+
+	// Map the file to memory
+	mmap, err := syscall.Mmap(int(mapFile.Fd()), 0, mmapTotalSize,
+		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+
+	if err != nil {
+		return nil,
+			fmt.Errorf("Unable to map shared memory file for logging")
+	}
+
+	// Make sure we touch every byte to ensure that the mmap isn't sparse
+	for i := 0; i < mmapTotalSize; i++ {
+		mmap[i] = 0
+	}
+
+	var rtn sharedMemory
+	rtn.fd = mapFile
+	rtn.mapSize = mmapTotalSize
+	rtn.buffer = mmap
+	header := (*mmapHeader)(unsafe.Pointer(&mmap[0]))
+	header.Version = qlogVersion
+
+	versionLen := len(daemonVersion)
+	if versionLen > len(header.DaemonVersion) {
+		versionLen = len(header.DaemonVersion)
+	}
+	copy(header.DaemonVersion[:], daemonVersion[:versionLen])
+	if versionLen < len(header.DaemonVersion) {
+		header.DaemonVersion[versionLen] = '\x00'
+	}
+
+	header.StrMapSize = MmapStrMapSize
+	headerOffset := int(unsafe.Sizeof(mmapHeader{}))
+	rtn.circBuf = newCircBuf(&header.CircBuf,
+		mmap[headerOffset:headerOffset+circBufSize])
+	rtn.strIdMap = *newIdStrMap(mmap, headerOffset+circBufSize)
+	rtn.errOut = errOut
+
+	return &rtn, nil
+}
+
+type sharedMemory struct {
+	fd       *os.File
+	mapSize  int
+	circBuf  circMemLogs
+	strIdMap idStrMap
+	buffer   []byte
+
+	// This is dangerous as Qlog also owns sharedMemory. sharedMemory must
+	// ensure that any call it makes to Qlog doesn't result in infinite recursion
+	errOut *Qlog
+
+	// For testing only
+	testDropStr string
+	testMode    bool
+}
+
+func (mem *sharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 	args ...interface{}) uint64 {
 
-	// The structure of this method should match CircMemLogs.writePacket() and
-	// CircMemLogs.writeArg() to ensure the size is computed correctly. This is
+	// The structure of this method should match circMemLogs.writePacket() and
+	// circMemLogs.writeArg() to ensure the size is computed correctly. This is
 	// especially critical for the error strings.
 
 	size := 0
 	size += 2 // Number of arguments
-	size += 2 // LogEntry.strIdx
-	size += 8 // LogEntry.reqId
-	size += 8 // LogEntry.timestamp
+	size += 2 // logEntry.strIdx
+	size += 8 // logEntry.reqId
+	size += 8 // logEntry.timestamp
 
 	for i, arg := range args {
 		argType := reflect.TypeOf(dangerous.NoescapeInterface(arg))
@@ -637,7 +630,7 @@ func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 				// Store a compound kind because this is a compound
 				// type and we don't want to carry/regenerate the
 				// reflect.Type object for all the arguments in
-				// CircMemLogs.writeArg()
+				// circMemLogs.writeArg()
 				kinds[i] = sliceOfBytesKind
 
 				size += 2 // Length of slice
@@ -654,32 +647,7 @@ func (mem *SharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 	return uint64(size)
 }
 
-// Don't use interfaces where possible because they're slow
-func insertUint8(buf []byte, offset uint64, input uint8) uint64 {
-	bufPtr := (*uint8)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 1
-}
-
-func insertUint16(buf []byte, offset uint64, input uint16) uint64 {
-	bufPtr := (*uint16)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 2
-}
-
-func insertUint32(buf []byte, offset uint64, input uint32) uint64 {
-	bufPtr := (*uint32)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 4
-}
-
-func insertUint64(buf []byte, offset uint64, input uint64) uint64 {
-	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
-	*bufPtr = input
-	return offset + 8
-}
-
-func (mem *SharedMemory) Sync() int {
+func (mem *sharedMemory) sync() int {
 	_, _, err := syscall.Syscall(syscall.SYS_MSYNC,
 		uintptr(unsafe.Pointer(&mem.buffer[0])), // *addr
 		uintptr(mem.mapSize),                    // length
@@ -688,14 +656,14 @@ func (mem *SharedMemory) Sync() int {
 	return int(err)
 }
 
-func (mem *SharedMemory) Close() error {
+func (mem *sharedMemory) close() error {
 	mem.errOut = nil
 	mem.buffer = nil
 	mem.mapSize = 0
 	return mem.fd.Close()
 }
 
-func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
+func (mem *sharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	timestamp int64, format string, args ...interface{}) {
 
 	// Allocate a small slice on the stack which will cover most cases. Any
@@ -709,7 +677,7 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 	packetSize := mem.computePacketSize(format, argumentKinds, args...)
 
 	// Make sure length isn't too long, excluding the packet size bytes
-	if packetSize > MaxPacketLen {
+	if packetSize > maxPacketLength {
 		args = make([]interface{}, 1)
 		args[0] = dangerous.NoescapeInterface(format)
 		argumentKinds[0] = reflect.String
@@ -736,4 +704,29 @@ func (mem *SharedMemory) logEntry(idx LogSubsystem, reqId uint64, level uint8,
 
 	mem.circBuf.writePacket(partialWrite, format, formatId, reqId, timestamp,
 		packetSize, argumentKinds, args...)
+}
+
+// Don't use interfaces where possible because they're slow
+func insertUint8(buf []byte, offset uint64, input uint8) uint64 {
+	bufPtr := (*uint8)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 1
+}
+
+func insertUint16(buf []byte, offset uint64, input uint16) uint64 {
+	bufPtr := (*uint16)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 2
+}
+
+func insertUint32(buf []byte, offset uint64, input uint32) uint64 {
+	bufPtr := (*uint32)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 4
+}
+
+func insertUint64(buf []byte, offset uint64, input uint64) uint64 {
+	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
+	*bufPtr = input
+	return offset + 8
 }
