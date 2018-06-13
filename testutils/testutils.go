@@ -320,7 +320,7 @@ func (th *TestHelper) messagesInTestLog(logs []TLA) []int {
 
 	for _, rawlog := range logLines {
 		nLines++
-		logOutput := rawlog.ToString()
+		logOutput := rawlog.String()
 		for idx, tla := range logs {
 			exists := strings.Contains(logOutput, tla.Text)
 			if exists {
@@ -593,7 +593,7 @@ func OutputLogError(errInfo LogscanError) (summary string) {
 
 	extraLines := 0
 	for _, rawLine := range testOutputRaw {
-		line := rawLine.ToString()
+		line := rawLine.String()
 		buffer.WriteString(line)
 
 		if strings.Contains(line, "PANIC") ||
