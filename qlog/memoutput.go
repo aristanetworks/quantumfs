@@ -471,21 +471,8 @@ func expandBuffer(buf []byte, howMuch int) []byte {
 
 const sliceOfBytesKind = (reflect.Slice << 16) | reflect.Uint8
 
-func newSharedMemory(dir string, filename string, mmapTotalSize int,
+func newSharedMemory(filepath string, mmapTotalSize int,
 	daemonVersion string, errOut *Qlog) (*sharedMemory, error) {
-
-	if dir == "" || filename == "" {
-		return nil, nil
-	}
-
-	// Create a file and its path to be mmap'd
-	err := os.MkdirAll(dir, 0777)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to ensure log file path exists: %s",
-			dir)
-	}
-
-	filepath := dir + string(os.PathSeparator) + filename
 
 	// Unlink any existing qlog file so we don't risk two processes both writing
 	// to the same log.
@@ -729,4 +716,25 @@ func insertUint64(buf []byte, offset uint64, input uint64) uint64 {
 	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
 	*bufPtr = input
 	return offset + 8
+}
+
+func takeQlogSnapshot(logfile string, snapshotDir string) {
+	from, err := os.Open(logfile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer from.Close()
+
+	timeStr := time.Now().Format("YYYY-MM-DD-hh-mm-ss.sss")
+	snapshotPath := fmt.Sprintf("%s/Error_%s.qlog", snapshotDir, timeStr)
+	to, err := os.OpenFile(snapshotDir, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer to.Close()
+
+	_, err = io.Copy(to, from)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

@@ -139,8 +139,10 @@ type Qlog struct {
 
 	// N.B. The format and args arguments are only valid until Write returns as
 	// they are forced to be allocated on the stack.
-	Write     func(format string, args ...interface{}) error
-	logBuffer *sharedMemory
+	Write            func(format string, args ...interface{}) error
+	logBuffer        *sharedMemory
+	filepath         string
+	errorSnapshotDir string
 
 	// Maximum level to log to the qlog file
 	maxLevel uint8
@@ -170,12 +172,24 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 		Write:     outLog,
 		maxLevel:  255,
 	}
-	var err error
-	q.logBuffer, err = newSharedMemory(ramfsPath, defaultMmapFile,
-		int(sharedMemLen), daemonVersion, &q)
 
-	if err != nil {
-		return nil, err
+	if ramfsPath != "" && defaultMmapFile != "" {
+		// Create a file and its path to be mmap'd
+		err := os.MkdirAll(ramfsPath, 0777)
+		if err != nil {
+			return nil, fmt.Errorf("Unable create log dir: %s",
+				ramfsPath)
+		}
+
+		q.filepath = ramfsPath + string(os.PathSeparator) + defaultMmapFile
+
+		var err error
+		q.logBuffer, err = newSharedMemory(q.filepath, int(sharedMemLen),
+			daemonVersion, &q)
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// check that our logLevel container is large enough for our subsystems
@@ -235,6 +249,11 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	unixNano := t.UnixNano()
 	if q.logBuffer != nil {
 		q.logBuffer.logEntry(idx, reqId, level, unixNano, format, args...)
+
+		// If this is an error log, we want to take a snapshot of the qlog
+		if level == 0 {
+			go takeQlogSnapshot(q.filepath, q.errorSnapshotDir)
+		}
 	}
 
 	if q.getLogLevel(idx, level) {
