@@ -354,14 +354,17 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 		}
 	}
 
-		var idx LogSubsystem
-		idx, e = getSubsystem(tokens[0])
-		if e != nil {
-			continue
-		}
+	// check that our logLevel container is large enough for our subsystems
+	if (uint8(logSubsystemMax) * maxLogLevels) >
+		uint8(unsafe.Sizeof(q.LogLevels))*8 {
 
-		q.setLogLevelBitmask(idx, uint8(level))
+		return nil, fmt.Errorf("Log level structure not large enough " +
+			"for given subsystems")
 	}
+
+	q.SetLogLevels(os.Getenv(logEnvTag))
+
+	return &q, nil
 }
 
 // Qlog is a shared memory, binary logging subsytem. It implements a circular buffer
