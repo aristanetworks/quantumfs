@@ -340,3 +340,8 @@ func TestQlogWrapAround(t *testing.T) {
 	// If we can parse the logs then this passed.
 	parseLogs(logger, tmpDir)
 }
+
+func TestQlogErrorCopy(t *testing.T) {
+	logger, tmpDir := setupQlog()
+
+}

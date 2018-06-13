@@ -718,7 +718,28 @@ func insertUint64(buf []byte, offset uint64, input uint64) uint64 {
 	return offset + 8
 }
 
-func takeQlogSnapshot(logfile string, snapshotDir string) {
+type byName []os.FileInfo
+
+func (f byName) Len() int           { return len(f) }
+func (f byName) Less(i, j int) bool { return f[i].Name() < f[j].Name() }
+func (f byName) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
+
+func pruneDir(snapshotDir string, maxEntries int) {
+	files, err := ReadDir(snapshotDir)
+	utils.AssertNoErr(err)
+
+	sort.Sort(sort.Reverse(byName(files)))
+
+	for idx, file := range files {
+		if idx >= maxEntries {
+			os.Delete(snapshotDir + "/" + file.Name())
+		}
+	}
+}
+
+func takeQlogSnapshot(logfile string, snapshotDir string, maxEntries int) {
+	pruneDir(snapshotDir, maxEntries)
+
 	from, err := os.Open(logfile)
 	if err != nil {
 		log.Fatal(err)
