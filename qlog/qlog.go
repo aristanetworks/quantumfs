@@ -14,42 +14,10 @@ import (
 
 const timeFormat = "2006-01-02T15:04:05.000000000"
 
-func specialReq(reqId uint64) string {
-	if reqId > MinFixedReqId {
-		switch reqId {
-		default:
-			return "UNKNOWN"
-		case MuxReqId:
-			return "[Mux]"
-		case FlushReqId:
-			return "[Flush]"
-		case QlogReqId:
-			return "[Qlog]"
-		case TestReqId:
-			return "[Test]"
-		case RefreshReqId:
-			return "[Refresh]"
-		}
+func init() {
+	for _, v := range logSubsystemList {
+		addLogSubsystem(v.name, v.logger)
 	}
-
-	var format string
-	var offset uint64
-	switch {
-	default:
-		format = "%d"
-		offset = 0
-	case FlusherRequestIdMin <= reqId && reqId < RefreshRequestIdMin:
-		format = "[Flush%d]"
-		offset = FlusherRequestIdMin
-	case RefreshRequestIdMin <= reqId && reqId < ForgetRequstIdMin:
-		format = "[Refresh%d]"
-		offset = RefreshRequestIdMin
-	case ForgetRequstIdMin <= reqId && reqId < UnusedRequestIdMin:
-		format = "[Forget%d]"
-		offset = ForgetRequstIdMin
-	}
-
-	return fmt.Sprintf(format, reqId-offset)
 }
 
 var logSubsystem = []string{}
@@ -58,23 +26,6 @@ var logSubsystemMap = map[string]LogSubsystem{}
 type logSubsystemPair struct {
 	name   string
 	logger LogSubsystem
-}
-
-var logSubsystemList = []logSubsystemPair{
-	{"Daemon", LogDaemon},
-	{"Datastore", LogDatastore},
-	{"WorkspaceDb", LogWorkspaceDb},
-	{"Test", LogTest},
-	{"Qlog", LogQlog},
-	{"Quark", LogQuark},
-	{"Spin", LogSpin},
-	{"Tool", LogTool},
-}
-
-func init() {
-	for _, v := range logSubsystemList {
-		addLogSubsystem(v.name, v.logger)
-	}
 }
 
 func addLogSubsystem(sys string, l LogSubsystem) {

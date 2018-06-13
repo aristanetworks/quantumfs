@@ -81,7 +81,6 @@ type wildcardedSequence struct {
 }
 
 func newWildcardedSeq(seq []qlog.LogOutput, wc []bool) wildcardedSequence {
-
 	var rtn wildcardedSequence
 	rtn.sequence = make([]qlog.LogOutput, len(seq), len(seq))
 	rtn.wildcards = make([]bool, len(wc), len(wc))
