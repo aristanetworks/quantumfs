@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -317,6 +318,20 @@ func TestBooleanLogType(t *testing.T) {
 	testLogs := parseLogs(logger, tmpDir)
 	utils.Assert(strings.Contains(testLogs, "booleans true false"),
 		"boolean log types incorrectly output: %s", testLogs)
+}
+
+func TestPartialQlogHeader(t *testing.T) {
+	logger, tmpDir := setupQlog()
+	wlog(logger, "This is a log")
+
+	os.Truncate(tmpDir+"/qlog", 100)
+	// This will panic if a truncated qlog header isn't handled
+	logs := parseLogs(logger, tmpDir)
+	utils.Assert(logs == "", "Non empty logs from truncated circ buffer")
+
+	os.Truncate(tmpDir+"/qlog", 4)
+	logs = parseLogs(logger, tmpDir)
+	utils.Assert(logs == "", "Non empty logs from truncated qlog header")
 }
 
 func TestQlogWrapAround(t *testing.T) {
