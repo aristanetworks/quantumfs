@@ -81,13 +81,13 @@ encoding/metadata.capnp.go: encoding/metadata.capnp
 grpc/rpc/rpc.pb.go: grpc/rpc/rpc.proto
 	protoc -I grpc/rpc/ grpc/rpc/rpc.proto --go_out=plugins=grpc:grpc/rpc
 
-libqfs.go:
-
 libqfs32:
 	CGO_ENABLED=1 GOARCH=386 go build -buildmode=c-shared -o libqfs.so libqfs/wrapper/libqfs.go
 
 libqfs.so: libqfs/wrapper/libqfs.go
+ifndef SKIP_LIBQFS
 	CGO_ENABLED=1 go build -buildmode=c-shared -o libqfs.so libqfs/wrapper/libqfs.go
+endif
 
 $(COMMANDS): encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
@@ -203,9 +203,6 @@ RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_QUPLOAD).x86_64.rpm
 clientRPM: check-fpm qfsclient
 	$(clientRPM-work)
 
-clientRPM-nogo: qfsclient-nogo
-	$(clientRPM-work)
-
 define clientRPM-work=
 	$(FPM) -n $(RPM_BASENAME_CLIENT) \
 		--description='QuantumFS client API' \
@@ -235,7 +232,7 @@ clientRPM32: check-fpm libqfs32
 			mock -r fedora-18-i386 --shell "cd /quantumfs && make clean" ; \
 			mock -r fedora-18-i386 --copyin ./libqfs.so /quantumfs/ ; \
 			mock -r fedora-18-i386 --copyin ./libqfs.h /quantumfs/ ; \
-			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clientRPM-nogo RPM_LIBDIR=/usr/lib" ; \
+			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clientRPM RPM_LIBDIR=/usr/lib" ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT).i686.rpm . ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT_DEVEL).i686.rpm . ; \
 			mock -r fedora-18-i386 --clean ; \

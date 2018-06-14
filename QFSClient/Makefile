@@ -30,13 +30,9 @@ LIBS           := -Wl,-Bdynamic -lqfs
 
 all: test
 
-qfsclient: libqfs.so
-	$(MAKE) $(TARGET)
+qfsclient: $(TARGET)
 
-qfsclient-nogo: $(TARGET)
-
-qfsclienttest: libqfs.so
-	$(MAKE) $(TEST_TARGET)
+qfsclienttest: $(TEST_TARGET)
 
 clean: qfsc-clean
 
@@ -46,9 +42,9 @@ qfsc-clean:
 %.o: %.cc
 	$(CXX) $(CXX_FLAGS) -c -o $@ $<
 
-$(OBJS): $(HDRS)
+$(OBJS): $(HDRS) libqfs.so
 
-$(TEST_OBJS): $(TEST_HDRS)
+$(TEST_OBJS): $(TEST_HDRS) libqfs.so
 
 $(TARGET): $(OBJS)
 	$(CXX) $(LD_FLAGS) -o $@ $^ $(LIBS)
@@ -61,8 +57,7 @@ gotests: qfsclient
 # run from this Makefile.
 # If the tests are run in some other way (eg on macOS for stand-alone
 # client library testing), the tests will use the system tempdir instead.
-test: cleanuplocal gotests
-	$(MAKE) $(TEST_TARGET)
+test: cleanuplocal $(TEST_TARGET) gotests
 	mkdir -p /dev/shm/$(ROOTDIRNAME)
 	LD_LIBRARY_PATH=$(d) TMPDIR=/dev/shm/$(ROOTDIRNAME) $(TEST_TARGET)
 
