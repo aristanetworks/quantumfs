@@ -282,6 +282,9 @@ func getTrackerMap(inFile string, maxThreads int) (int,
 	var logs []qlog.LogOutput
 	{
 		pastEndIdx, dataArray, strMap := qlog.ExtractFields(inFile)
+		if len(dataArray) == 0 {
+			panic("qlog file doesn't contain headers")
+		}
 		logs = qlog.OutputLogsExt(pastEndIdx, dataArray, strMap,
 			maxThreads, true)
 

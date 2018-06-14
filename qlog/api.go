@@ -52,15 +52,15 @@ const FnExitStr = "Out-- "
 // Global Functions
 
 // ExtractHeader takes the data from a qlog file and extracts the header from it
-func ExtractHeader(data []byte) *mmapHeader {
+func ExtractHeader(data []byte) (*mmapHeader, error) {
 	header := (*mmapHeader)(unsafe.Pointer(&data[0]))
 
 	if header.Version != qlogVersion {
-		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
-			header.Version, qlogVersion))
+		return nil, fmt.Errorf("Qlog version incompatible: "+
+			"got %d, need %d\n", header.Version, qlogVersion)
 	}
 
-	return header
+	return header, nil
 }
 
 // ExtractFields takes a qlog file path and extracts the components: end of log
@@ -69,9 +69,17 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 	strMapRtn []logStr) {
 
 	data := grabMemory(filepath)
-	header := ExtractHeader(data)
+
+	header, err := ExtractHeader(data)
+	if err != nil {
+		return 0, []byte{}, []logStr{}
+	}
 
 	mmapHeaderSize := uint64(unsafe.Sizeof(mmapHeader{}))
+
+	if uint64(len(data)) < mmapHeaderSize+header.CircBuf.Size {
+		return 0, []byte{}, []logStr{}
+	}
 
 	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
 		mmapHeaderSize {
@@ -234,6 +242,9 @@ func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
 	statusBar bool, fn WriteFn) {
 
 	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+	if len(dataArray) == 0 {
+		return
+	}
 
 	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
 	FormatLogs(logs, tabSpaces, statusBar, fn)
@@ -244,6 +255,9 @@ func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
 func ParseLogsRaw(filepath string) []*LogOutput {
 
 	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+	if len(dataArray) == 0 {
+		return []*LogOutput{}
+	}
 
 	return outputLogPtrs(pastEndIdx, dataArray, strMap, defaultParseThreads,
 		false)
