@@ -841,6 +841,9 @@ func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen uint64) {
 
 func packetStats(filepath string, statusBar bool, fn qlog.WriteFn) {
 	pastEndIdx, data, _ := qlog.ExtractFields(filepath)
+	if len(data) == 0 {
+		return
+	}
 
 	histogram := make(map[uint16]uint64)
 	maxPacketLen := uint16(0)

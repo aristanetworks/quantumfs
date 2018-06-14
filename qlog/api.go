@@ -73,6 +73,10 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 
 	mmapHeaderSize := uint64(unsafe.Sizeof(mmapHeader{}))
 
+	if uint64(len(data)) < mmapHeaderSize+header.CircBuf.Size {
+		return 0, []byte{}, []logStr{}
+	}
+
 	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
 		mmapHeaderSize {
 		fmt.Println("Data length inconsistent with expectations. ",
@@ -234,6 +238,9 @@ func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
 	statusBar bool, fn WriteFn) {
 
 	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+	if len(dataArray) == 0 {
+		return
+	}
 
 	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
 	FormatLogs(logs, tabSpaces, statusBar, fn)
@@ -244,6 +251,9 @@ func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
 func ParseLogsRaw(filepath string) []*LogOutput {
 
 	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+	if len(dataArray) == 0 {
+		return []*LogOutput{}
+	}
 
 	return outputLogPtrs(pastEndIdx, dataArray, strMap, defaultParseThreads,
 		false)
