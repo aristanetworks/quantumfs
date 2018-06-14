@@ -199,9 +199,6 @@ RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_PREFIX_CLIENT).x86_64.rpm $(RPM_FILE_PREF
 RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_QUPLOAD).x86_64.rpm
 
 clientRPM: check-fpm qfsclient
-	$(clientRPM-work)
-
-define clientRPM-work=
 	$(FPM) -n $(RPM_BASENAME_CLIENT) \
 		--description='QuantumFS client API' \
 		--depends jansson \
@@ -214,7 +211,6 @@ define clientRPM-work=
 		--depends $(RPM_BASENAME_CLIENT) \
 		QFSClient/qfs_client.h=/usr/include/qfs_client.h \
 		libqfs.h
-endef
 
 clientRPM32: check-fpm libqfs32.so
 	@echo "Building i686 RPMs using mock. This can take several minutes"
