@@ -10,10 +10,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/quantumfs/utils"
 )
@@ -341,7 +344,101 @@ func TestQlogWrapAround(t *testing.T) {
 	parseLogs(logger, tmpDir)
 }
 
+func waitFor(condition func() bool) {
+	for {
+		time.Sleep(20 * time.Millisecond)
+
+		if condition() {
+			return
+		}
+	}
+}
+
 func TestQlogErrorCopy(t *testing.T) {
 	logger, tmpDir := setupQlog()
+	errorDir := tmpDir + "/errors"
+	utils.AssertNoErr(os.Mkdir(errorDir, 0777))
+	logger.errorSnapshotDir = errorDir
+	logger.errorSnapshots = 2
 
+	for i := 0; i < 100; i++ {
+		if i == 50 {
+			logger.Log(LogTest, TestReqId, 0, "Error string")
+		}
+
+		logger.Log(LogTest, TestReqId, 3, "Filler %s", "123456789012345678")
+	}
+
+	waitFor(func() bool {
+		files, err := ioutil.ReadDir(errorDir)
+		utils.AssertNoErr(err)
+
+		errorFileCount := 0
+		for _, file := range files {
+			name := file.Name()
+			name = name[len(name)-5:]
+
+			if name == ".qlog" {
+				errorFileCount++
+			}
+		}
+
+		return (errorFileCount == 1)
+	})
+}
+
+func TestQlogErrorCopiesPrune(t *testing.T) {
+	logger, tmpDir := setupQlog()
+	errorDir := tmpDir + "/errors"
+	utils.AssertNoErr(os.Mkdir(errorDir, 0777))
+	logger.errorSnapshotDir = errorDir
+	logger.errorSnapshots = 3
+
+	for i := 0; i <= 100; i++ {
+		if i%10 == 0 {
+			logger.Log(LogTest, TestReqId, 0, "ERROR "+
+				strconv.Itoa(i))
+		}
+
+		logger.Log(LogTest, TestReqId, 3, "Filler %s", "123456789012345678")
+	}
+
+	waitFor(func() bool {
+		files, err := ioutil.ReadDir(errorDir)
+		utils.AssertNoErr(err)
+
+		errorFileMarker := 1
+		for _, file := range files {
+			name := file.Name()
+			name = name[len(name)-5:]
+
+			if name == ".qlog" {
+				// We're waiting for the last three errors to be
+				// what's left in the error directory
+				logData := ParseLogs(errorDir + "/" + file.Name())
+				error8 := strings.Index(logData, "ERROR8")
+				error9 := strings.Index(logData, "ERROR9")
+				error10 := strings.Index(logData, "ERROR10")
+				fileId := 1
+				if error8 != -1 {
+					if error9 != -1 {
+						if error10 != -1 {
+							fileId = 7
+						} else {
+							fileId = 5
+						}
+					} else {
+						fileId = 3
+					}
+				}
+				errorFileMarker *= fileId
+			}
+		}
+
+		// If all three of the last files exist, we expect the marker to be
+		// 105 since we've identified each with one of the first three primes
+		// and we do this to ensure that if there are for some reason
+		// duplicates, we'll be able to tell since the product won't be exact
+		return (errorFileMarker == 105)
+	})
 }

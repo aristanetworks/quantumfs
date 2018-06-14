@@ -8,11 +8,15 @@ package qlog
 import (
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"math"
 	"os"
 	"reflect"
+	"sort"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/aristanetworks/quantumfs/utils"
@@ -725,14 +729,14 @@ func (f byName) Less(i, j int) bool { return f[i].Name() < f[j].Name() }
 func (f byName) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
 
 func pruneDir(snapshotDir string, maxEntries int) {
-	files, err := ReadDir(snapshotDir)
+	files, err := ioutil.ReadDir(snapshotDir)
 	utils.AssertNoErr(err)
 
 	sort.Sort(sort.Reverse(byName(files)))
 
 	for idx, file := range files {
 		if idx >= maxEntries {
-			os.Delete(snapshotDir + "/" + file.Name())
+			os.Remove(snapshotDir + "/" + file.Name())
 		}
 	}
 }
@@ -741,21 +745,15 @@ func takeQlogSnapshot(logfile string, snapshotDir string, maxEntries int) {
 	pruneDir(snapshotDir, maxEntries)
 
 	from, err := os.Open(logfile)
-	if err != nil {
-		log.Fatal(err)
-	}
+	utils.AssertNoErr(err)
 	defer from.Close()
 
-	timeStr := time.Now().Format("YYYY-MM-DD-hh-mm-ss.sss")
+	timeStr := time.Now().Format("2006-01-02-15:04:05")
 	snapshotPath := fmt.Sprintf("%s/Error_%s.qlog", snapshotDir, timeStr)
-	to, err := os.OpenFile(snapshotDir, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		log.Fatal(err)
-	}
+	to, err := os.OpenFile(snapshotPath, os.O_RDWR|os.O_CREATE, 0666)
+	utils.AssertNoErr(err)
 	defer to.Close()
 
 	_, err = io.Copy(to, from)
-	if err != nil {
-		log.Fatal(err)
-	}
+	utils.AssertNoErr(err)
 }

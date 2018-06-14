@@ -335,7 +335,7 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 		maxLevel:  255,
 	}
 
-	if ramfsPath != "" && defaultMmapFile != "" {
+	if ramfsPath != "" {
 		// Create a file and its path to be mmap'd
 		err := os.MkdirAll(ramfsPath, 0777)
 		if err != nil {
@@ -345,7 +345,6 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 
 		q.filepath = ramfsPath + string(os.PathSeparator) + defaultMmapFile
 
-		var err error
 		q.logBuffer, err = newSharedMemory(q.filepath, int(sharedMemLen),
 			daemonVersion, &q)
 
@@ -382,6 +381,9 @@ type Qlog struct {
 
 	// Maximum level to log to the qlog file
 	maxLevel uint8
+	filepath         string
+	errorSnapshotDir string
+	errorSnapshots   int
 }
 
 // SetLogLevels stores the provided log level string in the qlog object.
@@ -509,7 +511,8 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 
 		// If this is an error log, we want to take a snapshot of the qlog
 		if level == 0 {
-			go takeQlogSnapshot(q.filepath, q.errorSnapshotDir)
+			go takeQlogSnapshot(q.filepath, q.errorSnapshotDir,
+				q.errorSnapshots)
 		}
 	}
 
