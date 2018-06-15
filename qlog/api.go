@@ -394,10 +394,10 @@ type Qlog struct {
 	logBuffer *sharedMemory
 
 	// Maximum level to log to the qlog file
-	maxLevel uint8
+	maxLevel         uint8
 	filepath         string
-	errorSnapshotDir string
-	errorSnapshots   int
+	ErrorSnapshotDir string
+	ErrorSnapshots   int
 }
 
 // SetLogLevels stores the provided log level string in the qlog object.
@@ -525,8 +525,9 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 
 		// If this is an error log, we want to take a snapshot of the qlog
 		if level == 0 {
-			go takeQlogSnapshot(q.filepath, q.errorSnapshotDir,
-				q.errorSnapshots)
+			q.Sync()
+			go takeQlogSnapshot(q.filepath, q.ErrorSnapshotDir,
+				q.ErrorSnapshots)
 		}
 	}
 

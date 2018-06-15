@@ -358,13 +358,16 @@ func TestQlogWrapAround(t *testing.T) {
 	parseLogs(logger, tmpDir)
 }
 
-func waitFor(condition func() bool) {
+func waitFor(msg string, condition func() bool) {
+	start := time.Now()
 	for {
-		time.Sleep(20 * time.Millisecond)
-
 		if condition() {
 			return
 		}
+
+		utils.Assert(time.Since(start) < 2*time.Second, "Timeout: "+msg)
+
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 
@@ -372,8 +375,8 @@ func TestQlogErrorCopy(t *testing.T) {
 	logger, tmpDir := setupQlog()
 	errorDir := tmpDir + "/errors"
 	utils.AssertNoErr(os.Mkdir(errorDir, 0777))
-	logger.errorSnapshotDir = errorDir
-	logger.errorSnapshots = 2
+	logger.ErrorSnapshotDir = errorDir
+	logger.ErrorSnapshots = 2
 
 	for i := 0; i < 100; i++ {
 		if i == 50 {
@@ -383,7 +386,7 @@ func TestQlogErrorCopy(t *testing.T) {
 		logger.Log(LogTest, TestReqId, 3, "Filler %s", "123456789012345678")
 	}
 
-	waitFor(func() bool {
+	waitFor("Waiting for error copy to show up", func() bool {
 		files, err := ioutil.ReadDir(errorDir)
 		utils.AssertNoErr(err)
 
@@ -405,24 +408,29 @@ func TestQlogErrorCopiesPrune(t *testing.T) {
 	logger, tmpDir := setupQlog()
 	errorDir := tmpDir + "/errors"
 	utils.AssertNoErr(os.Mkdir(errorDir, 0777))
-	logger.errorSnapshotDir = errorDir
-	logger.errorSnapshots = 3
+	logger.ErrorSnapshotDir = errorDir
+	logger.ErrorSnapshots = 3
 
 	for i := 0; i <= 100; i++ {
 		if i%10 == 0 {
 			logger.Log(LogTest, TestReqId, 0, "ERROR "+
 				strconv.Itoa(i))
+			// Space the errors out to ensure we don't see ERROR100 in
+			// iteration 90's qlog copy, etc.
+			time.Sleep(10 * time.Millisecond)
 		}
 
 		logger.Log(LogTest, TestReqId, 3, "Filler %s", "123456789012345678")
 	}
-
-	waitFor(func() bool {
+	time.Sleep(1 * time.Second)
+	waitFor("Waiting for only the last logs to be present", func() bool {
 		files, err := ioutil.ReadDir(errorDir)
 		utils.AssertNoErr(err)
 
 		errorFileMarker := 1
+		fileStr := ""
 		for _, file := range files {
+			fileStr += "|" + file.Name()
 			name := file.Name()
 			name = name[len(name)-5:]
 
@@ -430,10 +438,10 @@ func TestQlogErrorCopiesPrune(t *testing.T) {
 				// We're waiting for the last three errors to be
 				// what's left in the error directory
 				logData := ParseLogs(errorDir + "/" + file.Name())
-				error8 := strings.Index(logData, "ERROR8")
-				error9 := strings.Index(logData, "ERROR9")
-				error10 := strings.Index(logData, "ERROR10")
-				fileId := 1
+				error8 := strings.Index(logData, "ERROR 80")
+				error9 := strings.Index(logData, "ERROR 90")
+				error10 := strings.Index(logData, "ERROR 100")
+				fileId := 2
 				if error8 != -1 {
 					if error9 != -1 {
 						if error10 != -1 {

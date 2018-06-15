@@ -742,18 +742,19 @@ func pruneDir(snapshotDir string, maxEntries int) {
 }
 
 func takeQlogSnapshot(logfile string, snapshotDir string, maxEntries int) {
-	pruneDir(snapshotDir, maxEntries)
-
 	from, err := os.Open(logfile)
 	utils.AssertNoErr(err)
 	defer from.Close()
 
-	timeStr := time.Now().Format("2006-01-02-15:04:05")
-	snapshotPath := fmt.Sprintf("%s/Error_%s.qlog", snapshotDir, timeStr)
+	snapshotPath := fmt.Sprintf("%s/Error_%s.qlog", snapshotDir,
+		time.Now().Format(time.StampMilli))
+
 	to, err := os.OpenFile(snapshotPath, os.O_RDWR|os.O_CREATE, 0666)
 	utils.AssertNoErr(err)
 	defer to.Close()
 
 	_, err = io.Copy(to, from)
 	utils.AssertNoErr(err)
+
+	pruneDir(snapshotDir, maxEntries)
 }
