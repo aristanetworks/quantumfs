@@ -365,7 +365,7 @@ func waitFor(msg string, condition func() bool) {
 			return
 		}
 
-		utils.Assert(time.Since(start) < 2*time.Second, "Timeout: "+msg)
+		utils.Assert(time.Since(start) < 4*time.Second, "Timeout: "+msg)
 
 		time.Sleep(20 * time.Millisecond)
 	}

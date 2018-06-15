@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #ADMIN should be the email address of the notifyee
-ADMIN=pwn@arista.com
+ADMIN=your@email.com
 #ERRORDIR should be the path to the folder containing qlog copies, as set by the
 #quantumfs flag -errorDir
 ERRORDIR=/var/log/quantumfs
