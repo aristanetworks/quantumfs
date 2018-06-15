@@ -55,8 +55,7 @@ type BlobMapConfig struct {
 }
 
 type cqlStoreGlobal struct {
-	initOnce  sync.Once
-	resetOnce sync.Once
+	initMutex sync.RWMutex
 	cluster   Cluster
 	session   Session
 	sem       utils.Semaphore
@@ -74,48 +73,44 @@ type cqlStore struct {
 // Note: This routine is called by Init/New APIs
 //       in Ether and only one global initialization is done.
 
-// TBD: Based on use-cases revisit this singleton cluster
-//      and session context design
 // TBD: Need more investigation to see which parts of the
 //      config can be dynamically updated
 func initCqlStore(cluster Cluster) (cqlStore, error) {
+	globalCqlStore.initMutex.Lock()
+	defer globalCqlStore.initMutex.Unlock()
 
-	var err error
-	globalCqlStore.initOnce.Do(func() {
-		globalCqlStore.cluster = cluster
-		globalCqlStore.resetOnce = sync.Once{}
+	if globalCqlStore.session == nil {
+		session, err := cluster.CreateSession()
+		if err != nil {
+			err = fmt.Errorf("error in initCqlStore: %v", err)
+			return cqlStore{}, err
+		}
 		// The semaphore limits the number of concurrent
 		// inserts and queries to scyllaDB, otherwise we get timeouts
 		// from ScyllaDB. Timeouts are unavoidable since its possible
 		// to generate much faster rate of traffic than Scylla can handle.
 		// The number 100, has been emperically determined.
 		globalCqlStore.sem = make(utils.Semaphore, 100)
-		globalCqlStore.session, err = globalCqlStore.cluster.CreateSession()
-		if err != nil {
-			err = fmt.Errorf("error in initCqlStore: %v", err)
-			return
-		}
-	})
+		globalCqlStore.cluster = cluster
+		globalCqlStore.session = session
+	}
 
 	var cStore cqlStore
 	cStore.cluster = globalCqlStore.cluster
 	cStore.session = globalCqlStore.session
 	cStore.sem = &globalCqlStore.sem
 
-	return cStore, err
+	return cStore, nil
 }
 
 // mostly used by tests
 func resetCqlStore() {
-	globalCqlStore.resetOnce.Do(func() {
-		if globalCqlStore.session != nil {
-			globalCqlStore.session.Close()
-		}
-		// we cannot do globalCqlStore = cqlStore{}
-		// since we are inside resetOnce
-		globalCqlStore.cluster = nil
-		globalCqlStore.session = nil
-		globalCqlStore.sem = nil
-		globalCqlStore.initOnce = sync.Once{}
-	})
+	globalCqlStore.initMutex.Lock()
+	defer globalCqlStore.initMutex.Unlock()
+	if globalCqlStore.session != nil {
+		globalCqlStore.session.Close()
+	}
+	globalCqlStore.cluster = nil
+	globalCqlStore.session = nil
+	globalCqlStore.sem = nil
 }

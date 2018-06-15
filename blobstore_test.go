@@ -63,6 +63,53 @@ func (s *storeTests) TestNewCqlStoreFailure() {
 	s.Require().Error(err, "initCqlStore should have Failed")
 }
 
+func (s *storeTests) TestNewCqlStoreReInitAfterFailure() {
+	resetCqlStore()
+	mockcc := &MockCluster{}
+	mocksession := &MockSession{}
+	mocksession.On("Close").Return()
+	mockcc.On("CreateSession").Return(mocksession, errors.New("initFailed"))
+	_, err := initCqlStore(mockcc)
+
+	s.Require().Error(err, "initCqlStore should have Failed")
+	_, err = initCqlStore(mockcc)
+	s.Require().Error(err, "re-initCqlStore should have Failed")
+}
+
+func (s *storeTests) TestNewCqlStoreAvoidCreateSession() {
+	resetCqlStore()
+	mockcc := &MockCluster{}
+	mocksession := &MockSession{}
+	mocksession.On("Close").Return()
+	mockcc.On("CreateSession").Return(mocksession, nil).Times(1)
+	_, err := initCqlStore(mockcc)
+
+	s.Require().NoError(err, "initCqlStore should have passed")
+
+	var store cqlStore
+	// a re-init should pass and return mocksession
+	store, err = initCqlStore(mockcc)
+	s.Require().NoError(err, "re-initCqlStore should have passed")
+	s.Require().Equal(store.session, mocksession, "mocksession should be returned")
+}
+
+func (s *storeTests) TestNewCqlStoreReInitPass() {
+	resetCqlStore()
+	mockcc := &MockCluster{}
+	mocksession := &MockSession{}
+	mocksession.On("Close").Return()
+	mockcc.On("CreateSession").Return(nil, errors.New("initFailed")).Times(1)
+	_, err := initCqlStore(mockcc)
+
+	s.Require().Error(err, "initCqlStore should have Failed")
+
+	mockcc.On("CreateSession").Return(mocksession, nil)
+	// this retry of initCqlStore should pass even though
+	// prior attempt failed.
+	_, err = initCqlStore(mockcc)
+	s.Require().NoError(err, "re-initCqlStore should have passed")
+}
+
 func (s *storeTests) TestInsert() {
 	mocksession := s.bls.store.session.(*MockSession)
 	mockquery := &MockQuery{}
