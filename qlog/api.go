@@ -524,7 +524,7 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 		q.logBuffer.logEntry(idx, reqId, level, unixNano, format, args...)
 
 		// If this is an error log, we want to take a snapshot of the qlog
-		if level == 0 {
+		if level == 0 && q.ErrorSnapshotDir != "" && q.ErrorSnapshots > 0 {
 			q.Sync()
 			go takeQlogSnapshot(q.filepath, q.ErrorSnapshotDir,
 				q.ErrorSnapshots)
