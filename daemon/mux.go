@@ -2057,17 +2057,7 @@ func getQuantumfsExtendedKey(c *ctx, qfs *QuantumFs, inodeId InodeId) ([]byte,
 	// Update the Hash value before generating the key
 	inode.Sync_DOWN(c)
 
-	defer inode.getParentLock().RLock().RUnlock()
-
-	var dir *Directory
-	parent := inode.parent_(c)
-	if parent.isWorkspaceRoot() {
-		dir = &parent.(*WorkspaceRoot).Directory
-	} else {
-		dir = parent.(*Directory)
-	}
-
-	return dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
+	return inode.getQuantumfsExtendedKey(c)
 }
 
 const GetXAttrDataLog = "Mux::GetXAttrData"

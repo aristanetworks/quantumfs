@@ -155,6 +155,8 @@ type Inode interface {
 		owner fuse.Owner)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
 
+	getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status)
+
 	isDirty_(c *ctx) bool      // Returns true if the inode is dirty
 	dirty(c *ctx)              // Mark this Inode dirty
 	dirty_(c *ctx)             // Mark this Inode dirty
@@ -490,6 +492,34 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 
 		toCheck = toCheck.parent_(c)
 	}
+}
+
+func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) {
+	defer inode.getParentLock().RLock().RUnlock()
+
+	var record quantumfs.ImmutableDirectoryRecord
+	if inode.isOrphaned_() {
+		record = inode.unlinkRecord
+	} else {
+		var dir *Directory
+		parent := inode.parent_(c)
+		if parent.isWorkspaceRoot() {
+			dir = &parent.(*WorkspaceRoot).Directory
+		} else {
+			dir = parent.(*Directory)
+		}
+
+		defer dir.RLock().RUnlock()
+		defer dir.childRecordLock.Lock().Unlock()
+		record = dir.getRecordChildCall_(c, inode.inodeNum())
+	}
+
+	if record == nil {
+		c.wlog("Unable to get record for inode")
+		return nil, fuse.EIO
+	}
+
+	return record.EncodeExtendedKey(), fuse.OK
 }
 
 func (inode *InodeCommon) setParent(newParent InodeId) {
