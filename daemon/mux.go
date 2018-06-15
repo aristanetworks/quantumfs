@@ -89,7 +89,7 @@ func NewQuantumFs(config QuantumFsConfig, version string) (*QuantumFs, error) {
 	}
 
 	logger.ErrorSnapshotDir = config.ErrorDir
-	logger.ErrorSnapshots = config.MaxErrorCopies
+	logger.ErrorSnapshots = int(config.MaxErrorCopies)
 
 	if !config.VerboseTracing {
 		logger.SetMaxLevel(2) // dlog

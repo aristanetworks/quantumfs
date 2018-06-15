@@ -46,7 +46,7 @@ type QuantumFsConfig struct {
 
 	// If MaxErrorCopies is > 0, then whenever an error log occurs a copy of the
 	// qlog will be made and stored in ErrorDir
-	MaxErrorCopies uint32
+	MaxErrorCopies uint
 	ErrorDir       string
 
 	DataStoreName string

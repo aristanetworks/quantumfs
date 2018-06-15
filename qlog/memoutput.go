@@ -639,6 +639,10 @@ func (mem *sharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 }
 
 func (mem *sharedMemory) sync() int {
+	if mem.buffer == nil {
+		return 0
+	}
+
 	_, _, err := syscall.Syscall(syscall.SYS_MSYNC,
 		uintptr(unsafe.Pointer(&mem.buffer[0])), // *addr
 		uintptr(mem.mapSize),                    // length
@@ -743,7 +747,10 @@ func pruneDir(snapshotDir string, maxEntries int) {
 
 func takeQlogSnapshot(logfile string, snapshotDir string, maxEntries int) {
 	from, err := os.Open(logfile)
-	utils.AssertNoErr(err)
+	if err != nil {
+		// skip snapshots if there is no log
+		return
+	}
 	defer from.Close()
 
 	snapshotPath := fmt.Sprintf("%s/Error_%s.qlog", snapshotDir,
