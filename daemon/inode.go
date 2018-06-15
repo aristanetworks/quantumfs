@@ -787,8 +787,7 @@ func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 	defer c.qfs.mapMutex.Lock().Unlock()
 	addInodeRef_(c, inode.inodeNum(), owner)
 
-	refs := c.qfs.inodeRefcounts[inode.inodeNum()]
-	utils.Assert(refs > 0,
+	utils.Assert(c.qfs.inodeRefcounts[inode.inodeNum()] > 1,
 		"Increased from zero refcount!")
 }
 
