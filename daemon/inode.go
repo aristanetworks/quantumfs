@@ -314,6 +314,10 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	// We want to ensure that the orphan check and the parent sync are done
 	// under the same lock
 	if inode.isOrphaned_() {
+		// Still run the publish function to ensure the datastore contains
+		// updated contents. Our workspace may no longer care about our data,
+		// but someone else may.
+		publishFn()
 		c.vlog("Not flushing orphaned inode")
 		return
 	}
