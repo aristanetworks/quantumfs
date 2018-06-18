@@ -979,12 +979,20 @@ func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 	if !exists {
 		qfs.lookupCounts[inodeId] = 1
 
-		defer qfs.mapMutex.Lock().Unlock()
-		inode, _ := qfs.getInode_(c, inodeId)
-		if inode != nil {
-			addInodeRef_(c, inodeId, refLookups)
+		if inodeId <= quantumfs.InodeIdReservedEnd {
+			// These Inodes always exist
+			c.vlog("Skipping refcount of permanent inode")
 		} else {
-			c.vlog("Inode isn't instantiated")
+			defer qfs.mapMutex.Lock().Unlock()
+			inode, _ := qfs.getInode_(c, inodeId)
+			if inode != nil {
+				addInodeRef_(c, inodeId, refLookups)
+				utils.Assert(c.qfs.inodeRefcounts[inodeId] > 1,
+					"Increased from zero refcount for inode %d!",
+					inodeId)
+			} else {
+				c.vlog("Inode isn't instantiated")
+			}
 		}
 	} else {
 		qfs.lookupCounts[inodeId] = prev + 1

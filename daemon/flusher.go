@@ -212,6 +212,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	var dirtyElement *list.Element
 
 	inode.addRef(c, refTransient)
+	defer inode.delRef(c, refTransient)
 
 	flushSuccess := func() bool {
 		// the inode should be marked clean before flushing so that any new
@@ -238,8 +239,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		return inode.markUnclean_(dirtyElement)
 	}
 
-	inode.delRef(c, refDirty)     // Dirty queue reference
-	inode.delRef(c, refTransient) // addRef() above
+	inode.delRef(c, refDirty) // Dirty queue reference
 
 	return true
 }
