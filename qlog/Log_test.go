@@ -327,11 +327,13 @@ func TestPartialQlogHeader(t *testing.T) {
 	os.Truncate(tmpDir+"/qlog", 100)
 	// This will panic if a truncated qlog header isn't handled
 	logs := parseLogs(logger, tmpDir)
-	utils.Assert(logs == "", "Non empty logs from truncated circ buffer")
+	utils.Assert(strings.Contains(logs, "Qlog version incompatible"),
+		"Readable header from bad qlog")
 
 	os.Truncate(tmpDir+"/qlog", 4)
 	logs = parseLogs(logger, tmpDir)
-	utils.Assert(logs == "", "Non empty logs from truncated qlog header")
+	utils.Assert(strings.Contains(logs, "Qlog version incompatible"),
+		"Readable header from bad qlog")
 }
 
 func TestQlogWrapAround(t *testing.T) {
