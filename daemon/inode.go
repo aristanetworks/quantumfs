@@ -765,8 +765,7 @@ func (inode *InodeCommon) addRef(c *ctx) {
 	c.qfs.inodeRefcounts[inode.inodeNum()] = refs
 
 	c.vlog("A: %d refs on inode %d", refs, inode.inodeNum())
-	utils.Assert(refs > 1,
-		"Increased from zero refcount!")
+	utils.Assert(refs > 1, "Increased from zero refcount!")
 }
 
 func (inode *InodeCommon) delRef(c *ctx) {
