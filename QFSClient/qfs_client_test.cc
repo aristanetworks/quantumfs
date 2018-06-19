@@ -666,14 +666,14 @@ void QfsClientDeterminePathTest::TearDown() {
 TEST_F(QfsClientDeterminePathTest, DeterminePathTest) {
 	ASSERT_FALSE(this->api == NULL);
 
-	Error err = this->api->DeterminePath();
+	Error err = this->api->DeterminePathInTest();
 	ASSERT_EQ(err.code, kSuccess);
 
 	ASSERT_STREQ(this->api->path.c_str(), this->api_path.c_str());
 
 	// Test again when the api file doesn't exist anywhere
 	unlink(this->api_path.c_str());
-	err = this->api->DeterminePath();
+	err = this->api->DeterminePathInTest();
 	ASSERT_EQ(err.code, kCantFindApiFile);
 }
 

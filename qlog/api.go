@@ -52,26 +52,34 @@ const FnExitStr = "Out-- "
 // Global Functions
 
 // ExtractHeader takes the data from a qlog file and extracts the header from it
-func ExtractHeader(data []byte) *mmapHeader {
+func ExtractHeader(data []byte) (*mmapHeader, error) {
 	header := (*mmapHeader)(unsafe.Pointer(&data[0]))
 
 	if header.Version != qlogVersion {
-		panic(fmt.Sprintf("Qlog version incompatible: got %d, need %d\n",
-			header.Version, qlogVersion))
+		return nil, fmt.Errorf("Qlog version incompatible: "+
+			"got %d, need %d\n", header.Version, qlogVersion)
 	}
 
-	return header
+	return header, nil
 }
 
 // ExtractFields takes a qlog file path and extracts the components: end of log
 // offset, circular log buffer, string map
 func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
-	strMapRtn []logStr) {
+	strMapRtn []logStr, err error) {
 
 	data := grabMemory(filepath)
-	header := ExtractHeader(data)
+
+	header, err := ExtractHeader(data)
+	if err != nil {
+		return 0, []byte{}, []logStr{}, err
+	}
 
 	mmapHeaderSize := uint64(unsafe.Sizeof(mmapHeader{}))
+
+	if uint64(len(data)) < mmapHeaderSize+header.CircBuf.Size {
+		return 0, []byte{}, []logStr{}, fmt.Errorf("qlog truncated")
+	}
 
 	if uint64(len(data)) != uint64(header.StrMapSize)+header.CircBuf.Size+
 		mmapHeaderSize {
@@ -91,7 +99,8 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 	}
 
 	return header.CircBuf.endIndex(),
-		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap
+		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap,
+		nil
 }
 
 // OutputLogs is a simple interface to, given the components of a qlog that have
@@ -219,11 +228,14 @@ func FormatLogs(logs []LogOutput, tabSpaces int, statusBar bool, fn WriteFn) {
 func ParseLogs(filepath string) string {
 	rtn := ""
 
-	ParseLogsExt(filepath, 0, defaultParseThreads, false,
+	err := ParseLogsExt(filepath, 0, defaultParseThreads, false,
 		func(format string, args ...interface{}) (int, error) {
 			rtn += fmt.Sprintf(format, args...)
 			return len(format), nil
 		})
+	if err != nil {
+		return err.Error()
+	}
 
 	return rtn
 }
@@ -231,22 +243,29 @@ func ParseLogs(filepath string) string {
 // ParseLogsExt reads logs from a qlog file, formats them, optionally outputs a
 // statusBar to stdout, and applies a WriteFn to each
 func ParseLogsExt(filepath string, tabSpaces int, maxThreads int,
-	statusBar bool, fn WriteFn) {
+	statusBar bool, fn WriteFn) error {
 
-	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+	pastEndIdx, dataArray, strMap, err := ExtractFields(filepath)
+	if err != nil {
+		return err
+	}
 
 	logs := OutputLogsExt(pastEndIdx, dataArray, strMap, maxThreads, statusBar)
 	FormatLogs(logs, tabSpaces, statusBar, fn)
+	return nil
 }
 
 // ParseLogsRaw is a faster parse without any flair: logs may be out of order,
 // no tabbing. Returns LogOutput* which need to be Sprintf'd
-func ParseLogsRaw(filepath string) []*LogOutput {
+func ParseLogsRaw(filepath string) ([]*LogOutput, error) {
 
-	pastEndIdx, dataArray, strMap := ExtractFields(filepath)
+	pastEndIdx, dataArray, strMap, err := ExtractFields(filepath)
+	if err != nil {
+		return nil, err
+	}
 
 	return outputLogPtrs(pastEndIdx, dataArray, strMap, defaultParseThreads,
-		false)
+		false), nil
 }
 
 // LogscanSkim returns true if the log file string map given contains the substring

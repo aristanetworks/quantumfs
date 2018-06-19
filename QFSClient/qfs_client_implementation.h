@@ -86,6 +86,11 @@ class ApiImpl: public Api {
 	virtual Error GetBlock(const std::vector<byte> &key,
 			       std::vector<byte> *data);
 
+	// The libqfs method for finding the api will not recognize our hacked test
+	// api as being real, since it isn't a real api file, so we need to use our
+	// own method for finding the api file in tests.
+	Error DeterminePathInTest();
+
  private:
 	// Open an Api
 	Error OpenCommon(bool directIo);

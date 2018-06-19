@@ -89,7 +89,12 @@ func (read *reader) readHeader() *mmapHeader {
 			err))
 	}
 
-	return ExtractHeader(headerData)
+	header, err := ExtractHeader(headerData)
+	if err != nil {
+		panic(err)
+	}
+
+	return header
 }
 
 func (read *reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
