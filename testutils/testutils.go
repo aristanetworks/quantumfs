@@ -313,7 +313,8 @@ func (th *TestHelper) messagesInTestLog(logs []TLA) []int {
 	th.Assert(err == 0, "Sync failed with errno %d", err)
 
 	logFile := th.TempDir + "/ramfs/qlog"
-	logLines := qlog.ParseLogsRaw(logFile)
+	logLines, parseErr := qlog.ParseLogsRaw(logFile)
+	utils.AssertNoErr(parseErr)
 
 	nLines := 0
 	nFound := make([]int, len(logs))
@@ -586,7 +587,8 @@ func ShowSummary() {
 
 func OutputLogError(errInfo LogscanError) (summary string) {
 	errors := make([]string, 0, 10)
-	testOutputRaw := qlog.ParseLogsRaw(errInfo.LogFile)
+	testOutputRaw, err := qlog.ParseLogsRaw(errInfo.LogFile)
+	utils.AssertNoErr(err)
 	sort.Sort(qlog.SortByTimePtr(testOutputRaw))
 
 	var buffer bytes.Buffer

@@ -271,13 +271,16 @@ func main() {
 		} else if patternFile != "" {
 			filterLogOut(inFile, patternFile, true, tabSpaces)
 		} else {
-			qlog.ParseLogsExt(inFile, tabSpaces, maxThreads,
+			err := qlog.ParseLogsExt(inFile, tabSpaces, maxThreads,
 				(outFile != ""),
 				func(format string, args ...interface{}) (int,
 					error) {
 
 					return fmt.Fprintf(outFh, format, args...)
 				})
+			if err != nil {
+				panic(err)
+			}
 		}
 	case patternsOut:
 		if inFile == "" {
@@ -840,7 +843,14 @@ func wrapMinusEquals(lhs *uint64, rhs uint64, bufLen uint64) {
 }
 
 func packetStats(filepath string, statusBar bool, fn qlog.WriteFn) {
-	pastEndIdx, data, _ := qlog.ExtractFields(filepath)
+	pastEndIdx, data, _, err := qlog.ExtractFields(filepath)
+	if err != nil {
+		panic(err)
+	}
+
+	if len(data) == 0 {
+		return
+	}
 
 	histogram := make(map[uint16]uint64)
 	maxPacketLen := uint16(0)
