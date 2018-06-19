@@ -483,6 +483,16 @@ func TestOrphanedFileXAttrGetQfsKey(t *testing.T) {
 		_, err, data := utils.FGetXattr(fd, "quantumfs.key", 100)
 		test.AssertNoErr(err)
 		test.Assert(len(data) > 0, "Empty qfs key")
+
+		_, err = syscall.Write(fd, []byte("extra data"))
+		test.AssertNoErr(err)
+		test.AssertNoErr(syscall.Fdatasync(fd))
+
+		_, err, data2 := utils.FGetXattr(fd, "quantumfs.key", 100)
+		test.AssertNoErr(err)
+		test.Assert(len(data2) > 0 && !bytes.Equal(data, data2),
+			"qfs key not updated for orphan")
+
 	})
 }
 
