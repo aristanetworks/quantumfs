@@ -15,6 +15,7 @@
 #include <ios>
 #include <vector>
 
+#include "./libqfs.h"
 #include "QFSClient/qfs_client.h"
 #include "QFSClient/qfs_client_data.h"
 #include "QFSClient/qfs_client_test.h"
@@ -156,17 +157,22 @@ ApiImpl::~ApiImpl() {
 }
 
 Error ApiImpl::Open() {
-	return this->OpenCommon(true);
-}
-
-Error ApiImpl::TestOpen() {
 	return this->OpenCommon(false);
 }
 
-Error ApiImpl::OpenCommon(bool directIo) {
+Error ApiImpl::TestOpen() {
+	return this->OpenCommon(true);
+}
+
+Error ApiImpl::OpenCommon(bool inTest) {
 	if (this->path.length() == 0) {
 		// Path was not passed to constructor: determine path
-		Error err = this->DeterminePath();
+		Error err;
+		if (inTest) {
+			err = this->DeterminePathInTest();
+		} else {
+			err = this->DeterminePath();
+		}
 		if (err.code != kSuccess) {
 			return err;
 		}
@@ -175,7 +181,7 @@ Error ApiImpl::OpenCommon(bool directIo) {
 	if (this->fd == -1) {
 		int flags = O_RDWR | O_CLOEXEC;
 #if defined(O_DIRECT)
-		if (directIo) {
+		if (!inTest) {
 			flags |= O_DIRECT;
 		}
 #endif
@@ -294,6 +300,15 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 }
 
 Error ApiImpl::DeterminePath() {
+	FindApiPath_return apiPath = FindApiPath();
+	if (strlen(apiPath.r1) != 0) {
+		return util::getError(kCantFindApiFile, std::string(apiPath.r1));
+	}
+
+	this->path = std::string(apiPath.r0);
+}
+
+Error ApiImpl::DeterminePathInTest() {
 	// getcwd() with a NULL first parameter results in a buffer of whatever size
 	// is required being allocated, which we must then free. PATH_MAX isn't
 	// known at compile time (and it is possible for paths to be longer than
