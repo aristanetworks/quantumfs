@@ -805,7 +805,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	func() {
 		// Maybe give back the speculative lookupCount reference.
 		//
-		// See QuantumFs.inode_(), Directory.create_()
+		// See QuantumFs.inode_()
 		if instantiated {
 			defer qfs.lookupCountLock.Lock().Unlock()
 			if _, exists := qfs.lookupCounts[id]; !exists {
@@ -884,7 +884,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	// from here we will get the lookupCountLock and remove the reference if we
 	// speculated incorrectly.
 	//
-	// See Directory.create_(), QuantumFs.inode()
+	// See QuantumFs.inode()
 	qfs.inodeRefcounts[id] = 1
 
 	return inode, true
