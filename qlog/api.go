@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"os/exec"
 	"reflect"
 	"sort"
 	"strconv"
@@ -399,10 +400,9 @@ type Qlog struct {
 	logBuffer *sharedMemory
 
 	// Maximum level to log to the qlog file
-	maxLevel         uint8
-	filepath         string
-	ErrorSnapshotDir string
-	ErrorSnapshots   int
+	maxLevel  uint8
+	filepath  string
+	ErrorExec string
 }
 
 // SetLogLevels stores the provided log level string in the qlog object.
@@ -529,10 +529,15 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 		q.logBuffer.logEntry(idx, reqId, level, unixNano, format, args...)
 
 		// If this is an error log, we want to take a snapshot of the qlog
-		if level == 0 && q.ErrorSnapshotDir != "" && q.ErrorSnapshots > 0 {
+		if level == 0 && q.ErrorExec != "" {
 			q.Sync()
-			go takeQlogSnapshot(q.filepath, q.ErrorSnapshotDir,
-				q.ErrorSnapshots)
+			args := q.ErrorExec + " " + strconv.Itoa(os.Getpid()) + " " +
+				q.filepath
+
+			// run the command via eval so we don't have to parse and
+			// split the args up to satisfy the Command api
+			cmd := exec.Command("eval", args)
+			cmd.Run()
 		}
 	}
 

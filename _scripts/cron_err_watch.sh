@@ -2,35 +2,29 @@
 
 #ADMIN should be the email address of the notifyee
 ADMIN=your@email.com
-#ERRORDIR should be the path to the folder containing qlog copies, as set by the
+#ERROR_DIR should be the path to the folder containing qlog copies, as set by the
 #quantumfs flag -errorDir
-ERRORDIR=/var/log/quantumfs
+QFS_PID=$1
+QLOG_PATH=$2
+ERROR_DIR=/var/log/quantumfs
+MAX_FILES=3
+COPY_NAME=$(date +%Y-%M-%d_%T.%N).qlog
 
-if [ ! -d "$ERRORDIR" ]; then
-	echo "Error: please mkdir $ERRORDIR"
+if [ ! -d "$ERROR_DIR" ]; then
+	echo "Error: please mkdir $ERROR_DIR"
 	exit 1
 fi
 
-LS_STR=$(ls -1 $ERRORDIR)
-LAST_LS=$(<last_ls)
+#copy the qlog
+cp $QLOG_PATH $ERROR_DIR/$COPY_NAME
+
+#trim the directory contents
+ls -1t | tail -n +$MAX_FILES | xargs rm
+
+#send an email
 HOSTNAME=$(hostname)
 BODY="New QuantumFs errors have occurred.\n\
-Please check $ERRORDIR on $HOSTNAME for new qlogs containing errors.\n\n\
-Current contents of QuantumFs qlog error directory:\n$LS_STR\n"
-
-if [[ (-n $LS_STR) && (-n $LAST_LS) ]]; then
-	#If one is a substring of the other, then the logs have simply been pruned
-	if [[ "$LS_STR" == *"$LAST_LS"* || "$LAST_LS" == *"$LS_STR"* ]]; then
-		exit 0
-	fi
-else
-	#We have to check things a little differently if one of the strings is empty
-	if [[ "$LS_STR" == "$LAST_LS" ]]; then
-		exit 0
-	fi
-fi
+Please check $ERROR_DIR/$COPY_NAME on $HOSTNAME for new qlogs containing errors.\n"
 
 printf "$BODY" | mail -s "QuantumFs encountered an error on $HOSTNAME." $ADMIN
 echo "New errors found, sent email to $ADMIN"
-
-printf "$LS_STR" > ./last_ls

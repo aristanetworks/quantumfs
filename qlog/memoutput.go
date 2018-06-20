@@ -8,15 +8,11 @@ package qlog
 import (
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"reflect"
-	"sort"
 	"sync/atomic"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/aristanetworks/quantumfs/utils"
@@ -724,44 +720,4 @@ func insertUint64(buf []byte, offset uint64, input uint64) uint64 {
 	bufPtr := (*uint64)(unsafe.Pointer(&buf[offset]))
 	*bufPtr = input
 	return offset + 8
-}
-
-type byName []os.FileInfo
-
-func (f byName) Len() int           { return len(f) }
-func (f byName) Less(i, j int) bool { return f[i].Name() < f[j].Name() }
-func (f byName) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
-
-func pruneDir(snapshotDir string, maxEntries int) {
-	files, err := ioutil.ReadDir(snapshotDir)
-	utils.AssertNoErr(err)
-
-	sort.Sort(sort.Reverse(byName(files)))
-
-	for idx, file := range files {
-		if idx >= maxEntries {
-			os.Remove(snapshotDir + "/" + file.Name())
-		}
-	}
-}
-
-func takeQlogSnapshot(logfile string, snapshotDir string, maxEntries int) {
-	from, err := os.Open(logfile)
-	if err != nil {
-		// skip snapshots if there is no log
-		return
-	}
-	defer from.Close()
-
-	snapshotPath := fmt.Sprintf("%s/Error_%s.qlog", snapshotDir,
-		time.Now().Format(time.StampMilli))
-
-	to, err := os.OpenFile(snapshotPath, os.O_RDWR|os.O_CREATE, 0666)
-	utils.AssertNoErr(err)
-	defer to.Close()
-
-	_, err = io.Copy(to, from)
-	utils.AssertNoErr(err)
-
-	pruneDir(snapshotDir, maxEntries)
 }

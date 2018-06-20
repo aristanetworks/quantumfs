@@ -83,11 +83,9 @@ func init() {
 	qflag.StringVar(&config.MountPath, "mountpath", config.MountPath,
 		"Path to mount quantumfs at")
 
-	qflag.UintVar(&config.MaxErrorCopies, "maxErrorCopies",
-		config.MaxErrorCopies, "Max number of qlog copies to make on error")
-
-	qflag.StringVar(&config.ErrorDir, "errorDir", config.ErrorDir,
-		"Directory to copy qlog to when errors occur")
+	qflag.StringVar(&config.ErrorExec, "errorExec", config.ErrorExec,
+		"Executes the given command for each error log."+
+			" Pid and log filepath passed as parameters.")
 
 	qflag.Uint64Var(&config.CacheTimeSeconds, "cacheTimeSeconds",
 		config.CacheTimeSeconds,

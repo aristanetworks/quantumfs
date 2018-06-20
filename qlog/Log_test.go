@@ -12,11 +12,9 @@ import (
 	"math"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/aristanetworks/quantumfs/utils"
 )
@@ -358,111 +356,4 @@ func TestQlogWrapAround(t *testing.T) {
 	// with a "bounds out of range" failure in readBack().
 	// If we can parse the logs then this passed.
 	parseLogs(logger, tmpDir)
-}
-
-func waitFor(msg string, condition func() bool) {
-	start := time.Now()
-	for {
-		if condition() {
-			return
-		}
-
-		utils.Assert(time.Since(start) < 4*time.Second, "Timeout: "+msg)
-
-		time.Sleep(20 * time.Millisecond)
-	}
-}
-
-func TestQlogErrorCopy(t *testing.T) {
-	logger, tmpDir := setupQlog()
-	errorDir := tmpDir + "/errors"
-	utils.AssertNoErr(os.Mkdir(errorDir, 0777))
-	logger.ErrorSnapshotDir = errorDir
-	logger.ErrorSnapshots = 2
-
-	for i := 0; i < 100; i++ {
-		if i == 50 {
-			logger.Log(LogTest, TestReqId, 0, "Error string")
-		}
-
-		logger.Log(LogTest, TestReqId, 3, "Filler %s", "123456789012345678")
-	}
-
-	waitFor("Waiting for error copy to show up", func() bool {
-		files, err := ioutil.ReadDir(errorDir)
-		utils.AssertNoErr(err)
-
-		errorFileCount := 0
-		for _, file := range files {
-			name := file.Name()
-			name = name[len(name)-5:]
-
-			if name == ".qlog" {
-				errorFileCount++
-			}
-		}
-
-		return (errorFileCount == 1)
-	})
-}
-
-func TestQlogErrorCopiesPrune(t *testing.T) {
-	logger, tmpDir := setupQlog()
-	errorDir := tmpDir + "/errors"
-	utils.AssertNoErr(os.Mkdir(errorDir, 0777))
-	logger.ErrorSnapshotDir = errorDir
-	logger.ErrorSnapshots = 3
-
-	for i := 0; i <= 100; i++ {
-		if i%10 == 0 {
-			logger.Log(LogTest, TestReqId, 0, "ERROR "+
-				strconv.Itoa(i))
-			// Space the errors out to ensure we don't see ERROR100 in
-			// iteration 90's qlog copy, etc.
-			time.Sleep(10 * time.Millisecond)
-		}
-
-		logger.Log(LogTest, TestReqId, 3, "Filler %s", "123456789012345678")
-	}
-	time.Sleep(1 * time.Second)
-	waitFor("Waiting for only the last logs to be present", func() bool {
-		files, err := ioutil.ReadDir(errorDir)
-		utils.AssertNoErr(err)
-
-		errorFileMarker := 1
-		fileStr := ""
-		for _, file := range files {
-			fileStr += "|" + file.Name()
-			name := file.Name()
-			name = name[len(name)-5:]
-
-			if name == ".qlog" {
-				// We're waiting for the last three errors to be
-				// what's left in the error directory
-				logData := ParseLogs(errorDir + "/" + file.Name())
-				error8 := strings.Index(logData, "ERROR 80")
-				error9 := strings.Index(logData, "ERROR 90")
-				error10 := strings.Index(logData, "ERROR 100")
-				fileId := 2
-				if error8 != -1 {
-					if error9 != -1 {
-						if error10 != -1 {
-							fileId = 7
-						} else {
-							fileId = 5
-						}
-					} else {
-						fileId = 3
-					}
-				}
-				errorFileMarker *= fileId
-			}
-		}
-
-		// If all three of the last files exist, we expect the marker to be
-		// 105 since we've identified each with one of the first three primes
-		// and we do this to ensure that if there are for some reason
-		// duplicates, we'll be able to tell since the product won't be exact
-		return (errorFileMarker == 105)
-	})
 }

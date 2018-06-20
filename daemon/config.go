@@ -44,10 +44,7 @@ type QuantumFsConfig struct {
 	CacheSize uint64
 	MountPath string
 
-	// If MaxErrorCopies is > 0, then whenever an error log occurs a copy of the
-	// qlog will be made and stored in ErrorDir
-	MaxErrorCopies uint
-	ErrorDir       string
+	ErrorExec string
 
 	DataStoreName string
 	DataStoreConf string
