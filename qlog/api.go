@@ -534,10 +534,10 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 			args := q.ErrorExec + " " + strconv.Itoa(os.Getpid()) + " " +
 				q.filepath
 
-			// run the command via eval so we don't have to parse and
+			// run the command via bash so we don't have to parse and
 			// split the args up to satisfy the Command api
-			cmd := exec.Command("eval", args)
-			cmd.Run()
+			cmd := exec.Command("bash", "-c", args)
+			go cmd.Run()
 		}
 	}
 

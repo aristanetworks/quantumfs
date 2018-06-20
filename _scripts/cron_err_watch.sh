@@ -19,7 +19,13 @@ fi
 cp $QLOG_PATH $ERROR_DIR/$COPY_NAME
 
 #trim the directory contents
-ls -1t | tail -n +$MAX_FILES | xargs rm
+cd $ERROR_DIR
+MAX_FILES=$((MAX_FILES+1))
+FILES=$(ls -1t | tail -n "+$MAX_FILES")
+
+if [[ FILES != "" ]]; then
+	echo "${FILES}" | xargs -d '\n' rm
+fi
 
 #send an email
 HOSTNAME=$(hostname)
