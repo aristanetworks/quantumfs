@@ -729,7 +729,17 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	}()
 
 	c.qfs.setInode(c, inodeNum, newEntity)
+	func() {
+		defer c.qfs.mapMutex.Lock().Unlock()
+		c.qfs.inodeRefcounts[inodeNum] = 1
+	}()
 	c.qfs.incrementLookupCount(c, inodeNum)
+
+	// We want to ensure that we panic if we attempt to increment the refcount of
+	// an Inode with a zero refcount as that indicates a counting issue. To do so
+	// we must initialize with a non-zero refcount so incrementLookupCount()
+	// above will succeed. Give back the temporary reference count here.
+	newEntity.delRef(c)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
@@ -1731,7 +1741,6 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-
 	defer c.FuncIn("Directory::instantiateChild", "Inode %d of %d", inodeNum,
 		dir.inodeNum()).Out()
 	defer dir.childRecordLock.Lock().Unlock()
@@ -1811,9 +1820,10 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 		return nil, errors.New("Not Required Type")
 	}
 	c.vlog("Directory::lookupInternal found inode %d Name %s", inodeNum, name)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	child = c.qfs.inode(c, inodeNum)
-	if child != nil {
-		c.qfs.incrementLookupCount(c, inodeNum)
+	if child == nil {
+		c.qfs.shouldForget(c, inodeNum, 1)
 	}
 	return child, nil
 }

@@ -371,7 +371,7 @@ func TestForgetMarking(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// Wait for uninstantiation
-		uninstMsg := fmt.Sprintf("Mux::uninstantiateInode_ inode %d",
+		uninstMsg := fmt.Sprintf("Uninstantiating inode %d",
 			childIdA)
 		test.WaitForLogString(uninstMsg, "childA uninstantiation")
 
@@ -386,7 +386,7 @@ func TestForgetMarking(t *testing.T) {
 		test.qfs.Forget(uint64(childIdB), 1)
 		test.SyncAllWorkspaces()
 
-		uninstMsg = fmt.Sprintf("Mux::uninstantiateInode_ inode %d",
+		uninstMsg = fmt.Sprintf("Uninstantiating inode %d",
 			childIdB)
 		test.WaitForLogString(uninstMsg, "childB uninstantiation")
 
