@@ -155,6 +155,8 @@ type Inode interface {
 		owner fuse.Owner)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
 
+	getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status)
+
 	isDirty_(c *ctx) bool      // Returns true if the inode is dirty
 	dirty(c *ctx)              // Mark this Inode dirty
 	dirty_(c *ctx)             // Mark this Inode dirty
@@ -312,6 +314,10 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	// We want to ensure that the orphan check and the parent sync are done
 	// under the same lock
 	if inode.isOrphaned_() {
+		// Still run the publish function to ensure the datastore contains
+		// updated contents. Our workspace may no longer care about our data,
+		// but someone else may.
+		publishFn()
 		c.vlog("Not flushing orphaned inode")
 		return
 	}
@@ -586,6 +592,34 @@ func (inode *InodeCommon) markUnclean_(dirtyElement *list.Element) (already bool
 		return false
 	}
 	return true
+}
+
+func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) {
+	defer inode.getParentLock().RLock().RUnlock()
+
+	var record quantumfs.ImmutableDirectoryRecord
+	if inode.isOrphaned_() {
+		record = inode.unlinkRecord
+	} else {
+		var dir *Directory
+		parent := inode.parent_(c)
+		if parent.isWorkspaceRoot() {
+			dir = &parent.(*WorkspaceRoot).Directory
+		} else {
+			dir = parent.(*Directory)
+		}
+
+		defer dir.RLock().RUnlock()
+		defer dir.childRecordLock.Lock().Unlock()
+		record = dir.getRecordChildCall_(c, inode.inodeNum())
+	}
+
+	if record == nil {
+		c.wlog("Unable to get record for inode")
+		return nil, fuse.EIO
+	}
+
+	return record.EncodeExtendedKey(), fuse.OK
 }
 
 func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
