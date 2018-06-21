@@ -18,6 +18,15 @@ import (
 
 type InodeId uint64
 
+type refType int
+
+const (
+	refChild     = refType(1 << 0)  // References from children
+	refTransient = refType(1 << 28) // Transient function refs
+	refDirty     = refType(1 << 29) // Reference from dirty queue
+	refLookups   = refType(1 << 30) // LookupCount > 0
+)
+
 // Inode represents a specific path in the tree which updates as the tree itself
 // changes.
 type Inode interface {
@@ -193,8 +202,8 @@ type Inode interface {
 	cleanup(c *ctx)
 
 	// Reference counting to determine when an Inode may become uninstantiated.
-	addRef(c *ctx)
-	delRef(c *ctx)
+	addRef(c *ctx, owner refType)
+	delRef(c *ctx, owner refType)
 }
 
 type inodeHolder interface {
@@ -506,11 +515,11 @@ func (inode *InodeCommon) setParent(c *ctx, newParent Inode) {
 
 // Must be called with parentLock locked for writing
 func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
-	newParent.addRef(c)
+	newParent.addRef(c, refChild)
 
 	if inode.parentId != quantumfs.InodeIdInvalid {
 		oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
-		oldParent.delRef(c)
+		oldParent.delRef(c, refChild)
 	}
 
 	inode.parentId = newParent.inodeNum()
@@ -537,7 +546,7 @@ func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
 
 	oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
-	oldParent.delRef(c)
+	oldParent.delRef(c, refChild)
 
 	inode.parentId = inode.id
 	inode.setChildRecord(c, record)
@@ -787,22 +796,36 @@ func (inode *InodeCommon) cleanup(c *ctx) {
 	// Most inodes have nothing to do here
 }
 
-func (inode *InodeCommon) addRef(c *ctx) {
+// Must hold mapMutex for write.
+func addInodeRef_(c *ctx, inodeId InodeId, owner refType) {
+	refs := c.qfs.inodeRefcounts[inodeId]
+
+	if owner != refChild {
+		if utils.BitFlagsSet(uint(refs), uint(owner)) {
+			c.elog("Special refcount %x already set on inode %d", owner,
+				inodeId)
+			owner = refChild
+		}
+	}
+	c.qfs.inodeRefcounts[inodeId] = refs + int32(owner)
+
+	c.vlog("A: %x refs on inode %d", refs, inodeId)
+}
+
+func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
 		// These Inodes always exist
 		return
 	}
 
 	defer c.qfs.mapMutex.Lock().Unlock()
+	addInodeRef_(c, inode.inodeNum(), owner)
 
-	refs := c.qfs.inodeRefcounts[inode.inodeNum()] + 1
-	c.qfs.inodeRefcounts[inode.inodeNum()] = refs
-
-	c.vlog("A: %d refs on inode %d", refs, inode.inodeNum())
-	utils.Assert(refs > 1, "Increased from zero refcount!")
+	utils.Assert(c.qfs.inodeRefcounts[inode.inodeNum()] > 1,
+		"Increased from zero refcount!")
 }
 
-func (inode *InodeCommon) delRef(c *ctx) {
+func (inode *InodeCommon) delRef(c *ctx, owner refType) {
 	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
 		// These Inodes always exist
 		return
@@ -813,11 +836,20 @@ func (inode *InodeCommon) delRef(c *ctx) {
 	release := func() bool {
 		defer c.qfs.mapMutex.Lock().Unlock()
 
-		refs := c.qfs.inodeRefcounts[inode.inodeNum()] - 1
-		c.qfs.inodeRefcounts[inode.inodeNum()] = refs
+		refs := c.qfs.inodeRefcounts[inode.inodeNum()]
 
-		c.vlog("D: %d refs on inode %d", refs, inode.inodeNum())
-		if refs != 0 {
+		if owner != refChild {
+			if !utils.BitFlagsSet(uint(refs), uint(owner)) {
+				c.elog("Special refcount %x not set on inode %d",
+					owner, inode.inodeNum())
+				owner = refChild
+			}
+		}
+
+		c.qfs.inodeRefcounts[inode.inodeNum()] = refs - int32(owner)
+
+		c.vlog("D: %x refs on inode %d", refs, inode.inodeNum())
+		if refs != int32(owner) {
 			return false
 		}
 
@@ -837,7 +869,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 	// This Inode is now unlisted and unreachable
 
 	if !inode.isOrphaned_() {
-		inode.parent_(c).delRef(c)
+		inode.parent_(c).delRef(c, refChild)
 	}
 
 	if dir, isDir := inode.self.(inodeHolder); isDir {

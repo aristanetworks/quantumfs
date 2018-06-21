@@ -810,7 +810,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 			defer qfs.lookupCountLock.Lock().Unlock()
 			if _, exists := qfs.lookupCounts[id]; !exists {
 				c.vlog("Removing speculative lookup reference")
-				inode.delRef(c)
+				inode.delRef(c, refLookups)
 			} else {
 				c.vlog("Retaining speculative lookup reference")
 			}
@@ -885,7 +885,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	// speculated incorrectly.
 	//
 	// See QuantumFs.inode()
-	qfs.inodeRefcounts[id] = 1
+	addInodeRef_(c, id, refLookups)
 
 	return inode, true
 }
@@ -986,10 +986,8 @@ func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 			defer qfs.mapMutex.Lock().Unlock()
 			inode, _ := qfs.getInode_(c, inodeId)
 			if inode != nil {
-				qfs.inodeRefcounts[inodeId] =
-					qfs.inodeRefcounts[inodeId] + 1
-				refs := c.qfs.inodeRefcounts[inodeId]
-				utils.Assert(refs > 1,
+				addInodeRef_(c, inodeId, refLookups)
+				utils.Assert(c.qfs.inodeRefcounts[inodeId] > 1,
 					"Increased from zero refcount for inode %d!",
 					inodeId)
 			} else {
@@ -1052,7 +1050,7 @@ maybeReleaseRef:
 	if forgotten {
 		inode := qfs.inodeNoInstantiate(c, inodeId)
 		if inode != nil {
-			inode.delRef(c)
+			inode.delRef(c, refLookups)
 		} else {
 			c.vlog(alreadyUninstantiatedLog, inodeId)
 		}
