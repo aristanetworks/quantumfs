@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -400,9 +401,10 @@ type Qlog struct {
 	logBuffer *sharedMemory
 
 	// Maximum level to log to the qlog file
-	maxLevel  uint8
-	filepath  string
-	ErrorExec string
+	maxLevel        uint8
+	filepath        string
+	ErrorExec       string
+	ErrorInProgress uint32
 }
 
 // SetLogLevels stores the provided log level string in the qlog object.
@@ -530,14 +532,28 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 
 		// If this is an error log, we want to take a snapshot of the qlog
 		if level == 0 && q.ErrorExec != "" {
-			q.Sync()
-			args := q.ErrorExec + " " + strconv.Itoa(os.Getpid()) + " " +
-				q.filepath
+			perform := atomic.CompareAndSwapUint32(&q.ErrorInProgress,
+				0, 1)
 
-			// run the command via bash so we don't have to parse and
-			// split the args up to satisfy the Command api
-			cmd := exec.Command("bash", "-c", args)
-			go cmd.Run()
+			// We define this here to save an indent
+			handleError := func() {
+				defer func() {
+					atomic.StoreUint32(&q.ErrorInProgress, 0)
+				}()
+
+				q.Sync()
+				args := q.ErrorExec + " " +
+					strconv.Itoa(os.Getpid()) + " " + q.filepath
+
+				// run the command via sh so we don't have to parse
+				// and split the args up to satisfy the Command api
+				cmd := exec.Command("sh", "-c", args)
+				cmd.Run()
+			}
+
+			if perform {
+				go handleError()
+			}
 		}
 	}
 

@@ -2,12 +2,13 @@
 
 #ADMIN should be the email address of the notifyee
 ADMIN=your@email.com
-#ERROR_DIR should be the path to the folder containing qlog copies, as set by the
-#quantumfs flag -errorDir
+#ERROR_DIR is the destination folder for qlog copies
+ERROR_DIR=/var/log/quantumfs
+#MAX_FILES is the number of files to keep at any time in ERROR_DIR
+MAX_FILES=3
+
 QFS_PID=$1
 QLOG_PATH=$2
-ERROR_DIR=/var/log/quantumfs
-MAX_FILES=3
 COPY_NAME=$(date +%Y-%M-%d_%T.%N).qlog
 
 if [ ! -d "$ERROR_DIR" ]; then
