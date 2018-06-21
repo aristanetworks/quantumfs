@@ -805,7 +805,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	func() {
 		// Maybe give back the speculative lookupCount reference.
 		//
-		// See QuantumFs.inode_(), Directory.create_()
+		// See QuantumFs.inode_()
 		if instantiated {
 			defer qfs.lookupCountLock.Lock().Unlock()
 			if _, exists := qfs.lookupCounts[id]; !exists {
@@ -884,7 +884,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	// from here we will get the lookupCountLock and remove the reference if we
 	// speculated incorrectly.
 	//
-	// See Directory.create_(), QuantumFs.inode()
+	// See QuantumFs.inode()
 	addInodeRef_(c, id, refLookups)
 
 	return inode, true
@@ -1904,17 +1904,7 @@ func getQuantumfsExtendedKey(c *ctx, qfs *QuantumFs, inodeId InodeId) ([]byte,
 	// Update the Hash value before generating the key
 	inode.Sync_DOWN(c)
 
-	defer inode.getParentLock().RLock().RUnlock()
-
-	var dir *Directory
-	parent := inode.parent_(c)
-	if parent.isWorkspaceRoot() {
-		dir = &parent.(*WorkspaceRoot).Directory
-	} else {
-		dir = parent.(*Directory)
-	}
-
-	return dir.generateChildTypeKey_DOWN(c, inode.inodeNum())
+	return inode.getQuantumfsExtendedKey(c)
 }
 
 const GetXAttrDataLog = "Mux::GetXAttrData"

@@ -10,8 +10,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"strings"
-	"time"
 	"unsafe"
 )
 
@@ -19,13 +17,13 @@ const (
 	PacketHeaderLen = 20
 )
 
-type LogStrTrim struct {
+type logStrTrim struct {
 	Text         string
 	LogSubsystem uint8
 	LogLevel     uint8
 }
 
-type Reader struct {
+type reader struct {
 	file *os.File
 
 	headerSize    uint64
@@ -34,46 +32,21 @@ type Reader struct {
 
 	lastPastEndIdx uint64
 
-	strMap         []LogStrTrim
+	strMap         []logStrTrim
 	strMapLastRead uint64
 }
 
-func NewReader(qlogFile string) *Reader {
-	rtn := Reader{
-		headerSize: uint64(unsafe.Sizeof(MmapHeader{})),
-	}
-
-	file, err := os.Open(qlogFile)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to read from qlog file %s: %s",
-			qlogFile, err))
-	}
-
-	rtn.file = file
-	header := rtn.ReadHeader()
-	rtn.circBufSize = header.CircBuf.Size
-
-	rtn.daemonVersion = string(header.DaemonVersion[:])
-	terminatorIdx := strings.Index(rtn.daemonVersion, "\x00")
-	if terminatorIdx != -1 {
-		rtn.daemonVersion = rtn.daemonVersion[:terminatorIdx]
-	}
-
-	rtn.lastPastEndIdx = header.CircBuf.EndIndex()
-	return &rtn
-}
-
-func (read *Reader) readDataBlock(pos uint64, len uint64, outbuf []byte) {
+func (read *reader) readDataBlock(pos uint64, len uint64, outbuf []byte) {
 	_, err := read.file.ReadAt(outbuf[:len], int64(pos+read.headerSize))
 	if err != nil {
 		panic(fmt.Sprintf("Unable to read data from qlog file: %s", err))
 	}
 }
 
-func (read *Reader) RefreshStrMap() {
+func (read *reader) refreshStrMap() {
 	fileOffset := read.headerSize + read.circBufSize
 	if read.strMap == nil {
-		read.strMap = make([]LogStrTrim, 0)
+		read.strMap = make([]logStrTrim, 0)
 	}
 
 	buf := make([]byte, LogStrSize)
@@ -85,7 +58,7 @@ func (read *Reader) RefreshStrMap() {
 			break
 		}
 
-		mapEntry := (*LogStr)(unsafe.Pointer(&buf[0]))
+		mapEntry := (*logStr)(unsafe.Pointer(&buf[0]))
 		if mapEntry.Text[0] == '\x00' {
 			// No more strMap entries filled, stop looping
 			break
@@ -98,7 +71,7 @@ func (read *Reader) RefreshStrMap() {
 			mapBytes = mapBytes[:firstNullTerm]
 		}
 
-		var mapStr LogStrTrim
+		var mapStr logStrTrim
 		mapStr.LogSubsystem = mapEntry.LogSubsystem
 		mapStr.LogLevel = mapEntry.LogLevel
 		mapStr.Text = string(mapBytes) + "\n"
@@ -108,7 +81,7 @@ func (read *Reader) RefreshStrMap() {
 	}
 }
 
-func (read *Reader) ReadHeader() *MmapHeader {
+func (read *reader) readHeader() *mmapHeader {
 	headerData := make([]byte, read.headerSize)
 	_, err := read.file.ReadAt(headerData, 0)
 	if err != nil {
@@ -116,55 +89,15 @@ func (read *Reader) ReadHeader() *MmapHeader {
 			err))
 	}
 
-	return ExtractHeader(headerData)
-}
-
-type LogProcessMode int
-
-const (
-	TailOnly LogProcessMode = iota
-	ReadOnly
-	ReadThenTail
-)
-
-func (read *Reader) DaemonVersion() string {
-	return read.daemonVersion
-}
-
-func (read *Reader) ProcessLogs(mode LogProcessMode, fxn func(*LogOutput)) {
-	if mode == ReadThenTail || mode == ReadOnly {
-		freshHeader := read.ReadHeader()
-		newLogs, newIdx := read.parseOld(freshHeader.CircBuf.EndIndex())
-
-		read.lastPastEndIdx = newIdx
-		for _, v := range newLogs {
-			fxn(v)
-		}
-
-		// we may be done
-		if mode == ReadOnly {
-			return
-		}
+	header, err := ExtractHeader(headerData)
+	if err != nil {
+		panic(err)
 	}
 
-	// Run indefinitely
-	for {
-		freshHeader := read.ReadHeader()
-		if freshHeader.CircBuf.EndIndex() != read.lastPastEndIdx {
-			newLogs, newPastEndIdx := read.parse(read.lastPastEndIdx,
-				freshHeader.CircBuf.EndIndex())
-
-			read.lastPastEndIdx = newPastEndIdx
-			for _, v := range newLogs {
-				fxn(v)
-			}
-		}
-
-		time.Sleep(10 * time.Millisecond)
-	}
+	return header
 }
 
-func (read *Reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
+func (read *reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
 	haveReadTo uint64) {
 
 	logs = make([]*LogOutput, 0, 1000000)
@@ -179,7 +112,7 @@ func (read *Reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
 		// Read the packet size from file
 		lengthData := read.wrapRead(readTo-2, 2)
 		packetLen := *(*uint16)(unsafe.Pointer(&lengthData[0]))
-		packetLen &= ^(uint16(entryCompleteBit))
+		packetLen &= ^(uint16(EntryCompleteBit))
 
 		// If we reach a packet of insufficient length, then we're done
 		if packetLen == 0 {
@@ -202,8 +135,8 @@ func (read *Reader) parseOld(pastEndIdx uint64) (logs []*LogOutput,
 		wrapMinusEquals(&readTo, uint64(packetLen), read.circBufSize)
 
 		// Read the header to see if the log end just passed us as we parsed
-		freshHeader := read.ReadHeader()
-		newDistanceToEnd := wrapMinus(readTo, freshHeader.CircBuf.EndIndex(),
+		freshHeader := read.readHeader()
+		newDistanceToEnd := wrapMinus(readTo, freshHeader.CircBuf.endIndex(),
 			read.circBufSize)
 
 		// Distance to the moving end of logs should be decreasing. The
@@ -240,7 +173,7 @@ func reverseLogSlice(in []*LogOutput) []*LogOutput {
 	return logs
 }
 
-func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []*LogOutput,
+func (read *reader) parse(readFrom uint64, readTo uint64) (logs []*LogOutput,
 	haveReadTo uint64) {
 
 	logs = make([]*LogOutput, 0, 1000)
@@ -291,7 +224,7 @@ func (read *Reader) parse(readFrom uint64, readTo uint64) (logs []*LogOutput,
 	return logs, pastEndIdx
 }
 
-func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, *LogOutput,
+func (read *reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, *LogOutput,
 	bool) {
 
 	if pastEndIdx < 2 {
@@ -300,10 +233,10 @@ func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, *LogOutpu
 	}
 
 	var packetLen uint16
-	readBack(&pastEndIdx, data, packetLen, &packetLen)
+	ReadBack(&pastEndIdx, data, packetLen, &packetLen)
 
-	packetReady := ((packetLen & uint16(entryCompleteBit)) != 0)
-	packetLen &= ^(uint16(entryCompleteBit))
+	packetReady := ((packetLen & uint16(EntryCompleteBit)) != 0)
+	packetLen &= ^(uint16(EntryCompleteBit))
 
 	if uint64(len(data)) < pastEndIdx || pastEndIdx < uint64(packetLen) ||
 		packetLen < PacketHeaderLen {
@@ -323,7 +256,7 @@ func (read *Reader) readLogAt(data []byte, pastEndIdx uint64) (uint64, *LogOutpu
 	return 2 + uint64(packetLen), output, true
 }
 
-func (read *Reader) dataToLog(packetData []byte) *LogOutput {
+func (read *reader) dataToLog(packetData []byte) *LogOutput {
 	var numFields uint16
 	var strMapId uint16
 	var reqId uint64
@@ -360,7 +293,7 @@ func (read *Reader) dataToLog(packetData []byte) *LogOutput {
 
 	// Grab the string and output
 	if int(strMapId) >= len(read.strMap) {
-		read.RefreshStrMap()
+		read.refreshStrMap()
 
 		if int(strMapId) >= len(read.strMap) {
 			rtn = newLog(LogQlog, QlogReqId, 0,
@@ -377,7 +310,7 @@ func (read *Reader) dataToLog(packetData []byte) *LogOutput {
 	return &rtn
 }
 
-func (read *Reader) wrapRead(idx uint64, num uint64) []byte {
+func (read *reader) wrapRead(idx uint64, num uint64) []byte {
 	rtn := make([]byte, num)
 
 	if idx+num > read.circBufSize {
