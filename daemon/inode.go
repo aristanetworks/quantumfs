@@ -120,8 +120,8 @@ type Inode interface {
 	// parent Inode returned must only be used while that lock is held
 	parentId_() InodeId
 	parent_(c *ctx) Inode
-	setParent(newParent InodeId)
-	setParent_(newParent InodeId)
+	setParent(c *ctx, newParent Inode)
+	setParent_(c *ctx, newParent Inode)
 	getParentLock() *utils.DeferableRwMutex
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
@@ -498,43 +498,15 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	}
 }
 
-func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) {
-	defer inode.getParentLock().RLock().RUnlock()
-
-	var record quantumfs.ImmutableDirectoryRecord
-	if inode.isOrphaned_() {
-		record = inode.unlinkRecord
-	} else {
-		var dir *Directory
-		parent := inode.parent_(c)
-		if parent.isWorkspaceRoot() {
-			dir = &parent.(*WorkspaceRoot).Directory
-		} else {
-			dir = parent.(*Directory)
-		}
-
-		defer dir.RLock().RUnlock()
-		defer dir.childRecordLock.Lock().Unlock()
-		record = dir.getRecordChildCall_(c, inode.inodeNum())
-	}
-
-	if record == nil {
-		c.wlog("Unable to get record for inode")
-		return nil, fuse.EIO
-	}
-
-	return record.EncodeExtendedKey(), fuse.OK
-}
-
-func (inode *InodeCommon) setParent(newParent InodeId) {
+func (inode *InodeCommon) setParent(c *ctx, newParent Inode) {
 	defer inode.parentLock.Lock().Unlock()
+	inode.setParent_(c, newParent)
 
-	inode.parentId = newParent
 }
 
 // Must be called with parentLock locked for writing
-func (inode *InodeCommon) setParent_(newParent InodeId) {
-	inode.parentId = newParent
+func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
+	inode.parentId = newParent.inodeNum()
 }
 
 func (inode *InodeCommon) getParentLock() *utils.DeferableRwMutex {
@@ -609,6 +581,34 @@ func (inode *InodeCommon) markUnclean_(dirtyElement *list.Element) (already bool
 		return false
 	}
 	return true
+}
+
+func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) {
+	defer inode.getParentLock().RLock().RUnlock()
+
+	var record quantumfs.ImmutableDirectoryRecord
+	if inode.isOrphaned_() {
+		record = inode.unlinkRecord
+	} else {
+		var dir *Directory
+		parent := inode.parent_(c)
+		if parent.isWorkspaceRoot() {
+			dir = &parent.(*WorkspaceRoot).Directory
+		} else {
+			dir = parent.(*Directory)
+		}
+
+		defer dir.RLock().RUnlock()
+		defer dir.childRecordLock.Lock().Unlock()
+		record = dir.getRecordChildCall_(c, inode.inodeNum())
+	}
+
+	if record == nil {
+		c.wlog("Unable to get record for inode")
+		return nil, fuse.EIO
+	}
+
+	return record.EncodeExtendedKey(), fuse.OK
 }
 
 func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,

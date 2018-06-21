@@ -70,10 +70,10 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 
 	typespaceList := NewTypespaceList()
 	qfs.inodes[quantumfs.InodeIdRoot] = typespaceList
-	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(typespaceList.treeState(),
-		typespaceList.inodeNum())
-	qfs.inodes[quantumfs.InodeIdLowMemMarker] = NewLowMemFile(
-		typespaceList.treeState(), typespaceList.inodeNum())
+	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(&qfs.c,
+		typespaceList.treeState(), typespaceList)
+	qfs.inodes[quantumfs.InodeIdLowMemMarker] = NewLowMemFile(&qfs.c,
+		typespaceList.treeState(), typespaceList)
 	return qfs
 }
 

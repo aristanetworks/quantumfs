@@ -72,8 +72,8 @@ type HardlinkTable interface {
 		record quantumfs.DirectoryRecord) *HardlinkLeg
 	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
 	nlinks(fileId quantumfs.FileId) uint32
-	claimAsChild_(inode Inode)
-	claimAsChild(inode Inode)
+	claimAsChild_(c *ctx, inode Inode)
+	claimAsChild(c *ctx, inode Inode)
 	getWorkspaceRoot() *WorkspaceRoot
 	apply(c *ctx, hardlinkDelta *HardlinkDelta)
 	getNormalized(fileId quantumfs.FileId) (
@@ -123,13 +123,12 @@ func newHardlinkTable(c *ctx, wsr *WorkspaceRoot,
 }
 
 // Must be called with inode's parentLock locked for writing
-func (ht *HardlinkTableImpl) claimAsChild_(inode Inode) {
-	inode.setParent_(ht.getWorkspaceRoot().inodeNum())
+func (ht *HardlinkTableImpl) claimAsChild_(c *ctx, inode Inode) {
+	inode.setParent_(c, ht.getWorkspaceRoot())
 }
 
-func (ht *HardlinkTableImpl) claimAsChild(inode Inode) {
-	defer inode.getParentLock().Lock().Unlock()
-	inode.setParent_(ht.getWorkspaceRoot().inodeNum())
+func (ht *HardlinkTableImpl) claimAsChild(c *ctx, inode Inode) {
+	inode.setParent(c, ht.getWorkspaceRoot())
 }
 
 func (ht *HardlinkTableImpl) getWorkspaceRoot() *WorkspaceRoot {

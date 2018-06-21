@@ -18,7 +18,7 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-func NewApiInode(treeState *TreeState, parent InodeId) Inode {
+func NewApiInode(c *ctx, treeState *TreeState, parent Inode) Inode {
 	api := ApiInode{
 		InodeCommon: InodeCommon{
 			id:         quantumfs.InodeIdApi,
@@ -27,7 +27,7 @@ func NewApiInode(treeState *TreeState, parent InodeId) Inode {
 		},
 	}
 	api.self = &api
-	api.setParent(parent)
+	api.setParent(c, parent)
 	utils.Assert(api.treeState() != nil, "ApiInode treeState is nil at init")
 	return &api
 }
