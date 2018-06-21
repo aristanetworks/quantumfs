@@ -15,3 +15,5 @@
 .*.swp
 .swp
 /wsdbhealthcheck
+libqfs.*
+libqfs32.*

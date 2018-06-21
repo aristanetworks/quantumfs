@@ -313,14 +313,15 @@ func (th *TestHelper) messagesInTestLog(logs []TLA) []int {
 	th.Assert(err == 0, "Sync failed with errno %d", err)
 
 	logFile := th.TempDir + "/ramfs/qlog"
-	logLines := qlog.ParseLogsRaw(logFile)
+	logLines, parseErr := qlog.ParseLogsRaw(logFile)
+	utils.AssertNoErr(parseErr)
 
 	nLines := 0
 	nFound := make([]int, len(logs))
 
 	for _, rawlog := range logLines {
 		nLines++
-		logOutput := rawlog.ToString()
+		logOutput := rawlog.String()
 		for idx, tla := range logs {
 			exists := strings.Contains(logOutput, tla.Text)
 			if exists {
@@ -586,14 +587,15 @@ func ShowSummary() {
 
 func OutputLogError(errInfo LogscanError) (summary string) {
 	errors := make([]string, 0, 10)
-	testOutputRaw := qlog.ParseLogsRaw(errInfo.LogFile)
+	testOutputRaw, err := qlog.ParseLogsRaw(errInfo.LogFile)
+	utils.AssertNoErr(err)
 	sort.Sort(qlog.SortByTimePtr(testOutputRaw))
 
 	var buffer bytes.Buffer
 
 	extraLines := 0
 	for _, rawLine := range testOutputRaw {
-		line := rawLine.ToString()
+		line := rawLine.String()
 		buffer.WriteString(line)
 
 		if strings.Contains(line, "PANIC") ||
