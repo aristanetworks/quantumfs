@@ -8,6 +8,7 @@ PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/grpc
 PKGS_TO_TEST+=quantumfs/grpc/server quantumfs/qlogstats
 PKGS_TO_TEST+=quantumfs/cmd/qupload
+LIBRARIES=libqfs.so libqfs.h libqfs32.so libqfs32.h
 
 # It's common practice to use a 'v' prefix on tags, but the prefix should be
 # removed when making the RPM version string.
@@ -28,7 +29,7 @@ RPM_RELEASE := 1
 all: lockcheck cppstyle vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) wsdbservice qfsclient
 
 clean:
-	rm -f $(COMMANDS) $(COMMANDS386) $(COMMANDS_STATIC)
+	rm -f $(COMMANDS) $(COMMANDS386) $(COMMANDS_STATIC) $(LIBRARIES)
 
 # Vendored dependency management
 #
@@ -79,6 +80,12 @@ encoding/metadata.capnp.go: encoding/metadata.capnp
 
 grpc/rpc/rpc.pb.go: grpc/rpc/rpc.proto
 	protoc -I grpc/rpc/ grpc/rpc/rpc.proto --go_out=plugins=grpc:grpc/rpc
+
+libqfs32.so:
+	CGO_ENABLED=1 GOARCH=386 go build -buildmode=c-shared -o libqfs32.so libqfs/wrapper/libqfs.go
+
+libqfs.so: libqfs/wrapper/libqfs.go
+	CGO_ENABLED=1 go build -buildmode=c-shared -o libqfs.so libqfs/wrapper/libqfs.go
 
 $(COMMANDS): encoding/metadata.capnp.go
 	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
@@ -197,13 +204,15 @@ clientRPM: check-fpm qfsclient
 		--depends jansson \
 		--depends openssl \
 		--depends libstdc++ \
-		QFSClient/libqfsclient.so=$(RPM_LIBDIR)/libqfsclient.so
+		QFSClient/libqfsclient.so=$(RPM_LIBDIR)/libqfsclient.so \
+		libqfs.so
 	$(FPM) -n $(RPM_BASENAME_CLIENT_DEVEL) \
 		--description='Development files for QuantumFS client API' \
 		--depends $(RPM_BASENAME_CLIENT) \
-		QFSClient/qfs_client.h=/usr/include/qfs_client.h
+		QFSClient/qfs_client.h=/usr/include/qfs_client.h \
+		libqfs.h
 
-clientRPM32:
+clientRPM32: check-fpm libqfs32.so
 	@echo "Building i686 RPMs using mock. This can take several minutes"
 	{ \
 		set -e ; \
@@ -214,7 +223,10 @@ clientRPM32:
 			mock -r fedora-18-i386 --install sudo procps-ng git gtest-devel jansson-devel openssl-devel ruby-devel rubygems ; \
 			mock -r fedora-18-i386 --shell "sudo gem install --no-ri --no-rdoc fpm" ; \
 			mock -r fedora-18-i386 --copyin . /quantumfs ; \
-			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clean clientRPM RPM_LIBDIR=/usr/lib" ; \
+			mock -r fedora-18-i386 --shell "cd /quantumfs && make clean" ; \
+			mock -r fedora-18-i386 --copyin ./libqfs32.so /quantumfs/libqfs.so ; \
+			mock -r fedora-18-i386 --copyin ./libqfs32.h /quantumfs/libqfs.h ; \
+			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clientRPM RPM_LIBDIR=/usr/lib" ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT).i686.rpm . ; \
 			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT_DEVEL).i686.rpm . ; \
 			mock -r fedora-18-i386 --clean ; \

@@ -51,7 +51,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		}
 
 		// We need to reparent under the srcInode lock
-		dir.hardlinkTable.claimAsChild_(srcInode)
+		dir.hardlinkTable.claimAsChild_(c, srcInode)
 
 		return newRecord, needsSync, fuse.OK
 	}()
@@ -121,30 +121,6 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	dir.flush(c)
 
 	return fuse.OK
-}
-
-// Return extended key by combining ObjectKey, inode type, and inode size
-func (dir *Directory) generateChildTypeKey_DOWN(c *ctx, inodeNum InodeId) ([]byte,
-	fuse.Status) {
-
-	defer c.FuncIn("Directory::generateChildTypeKey_DOWN", "inode %d",
-		inodeNum).Out()
-
-	// We hold the exclusive tree lock and so cannot be racing against another
-	// access. Thus it is safe to assume nothing has changed between the flush in
-	// our caller and the lock grab in getRecordChildCall_() below.
-	defer dir.RLock().RUnlock()
-	defer dir.childRecordLock.Lock().Unlock()
-
-	record := dir.getRecordChildCall_(c, inodeNum)
-	if record == nil {
-		c.elog("Unable to get record from parent for inode %s", inodeNum)
-		return nil, fuse.EIO
-	}
-
-	typeKey := record.EncodeExtendedKey()
-
-	return typeKey, fuse.OK
 }
 
 // The returned cleanup function of terminal directory should be called at the end of
@@ -256,7 +232,7 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
 		if inode != nil {
-			inode.setParent(dir.inodeNum())
+			inode.setParent(c, dir)
 		}
 		return remoteRecord
 	}
@@ -268,7 +244,7 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 	if inode != nil {
 		func() {
 			defer inode.getParentLock().Lock().Unlock()
-			dir.hardlinkTable.claimAsChild_(inode)
+			dir.hardlinkTable.claimAsChild_(c, inode)
 		}()
 	}
 	return newHardlinkLeg(localRecord.Filename(), fileId,

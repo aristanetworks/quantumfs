@@ -18,6 +18,15 @@ import (
 
 type InodeId uint64
 
+type refType int
+
+const (
+	refChild     = refType(1 << 0)  // References from children
+	refTransient = refType(1 << 28) // Transient function refs
+	refDirty     = refType(1 << 29) // Reference from dirty queue
+	refLookups   = refType(1 << 30) // LookupCount > 0
+)
+
 // Inode represents a specific path in the tree which updates as the tree itself
 // changes.
 type Inode interface {
@@ -120,8 +129,8 @@ type Inode interface {
 	// parent Inode returned must only be used while that lock is held
 	parentId_() InodeId
 	parent_(c *ctx) Inode
-	setParent(newParent InodeId)
-	setParent_(newParent InodeId)
+	setParent(c *ctx, newParent Inode)
+	setParent_(c *ctx, newParent Inode)
 	getParentLock() *utils.DeferableRwMutex
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
@@ -155,16 +164,14 @@ type Inode interface {
 		owner fuse.Owner)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
 
+	getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status)
+
 	isDirty_(c *ctx) bool      // Returns true if the inode is dirty
 	dirty(c *ctx)              // Mark this Inode dirty
 	dirty_(c *ctx)             // Mark this Inode dirty
 	markClean_() *list.Element // Mark this Inode as cleaned
 	// Undo marking the inode as clean
 	markUnclean_(dirtyElement *list.Element) bool
-
-	// The kernel has forgotten about this Inode. Add yourself to the list to be
-	// flushed and forgotten.
-	queueToForget(c *ctx)
 
 	// Returns this inode's place in the dirtyQueue
 	dirtyElement_() *list.Element
@@ -193,6 +200,10 @@ type Inode interface {
 	// cleanup which is necessary, but it is possible for the Inode to be
 	// accessed after cleanup() has completed.
 	cleanup(c *ctx)
+
+	// Reference counting to determine when an Inode may become uninstantiated.
+	addRef(c *ctx, owner refType)
+	delRef(c *ctx, owner refType)
 }
 
 type inodeHolder interface {
@@ -312,6 +323,10 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	// We want to ensure that the orphan check and the parent sync are done
 	// under the same lock
 	if inode.isOrphaned_() {
+		// Still run the publish function to ensure the datastore contains
+		// updated contents. Our workspace may no longer care about our data,
+		// but someone else may.
+		publishFn()
 		c.vlog("Not flushing orphaned inode")
 		return
 	}
@@ -492,15 +507,23 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	}
 }
 
-func (inode *InodeCommon) setParent(newParent InodeId) {
+func (inode *InodeCommon) setParent(c *ctx, newParent Inode) {
 	defer inode.parentLock.Lock().Unlock()
+	inode.setParent_(c, newParent)
 
-	inode.parentId = newParent
 }
 
 // Must be called with parentLock locked for writing
-func (inode *InodeCommon) setParent_(newParent InodeId) {
-	inode.parentId = newParent
+func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
+	newParent.addRef(c, refChild)
+
+	if inode.parentId != quantumfs.InodeIdInvalid {
+		oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
+		oldParent.delRef(c, refChild)
+	}
+
+	inode.parentId = newParent.inodeNum()
+	utils.Assert(inode.id != inode.parentId, "Orphaned via setParent_()")
 }
 
 func (inode *InodeCommon) getParentLock() *utils.DeferableRwMutex {
@@ -521,6 +544,9 @@ func (inode *InodeCommon) orphan(c *ctx, record quantumfs.DirectoryRecord) {
 // parentLock must be Locked
 func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
+
+	oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
+	oldParent.delRef(c, refChild)
 
 	inode.parentId = inode.id
 	inode.setChildRecord(c, record)
@@ -555,7 +581,7 @@ func (inode *InodeCommon) dirty(c *ctx) {
 func (inode *InodeCommon) dirty_(c *ctx) {
 	if inode.dirtyElement__ == nil {
 		c.vlog("Queueing inode %d on dirty list", inode.id)
-		inode.dirtyElement__ = c.qfs.queueDirtyInode_(c, inode.self)
+		inode.dirtyElement__ = c.qfs.flusher.queueDirtyInode_(c, inode.self)
 	}
 }
 
@@ -577,6 +603,34 @@ func (inode *InodeCommon) markUnclean_(dirtyElement *list.Element) (already bool
 	return true
 }
 
+func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) {
+	defer inode.getParentLock().RLock().RUnlock()
+
+	var record quantumfs.ImmutableDirectoryRecord
+	if inode.isOrphaned_() {
+		record = inode.unlinkRecord
+	} else {
+		var dir *Directory
+		parent := inode.parent_(c)
+		if parent.isWorkspaceRoot() {
+			dir = &parent.(*WorkspaceRoot).Directory
+		} else {
+			dir = parent.(*Directory)
+		}
+
+		defer dir.RLock().RUnlock()
+		defer dir.childRecordLock.Lock().Unlock()
+		record = dir.getRecordChildCall_(c, inode.inodeNum())
+	}
+
+	if record == nil {
+		c.wlog("Unable to get record for inode")
+		return nil, fuse.EIO
+	}
+
+	return record.EncodeExtendedKey(), fuse.OK
+}
+
 func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 	newKey quantumfs.ObjectKey, hardlinkDelta *HardlinkDelta) {
 
@@ -586,14 +640,6 @@ func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 
 func (inode *InodeCommon) finishInit(c *ctx) []inodePair {
 	return nil
-}
-
-func (inode *InodeCommon) queueToForget(c *ctx) {
-	defer c.funcIn("InodeCommon::queueToForget").Out()
-
-	defer c.qfs.flusher.lock.Lock().Unlock()
-	de := c.qfs.queueInodeToForget_(c, inode.self)
-	inode.dirtyElement__ = de
 }
 
 // flusher lock must be locked when calling this function
@@ -748,6 +794,94 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 func (inode *InodeCommon) cleanup(c *ctx) {
 	defer c.funcIn("InodeCommon::cleanup").Out()
 	// Most inodes have nothing to do here
+}
+
+// Must hold mapMutex for write.
+func addInodeRef_(c *ctx, inodeId InodeId, owner refType) {
+	refs := c.qfs.inodeRefcounts[inodeId]
+
+	if owner != refChild {
+		if utils.BitFlagsSet(uint(refs), uint(owner)) {
+			c.elog("Special refcount %x already set on inode %d", owner,
+				inodeId)
+			owner = refChild
+		}
+	}
+	c.qfs.inodeRefcounts[inodeId] = refs + int32(owner)
+
+	c.vlog("A: %x refs on inode %d", refs, inodeId)
+}
+
+func (inode *InodeCommon) addRef(c *ctx, owner refType) {
+	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
+		// These Inodes always exist
+		return
+	}
+
+	defer c.qfs.mapMutex.Lock().Unlock()
+	addInodeRef_(c, inode.inodeNum(), owner)
+
+	utils.Assert(c.qfs.inodeRefcounts[inode.inodeNum()] > 1,
+		"Increased from zero refcount!")
+}
+
+func (inode *InodeCommon) delRef(c *ctx, owner refType) {
+	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
+		// These Inodes always exist
+		return
+	}
+
+	defer inode.parentLock.Lock().Unlock()
+
+	release := func() bool {
+		defer c.qfs.mapMutex.Lock().Unlock()
+
+		refs := c.qfs.inodeRefcounts[inode.inodeNum()]
+
+		if owner != refChild {
+			if !utils.BitFlagsSet(uint(refs), uint(owner)) {
+				c.elog("Special refcount %x not set on inode %d",
+					owner, inode.inodeNum())
+				owner = refChild
+			}
+		}
+
+		c.qfs.inodeRefcounts[inode.inodeNum()] = refs - int32(owner)
+
+		c.vlog("D: %x refs on inode %d", refs, inode.inodeNum())
+		if refs != int32(owner) {
+			return false
+		}
+
+		c.vlog("Uninstantiating inode %d", inode.inodeNum())
+
+		c.qfs.setInode_(c, inode.inodeNum(), nil)
+		delete(c.qfs.inodeRefcounts, inode.inodeNum())
+
+		c.qfs.addUninstantiated_(c, []inodePair{
+			newInodePair(inode.inodeNum(), inode.parentId_())})
+		return true
+	}()
+	if !release {
+		return
+	}
+
+	// This Inode is now unlisted and unreachable
+
+	if !inode.isOrphaned_() {
+		inode.parent_(c).delRef(c, refChild)
+	}
+
+	if dir, isDir := inode.self.(inodeHolder); isDir {
+		inodeChildren := make([]InodeId, 0, 200)
+		dir.foreachDirectInode(c, func(i InodeId) bool {
+			inodeChildren = append(inodeChildren, i)
+			return true
+		})
+		c.qfs.removeUninstantiated(c, inodeChildren)
+	}
+
+	inode.cleanup(c)
 }
 
 func reload(c *ctx, hardlinkTable HardlinkTable, rc *RefreshContext, inode Inode,

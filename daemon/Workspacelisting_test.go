@@ -160,7 +160,7 @@ func TestWorkspaceDeletionManualForget(t *testing.T) {
 
 		// Check to ensure that the kernel is still able to Forget it
 		test.qfs.Forget(uint64(workspaceInodeId), 1)
-		test.TestLogDoesNotContain(fmt.Sprintf(skipForgetLog,
+		test.TestLogDoesNotContain(fmt.Sprintf(alreadyUninstantiatedLog,
 			workspaceInodeId))
 		defer test.qfs.incrementLookupCount(test.newCtx(), workspaceInodeId)
 	})

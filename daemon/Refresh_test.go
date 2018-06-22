@@ -66,6 +66,12 @@ func refreshTest(ctx *ctx, test *testHelper, workspace string,
 	workspaceName := ts + "/" + ns + "/" + ws
 	test.markImmutable(ctx, workspaceName)
 	test.remountFilesystem()
+
+	// Ensure the WSR is instantiated over the refresh
+	dir, err := os.Open(workspace)
+	test.AssertNoErr(err)
+	defer dir.Close()
+
 	test.advanceWorkspace(workspaceName, nonce, src, dst)
 	test.WaitForRefreshTo(workspaceName, dst)
 	test.markMutable(ctx, workspaceName)
