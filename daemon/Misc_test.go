@@ -10,6 +10,7 @@ import (
 	"os"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/quantumfs/testutils"
 )
@@ -82,5 +83,22 @@ func TestWorkspacePubSubCallback(t *testing.T) {
 
 		test.WaitForLogString("Mux::handleWorkspaceChanges",
 			"Workspace pubsub callback to be called")
+	})
+}
+
+func TestInodeIdsIncrementing(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ids := newInodeIds(100 * time.Millisecond)
+		test.Assert(ids.newInodeId() == 4, "Wrong 1st inodeId given")
+		test.Assert(ids.newInodeId() == 5, "Wrong 2nd inodeId given")
+		test.Assert(ids.newInodeId() == 6, "Wrong 3rd inodeId given")
+
+		ids.releaseInodeId(4)
+		time.Sleep(50 * time.Millisecond)
+		test.Assert(ids.newInodeId() == 7, "Wrong next id during delay")
+		time.Sleep(60 * time.Millisecond)
+
+		test.Assert(ids.newInodeId() == 4, "Didn't get to reuse 1st id")
+		test.Assert(ids.newInodeId() == 8, "Wrong next id")
 	})
 }

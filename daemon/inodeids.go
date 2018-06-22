@@ -18,7 +18,7 @@ type reusableId struct {
 
 func newInodeIds(delay time.Duration) *inodeIds {
 	return &inodeIds{
-		highMark:      quantumfs.InodeIdReservedEnd,
+		highMark:      quantumfs.InodeIdReservedEnd + 1,
 		reusableMap:   make(map[InodeId]struct{}),
 		reusableDelay: delay,
 	}

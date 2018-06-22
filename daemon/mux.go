@@ -950,6 +950,7 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 
 	for _, inodeNum := range uninstantiated {
 		delete(qfs.parentOfUninstantiated, inodeNum)
+		qfs.releaseInodeId(inodeNum)
 		c.vlog("Removing uninstantiated %d (%d)", inodeNum,
 			len(qfs.parentOfUninstantiated))
 	}
