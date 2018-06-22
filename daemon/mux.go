@@ -41,7 +41,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
 		inodeRefcounts:         make(map[InodeId]int32),
-		inodeIds:               newInodeIds(time.Minute),
+		inodeIds:               newInodeIds(time.Minute, time.Minute*5),
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
 		parentOfUninstantiated: make(map[InodeId]InodeId),

@@ -16,9 +16,10 @@ type reusableId struct {
 	usable time.Time
 }
 
-func newInodeIds(delay time.Duration) *inodeIds {
+func newInodeIds(delay time.Duration, gbPeriod time.Duration) *inodeIds {
 	return &inodeIds{
 		highMark:      quantumfs.InodeIdReservedEnd + 1,
+		gbPeriod:      gbPeriod,
 		reusableMap:   make(map[InodeId]struct{}),
 		reusableDelay: delay,
 	}
@@ -26,6 +27,9 @@ func newInodeIds(delay time.Duration) *inodeIds {
 
 type inodeIds struct {
 	highMark uint64
+	// The last time of garbage collection or a change in highMark
+	lastEvent time.Time
+	gbPeriod  time.Duration
 
 	reusableIds list.List
 	reusableMap map[InodeId]struct{}
@@ -37,6 +41,8 @@ type inodeIds struct {
 
 func (ids *inodeIds) newInodeId() InodeId {
 	defer ids.lock.Lock().Unlock()
+
+	ids.garbageCollect_()
 
 	for {
 		nextIdElem := ids.reusableIds.Front()
@@ -70,6 +76,8 @@ func (ids *inodeIds) newInodeId() InodeId {
 func (ids *inodeIds) releaseInodeId(id InodeId) {
 	defer ids.lock.Lock().Unlock()
 
+	ids.garbageCollect_()
+
 	if uint64(id) >= ids.highMark {
 		// garbage collect this id
 		return
@@ -78,8 +86,20 @@ func (ids *inodeIds) releaseInodeId(id InodeId) {
 	ids.push_(id)
 }
 
+func (ids *inodeIds) garbageCollect_() {
+	if time.Since(ids.lastEvent) > ids.gbPeriod {
+		ids.lastEvent = ids.lastEvent.Add(ids.gbPeriod)
+		ids.highMark = uint64(0.9 * float64(ids.highMark))
+		if ids.highMark < quantumfs.InodeIdReservedEnd+1 {
+			ids.highMark = quantumfs.InodeIdReservedEnd + 1
+		}
+	}
+}
+
 // ids.lock must be locked
 func (ids *inodeIds) allocateFreshId_() InodeId {
+	ids.lastEvent = time.Now()
+
 	for {
 		nextId := InodeId(ids.highMark)
 		ids.highMark++

@@ -88,7 +88,7 @@ func TestWorkspacePubSubCallback(t *testing.T) {
 
 func TestInodeIdsIncrementing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		ids := newInodeIds(100 * time.Millisecond)
+		ids := newInodeIds(100*time.Millisecond, time.Second)
 		test.Assert(ids.newInodeId() == 4, "Wrong 1st inodeId given")
 		test.Assert(ids.newInodeId() == 5, "Wrong 2nd inodeId given")
 		test.Assert(ids.newInodeId() == 6, "Wrong 3rd inodeId given")
@@ -100,5 +100,44 @@ func TestInodeIdsIncrementing(t *testing.T) {
 
 		test.Assert(ids.newInodeId() == 4, "Didn't get to reuse 1st id")
 		test.Assert(ids.newInodeId() == 8, "Wrong next id")
+	})
+}
+
+func TestInodeIdsGarbageCollection(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		ids := newInodeIds(time.Millisecond, 100*time.Millisecond)
+
+		allocated := make([]InodeId, 100, 100)
+		for i := 0; i < 100; i++ {
+			allocated[i] = ids.newInodeId()
+		}
+
+		for i := 0; i < 100; i++ {
+			ids.releaseInodeId(allocated[i])
+		}
+
+		time.Sleep(time.Millisecond * 10)
+
+		func() {
+			defer ids.lock.Lock().Unlock()
+			test.Assert(ids.highMark == 104,
+				"Garbage collection happened too soon")
+		}()
+
+		time.Sleep(time.Millisecond * 100)
+
+		// go through all the ids and ensure that we garbage collected
+		for i := 0; i < 90; i++ {
+			ids.newInodeId()
+		}
+
+		func() {
+			defer ids.lock.Lock().Unlock()
+			test.Assert(ids.highMark == 94,
+				"Garbage collection happened too soon")
+		}()
+
+		test.Assert(ids.newInodeId() == 94,
+			"inodeIds didn't resume counting after GB")
 	})
 }
