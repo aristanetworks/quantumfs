@@ -41,7 +41,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
 		inodeRefcounts:         make(map[InodeId]int32),
-		inodeNum:               quantumfs.InodeIdReservedEnd,
+		inodeIds:               newInodeIds(time.Minute),
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
@@ -114,7 +114,7 @@ type QuantumFs struct {
 	fuse.RawFileSystem
 	server        *fuse.Server
 	config        QuantumFsConfig
-	inodeNum      uint64
+	inodeIds      *inodeIds
 	fileHandleNum uint64
 	c             ctx
 
@@ -1093,7 +1093,12 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 
 // Retrieve a unique inode number
 func (qfs *QuantumFs) newInodeId() InodeId {
-	return InodeId(atomic.AddUint64(&qfs.inodeNum, 1))
+	return qfs.inodeIds.newInodeId()
+}
+
+// Free a now unused inode id
+func (qfs *QuantumFs) releaseInodeId(id InodeId) {
+	qfs.inodeIds.releaseInodeId(id)
 }
 
 // Retrieve a unique filehandle number
