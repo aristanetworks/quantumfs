@@ -471,21 +471,8 @@ func expandBuffer(buf []byte, howMuch int) []byte {
 
 const sliceOfBytesKind = (reflect.Slice << 16) | reflect.Uint8
 
-func newSharedMemory(dir string, filename string, mmapTotalSize int,
+func newSharedMemory(filepath string, mmapTotalSize int,
 	daemonVersion string, errOut *Qlog) (*sharedMemory, error) {
-
-	if dir == "" || filename == "" {
-		return nil, nil
-	}
-
-	// Create a file and its path to be mmap'd
-	err := os.MkdirAll(dir, 0777)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to ensure log file path exists: %s",
-			dir)
-	}
-
-	filepath := dir + string(os.PathSeparator) + filename
 
 	// Unlink any existing qlog file so we don't risk two processes both writing
 	// to the same log.
@@ -648,6 +635,10 @@ func (mem *sharedMemory) computePacketSize(format string, kinds []reflect.Kind,
 }
 
 func (mem *sharedMemory) sync() int {
+	if mem.buffer == nil {
+		return 0
+	}
+
 	_, _, err := syscall.Syscall(syscall.SYS_MSYNC,
 		uintptr(unsafe.Pointer(&mem.buffer[0])), // *addr
 		uintptr(mem.mapSize),                    // length

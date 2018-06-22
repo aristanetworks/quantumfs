@@ -12,10 +12,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"os/exec"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -353,12 +355,23 @@ func NewQlogExt(ramfsPath string, sharedMemLen uint64, daemonVersion string,
 		Write:     outLog,
 		maxLevel:  255,
 	}
-	var err error
-	q.logBuffer, err = newSharedMemory(ramfsPath, defaultMmapFile,
-		int(sharedMemLen), daemonVersion, &q)
 
-	if err != nil {
-		return nil, err
+	if ramfsPath != "" {
+		// Create a file and its path to be mmap'd
+		err := os.MkdirAll(ramfsPath, 0777)
+		if err != nil {
+			return nil, fmt.Errorf("Unable create log dir: %s",
+				ramfsPath)
+		}
+
+		q.filepath = ramfsPath + string(os.PathSeparator) + defaultMmapFile
+
+		q.logBuffer, err = newSharedMemory(q.filepath, int(sharedMemLen),
+			daemonVersion, &q)
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// check that our logLevel container is large enough for our subsystems
@@ -388,7 +401,10 @@ type Qlog struct {
 	logBuffer *sharedMemory
 
 	// Maximum level to log to the qlog file
-	maxLevel uint8
+	maxLevel        uint8
+	filepath        string
+	ErrorExec       string
+	ErrorInProgress uint32
 }
 
 // SetLogLevels stores the provided log level string in the qlog object.
@@ -513,6 +529,32 @@ func (q *Qlog) Log_(t time.Time, idx LogSubsystem, reqId uint64, level uint8,
 	unixNano := t.UnixNano()
 	if q.logBuffer != nil {
 		q.logBuffer.logEntry(idx, reqId, level, unixNano, format, args...)
+
+		// If this is an error log, we want to take a snapshot of the qlog
+		if level == 0 && q.ErrorExec != "" {
+			perform := atomic.CompareAndSwapUint32(&q.ErrorInProgress,
+				0, 1)
+
+			// We define this here to save an indent
+			handleError := func() {
+				defer func() {
+					atomic.StoreUint32(&q.ErrorInProgress, 0)
+				}()
+
+				q.Sync()
+				args := q.ErrorExec + " " +
+					strconv.Itoa(os.Getpid()) + " " + q.filepath
+
+				// run the command via sh so we don't have to parse
+				// and split the args up to satisfy the Command api
+				cmd := exec.Command("sh", "-c", args)
+				cmd.Run()
+			}
+
+			if perform {
+				go handleError()
+			}
+		}
 	}
 
 	if q.getLogLevel(idx, level) {
