@@ -27,7 +27,12 @@ type ctx struct {
 }
 
 func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
-	contextCopy := *context
+	var contextCopy *fuse.Context
+	if context != nil {
+		contextDeref := *context
+		contextCopy = &contextDeref
+	}
+
 	requestCtx := &ctx{
 		Ctx: quantumfs.Ctx{
 			Qlog:      c.Qlog,
@@ -38,7 +43,7 @@ func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
 		config:      c.config,
 		workspaceDB: c.workspaceDB,
 		dataStore:   c.dataStore,
-		fuseCtx:     &contextCopy,
+		fuseCtx:     contextCopy,
 	}
 	return requestCtx
 }
