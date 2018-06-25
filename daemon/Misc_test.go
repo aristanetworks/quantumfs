@@ -89,31 +89,33 @@ func TestWorkspacePubSubCallback(t *testing.T) {
 func TestInodeIdsIncrementing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		ids := newInodeIds(100*time.Millisecond, time.Second)
-		test.Assert(ids.newInodeId() == 4, "Wrong 1st inodeId given")
-		test.Assert(ids.newInodeId() == 5, "Wrong 2nd inodeId given")
-		test.Assert(ids.newInodeId() == 6, "Wrong 3rd inodeId given")
+		c := &test.qfs.c
+		test.Assert(ids.newInodeId(c) == 4, "Wrong 1st inodeId given")
+		test.Assert(ids.newInodeId(c) == 5, "Wrong 2nd inodeId given")
+		test.Assert(ids.newInodeId(c) == 6, "Wrong 3rd inodeId given")
 
-		ids.releaseInodeId(4)
+		ids.releaseInodeId(c, 4)
 		time.Sleep(50 * time.Millisecond)
-		test.Assert(ids.newInodeId() == 7, "Wrong next id during delay")
+		test.Assert(ids.newInodeId(c) == 7, "Wrong next id during delay")
 		time.Sleep(60 * time.Millisecond)
 
-		test.Assert(ids.newInodeId() == 4, "Didn't get to reuse 1st id")
-		test.Assert(ids.newInodeId() == 8, "Wrong next id")
+		test.Assert(ids.newInodeId(c) == 4, "Didn't get to reuse 1st id")
+		test.Assert(ids.newInodeId(c) == 8, "Wrong next id")
 	})
 }
 
 func TestInodeIdsGarbageCollection(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		ids := newInodeIds(time.Millisecond, 100*time.Millisecond)
+		c := &test.qfs.c
 
 		allocated := make([]InodeId, 100, 100)
 		for i := 0; i < 100; i++ {
-			allocated[i] = ids.newInodeId()
+			allocated[i] = ids.newInodeId(c)
 		}
 
 		for i := 0; i < 100; i++ {
-			ids.releaseInodeId(allocated[i])
+			ids.releaseInodeId(c, allocated[i])
 		}
 
 		time.Sleep(time.Millisecond * 10)
@@ -128,7 +130,7 @@ func TestInodeIdsGarbageCollection(t *testing.T) {
 
 		// go through all the ids and ensure that we garbage collected
 		for i := 0; i < 90; i++ {
-			ids.newInodeId()
+			ids.newInodeId(c)
 		}
 
 		func() {
@@ -137,7 +139,45 @@ func TestInodeIdsGarbageCollection(t *testing.T) {
 				"Garbage collection happened too soon")
 		}()
 
-		test.Assert(ids.newInodeId() == 94,
+		test.Assert(ids.newInodeId(c) == 94,
 			"inodeIds didn't resume counting after GB")
+	})
+}
+
+func TestInodeIdsReuseCheck(t *testing.T) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		func() {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.reusableDelay = time.Millisecond * 2
+			test.qfs.inodeIds.gcPeriod = time.Millisecond * 20
+		}()
+
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA/dirB", 0777))
+		test.MakeFile(workspace + "/dirA/dirB/fileA")
+
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA/dirC", 0777))
+		test.MakeFile(workspace + "/dirA/dirC/fileB")
+
+		fileA := test.getInodeNum(workspace + "/dirA/dirB/fileA")
+		dirC := test.getInodeNum(workspace + "/dirA/dirC")
+		fileB := test.getInodeNum(workspace + "/dirA/dirC/fileB")
+		test.Assert(dirC == fileA+1, "inode id not simply incremented")
+		test.Assert(fileB == dirC+1, "inode id not simply incremented")
+
+		// wait for garbage collection to happen at least once
+		test.WaitFor("inode ids to be garbage collected", func() bool {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.garbageCollect_(&test.qfs.c)
+			return test.qfs.inodeIds.highMark < uint64(fileB)
+		})
+
+		test.MakeFile(workspace + "/dirA/fileC")
+		test.MakeFile(workspace + "/dirA/fileD")
+		fileC := test.getInodeNum(workspace + "/dirA/fileC")
+		fileD := test.getInodeNum(workspace + "/dirA/fileD")
+		test.Assert(fileC == fileB+1, "inode id not incremented after GC")
+		test.Assert(fileD == fileC+1, "inode id not incremented after GC")
 	})
 }

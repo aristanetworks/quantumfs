@@ -16,10 +16,10 @@ type reusableId struct {
 	usable time.Time
 }
 
-func newInodeIds(delay time.Duration, gbPeriod time.Duration) *inodeIds {
+func newInodeIds(delay time.Duration, gcPeriod time.Duration) *inodeIds {
 	return &inodeIds{
 		highMark:      quantumfs.InodeIdReservedEnd + 1,
-		gbPeriod:      gbPeriod,
+		gcPeriod:      gcPeriod,
 		reusableMap:   make(map[InodeId]struct{}),
 		reusableDelay: delay,
 	}
@@ -29,7 +29,7 @@ type inodeIds struct {
 	highMark uint64
 	// The last time of garbage collection or a change in highMark
 	lastEvent time.Time
-	gbPeriod  time.Duration
+	gcPeriod  time.Duration
 
 	reusableIds list.List
 	reusableMap map[InodeId]struct{}
@@ -39,10 +39,10 @@ type inodeIds struct {
 	reusableDelay time.Duration
 }
 
-func (ids *inodeIds) newInodeId() InodeId {
+func (ids *inodeIds) newInodeId(c *ctx) InodeId {
 	defer ids.lock.Lock().Unlock()
 
-	ids.garbageCollect_()
+	ids.garbageCollect_(c)
 
 	for {
 		nextIdElem := ids.reusableIds.Front()
@@ -73,10 +73,10 @@ func (ids *inodeIds) newInodeId() InodeId {
 	return ids.allocateFreshId_()
 }
 
-func (ids *inodeIds) releaseInodeId(id InodeId) {
+func (ids *inodeIds) releaseInodeId(c *ctx, id InodeId) {
 	defer ids.lock.Lock().Unlock()
 
-	ids.garbageCollect_()
+	ids.garbageCollect_(c)
 
 	if uint64(id) >= ids.highMark {
 		// garbage collect this id
@@ -86,10 +86,14 @@ func (ids *inodeIds) releaseInodeId(id InodeId) {
 	ids.push_(id)
 }
 
-func (ids *inodeIds) garbageCollect_() {
-	if time.Since(ids.lastEvent) > ids.gbPeriod {
-		ids.lastEvent = ids.lastEvent.Add(ids.gbPeriod)
-		ids.highMark = uint64(0.9 * float64(ids.highMark))
+const inodeIdsGb = "Garbage collected highmark"
+
+func (ids *inodeIds) garbageCollect_(c *ctx) {
+	if time.Since(ids.lastEvent) > ids.gcPeriod {
+		ids.lastEvent = ids.lastEvent.Add(ids.gcPeriod)
+		newHighMark := uint64(0.9 * float64(ids.highMark))
+		c.vlog(inodeIdsGb, ids.highMark, newHighMark)
+		ids.highMark = newHighMark
 		if ids.highMark < quantumfs.InodeIdReservedEnd+1 {
 			ids.highMark = quantumfs.InodeIdReservedEnd + 1
 		}
