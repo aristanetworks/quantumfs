@@ -41,6 +41,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
 		inodeRefcounts:         make(map[InodeId]int32),
+		inodeIds:               newInodeIds(time.Minute, time.Minute*5),
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
@@ -64,7 +65,6 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 
 	qfs.c.vlog("Random seed: %d", utils.RandomSeed)
 
-	qfs.inodeIds = newInodeIds(time.Minute, time.Minute*5, qfs.idInUse)
 	qfs.c.qfs = qfs
 
 	typespaceList := NewTypespaceList()
@@ -679,13 +679,6 @@ func adjustVmDirtyBackgroundBytes(c *ctx) {
 	}
 }
 
-func (qfs *QuantumFs) idInUse(id InodeId) bool {
-	defer qfs.mapMutex.RLock().RUnlock()
-
-	inode, hasInodeId := qfs.getInode_(&qfs.c, id)
-	return inode != nil || hasInodeId
-}
-
 // Must hold the mapMutex
 func (qfs *QuantumFs) getInode_(c *ctx, id InodeId) (Inode, bool) {
 	inode, instantiated := qfs.inodes[id]
@@ -1099,9 +1092,20 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 	}
 }
 
-// Retrieve a unique inode number
+// Retrieves a unique inode number
 func (qfs *QuantumFs) newInodeId() InodeId {
-	return qfs.inodeIds.newInodeId(&qfs.c)
+	defer qfs.mapMutex.Lock().Unlock()
+
+	for {
+		// When we get a new id, it's possible that we're still using it.
+		// If it's still in use, grab another one instead
+		newId := qfs.inodeIds.newInodeId(&qfs.c)
+
+		inode, inodeIdUsed := qfs.getInode_(&qfs.c, newId)
+		if inode == nil && !inodeIdUsed {
+			return newId
+		}
+	}
 }
 
 // Free a now unused inode id
