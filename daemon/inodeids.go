@@ -39,7 +39,7 @@ type inodeIds struct {
 	reusableDelay time.Duration
 }
 
-func (ids *inodeIds) newInodeId(c *ctx) InodeId {
+func (ids *inodeIds) newInodeId(c *ctx) (newId InodeId, reused bool) {
 	defer ids.lock.Lock().Unlock()
 
 	ids.garbageCollect_(c)
@@ -63,14 +63,14 @@ func (ids *inodeIds) newInodeId(c *ctx) InodeId {
 
 		if uint64(nextId.id) < ids.highMark {
 			// this id is useable
-			return nextId.id
+			return nextId.id, true
 		}
 
 		// discard to garbage collect and try the next element
 	}
 
 	// we didn't find an id to reuse, so return a fresh one
-	return ids.allocateFreshId_()
+	return ids.allocateFreshId_(), false
 }
 
 func (ids *inodeIds) releaseInodeId(c *ctx, id InodeId) {

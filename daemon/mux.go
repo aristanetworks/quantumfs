@@ -1094,15 +1094,26 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 
 // Retrieves a unique inode number
 func (qfs *QuantumFs) newInodeId() InodeId {
-	defer qfs.mapMutex.Lock().Unlock()
-
 	for {
 		// When we get a new id, it's possible that we're still using it.
 		// If it's still in use, grab another one instead
-		newId := qfs.inodeIds.newInodeId(&qfs.c)
+		newId, reused := qfs.inodeIds.newInodeId(&qfs.c)
 
-		inode, inodeIdUsed := qfs.getInode_(&qfs.c, newId)
-		if inode == nil && !inodeIdUsed {
+		// If this is a reused id, then it's safe to use immediately
+		if reused {
+			return newId
+		}
+
+		// We expect that ids will be reused more often than not. To optimize
+		// for that case, we only lock the map mutex when we absolutely must
+		idIsFree := func() bool {
+			defer qfs.mapMutex.Lock().Unlock()
+
+			inode, inodeIdUsed := qfs.getInode_(&qfs.c, newId)
+			return inode == nil && !inodeIdUsed
+		}()
+
+		if idIsFree {
 			return newId
 		}
 	}
