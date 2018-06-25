@@ -88,7 +88,8 @@ func TestWorkspacePubSubCallback(t *testing.T) {
 
 func TestInodeIdsIncrementing(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		ids := newInodeIds(100*time.Millisecond, time.Second)
+		ids := newInodeIds(100*time.Millisecond, time.Second,
+			test.qfs.idInUse)
 		c := &test.qfs.c
 		test.Assert(ids.newInodeId(c) == 4, "Wrong 1st inodeId given")
 		test.Assert(ids.newInodeId(c) == 5, "Wrong 2nd inodeId given")
@@ -106,7 +107,8 @@ func TestInodeIdsIncrementing(t *testing.T) {
 
 func TestInodeIdsGarbageCollection(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		ids := newInodeIds(time.Millisecond, 100*time.Millisecond)
+		ids := newInodeIds(time.Millisecond, 100*time.Millisecond,
+			test.qfs.idInUse)
 		c := &test.qfs.c
 
 		allocated := make([]InodeId, 100, 100)

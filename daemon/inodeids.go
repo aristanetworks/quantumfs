@@ -16,12 +16,15 @@ type reusableId struct {
 	usable time.Time
 }
 
-func newInodeIds(delay time.Duration, gcPeriod time.Duration) *inodeIds {
+func newInodeIds(delay time.Duration, gcPeriod time.Duration,
+	idInUse func(InodeId) bool) *inodeIds {
+
 	return &inodeIds{
 		highMark:      quantumfs.InodeIdReservedEnd + 1,
 		gcPeriod:      gcPeriod,
 		reusableMap:   make(map[InodeId]struct{}),
 		reusableDelay: delay,
+		idInUse:       idInUse,
 	}
 }
 
@@ -37,6 +40,9 @@ type inodeIds struct {
 
 	// configurations
 	reusableDelay time.Duration
+
+	// a function that allows inodeIds to test whether an id is in use still
+	idInUse func(InodeId) bool
 }
 
 func (ids *inodeIds) newInodeId(c *ctx) InodeId {
@@ -109,10 +115,17 @@ func (ids *inodeIds) allocateFreshId_() InodeId {
 		ids.highMark++
 
 		_, exists := ids.reusableMap[nextId]
-		if !exists {
-			// this id isn't on a delay, so it's safe to use
-			return nextId
+		if exists {
+			// this id is on a delay, so it isn't safe to use
+			continue
 		}
+
+		if ids.idInUse(nextId) {
+			// id is still in use by the system, so we can't use it
+			continue
+		}
+
+		return nextId
 	}
 }
 

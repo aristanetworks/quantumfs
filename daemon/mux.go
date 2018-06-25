@@ -41,7 +41,6 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
 		inodeRefcounts:         make(map[InodeId]int32),
-		inodeIds:               newInodeIds(time.Minute, time.Minute*5),
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
@@ -65,6 +64,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 
 	qfs.c.vlog("Random seed: %d", utils.RandomSeed)
 
+	qfs.inodeIds = newInodeIds(time.Minute, time.Minute*5, qfs.idInUse)
 	qfs.c.qfs = qfs
 
 	typespaceList := NewTypespaceList()
@@ -677,6 +677,13 @@ func adjustVmDirtyBackgroundBytes(c *ctx) {
 	if err != nil {
 		c.wlog("Unable to set vm.dirty_background_bytes: %s", err.Error())
 	}
+}
+
+func (qfs *QuantumFs) idInUse(id InodeId) bool {
+	defer qfs.mapMutex.RLock().RUnlock()
+
+	inode, hasInodeId := qfs.getInode_(&qfs.c, id)
+	return inode != nil || hasInodeId
 }
 
 // Must hold the mapMutex
