@@ -44,6 +44,8 @@ type QuantumFsConfig struct {
 	CacheSize uint64
 	MountPath string
 
+	ErrorExec string
+
 	DataStoreName string
 	DataStoreConf string
 

@@ -15,7 +15,7 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-func NewLowMemFile(treeState *TreeState, parent InodeId) Inode {
+func NewLowMemFile(c *ctx, treeState *TreeState, parent Inode) Inode {
 	lm := LowMemFile{
 		InodeCommon: InodeCommon{
 			id:         quantumfs.InodeIdLowMemMarker,
@@ -24,7 +24,7 @@ func NewLowMemFile(treeState *TreeState, parent InodeId) Inode {
 		},
 	}
 	lm.self = &lm
-	lm.setParent(parent)
+	lm.setParent(c, parent)
 	utils.Assert(lm.treeState() != nil, "LowMemFile treeState is nil at init")
 	return &lm
 }

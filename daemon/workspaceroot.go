@@ -84,7 +84,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	wsr.hardlinkTable = newHardlinkTable(c, &wsr, workspaceRoot.HardlinkEntry())
 	initDirectory(c, workspace, &wsr.Directory,
 		wsr.hardlinkTable, workspaceRoot.BaseLayer(), inodeNum,
-		parent.inodeNum(), wsr.treeState())
+		parent, wsr.treeState())
 
 	return &wsr
 }

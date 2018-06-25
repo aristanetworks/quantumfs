@@ -9,7 +9,6 @@ package daemon
 // requests and forwards them to the correct Inode.
 
 import (
-	"container/list"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -41,6 +40,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		RawFileSystem:          fuse.NewDefaultRawFileSystem(),
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
+		inodeRefcounts:         make(map[InodeId]int32),
 		inodeNum:               quantumfs.InodeIdReservedEnd,
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
@@ -48,7 +48,6 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		lookupCounts:           make(map[InodeId]uint64),
 		workspaceMutability:    make(map[string]workspaceState),
 		toBeReleased:           make(chan uint64, 1000000),
-		toBeForgotten:          make(chan uint64, 1000000),
 		toNotifyFuse:           make(chan FuseNotification, 10000),
 		stopWaitingForSignals:  make(chan struct{}),
 		syncAllRetries:         -1,
@@ -70,10 +69,10 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 
 	typespaceList := NewTypespaceList()
 	qfs.inodes[quantumfs.InodeIdRoot] = typespaceList
-	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(typespaceList.treeState(),
-		typespaceList.inodeNum())
-	qfs.inodes[quantumfs.InodeIdLowMemMarker] = NewLowMemFile(
-		typespaceList.treeState(), typespaceList.inodeNum())
+	qfs.inodes[quantumfs.InodeIdApi] = NewApiInode(&qfs.c,
+		typespaceList.treeState(), typespaceList)
+	qfs.inodes[quantumfs.InodeIdLowMemMarker] = NewLowMemFile(&qfs.c,
+		typespaceList.treeState(), typespaceList)
 	return qfs
 }
 
@@ -87,6 +86,9 @@ func NewQuantumFs(config QuantumFsConfig, version string) (*QuantumFs, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	logger.ErrorExec = config.ErrorExec
+
 	if !config.VerboseTracing {
 		logger.SetMaxLevel(2) // dlog
 	}
@@ -128,8 +130,9 @@ type QuantumFs struct {
 
 	// This is a leaf lock for protecting the instantiation maps
 	// Do not grab other locks while holding this
-	mapMutex utils.DeferableRwMutex
-	inodes   map[InodeId]Inode
+	mapMutex       utils.DeferableRwMutex
+	inodes         map[InodeId]Inode
+	inodeRefcounts map[InodeId]int32
 
 	fileHandles sync.Map // map[FileHandleId]FileHandle
 
@@ -172,8 +175,7 @@ type QuantumFs struct {
 	mutabilityLock      utils.DeferableRwMutex
 	workspaceMutability map[string]workspaceState
 
-	toBeReleased  chan uint64 // FileHandleId
-	toBeForgotten chan uint64 // InodeId
+	toBeReleased chan uint64 // FileHandleId
 
 	// FUSE notification requests cannot be made from the same goroutine handling
 	// any FUSE request or a deadlock inside the kernel may result. Instead we
@@ -208,7 +210,6 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 
 	go qfs.adjustKernelKnobs()
 	go batchProcessor(qfs.toBeReleased, qfs.fileHandleReleaser)
-	go batchProcessor(qfs.toBeForgotten, qfs.inodeForgetter)
 	go qfs.fuseNotifier()
 	go qfs.waitForSignals()
 
@@ -216,43 +217,6 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 
 	qfs.server = server
 	return nil
-}
-
-const InodeForgetter = "Mux::inodeForgetter"
-
-func (qfs *QuantumFs) inodeForgetter(ids []uint64) {
-	c := qfs.c.forgetCtx()
-	defer c.funcIn(InodeForgetter).Out()
-
-	parents := make(map[InodeId]struct{})
-
-	func() {
-		defer qfs.instantiationLock.Lock().Unlock()
-		for _, id := range ids {
-			inodeId := InodeId(id)
-			inode := qfs.inodeNoInstantiate(c, inodeId)
-			if inode != nil {
-				inode.queueToForget(c)
-			} else {
-				c.vlog("Forgetting uninstantiated Inode %d", inodeId)
-				func() {
-					defer qfs.mapMutex.Lock().Unlock()
-					parent := qfs.parentOfUninstantiated[inodeId]
-					parents[parent] = struct{}{}
-				}()
-			}
-		}
-	}()
-
-	for parentId, _ := range parents {
-		func() {
-			_, unlock := qfs.RLockTreeGetInode(c, parentId)
-			defer unlock.RUnlock()
-
-			defer qfs.instantiationLock.Lock().Unlock()
-			qfs.uninstantiateInode_(c, parentId)
-		}()
-	}
 }
 
 const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
@@ -434,7 +398,6 @@ func (qfs *QuantumFs) Shutdown() error {
 		qfs.c.elog("Syncing log file failed with %d. Closing it.", err)
 	}
 	close(qfs.toBeReleased)
-	close(qfs.toBeForgotten)
 	close(qfs.toNotifyFuse)
 	return qfs.c.Qlog.Close()
 }
@@ -651,42 +614,6 @@ func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode) bool {
 	return inode.flush(c).IsValid()
 }
 
-const skipForgetLog = "inode %d doesn't need to be forgotten"
-
-// Requires treeState lock for read and the instantiationLock
-func (qfs *QuantumFs) uninstantiateInode_(c *ctx, inodeNum InodeId) {
-	defer c.FuncIn("Mux::uninstantiateInode_", "inode %d", inodeNum).Out()
-
-	inode := qfs.inodeNoInstantiate(c, inodeNum)
-	if inode == nil || inodeNum == quantumfs.InodeIdRoot ||
-		inodeNum == quantumfs.InodeIdApi {
-
-		c.vlog(skipForgetLog, inodeNum)
-		// Nothing to do
-		return
-	}
-
-	qfs.uninstantiateChain_(c, inode)
-}
-
-func (qfs *QuantumFs) uninstantiateInode(c *ctx, inodeNum InodeId) {
-	defer c.FuncIn("Mux::uninstantiateInode", "inode %d", inodeNum).Out()
-	defer qfs.instantiationLock.Lock().Unlock()
-	qfs.uninstantiateInode_(c, inodeNum)
-}
-
-// Queue an Inode to be flushed because it is dirty
-// flusher lock must be locked when calling this function
-func (qfs *QuantumFs) queueDirtyInode_(c *ctx, inode Inode) *list.Element {
-	return qfs.flusher.queue_(c, inode, false)
-}
-
-// Queue an Inode because the kernel has forgotten about it
-// flusher lock must be locked when calling this function
-func (qfs *QuantumFs) queueInodeToForget_(c *ctx, inode Inode) *list.Element {
-	return qfs.flusher.queue_(c, inode, true)
-}
-
 // There are several configuration knobs in the kernel which can affect FUSE
 // performance. Don't depend on the system being configured correctly for QuantumFS,
 // instead try to change the settings ourselves.
@@ -878,6 +805,21 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 		inode, instantiated = qfs.inode_(c, id)
 	}()
 
+	func() {
+		// Maybe give back the speculative lookupCount reference.
+		//
+		// See QuantumFs.inode_()
+		if instantiated {
+			defer qfs.lookupCountLock.Lock().Unlock()
+			if _, exists := qfs.lookupCounts[id]; !exists {
+				c.vlog("Removing speculative lookup reference")
+				inode.delRef(c, refLookups)
+			} else {
+				c.vlog("Retaining speculative lookup reference")
+			}
+		}
+	}()
+
 	if instantiated {
 		uninstantiated := inode.finishInit(c)
 		if len(uninstantiated) > 0 {
@@ -903,6 +845,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	parentId, uninstantiated := qfs.parentOfUninstantiated[id]
 	if !uninstantiated {
 		// We don't know anything about this Inode
+		c.vlog("Inode not in parentOfUninstantiated")
 		return nil, false
 	}
 
@@ -938,6 +881,15 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 	delete(qfs.parentOfUninstantiated, id)
 	qfs.inodes[id] = inode
 
+	// We need to start an Inode with some initial reference count and we would
+	// like to be able to catch increments from zero. Therefore we speculatively
+	// provide a reference for lookupCounts here. In inode() after returning
+	// from here we will get the lookupCountLock and remove the reference if we
+	// speculated incorrectly.
+	//
+	// See QuantumFs.inode()
+	addInodeRef_(c, id, refLookups)
+
 	return inode, true
 }
 
@@ -945,6 +897,11 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
 	defer qfs.mapMutex.Lock().Unlock()
 
+	qfs.setInode_(c, id, inode)
+}
+
+// Must hold mapMutex exclusively
+func (qfs *QuantumFs) setInode_(c *ctx, id InodeId, inode Inode) {
 	if inode != nil {
 		qfs.inodes[id] = inode
 	} else {
@@ -1003,7 +960,7 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 func (qfs *QuantumFs) incrementLookupCount(c *ctx, inodeId InodeId) {
 	defer c.FuncIn("Mux::incrementLookupCount", "inode %d", inodeId).Out()
 	defer qfs.lookupCountLock.Lock().Unlock()
-	qfs.incrementLookupCount_(inodeId)
+	qfs.incrementLookupCount_(c, inodeId)
 }
 
 // Increment several Inode's lookup counts.
@@ -1015,15 +972,31 @@ func (qfs *QuantumFs) incrementLookupCounts(c *ctx, children []directoryContents
 		if child.filename == "." || child.filename == ".." {
 			continue
 		}
-		qfs.incrementLookupCount_(InodeId(child.attr.Ino))
+		qfs.incrementLookupCount_(c, InodeId(child.attr.Ino))
 	}
 }
 
 // Must hold lookupCountLock
-func (qfs *QuantumFs) incrementLookupCount_(inodeId InodeId) {
+func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 	prev, exists := qfs.lookupCounts[inodeId]
 	if !exists {
 		qfs.lookupCounts[inodeId] = 1
+
+		if inodeId <= quantumfs.InodeIdReservedEnd {
+			// These Inodes always exist
+			c.vlog("Skipping refcount of permanent inode")
+		} else {
+			defer qfs.mapMutex.Lock().Unlock()
+			inode, _ := qfs.getInode_(c, inodeId)
+			if inode != nil {
+				addInodeRef_(c, inodeId, refLookups)
+				utils.Assert(c.qfs.inodeRefcounts[inodeId] > 1,
+					"Increased from zero refcount for inode %d!",
+					inodeId)
+			} else {
+				c.vlog("Inode isn't instantiated")
+			}
+		}
 	} else {
 		qfs.lookupCounts[inodeId] = prev + 1
 	}
@@ -1039,6 +1012,8 @@ func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
 	return lookupCount, true
 }
 
+const alreadyUninstantiatedLog = "inode %d wasn't instantiated"
+
 // Returns true if the count became zero or was previously zero
 func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 	defer c.FuncIn("Mux::shouldForget", "inode %d count %d", inodeId,
@@ -1048,11 +1023,14 @@ func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 		return false
 	}
 
+	forgotten := false
+
 	defer qfs.lookupCountLock.Lock().Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
 		c.vlog("inode %d has not been instantiated", inodeId)
-		return true
+		forgotten = true
+		goto maybeReleaseRef
 	}
 
 	if lookupCount < count {
@@ -1065,10 +1043,22 @@ func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 		if count > 1 {
 			c.vlog("Forgetting inode with lookupCount of %d", count)
 		}
-		return true
+		delete(qfs.lookupCounts, inodeId)
+		forgotten = true
 	} else {
-		return false
+		forgotten = false
 	}
+
+maybeReleaseRef:
+	if forgotten {
+		inode := qfs.inodeNoInstantiate(c, inodeId)
+		if inode != nil {
+			inode.delRef(c, refLookups)
+		} else {
+			c.vlog(alreadyUninstantiatedLog, inodeId)
+		}
+	}
+	return forgotten
 }
 
 // Get a file handle in a thread safe way
@@ -1214,144 +1204,6 @@ func (qfs *QuantumFs) lookupCommon(c *ctx, inodeId InodeId, name string,
 	}
 
 	return inode.Lookup(c, name, out)
-}
-
-// Needs treelock for read as well as the instantiationLock exclusively.
-func (qfs *QuantumFs) uninstantiateChain_(c *ctx, inode Inode) {
-	defer c.FuncIn("Mux::uninstantiateChain_", "inode %d",
-		inode.inodeNum()).Out()
-
-	inodeChildren := make([]InodeId, 0)
-	initial := true
-	for {
-		inodeChildren = inodeChildren[:0]
-		inodeNum := inode.inodeNum()
-		c.vlog("Evaluating inode %d for uninstantiation", inodeNum)
-		lookupCount, exists := qfs.lookupCount(inodeNum)
-		if lookupCount != 0 {
-			c.vlog("Inode %d still has %d pending lookups",
-				inodeNum, lookupCount)
-			break
-		}
-
-		shouldBreak := func() bool {
-			defer qfs.flusher.lock.Lock().Unlock()
-			if de := inode.dirtyElement_(); de != nil {
-				c.vlog("Inode %d dirty, not uninstantiating yet",
-					inodeNum)
-				dirtyNode := de.Value.(*dirtyInode)
-				dirtyNode.shouldUninstantiate = true
-				return true
-			}
-			return false
-		}()
-		if shouldBreak {
-			break
-		}
-
-		// If the loop is in the first iteration, we can treat the
-		// non-existence of lookupCount as zero value and bypass the
-		// if-statement
-		if !exists && !initial {
-			c.vlog("Inode %d is uninstantiated by its child", inodeNum)
-			break
-		}
-		initial = false
-
-		lookupCountDel := make([]InodeId, 0)
-
-		if dir, isDir := inode.(inodeHolder); isDir {
-			childrenReady := true
-			dir.foreachDirectInode(c, func(i InodeId) bool {
-				// To be fully unloaded, the child must have lookup
-				// count of zero (no kernel refs) *and*
-				// be uninstantiated
-				lookupCount, exists = qfs.lookupCount(i)
-				if lookupCount != 0 ||
-					qfs.inodeNoInstantiate(c, i) != nil {
-
-					// Not ready to forget, no more to do
-					c.vlog("Not all children unloaded, %d in %d",
-						i, inodeNum)
-					childrenReady = false
-					return false
-				}
-				if exists {
-					lookupCountDel = append(lookupCountDel, i)
-				}
-
-				inodeChildren = append(inodeChildren, i)
-				return true
-			})
-
-			if !childrenReady {
-				return
-			}
-		}
-
-		// Great, we want to forget this so proceed
-		shouldClean := func() bool {
-			defer qfs.lookupCountLock.Lock().Unlock()
-
-			// With the lookupCountLock and instantiationLock both held
-			// exclusively, no inodes may be instantiated and no lookups
-			// finished. Thus we are safe to fully uninstantiate this
-			// inode as long as there hasn't been a lookup between
-			// starting to uninstantiate it and here.
-
-			count, exists := qfs.lookupCounts[inodeNum]
-			if exists && count == 0 {
-				qfs.setInode(c, inodeNum, nil)
-				delete(qfs.lookupCounts, inodeNum)
-				for _, childId := range lookupCountDel {
-					delete(qfs.lookupCounts, childId)
-				}
-				qfs.removeUninstantiated(c, inodeChildren)
-				return true
-			} else {
-				return false
-			}
-		}()
-		if !shouldClean {
-			c.vlog("Not cleaning up inode %d yet", inodeNum)
-			return
-		}
-		inode.cleanup(c)
-		c.vlog("Set inode %d to nil", inodeNum)
-
-		func() {
-			defer qfs.flusher.lock.Lock().Unlock()
-			utils.Assert(inode.dirtyElement_() == nil,
-				"inode %d dirty after uninstantiation", inodeNum)
-		}()
-
-		if !inode.isOrphaned() && inodeNum != quantumfs.InodeIdRoot {
-			// Then check our parent and iterate again
-			inode = func() (parent Inode) {
-				defer inode.getParentLock().RLock().RUnlock()
-
-				// Do nothing if we're orphaned
-				if inode.isOrphaned_() {
-					return nil
-				}
-
-				parent = qfs.inodeNoInstantiate(c,
-					inode.parentId_())
-				if parent == nil {
-					panic(fmt.Sprintf("Parent was unloaded "+
-						"before child! %d %d",
-						inode.parentId_(), inodeNum))
-				}
-
-				qfs.addUninstantiated(c, []inodePair{
-					newInodePair(inodeNum, inode.parentId_())})
-
-				return parent
-			}()
-			continue
-		}
-		break
-	}
 }
 
 // Returns the inode id of the root, the typespace, the namespace and the workspace
@@ -1623,9 +1475,7 @@ func (qfs *QuantumFs) Forget(nodeID uint64, nlookup uint64) {
 
 	inodeId := InodeId(nodeID)
 
-	if qfs.shouldForget(c, inodeId, nlookup) {
-		qfs.toBeForgotten <- uint64(inodeId)
-	} else {
+	if !qfs.shouldForget(c, inodeId, nlookup) {
 		c.vlog("inode %d lookup not zero yet", inodeId)
 	}
 }

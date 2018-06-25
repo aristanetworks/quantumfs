@@ -76,7 +76,7 @@ func foreachDentry(c *ctx, key quantumfs.ObjectKey,
 func initDirectory(c *ctx, name string, dir *Directory,
 	hardlinkTable HardlinkTable,
 	baseLayerId quantumfs.ObjectKey, inodeNum InodeId,
-	parent InodeId, treeState *TreeState) {
+	parent Inode, treeState *TreeState) {
 
 	defer c.FuncIn("initDirectory",
 		"baselayer from %s", baseLayerId.String()).Out()
@@ -86,7 +86,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	dir.InodeCommon.id = inodeNum
 	dir.InodeCommon.name_ = name
 	dir.InodeCommon.accessed_ = 0
-	dir.setParent(parent)
+	dir.setParent(c, parent)
 	dir.treeState_ = treeState
 	dir.hardlinkTable = hardlinkTable
 	dir.baseLayerId = baseLayerId
@@ -131,8 +131,8 @@ func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uin
 			"Directory nor WorkspaceRoot", inodeNum))
 	}
 
-	initDirectory(c, name, &dir, hardlinkTable,
-		baseLayerId, inodeNum, parent.inodeNum(), parent.treeState())
+	initDirectory(c, name, &dir, hardlinkTable, baseLayerId, inodeNum, parent,
+		parent.treeState())
 	return &dir
 }
 
@@ -439,7 +439,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 			c.vlog("Setting parent of inode %d from %d to %d",
 				inodeId, inode.parentId_(), dir.inodeNum())
 			inode.setName(name)
-			inode.setParent_(dir.inodeNum())
+			inode.setParent_(c, dir)
 		} else {
 			c.qfs.addUninstantiated(c, []inodePair{
 				newInodePair(inodeId, dir.inodeNum()),
@@ -729,7 +729,17 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	}()
 
 	c.qfs.setInode(c, inodeNum, newEntity)
+	func() {
+		defer c.qfs.mapMutex.Lock().Unlock()
+		addInodeRef_(c, inodeNum, refTransient)
+	}()
 	c.qfs.incrementLookupCount(c, inodeNum)
+
+	// We want to ensure that we panic if we attempt to increment the refcount of
+	// an Inode with a zero refcount as that indicates a counting issue. To do so
+	// we must initialize with a non-zero refcount so incrementLookupCount()
+	// above will succeed. Give back the temporary reference count here.
+	newEntity.delRef(c, refTransient)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
@@ -1328,7 +1338,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			utils.Assert(dst.inodeNum() != childInode.inodeNum(),
 				"Cannot orphan child by renaming %s %d",
 				newName, dst.inodeNum())
-			childInode.setParent_(dst.inodeNum())
+			childInode.setParent_(c, dst)
 			childInode.setName(newName)
 			childInode.clearAccessedCache()
 		}
@@ -1731,7 +1741,6 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 }
 
 func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-
 	defer c.FuncIn("Directory::instantiateChild", "Inode %d of %d", inodeNum,
 		dir.inodeNum()).Out()
 	defer dir.childRecordLock.Lock().Unlock()
@@ -1811,9 +1820,10 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 		return nil, errors.New("Not Required Type")
 	}
 	c.vlog("Directory::lookupInternal found inode %d Name %s", inodeNum, name)
+	c.qfs.incrementLookupCount(c, inodeNum)
 	child = c.qfs.inode(c, inodeNum)
-	if child != nil {
-		c.qfs.incrementLookupCount(c, inodeNum)
+	if child == nil {
+		c.qfs.shouldForget(c, inodeNum, 1)
 	}
 	return child, nil
 }

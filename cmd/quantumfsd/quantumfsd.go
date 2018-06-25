@@ -83,6 +83,10 @@ func init() {
 	qflag.StringVar(&config.MountPath, "mountpath", config.MountPath,
 		"Path to mount quantumfs at")
 
+	qflag.StringVar(&config.ErrorExec, "errorExec", config.ErrorExec,
+		"Executes the given command for each error log."+
+			" Pid and log filepath passed as parameters.")
+
 	qflag.Uint64Var(&config.CacheTimeSeconds, "cacheTimeSeconds",
 		config.CacheTimeSeconds,
 		"Number of seconds the kernel will cache response data")
