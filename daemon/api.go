@@ -679,7 +679,17 @@ func (api *ApiHandle) refreshWorkspace(c *ctx, buf []byte) int {
 			"workspace name '%s' is malformed", cmd.Workspace)
 	}
 
-	c.qfs.refreshWorkspace(c, cmd.Workspace)
+	parts := strings.Split(cmd.Workspace, "/")
+	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
+		parts[0], parts[1], parts[2])
+
+	if err != nil {
+		c.elog("Unable to get workspace rootId")
+		return api.queueErrorResponse(quantumfs.ErrorWorkspaceNotFound,
+			"Unable to get workspace rootId")
+	}
+
+	c.qfs.refreshWorkspace(c, cmd.Workspace, rootId, nonce)
 
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Refresh Succeeded")
 }
