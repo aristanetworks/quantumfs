@@ -184,10 +184,17 @@ func loadWorkspaceDB() {
 }
 
 func parseConfigFile() {
-	confFlag := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-	confFlag.Usage = func() {} // Be silent
-	confFlag.StringVar(&configFile, "config", "", "")
-	confFlag.Parse(os.Args[1:])
+	captureFilename := false
+	for _, param := range os.Args[1:] {
+		if captureFilename {
+			configFile = param
+			break
+		}
+
+		if param == "-config" {
+			captureFilename = true
+		}
+	}
 
 	if configFile != "" {
 		file, err := os.Open(configFile)
