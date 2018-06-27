@@ -92,9 +92,9 @@ func newInodeId(c *ctx, ids *inodeIds) InodeId {
 }
 
 func TestInodeIdsIncrementing(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-		ids := newInodeIds(100*time.Millisecond, time.Second)
-		c := &test.qfs.c
+	runTestNoQfs(t, func(test *testHelper) {
+		ids := newInodeIds(100*time.Millisecond, time.Hour)
+		c := test.newCtx()
 		test.Assert(newInodeId(c, ids) == 4, "Wrong 1st inodeId given")
 		test.Assert(newInodeId(c, ids) == 5, "Wrong 2nd inodeId given")
 		test.Assert(newInodeId(c, ids) == 6, "Wrong 3rd inodeId given")
@@ -110,9 +110,9 @@ func TestInodeIdsIncrementing(t *testing.T) {
 }
 
 func TestInodeIdsGarbageCollection(t *testing.T) {
-	runTest(t, func(test *testHelper) {
+	runTestNoQfs(t, func(test *testHelper) {
 		ids := newInodeIds(time.Millisecond, 100*time.Millisecond)
-		c := &test.qfs.c
+		c := test.newCtx()
 
 		allocated := make([]InodeId, 100, 100)
 		for i := 0; i < 100; i++ {
@@ -145,7 +145,7 @@ func TestInodeIdsGarbageCollection(t *testing.T) {
 		}()
 
 		test.Assert(newInodeId(c, ids) == 94,
-			"inodeIds didn't resume counting after GB")
+			"inodeIds didn't resume counting after GC")
 	})
 }
 
@@ -171,10 +171,11 @@ func TestInodeIdsReuseCheck(t *testing.T) {
 		test.Assert(dirC == fileA+1, "inode id not simply incremented")
 		test.Assert(fileB == dirC+1, "inode id not simply incremented")
 
+		c := test.newCtx()
 		// wait for garbage collection to happen at least once
 		test.WaitFor("inode ids to be garbage collected", func() bool {
 			defer test.qfs.inodeIds.lock.Lock().Unlock()
-			test.qfs.inodeIds.garbageCollect_(&test.qfs.c)
+			test.qfs.inodeIds.testHighmark_(c)
 			return test.qfs.inodeIds.highMark < uint64(fileB)
 		})
 

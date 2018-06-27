@@ -26,6 +26,8 @@ func newInodeIds(delay time.Duration, gcPeriod time.Duration) *inodeIds {
 }
 
 type inodeIds struct {
+	lock utils.DeferableMutex
+
 	highMark uint64
 	// The last time of garbage collection or a change in highMark
 	lastEvent time.Time
@@ -33,7 +35,6 @@ type inodeIds struct {
 
 	reusableIds list.List
 	reusableMap map[InodeId]struct{}
-	lock        utils.DeferableMutex
 
 	// configurations
 	reusableDelay time.Duration
@@ -42,7 +43,7 @@ type inodeIds struct {
 func (ids *inodeIds) newInodeId(c *ctx) (newId InodeId, reused bool) {
 	defer ids.lock.Lock().Unlock()
 
-	ids.garbageCollect_(c)
+	ids.testHighmark_(c)
 
 	for {
 		nextIdElem := ids.reusableIds.Front()
@@ -76,7 +77,7 @@ func (ids *inodeIds) newInodeId(c *ctx) (newId InodeId, reused bool) {
 func (ids *inodeIds) releaseInodeId(c *ctx, id InodeId) {
 	defer ids.lock.Lock().Unlock()
 
-	ids.garbageCollect_(c)
+	ids.testHighmark_(c)
 
 	if uint64(id) >= ids.highMark {
 		// garbage collect this id
@@ -88,7 +89,8 @@ func (ids *inodeIds) releaseInodeId(c *ctx, id InodeId) {
 
 const inodeIdsGb = "Garbage collected highmark"
 
-func (ids *inodeIds) garbageCollect_(c *ctx) {
+// The inodeids lock must be held
+func (ids *inodeIds) testHighmark_(c *ctx) {
 	if time.Since(ids.lastEvent) > ids.gcPeriod {
 		ids.lastEvent = ids.lastEvent.Add(ids.gcPeriod)
 		newHighMark := uint64(0.9 * float64(ids.highMark))
@@ -125,7 +127,7 @@ func (ids *inodeIds) push_(id InodeId) {
 	ids.reusableMap[id] = struct{}{}
 }
 
-// ids.lock must be locked. id an idElem must match
+// ids.lock must be locked. idElem should correspond to the id given
 func (ids *inodeIds) remove_(id InodeId, idElem *list.Element) {
 	ids.reusableIds.Remove(idElem)
 	delete(ids.reusableMap, id)

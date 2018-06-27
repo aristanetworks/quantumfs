@@ -1108,9 +1108,10 @@ func (qfs *QuantumFs) newInodeId() InodeId {
 			return inode == nil && !inodeIdUsed
 		}()
 
-		if idIsFree {
-			return newId
+		if !idIsFree {
+			continue
 		}
+		return newId
 	}
 }
 
