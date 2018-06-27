@@ -414,7 +414,7 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 		if state.Deleted {
 			go qfs.handleDeletedWorkspace(c, name)
 		} else {
-			go qfs.refreshWorkspace(c, name)
+			go qfs.refreshWorkspace(c, name, state.RootId, state.Nonce)
 		}
 	}
 }
@@ -478,7 +478,9 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	cleanup()
 }
 
-func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
+func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
+	rootId quantumfs.ObjectKey, nonce quantumfs.WorkspaceNonce) {
+
 	defer c.FuncIn("Mux::refreshWorkspace", "workspace %s", name).Out()
 
 	c = c.refreshCtx()
@@ -503,13 +505,6 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 		return
 	}
 
-	rootId, nonce, err := c.workspaceDB.Workspace(&c.Ctx,
-		parts[0], parts[1], parts[2])
-
-	if err != nil {
-		c.elog("Unable to get workspace rootId")
-		return
-	}
 	if !nonce.SameIncarnation(&wsr.nonce) {
 		c.dlog("Not refreshing workspace %s due to mismatching "+
 			"nonces %s vs %s", name, wsr.nonce.String(), nonce.String())
@@ -529,7 +524,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string) {
 
 	defer wsr.LockTree().Unlock()
 
-	err = qfs.flusher.syncWorkspace_(c, name)
+	err := qfs.flusher.syncWorkspace_(c, name)
 	if err != nil {
 		c.elog("Unable to syncWorkspace: %s", err.Error())
 		return
