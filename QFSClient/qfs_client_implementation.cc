@@ -306,6 +306,7 @@ Error ApiImpl::DeterminePath() {
 	}
 
 	this->path = std::string(apiPath.r0);
+	return util::getError(kSuccess);
 }
 
 Error ApiImpl::DeterminePathInTest() {
