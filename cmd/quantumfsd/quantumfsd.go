@@ -41,7 +41,6 @@ var cacheTimeNsecs uint
 var memLogMegabytes uint
 var showMaxSizes bool
 var configFile string
-var mountOptionsStr string
 
 var qflag *flag.FlagSet
 var config daemon.QuantumFsConfig
@@ -64,11 +63,13 @@ func init() {
 		MagicOwnership:   true,
 	}
 
+	fmt.Printf("QuantumFS version %s\n", version)
+}
+
+func initFlags() {
 	const (
 		defaultCacheSize = "24G"
 	)
-
-	fmt.Printf("QuantumFS version %s\n", version)
 
 	qflag = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
@@ -122,7 +123,8 @@ func init() {
 	qflag.BoolVar(&config.MagicOwnership, "magicOwnership",
 		config.MagicOwnership, "Enable magic ownership")
 
-	qflag.StringVar(&mountOptionsStr, "o", "", "Mount Options")
+	qflag.StringVar(&config.MountOptions, "o", config.MountOptions,
+		"Mount Options")
 }
 
 func maxSizes() {
@@ -234,6 +236,11 @@ func processArgs() {
 	// override those values if available.
 	parseConfigFile()
 
+	// Now that we've loaded the config file into the config, we can initialize
+	// the flags with those defaults, otherwise Parse will overwrite the config
+	initFlags()
+
+	// Parse any command line parameters, overwriting anything already set
 	qflag.Parse(os.Args[1:])
 
 	if showMaxSizes {
@@ -293,7 +300,7 @@ func main() {
 
 	var mountOptions = fuse.MountOptions{
 		Name:    "QuantumFS",
-		Options: strings.Split(mountOptionsStr, ","),
+		Options: strings.Split(config.MountOptions, ","),
 	}
 
 	quantumfs, err := daemon.NewQuantumFs(config, "QuantumFs "+version)
