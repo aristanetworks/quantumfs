@@ -73,4 +73,7 @@ type QuantumFsConfig struct {
 	// and directories owned by a non-system ID to appear as owned by the current
 	// user. This adds some overhead to open heavy workloads.
 	MagicOwnership bool
+
+	// Mount options will be passed to fuse, like mount -o
+	MountOptions string
 }

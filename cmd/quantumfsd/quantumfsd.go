@@ -41,7 +41,6 @@ var cacheTimeNsecs uint
 var memLogMegabytes uint
 var showMaxSizes bool
 var configFile string
-var mountOptionsStr string
 
 var qflag *flag.FlagSet
 var config daemon.QuantumFsConfig
@@ -122,7 +121,8 @@ func init() {
 	qflag.BoolVar(&config.MagicOwnership, "magicOwnership",
 		config.MagicOwnership, "Enable magic ownership")
 
-	qflag.StringVar(&mountOptionsStr, "o", "", "Mount Options")
+	qflag.StringVar(&config.MountOptions, "o", config.MountOptions,
+		"Mount Options")
 }
 
 func maxSizes() {
@@ -286,7 +286,7 @@ func main() {
 
 	var mountOptions = fuse.MountOptions{
 		Name:    "QuantumFS",
-		Options: strings.Split(mountOptionsStr, ","),
+		Options: strings.Split(config.MountOptions, ","),
 	}
 
 	quantumfs, err := daemon.NewQuantumFs(config, "QuantumFs "+version)
