@@ -329,13 +329,17 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string,
 		rootID: rootID.String(),
 	}
 
+	// Use a local SkipMap to hold keys we visit during a single workspace's walk.
+	// If the walk fails we do not merge these keys with the the global SkipMap.
+	localSkipMap := utils.NewSkipMap(oldC.ttlCfg.SkipMapMaxLen)
+
 	// Every call to walker.Walk() needs a walkFunc
 	walkFunc := func(cw *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
 		return utils.RefreshTTL(cw, path, key, size, isDir, c.cqlds,
 			c.ttlCfg.TTLNew, c.ttlCfg.SkipMapResetAfter_ms/1000,
-			skipMap)
+			skipMap, localSkipMap)
 	}
 
 	// Call the walker library.
@@ -347,6 +351,13 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string,
 
 		AddPointWalkerWorkspace(c, w, false, time.Since(start))
 	} else {
+		if skipMap != nil {
+			_, skipMapLen := skipMap.Len()
+			_, localSkipMapLen := localSkipMap.Len()
+			c.vlog("Merging localSkipMap(len=%d) with globalSkipMap(len=%d)",
+				localSkipMapLen, skipMapLen)
+			skipMap.Merge(localSkipMap)
+		}
 		c.vlog("%s TTL refresh for %s/%s/%s (%s)", successPrefix, ts, ns, ws,
 			rootID.String())
 		AddPointWalkerWorkspace(c, w, true, time.Since(start))
