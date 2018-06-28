@@ -6,9 +6,7 @@ package utils
 import (
 	"container/list"
 
-	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/aristanetworks/quantumfs/walker"
 )
 
 type SkipMap struct {
@@ -28,13 +26,10 @@ func NewSkipMap(maxLength int) *SkipMap {
 	}
 }
 
-func (bc *SkipMap) Check(c *walker.Ctx,
-	key quantumfs.ObjectKey) (inCache bool) {
-
+func (bc *SkipMap) Check(key string) (inCache bool) {
 	defer bc.mutex.Lock().Unlock()
 
-	element, exists := bc.keys[string(key.Value())]
-
+	element, exists := bc.keys[key]
 	if exists {
 		// Update the position in the lru
 		bc.lru.MoveToBack(element)
@@ -45,22 +40,19 @@ func (bc *SkipMap) Check(c *walker.Ctx,
 
 var empty struct{}
 
-func (bc *SkipMap) Set(c *walker.Ctx, key quantumfs.ObjectKey) {
+func (bc *SkipMap) Set(key string) {
 	defer bc.mutex.Lock().Unlock()
-
-	kv := string(key.Value())
 
 	// We must always check, when we have the cache lock, whether a key exists
 	// before doing operations that assume it exists, since there is no guarantee
 	// that the key exists by the time we've acquired the lock
-	if element, exists := bc.keys[kv]; exists {
-
+	if element, exists := bc.keys[key]; exists {
 		// Update the position in the lru
 		bc.lru.MoveToBack(element)
 		return
 	}
 
-	bc.keys[kv] = bc.lru.PushBack(kv)
+	bc.keys[key] = bc.lru.PushBack(key)
 
 	// Ensure the cache length is maintained
 	if bc.lru.Len() > bc.maxLen {
@@ -82,4 +74,11 @@ func (bc *SkipMap) Clear() {
 func (bc *SkipMap) Len() (lruLen int, mapLen int) {
 	defer bc.mutex.Lock().Unlock()
 	return bc.lru.Len(), len(bc.keys)
+}
+
+func (bc *SkipMap) Merge(local *SkipMap) {
+	defer local.mutex.Lock().Unlock()
+	for key := range local.keys {
+		bc.Set(key)
+	}
 }

@@ -16,19 +16,26 @@ import (
 // RefreshTTL will update the TTL of the block pointed to by key.
 func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 	size uint64, isDir bool, cqlds blobstore.BlobStore, newTTL int64,
-	ttlThreshold int64, skipMap *SkipMap) error {
+	ttlThreshold int64, globalSkipMap *SkipMap, localSkipMap *SkipMap) error {
 
 	if walker.SkipKey(c, key) {
 		return nil
 	}
 
 	kv := key.Value()
+	ks := string(kv)
 
-	if skipMap != nil {
-		if skipMap.Check(c, key) {
-			return walker.SkipEntry
-		}
-	} else {
+	// Check to see if the key is present in either the globalSkipMap or the localSkipMap.
+	// localSkipMap is just specific to this workspaces's walk.
+	if globalSkipMap != nil && globalSkipMap.Check(ks) {
+		return walker.SkipEntry
+	}
+
+	if localSkipMap != nil && localSkipMap.Check(ks) {
+		return walker.SkipEntry
+	}
+
+	if globalSkipMap == nil {
 		// legacy behavior
 		ttlVal, err := GetTTLForKey(c, cqlds, key, path)
 		if err != nil {
@@ -53,9 +60,12 @@ func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		return fmt.Errorf("path: %v key %v: %v", path, key.String(), err)
 	}
 
-	// only set the skipMap if we return successfully
-	if skipMap != nil {
-		skipMap.Set(c, key)
+	// On successfully refreshing the TTL, add the key to localSkipMap.
+	if localSkipMap != nil {
+		localSkipMap.Set(ks)
+		// If there is no localSkipMap, add it to the globalSkipMap
+	} else if globalSkipMap != nil {
+		globalSkipMap.Set(ks)
 	}
 	return nil
 }
