@@ -11,7 +11,6 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
-	"strings"
 	"time"
 
 	"code.cloudfoundry.org/bytefmt"
@@ -122,9 +121,6 @@ func initFlags() {
 
 	qflag.BoolVar(&config.MagicOwnership, "magicOwnership",
 		config.MagicOwnership, "Enable magic ownership")
-
-	qflag.StringVar(&config.MountOptions, "o", config.MountOptions,
-		"Mount Options")
 }
 
 func maxSizes() {
@@ -299,8 +295,7 @@ func main() {
 	go reduceGCPercent(config.CacheSize)
 
 	var mountOptions = fuse.MountOptions{
-		Name:    "QuantumFS",
-		Options: strings.Split(config.MountOptions, ","),
+		Name: "QuantumFS",
 	}
 
 	quantumfs, err := daemon.NewQuantumFs(config, "QuantumFs "+version)
