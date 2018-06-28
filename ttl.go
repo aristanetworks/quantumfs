@@ -50,7 +50,7 @@ func handleTTL(args []string) error {
 		return walkutils.RefreshTTL(c, path, key, size, isDir,
 			cs.cqlds, cs.ttlCfg.TTLNew,
 			cs.ttlCfg.SkipMapResetAfter_ms/1000,
-			nil)
+			nil, nil)
 	}
 
 	showRootIDStatus := true
@@ -95,7 +95,7 @@ func handleForceTTL(args []string) error {
 		key quantumfs.ObjectKey, size uint64, isDir bool) error {
 
 		return walkutils.RefreshTTL(c, path, key, size, isDir,
-			cs.cqlds, newTTL, newTTL, nil)
+			cs.cqlds, newTTL, newTTL, nil, nil)
 	}
 
 	showRootIDStatus := true
