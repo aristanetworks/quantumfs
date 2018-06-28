@@ -27,7 +27,7 @@ var SkipEntry = errors.New("skip this key")
 // WalkFunc is the type of the function called for each data block under the
 // Workspace.
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
-	size uint64, isDir, isMetadata bool) error
+	size uint64, isDir bool, objType quantumfs.ObjectType) error
 
 // Ctx maintains context for the walker library.
 type Ctx struct {
@@ -39,10 +39,10 @@ type Ctx struct {
 }
 
 type workerData struct {
-	path       string
-	key        quantumfs.ObjectKey
-	size       uint64
-	isMetadata bool
+	path    string
+	key     quantumfs.ObjectKey
+	size    uint64
+	objType quantumfs.ObjectType
 }
 
 func panicHandler(c *Ctx, err *error) {
@@ -124,7 +124,8 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 		// WSR
 		if err = writeToChan(c, keyChan, "[rootId]", rootID,
-			uint64(buf.Size()), true); err != nil {
+			uint64(buf.Size()),
+			quantumfs.ObjectTypeWorkspaceRoot); err != nil {
 
 			return err
 		}
@@ -190,7 +191,8 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 			"WorkspaceRoot buffer %s", key.String())
 
 		if err := writeToChan(c, keyChan, "[hardlink table]", key,
-			uint64(buf.Size()), false); err != nil {
+			uint64(buf.Size()),
+			quantumfs.ObjectTypeHardlink); err != nil {
 			return err
 		}
 
@@ -211,8 +213,8 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	simplebuffer.AssertNonZeroBuf(buf,
 		"MultiBlockFile buffer %s", key.String())
 
-	if err := writeToChan(c, keyChan, path, key,
-		uint64(buf.Size()), true); err != nil {
+	if err := writeToChan(c, keyChan, path, key, uint64(buf.Size()),
+		quantumfs.ObjectTypeMediumFile); err != nil {
 		return err
 	}
 
@@ -222,10 +224,11 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 		if i == len(keys)-1 {
 			// Return, since this is last block
 			return writeToChan(c, keyChan, path, k,
-				uint64(mbf.SizeOfLastBlock()), false)
+				uint64(mbf.SizeOfLastBlock()),
+				quantumfs.ObjectTypeSmallFile)
 		}
-		if err := writeToChan(c, keyChan, path, k,
-			uint64(mbf.BlockSize()), false); err != nil {
+		if err := writeToChan(c, keyChan, path, k, uint64(mbf.BlockSize()),
+			quantumfs.ObjectTypeSmallFile); err != nil {
 			return err
 		}
 	}
@@ -246,7 +249,7 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 		"VeryLargeFile buffer %s", key.String())
 
 	if err := writeToChan(c, keyChan, path, key,
-		uint64(buf.Size()), true); err != nil {
+		uint64(buf.Size()), quantumfs.ObjectTypeVeryLargeFile); err != nil {
 		return err
 	}
 	vlf := buf.AsVeryLargeFile()
@@ -276,8 +279,8 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 
 		// When wf returns SkipEntry for a DirectoryEntry, we can skip the
 		// DirectoryRecords in that DirectoryEntry
-		if err := wf(c, path, key, uint64(buf.Size()),
-			true, true); err != nil {
+		if err := wf(c, path, key, uint64(buf.Size()), true,
+			quantumfs.ObjectTypeDirectory); err != nil {
 			if err == SkipEntry {
 				return nil
 			}
@@ -362,7 +365,7 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 			return handleDirectoryRecord(c, fpath, ds, hldr, wf, keyChan)
 		}
 	default:
-		return writeToChan(c, keyChan, fpath, key, dr.Size(), false)
+		return writeToChan(c, keyChan, fpath, key, dr.Size(), dr.Type())
 	}
 }
 
@@ -381,8 +384,8 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 	simplebuffer.AssertNonZeroBuf(buf,
 		"Attributes List buffer %s", extKey.String())
 
-	err := writeToChan(c, keyChan, fpath, extKey, uint64(buf.Size()), false)
-	if err != nil {
+	if err := writeToChan(c, keyChan, fpath, extKey, uint64(buf.Size()),
+		quantumfs.ObjectTypeExtendedAttribute); err != nil {
 		return err
 	}
 
@@ -399,7 +402,7 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 			"Attributes List buffer %s", key.String())
 
 		err := writeToChan(c, keyChan, fpath, key,
-			uint64(buf.Size()), false)
+			uint64(buf.Size()), quantumfs.ObjectTypeSmallFile)
 		if err != nil {
 			return err
 		}
@@ -420,20 +423,20 @@ func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 			}
 		}
 		if err := wf(c, keyItem.path, keyItem.key, keyItem.size,
-			false, keyItem.isMetadata); err != nil && err != SkipEntry {
+			false, keyItem.objType); err != nil && err != SkipEntry {
 			return err
 		}
 	}
 }
 
 func writeToChan(c context.Context, keyChan chan<- *workerData, p string,
-	k quantumfs.ObjectKey, s uint64, m bool) error {
+	k quantumfs.ObjectKey, s uint64, t quantumfs.ObjectType) error {
 
 	select {
 	case <-c.Done():
 		return fmt.Errorf("Quitting writeToChan because at least one " +
 			"goroutine failed with an error")
-	case keyChan <- &workerData{path: p, key: k, size: s, isMetadata: m}:
+	case keyChan <- &workerData{path: p, key: k, size: s, objType: t}:
 	}
 	return nil
 }
