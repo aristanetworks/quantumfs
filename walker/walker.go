@@ -276,7 +276,8 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 
 		// When wf returns SkipEntry for a DirectoryEntry, we can skip the
 		// DirectoryRecords in that DirectoryEntry
-		if err := wf(c, path, key, uint64(buf.Size()), true, true); err != nil {
+		if err := wf(c, path, key, uint64(buf.Size()),
+			true, true); err != nil {
 			if err == SkipEntry {
 				return nil
 			}
@@ -418,8 +419,8 @@ func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 				return nil
 			}
 		}
-		if err := wf(c, keyItem.path, keyItem.key,
-			keyItem.size, false, keyItem.isMetadata); err != nil && err != SkipEntry {
+		if err := wf(c, keyItem.path, keyItem.key, keyItem.size,
+			false, keyItem.isMetadata); err != nil && err != SkipEntry {
 			return err
 		}
 	}
