@@ -211,12 +211,49 @@ func mergeUploader(c *ctx, buffers chan ImmutableBuffer, rtnErr *error,
 
 const maxUploadBacklog = 1000
 
+func panicRecovery(c *ctx, output *quantumfs.ObjectKey, base quantumfs.ObjectKey,
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+
+	if err := recover(); err != nil {
+		data := fmt.Sprintf("Fatal error during merge: %s\n", err)
+		data += fmt.Sprintf("Base rootID: %s\n", base.String())
+		data += fmt.Sprintf("Remote rootID: %s\n", remote.String())
+		data += fmt.Sprintf("Local rootID: %s\n", local.String())
+		if len(data) > quantumfs.MaxBlockSize {
+			data = data[:quantumfs.MaxBlockSize]
+		}
+
+		errorFile := newSmallAccessor(c, 0, quantumfs.EmptyBlockKey)
+		written, err := errorFile.writeBlock(c, 0, 0, []byte(data))
+		if written != len(data) || err != nil {
+			c.elog("Unable to write small accessor: %d %s", written, err)
+			return
+		}
+
+		uid := c.fuseCtx.Owner.Uid
+		gid := c.fuseCtx.Owner.Gid
+		UID := quantumfs.ObjectUid(uid, uid)
+		GID := quantumfs.ObjectGid(gid, gid)
+		errorRecord := createNewEntry(c, "README", 0777, 0777, 0, 0, UID,
+			GID, quantumfs.ObjectTypeSmallFile,
+			errorFile.sync(c, publishNow))
+
+		panicDirectory := publishDirectoryRecords(c,
+			[]quantumfs.DirectoryRecord{errorRecord}, publishNow)
+		*output = publishWorkspaceRoot(c, panicDirectory,
+			make(map[quantumfs.FileId]*HardlinkTableEntry), publishNow)
+	}
+}
+
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
 	local quantumfs.ObjectKey, prefer mergePreference,
-	skipPaths *mergeSkipPaths, breadcrumb string) (quantumfs.ObjectKey, error) {
+	skipPaths *mergeSkipPaths, breadcrumb string) (rtn quantumfs.ObjectKey,
+	rtnErr error) {
 
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d wsr %s", prefer,
 		len(skipPaths.paths), breadcrumb).Out()
+
+	defer panicRecovery(c, &rtn, base, remote, local)
 
 	toSet := make(chan ImmutableBuffer, maxUploadBacklog)
 	merge := newMerger(c, prefer, func(c *ctx,
@@ -268,7 +305,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		return local, err
 	}
 
-	rtn := publishWorkspaceRoot(c, localDirectory, tracker.filterDeadEntries(),
+	rtn = publishWorkspaceRoot(c, localDirectory, tracker.filterDeadEntries(),
 		merge.pubFn)
 
 	return rtn, uploadErr
