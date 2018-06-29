@@ -27,7 +27,7 @@ var SkipEntry = errors.New("skip this key")
 // WalkFunc is the type of the function called for each data block under the
 // Workspace.
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
-	size uint64, isDir bool, objType quantumfs.ObjectType) error
+	size uint64, objType quantumfs.ObjectType) error
 
 // Ctx maintains context for the walker library.
 type Ctx struct {
@@ -279,7 +279,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 
 		// When wf returns SkipEntry for a DirectoryEntry, we can skip the
 		// DirectoryRecords in that DirectoryEntry
-		if err := wf(c, path, key, uint64(buf.Size()), true,
+		if err := wf(c, path, key, uint64(buf.Size()),
 			quantumfs.ObjectTypeDirectory); err != nil {
 			if err == SkipEntry {
 				return nil
@@ -423,7 +423,7 @@ func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 			}
 		}
 		if err := wf(c, keyItem.path, keyItem.key, keyItem.size,
-			false, keyItem.objType); err != nil && err != SkipEntry {
+			keyItem.objType); err != nil && err != SkipEntry {
 			return err
 		}
 	}

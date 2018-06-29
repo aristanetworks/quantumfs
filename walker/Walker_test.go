@@ -426,7 +426,7 @@ func TestWalkPanicString(t *testing.T) {
 			root, err)
 
 		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			isDir bool, objType quantumfs.ObjectType) error {
+			objType quantumfs.ObjectType) error {
 
 			if strings.HasSuffix(path, "/panicFile") {
 				panic(expectedString)
@@ -465,7 +465,7 @@ func TestWalkPanicErr(t *testing.T) {
 			root, err)
 
 		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			isDir bool, objType quantumfs.ObjectType) error {
+			objType quantumfs.ObjectType) error {
 
 			if strings.HasSuffix(path, "/panicFile") {
 				panic(expectedErr)
@@ -504,7 +504,7 @@ func TestWalkErr(t *testing.T) {
 			root, err)
 
 		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			isDir bool, objType quantumfs.ObjectType) error {
+			objType quantumfs.ObjectType) error {
 
 			if strings.HasSuffix(path, "/errorFile") {
 				return expectedErr
