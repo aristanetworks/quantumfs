@@ -12,5 +12,5 @@ func main() {
 
 	ZeroKey := quantumfs.NewObjectKey(quantumfs.KeyTypeEmbedded,
 		[quantumfs.ObjectKeyLength - 1]byte{})
-	_ = walker.Walk(nil, nil, ZeroKey, nil)
+	_, _ = walker.Walk(nil, nil, ZeroKey, nil)
 }
