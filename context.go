@@ -36,6 +36,7 @@ type Ctx struct {
 	numWalkers  int
 	iteration   uint
 	keyspace    string
+	aliveCount  int64
 }
 
 func getWalkerDaemonContext(influxServer string, influxPort uint16,

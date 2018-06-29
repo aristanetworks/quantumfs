@@ -104,20 +104,21 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration) {
 //
 // tags:   keyspace    - Keyspace of the WorkspaceDB
 //
-// fields: alive - a place holder. Since, we have to have a field.
+// fields: alive - a monotonically increasing count.
 //
 func AddPointWalkerHeartBeat(c *Ctx) {
 
 	if c.Influx == nil {
 		return
 	}
+	c.aliveCount += 1
 
 	measurement := "walkerHeartBeat"
 	tags := map[string]string{
 		"keyspace": c.keyspace,
 	}
 	fields := map[string]interface{}{
-		"alive":        1,
+		"alive":        c.aliveCount,
 		"iteration":    c.iteration,
 		"countSuccess": c.numSuccess,
 		"countError":   c.numError,
@@ -129,6 +130,6 @@ func AddPointWalkerHeartBeat(c *Ctx) {
 			err.Error())
 		return
 	}
-	c.vlog("%s Writing %s iteration=%d numSuccess=%d numError=%d to influxDB\n",
-		successPrefix, measurement, c.iteration, c.numSuccess, c.numError)
+	c.vlog("%s Writing %s aliveCount=%d iteration=%d numSuccess=%d numError=%d to influxDB\n",
+		successPrefix, measurement, c.aliveCount, c.iteration, c.numSuccess, c.numError)
 }
