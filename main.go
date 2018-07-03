@@ -335,9 +335,9 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string,
 
 	// Every call to walker.Walk() needs a walkFunc
 	walkFunc := func(cw *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64, isDir bool) error {
+		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType) error {
 
-		return utils.RefreshTTL(cw, path, key, size, isDir, c.cqlds,
+		return utils.RefreshTTL(cw, path, key, size, objType, c.cqlds,
 			c.ttlCfg.TTLNew, c.ttlCfg.SkipMapResetAfter_ms/1000,
 			skipMap, localSkipMap)
 	}
