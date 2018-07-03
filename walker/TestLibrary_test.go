@@ -133,7 +133,7 @@ func (th *testHelper) checkSmallFileHardlinkKey(workspace string,
 		root, err)
 
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, isDir bool) error {
+		size uint64, objType quantumfs.ObjectType) error {
 
 		// this check works for small files (1 block) only
 		if _, exists := hlpaths[path]; exists {
@@ -220,11 +220,12 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 	var walkerMap = make(map[string]int)
 	var mapLock utils.DeferableMutex
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, isDir bool) error {
+		size uint64, objType quantumfs.ObjectType) error {
 
 		// NOTE: In the TTL walker this path comparison will be
 		// replaced by a TTL comparison.
-		if skipDirTest && isDir && strings.HasSuffix(path, "/dir1") {
+		if skipDirTest && objType == quantumfs.ObjectTypeDirectory &&
+			strings.HasSuffix(path, "/dir1") {
 			return SkipEntry
 		}
 
