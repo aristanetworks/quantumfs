@@ -212,7 +212,7 @@ func mergeUploader(c *ctx, buffers chan ImmutableBuffer, rtnErr *error,
 const maxUploadBacklog = 1000
 
 func panicRecovery(c *ctx, output *quantumfs.ObjectKey, base quantumfs.ObjectKey,
-	remote quantumfs.ObjectKey, local quantumfs.ObjectKey) {
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey, wsr string) {
 
 	if err := recover(); err != nil {
 		data := fmt.Sprintf("Fatal error during merge: %s\n", err)
@@ -242,6 +242,8 @@ func panicRecovery(c *ctx, output *quantumfs.ObjectKey, base quantumfs.ObjectKey
 			[]quantumfs.DirectoryRecord{errorRecord}, publishNow)
 		*output = publishWorkspaceRoot(c, panicDirectory,
 			make(map[quantumfs.FileId]*HardlinkTableEntry), publishNow)
+
+		c.qfs.setWorkspaceImmutable(wsr)
 	}
 }
 
@@ -253,7 +255,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d wsr %s", prefer,
 		len(skipPaths.paths), breadcrumb).Out()
 
-	defer panicRecovery(c, &rtn, base, remote, local)
+	defer panicRecovery(c, &rtn, base, remote, local, breadcrumb)
 
 	toSet := make(chan ImmutableBuffer, maxUploadBacklog)
 	merge := newMerger(c, prefer, func(c *ctx,
