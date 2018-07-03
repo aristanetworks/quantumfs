@@ -15,7 +15,7 @@ import (
 
 // RefreshTTL will update the TTL of the block pointed to by key.
 func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-	size uint64, isDir bool, cqlds blobstore.BlobStore, newTTL int64,
+	size uint64, objType quantumfs.ObjectType, cqlds blobstore.BlobStore, newTTL int64,
 	ttlThreshold int64, globalSkipMap *SkipMap, localSkipMap *SkipMap) error {
 
 	if walker.SkipKey(c, key) {
