@@ -52,7 +52,7 @@ func printPath2Key(args []string) error {
 	var listLock utils.DeferableMutex
 	keyList := make([]quantumfs.ObjectKey, 0, 10)
 	finder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, isDir bool) error {
+		size uint64, objType quantumfs.ObjectType) error {
 
 		if strings.Compare(path, searchPath) == 0 {
 			defer listLock.Lock().Unlock()

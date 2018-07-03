@@ -45,9 +45,9 @@ func handleTTL(args []string) error {
 	wsname := args[0]
 
 	walkFunc := func(c *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64, isDir bool) error {
+		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType) error {
 
-		return walkutils.RefreshTTL(c, path, key, size, isDir,
+		return walkutils.RefreshTTL(c, path, key, size, objType,
 			cs.cqlds, cs.ttlCfg.TTLNew,
 			cs.ttlCfg.SkipMapResetAfter_ms/1000,
 			nil, nil)
@@ -92,9 +92,9 @@ func handleForceTTL(args []string) error {
 
 	// Internal Walker for TTL.
 	walkFunc := func(c *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64, isDir bool) error {
+		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType) error {
 
-		return walkutils.RefreshTTL(c, path, key, size, isDir,
+		return walkutils.RefreshTTL(c, path, key, size, objType,
 			cs.cqlds, newTTL, newTTL, nil, nil)
 	}
 
@@ -130,7 +130,7 @@ func handleTTLHistogram(args []string) error {
 	var maplock utils.DeferableMutex
 	hist := qubitutils.NewHistogram()
 	bucketer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, isDir bool) error {
+		size uint64, objType quantumfs.ObjectType) error {
 
 		if walker.SkipKey(c, key) {
 			return nil

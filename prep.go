@@ -114,11 +114,11 @@ func walkHelper(c *Ctx,
 		start := time.Now()
 		var keysWalked uint64
 		wrapper = func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-			size uint64, isDir bool) error {
+			size uint64, objType quantumfs.ObjectType) error {
 
 			atomic.AddUint64(&keysWalked, 1)
 			defer showProgress(progress, start, keysWalked)
-			return handler(c, path, key, size, isDir)
+			return handler(c, path, key, size, objType)
 		}
 
 		// add a newline to separate the progress information
@@ -141,7 +141,7 @@ func getTrackerHandler(filter func(path string) bool) (*tracker, walker.WalkFunc
 	tracker := newTracker()
 	var mapLock utils.DeferableMutex
 	handler := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, isDir bool) error {
+		size uint64, objType quantumfs.ObjectType) error {
 
 		defer mapLock.Lock().Unlock()
 		if filter != nil && filter(path) {
