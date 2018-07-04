@@ -279,7 +279,7 @@ func ParseLogsRaw(filepath string) ([]*LogOutput, error) {
 // LogscanSkim returns true if the log file string map given contains the substring
 // "ERROR"
 func LogscanSkim(filepath string, exceptions map[string]struct{}) bool {
-	if len(exceptions) != 0 {
+	if exceptions != nil {
 		return testStrMap(filepath, exceptions)
 	}
 
