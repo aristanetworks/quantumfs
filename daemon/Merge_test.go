@@ -6,6 +6,7 @@ package daemon
 // Test workspace merging
 
 import (
+	"io/ioutil"
 	"os"
 	"syscall"
 	"testing"
@@ -1052,5 +1053,65 @@ func TestMergeDeepMergeHardlinkPartial(t *testing.T) {
 					[]byte("test data"), 2)
 			}
 		})
+	})
+}
+
+func TestMergeLostBlock(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		api := test.getApi()
+
+		backingStore := newTestDataStore(test)
+		test.SetDataStore(backingStore)
+		// Make sure we cache nothing
+		test.qfs.c.dataStore.cache = newCombiningCache(0)
+
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA", 0777))
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/file",
+			"base data"))
+
+		test.AssertNoErr(api.Branch(test.RelPath(workspace),
+			"test/test/branchA"))
+		test.AssertNoErr(api.Branch(test.RelPath(workspace),
+			"test/test/branchB"))
+
+		test.AssertNoErr(api.EnableRootWrite("test/test/branchA"))
+		test.AssertNoErr(api.EnableRootWrite("test/test/branchB"))
+
+		branchA := test.AbsPath("test/test/branchA")
+		branchB := test.AbsPath("test/test/branchB")
+		test.AssertNoErr(os.MkdirAll(branchA+"/dirA", 0777))
+		test.AssertNoErr(os.MkdirAll(branchB+"/dirA", 0777))
+
+		test.AssertNoErr(testutils.PrintToFile(branchA+"/dirA/file",
+			"test data A"))
+		test.AssertNoErr(testutils.PrintToFile(branchB+"/dirA/file",
+			"test data B"))
+
+		// Delete a block artificially from the datastore
+		key := make([]byte, quantumfs.ExtendedKeyLength)
+		_, err := syscall.Getxattr(branchA+"/dirA/file",
+			quantumfs.XAttrTypeKey, key)
+		test.AssertNoErr(err)
+		func() {
+			defer backingStore.holeLock.Lock().Unlock()
+			binaryKey, _, _, err := quantumfs.DecodeExtendedKey("" +
+				string(key))
+			test.AssertNoErr(err)
+			backingStore.holes[binaryKey.String()] = struct{}{}
+		}()
+
+		err = api.Merge3Way(test.RelPath(workspace), "test/test/branchA",
+			"test/test/branchB", quantumfs.PreferNewer, []string{})
+		test.Assert(err == nil, "Merge can't recover with missing block")
+
+		files, err := ioutil.ReadDir(branchB)
+		test.AssertNoErr(err)
+		test.Assert(len(files) == 2, "Readme file not replacing workspace")
+		test.Assert(files[0].Name() == "README", "File created not README")
+
+		defer test.qfs.mutabilityLock.RLock().RUnlock()
+		test.Assert(test.qfs.workspaceMutability["test/test/"+
+			"branchB"] == workspaceImmutable, "Workspace not locked")
 	})
 }
