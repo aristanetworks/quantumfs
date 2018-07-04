@@ -210,12 +210,13 @@ func mergeUploader(c *ctx, buffers chan ImmutableBuffer, rtnErr *error,
 }
 
 const maxUploadBacklog = 1000
+const panicLog = "Panic during merge: %s"
 
 func panicRecovery(c *ctx, output *quantumfs.ObjectKey, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey, wsr string) {
 
 	if err := recover(); err != nil {
-		c.elog("Panic during merge: %s", err)
+		c.elog(panicLog, err)
 		data := fmt.Sprintf("Fatal error during merge: %s\n", err)
 		data += fmt.Sprintf("Base rootID: %s\n", base.String())
 		data += fmt.Sprintf("Remote rootID: %s\n", remote.String())
