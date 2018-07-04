@@ -91,18 +91,24 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 
 	// create a safer map to use
 	strMapData := data[mmapHeaderSize+header.CircBuf.Size:]
-	strMap := make([]logStr, len(strMapData)/LogStrSize)
-	idx := 0
-	for i := 0; i+LogStrSize <= len(strMapData); i += LogStrSize {
-		mapEntry := (*logStr)(unsafe.Pointer(&strMapData[i]))
-		strMap[idx] = *mapEntry
-
-		idx++
-	}
+	strMap := make([]logStr, len(data)/LogStrSize)
+	visitStrMap(strMapData, func(idx int, entry *logStr) {
+		strMap[idx] = *entry
+	})
 
 	return header.CircBuf.endIndex(),
 		data[mmapHeaderSize : mmapHeaderSize+header.CircBuf.Size], strMap,
 		nil
+}
+
+func visitStrMap(data []byte, visit func(int, *logStr)) {
+	idx := 0
+	for i := 0; i+LogStrSize <= len(data); i += LogStrSize {
+		mapEntry := (*logStr)(unsafe.Pointer(&data[i]))
+		visit(idx, mapEntry)
+
+		idx++
+	}
 }
 
 // OutputLogs is a simple interface to, given the components of a qlog that have
@@ -272,7 +278,11 @@ func ParseLogsRaw(filepath string) ([]*LogOutput, error) {
 
 // LogscanSkim returns true if the log file string map given contains the substring
 // "ERROR"
-func LogscanSkim(filepath string) bool {
+func LogscanSkim(filepath string, exceptions map[string]struct{}) bool {
+	if exceptions != nil {
+		return testStrMap(filepath, exceptions)
+	}
+
 	strMapData := extractStrMapData(filepath)
 
 	// This takes too much time, so only count one string as failing

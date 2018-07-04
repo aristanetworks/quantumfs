@@ -73,6 +73,21 @@ func extractStrMapData(filepath string) []byte {
 		int64(header.StrMapSize), file)
 }
 
+func testStrMap(filepath string, exceptions map[string]struct{}) bool {
+	foundErr := false
+	data := extractStrMapData(filepath)
+
+	visitStrMap(data, func(idx int, entry *logStr) {
+		if _, exists := exceptions[string(entry.Text[:])]; !exists {
+			if string(entry.Text[:5]) == "ERROR" {
+				foundErr = true
+			}
+		}
+	})
+
+	return foundErr
+}
+
 func grabMemory(filepath string) []byte {
 	if filepath == "" {
 		return nil
