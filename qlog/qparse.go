@@ -78,7 +78,10 @@ func testStrMap(filepath string, exceptions map[string]struct{}) bool {
 	data := extractStrMapData(filepath)
 
 	visitStrMap(data, func(idx int, entry *logStr) {
-		if _, exists := exceptions[string(entry.Text[:])]; !exists {
+		// trim any zeros
+		trimmed := strings.TrimRight(string(entry.Text[:]), "\000")
+
+		if _, exists := exceptions[trimmed]; !exists {
 			if string(entry.Text[:5]) == "ERROR" {
 				foundErr = true
 			}
