@@ -217,7 +217,9 @@ func panicRecovery(c *ctx, output *quantumfs.ObjectKey, base quantumfs.ObjectKey
 
 	if err := recover(); err != nil {
 		c.elog(panicLog, err)
-		data := fmt.Sprintf("Fatal error during merge: %s\n", err)
+		data := "Please contact quantumfs-dev@arista.com as soon as " +
+			"possible to recover your data.\n\n"
+		data += fmt.Sprintf("Fatal error during merge: %s\n", err)
 		data += fmt.Sprintf("Base rootID: %s\n", base.String())
 		data += fmt.Sprintf("Remote rootID: %s\n", remote.String())
 		data += fmt.Sprintf("Local rootID: %s\n", local.String())
