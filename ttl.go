@@ -23,7 +23,7 @@ func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 	}
 
 	kv := key.Value()
-	ks := string(kv)
+	ks := key.String()
 
 	// Check to see if the key is present in either the globalSkipMap or the localSkipMap.
 	// localSkipMap is just specific to this workspaces's walk.
@@ -51,13 +51,13 @@ func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 
 	buf, _, err := cqlds.Get(ToECtx(c), kv)
 	if err != nil {
-		return fmt.Errorf("refreshTTL: path: %v key %v: %v", path, key.String(), err)
+		return fmt.Errorf("refreshTTL: path: %v key %v: %v", path, ks, err)
 	}
 	newmetadata := make(map[string]string)
 	newmetadata[cql.TimeToLive] = fmt.Sprintf("%d", newTTL)
 	err = cqlds.Insert(ToECtx(c), kv, buf, newmetadata)
 	if err != nil {
-		return fmt.Errorf("path: %v key %v: %v", path, key.String(), err)
+		return fmt.Errorf("path: %v key %v: %v", path, ks, err)
 	}
 
 	// On successfully refreshing the TTL, add the key to localSkipMap.
