@@ -14,6 +14,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
+	qutils "github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
 	"github.com/aristanetworks/qubit/tools/qwalker/utils"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
@@ -107,6 +108,7 @@ func main() {
 	// Start heart beat messaging.
 	timer := time.Tick(heartBeatInterval)
 	go heartBeat(c, timer)
+	qutils.ServePprof()
 
 	walkFullWSDBLoop(c, true, *useSkipMap)
 }
@@ -120,11 +122,10 @@ func walkFullWSDBLoop(c *Ctx, backOffLoop bool, useSkipMap bool) {
 		ttlCfg.SkipMapMaxLen = 20 * 1024 * 1024
 	}
 
-	var skipMap *utils.SkipMap
 	var skipMapPeriod time.Duration
 	var nextMapReset time.Time
 	if useSkipMap {
-		skipMap = utils.NewSkipMap(ttlCfg.SkipMapMaxLen)
+		c.skipMap = utils.NewSkipMap(ttlCfg.SkipMapMaxLen)
 		skipMapPeriod = time.Duration(ttlCfg.SkipMapResetAfter_ms) *
 			time.Millisecond
 		nextMapReset = time.Now().Add(skipMapPeriod)
@@ -138,7 +139,7 @@ func walkFullWSDBLoop(c *Ctx, backOffLoop bool, useSkipMap bool) {
 
 		if useSkipMap && time.Now().After(nextMapReset) {
 			c.vlog(SkipMapClearLog)
-			skipMap.Clear()
+			c.skipMap.Clear()
 			nextMapReset = time.Now().Add(skipMapPeriod)
 		}
 
@@ -146,7 +147,7 @@ func walkFullWSDBLoop(c *Ctx, backOffLoop bool, useSkipMap bool) {
 		c.vlog("Iteration[%d] started at %s", c.iteration,
 			startTimeOuter.String())
 
-		err := walkFullWSDBSetup(c, skipMap)
+		err := walkFullWSDBSetup(c)
 
 		dur := time.Since(startTimeOuter)
 		errStr := ""
@@ -178,10 +179,9 @@ func walkFullWSDBLoop(c *Ctx, backOffLoop bool, useSkipMap bool) {
 // - walkFullWSDB Inner: This queues work on the workChan
 //
 // When an error occurs in any of the gouroutines, c.Done() is triggered and
-// all the goroutines exit. Errors returned from walker.Walk() are
+// all the goroutines exit. Errors returned from Walk() are
 // ignored.
-func walkFullWSDBSetup(c *Ctx, skipMap *utils.SkipMap) error {
-
+func walkFullWSDBSetup(c *Ctx) error {
 	group, groupCtx := errgroup.WithContext(context.Background())
 	c.Context = groupCtx
 	workChan := make(chan *workerData)
@@ -190,7 +190,7 @@ func walkFullWSDBSetup(c *Ctx, skipMap *utils.SkipMap) error {
 	for i := 1; i <= c.numWalkers; i++ {
 		id := i
 		group.Go(func() error {
-			return walkWorker(c, workChan, id, skipMap)
+			return walkWorker(c, workChan, id)
 		})
 	}
 
@@ -274,9 +274,7 @@ func queueWorkspace(c *Ctx, workChan chan<- *workerData, t string, n string,
 	return nil
 }
 
-func walkWorker(c *Ctx, workChan <-chan *workerData, workerID int,
-	skipMap *utils.SkipMap) (err error) {
-
+func walkWorker(c *Ctx, workChan <-chan *workerData, workerID int) (err error) {
 	c.vlog("%s walkWorker[%d] started", eventPrefix, workerID)
 	for {
 		select {
@@ -294,8 +292,7 @@ func walkWorker(c *Ctx, workChan <-chan *workerData, workerID int,
 			}
 			c.vlog("%s walkWorker[%d] processing %s/%s/%s",
 				eventPrefix, workerID, w.ts, w.ns, w.ws)
-			if cmdErr := runWalker(c, w.ts, w.ns, w.ws,
-				skipMap); cmdErr != nil {
+			if cmdErr := runWalker(c, w.ts, w.ns, w.ws); cmdErr != nil {
 
 				atomic.AddUint32(&c.numError, 1)
 			} else {
@@ -306,9 +303,7 @@ func walkWorker(c *Ctx, workChan <-chan *workerData, workerID int,
 }
 
 // Wrapper around the call to the walker library.
-func runWalker(oldC *Ctx, ts string, ns string, ws string,
-	skipMap *utils.SkipMap) error {
-
+func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 	var err error
 	var rootID quantumfs.ObjectKey
 	wsname := ts + "/" + ns + "/" + ws
@@ -333,13 +328,13 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string,
 	// If the walk fails we do not merge these keys with the the global SkipMap.
 	localSkipMap := utils.NewSkipMap(oldC.ttlCfg.SkipMapMaxLen)
 
-	// Every call to walker.Walk() needs a walkFunc
+	// Every call to Walk() needs a walkFunc
 	walkFunc := func(cw *walker.Ctx, path string,
 		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType) error {
 
 		return utils.RefreshTTL(cw, path, key, size, objType, c.cqlds,
 			c.ttlCfg.TTLNew, c.ttlCfg.SkipMapResetAfter_ms/1000,
-			skipMap, localSkipMap)
+			c.skipMap, localSkipMap)
 	}
 
 	// Call the walker library.
@@ -349,18 +344,20 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string,
 		c.elog("TTL refresh for %s/%s/%s (%s), err(%s)", ts, ns, ws,
 			rootID.String(), err.Error())
 
-		AddPointWalkerWorkspace(c, w, false, time.Since(start))
+		AddPointWalkerWorkspace(c, w, false, time.Since(start), err.Error())
 	} else {
-		if skipMap != nil {
-			_, skipMapLen := skipMap.Len()
+		if c.skipMap != nil {
+			_, beforeSkipMapLen := c.skipMap.Len()
 			_, localSkipMapLen := localSkipMap.Len()
-			c.vlog("Merging localSkipMap(len=%d) with globalSkipMap(len=%d)",
-				localSkipMapLen, skipMapLen)
-			skipMap.Merge(localSkipMap)
+			c.skipMap.Merge(localSkipMap)
+			_, afterSkipMapLen := c.skipMap.Len()
+			c.vlog("Merging localSkipMap(len=%d) with globalSkipMap(len=%d) "+
+				"-> globalSkipMap(len=%d)",
+				localSkipMapLen, beforeSkipMapLen, afterSkipMapLen)
 		}
 		c.vlog("%s TTL refresh for %s/%s/%s (%s)", successPrefix, ts, ns, ws,
 			rootID.String())
-		AddPointWalkerWorkspace(c, w, true, time.Since(start))
+		AddPointWalkerWorkspace(c, w, true, time.Since(start), "")
 	}
 	return err
 }

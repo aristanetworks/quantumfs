@@ -218,19 +218,19 @@ func TestMapMaxLen(t *testing.T) {
 
 		test.SyncAllWorkspaces()
 
-		skipMap := utils.NewSkipMap(c.ttlCfg.SkipMapMaxLen)
-		walkFullWSDBSetup(c, skipMap)
+		c.skipMap = utils.NewSkipMap(c.ttlCfg.SkipMapMaxLen)
+		walkFullWSDBSetup(c)
 
-		cacheLen, mapLen := skipMap.Len()
+		cacheLen, mapLen := c.skipMap.Len()
 		test.Assert(cacheLen == mapLen, "Lru and map mismatch")
 		// The cache should be full, given the number of files we made
 		test.Assert(cacheLen == c.ttlCfg.SkipMapMaxLen,
 			"Max length not obeyed: %d", cacheLen)
 
 		// No matter how many times we walk, the map length should be obeyed
-		walkFullWSDBSetup(c, skipMap)
+		walkFullWSDBSetup(c)
 
-		cacheLen, mapLen = skipMap.Len()
+		cacheLen, mapLen = c.skipMap.Len()
 		test.Assert(cacheLen == mapLen, "Lru and map mismatch")
 		test.Assert(cacheLen == c.ttlCfg.SkipMapMaxLen,
 			"Max length not obeyed: %d", cacheLen)

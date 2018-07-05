@@ -15,6 +15,7 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
+	"github.com/aristanetworks/qubit/tools/qwalker/utils"
 	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
@@ -37,6 +38,7 @@ type Ctx struct {
 	iteration   uint
 	keyspace    string
 	aliveCount  int64
+	skipMap     *utils.SkipMap
 }
 
 func getWalkerDaemonContext(influxServer string, influxPort uint16,

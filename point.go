@@ -26,9 +26,10 @@ type wsDetails struct {
 //                       seconds (uint)
 //         iteration   - The iteration number for this walk
 //         rootID      - rootID for the workSpace
+//	   errStr      - error String when the walk is failed.
 ///
 func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
-	dur time.Duration) {
+	dur time.Duration, walkErr string) {
 
 	if c.Influx == nil {
 		return
@@ -46,21 +47,21 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 		"walkTime":  uint(dur / time.Second),
 		"iteration": c.iteration,
 		"rootID":    w.rootID,
+		"errStr":    walkErr,
 	}
 
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
-		c.elog("Writing %s to influxDB for "+
-			"%s/%s/%s (%s) iteration=%d walkSuccess=%v err:%s\n",
-			measurement, w.ts, w.ns, w.ws, w.rootID,
-			c.iteration, pass, err.Error())
+		c.elog("InfluxDB %s=%s %s/%s/%s (%s) iteration=%d "+
+			"walkSuccess=%v walkErrMsg=(%q) InfluxErr:%s\n",
+			measurement, dur.String(), w.ts, w.ns, w.ws, w.rootID, c.iteration,
+			pass, walkErr, err.Error())
 		return
 	}
-	c.vlog("%s Writing %s=%s to influxDB for "+
-		"%s/%s/%s (%s) iteration=%d walkSuccess=%v \n",
-		successPrefix, measurement, dur.String(),
-		w.ts, w.ns, w.ws, w.rootID,
-		c.iteration, pass)
+	c.vlog("%s InfluxDB %s=%s "+"%s/%s/%s (%s) iteration=%d walkSuccess=%v "+
+		"walkErrMsg=%s \n",
+		successPrefix, measurement, dur.String(), w.ts, w.ns, w.ws, w.rootID, c.iteration,
+		pass, walkErr)
 }
 
 // AddPointWalkerIteration is a measurement point writer
@@ -91,20 +92,23 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration) {
 	}
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
-		c.elog("Writing %s iteration=%d to influxDB err: %s\n",
-			measurement, c.iteration, err.Error())
+		c.elog("InfluxDB %s=%s iteration=%d numSuccess=%d numError=%d "+
+			"InfluxErr: %s\n",
+			measurement, dur.String(), c.iteration, c.numSuccess, c.numError,
+			err.Error())
 		return
 	}
-	c.vlog("%s Writing %s=%s iteration=%d numSuccess=%d numError=%d to influxDB\n",
-		successPrefix, measurement, dur.String(), c.iteration, c.numSuccess,
-		c.numError)
+	c.vlog("%s InfluxDB %s=%s iteration=%d numSuccess=%d numError=%d\n",
+		successPrefix, measurement, dur.String(), c.iteration, c.numSuccess, c.numError)
 }
 
 // Write point to indicate that walker is alive.
 //
 // tags:   keyspace    - Keyspace of the WorkspaceDB
 //
-// fields: alive - a monotonically increasing count.
+// fields: alive      - a monotonically increasing count.
+//         skipMapLen - Num keys in the skipMap
+//         skipLRULen - Num elements in skipMap LRU
 //
 func AddPointWalkerHeartBeat(c *Ctx) {
 
@@ -112,6 +116,7 @@ func AddPointWalkerHeartBeat(c *Ctx) {
 		return
 	}
 	c.aliveCount += 1
+	skipLRULen, skipMapLen := c.skipMap.Len()
 
 	measurement := "walkerHeartBeat"
 	tags := map[string]string{
@@ -122,14 +127,20 @@ func AddPointWalkerHeartBeat(c *Ctx) {
 		"iteration":    c.iteration,
 		"countSuccess": c.numSuccess,
 		"countError":   c.numError,
+		"skipMapLen":   skipMapLen,
+		"skipLRULen":   skipLRULen,
 	}
 
 	err := c.Influx.WritePoint(measurement, tags, fields)
 	if err != nil {
-		c.elog("Error:   Writing %s to influxDB err: %s\n", measurement,
-			err.Error())
+		c.elog("InfluxDB %s aliveCount=%d iteration=%d numSuccess=%d numError=%d "+
+			"skipMapLen=%d skipLRULen=%d InfluxErr=%s\n",
+			successPrefix, measurement, c.aliveCount, c.iteration, c.numSuccess, c.numError,
+			skipMapLen, skipLRULen, err.Error())
 		return
 	}
-	c.vlog("%s Writing %s aliveCount=%d iteration=%d numSuccess=%d numError=%d to influxDB\n",
-		successPrefix, measurement, c.aliveCount, c.iteration, c.numSuccess, c.numError)
+	c.vlog("%s InfluxDB %s aliveCount=%d iteration=%d numSuccess=%d numError=%d "+
+		"skipMapLen=%d skipLRULen=%d\n",
+		successPrefix, measurement, c.aliveCount, c.iteration, c.numSuccess, c.numError,
+		skipMapLen, skipLRULen)
 }
