@@ -41,7 +41,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
 		inodeRefcounts:         make(map[InodeId]int32),
-		inodeIds:               newInodeIds(time.Minute, time.Minute*5),
+		inodeIds:               newInodeIds(6*time.Minute, time.Minute*20),
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
@@ -1060,6 +1060,10 @@ maybeReleaseRef:
 // Get a file handle in a thread safe way
 func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 	fileHandle, _ := qfs.fileHandles.Load(id)
+	if fileHandle == nil {
+		return nil
+	}
+
 	return fileHandle.(FileHandle)
 }
 
@@ -1122,7 +1126,16 @@ func (qfs *QuantumFs) releaseInodeId(c *ctx, id InodeId) {
 
 // Retrieve a unique filehandle number
 func (qfs *QuantumFs) newFileHandleId() FileHandleId {
-	return FileHandleId(atomic.AddUint64(&qfs.fileHandleNum, 1))
+	//return FileHandleId(atomic.AddUint64(&qfs.fileHandleNum, 1))
+	rtn := atomic.AddUint64(&qfs.fileHandleNum, 1)
+	if uint32(rtn) == 0 {
+		if rtn != 0 {
+			qfs.c.elog("ROLLOVER 32bit FILEHANDLE")
+		} else {
+			qfs.c.elog("ZERO FILEHANDLE")
+		}
+	}
+	return FileHandleId(rtn)
 }
 
 // Trigger all active workspaces to sync
@@ -2130,7 +2143,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 	defer unlock.RUnlock()
 	logFilehandleWorkspace(c, fileHandle)
 	if fileHandle == nil {
-		c.elog("Read failed %d", fileHandle)
+		c.elog("Read failed %d", input.Fh)
 		return nil, fuse.ENOENT
 	}
 

@@ -64,6 +64,7 @@ func (ids *inodeIds) newInodeId(c *ctx) (newId InodeId, reused bool) {
 
 		if uint64(nextId.id) < ids.highMark {
 			// this id is useable
+			c.vlog("Reusing inode id %d", uint64(nextId.id))
 			return nextId.id, true
 		}
 
