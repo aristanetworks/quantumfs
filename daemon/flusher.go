@@ -211,10 +211,31 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	inode := dirtyInode.inode
 	var dirtyElement *list.Element
 
+	// doesn't grab any inode / parent lock, so is safe here
 	inode.addRef(c, refTransient)
-	defer inode.delRef(c, refTransient)
+	flushSuccess := false
+	flusherUnlocked := false
 
-	flushSuccess := func() bool {
+	func() {
+		defer func() {
+			defer func() {
+				if flusherUnlocked {
+					c.qfs.flusher.lock.Lock()
+				}
+
+				// flushing the inode has failed, if the inode has
+				// been dirtied in the meantime, just drop this list
+				// entry as there is now another one
+				if !flushSuccess {
+					flushSuccess = true &&
+						inode.markUnclean_(dirtyElement)
+				}
+			}()
+			// we must do this without the flusher locked
+			inode.delRef(c, refTransient)
+
+		}()
+
 		// the inode should be marked clean before flushing so that any new
 		// attemps to write to the inode dirties it again. Even though the
 		// inode is clean, it cannot be uninstantiated as the lookupCount is
@@ -224,24 +245,21 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		if dq.treeState.skipFlush {
 			// Don't waste time flushing inodes in deleted workspaces
 			c.vlog("Skipping flush as workspace is deleted")
-			return true
+			flushSuccess = true
+			return
 		}
 
 		c.qfs.flusher.lock.Unlock()
-		defer c.qfs.flusher.lock.Lock()
-		flushSuccess := c.qfs.flushInode_(c, inode)
-		return flushSuccess
+		flusherUnlocked = true
+
+		flushSuccess = c.qfs.flushInode_(c, inode)
+
+		if flushSuccess {
+			inode.delRef(c, refDirty) // Dirty queue reference
+		}
 	}()
-	if !flushSuccess {
-		// flushing the inode has failed, if the inode has been dirtied in
-		// the meantime, just drop this list entry as there is now another
-		// one
-		return inode.markUnclean_(dirtyElement)
-	}
 
-	inode.delRef(c, refDirty) // Dirty queue reference
-
-	return true
+	return flushSuccess
 }
 
 func init() {
