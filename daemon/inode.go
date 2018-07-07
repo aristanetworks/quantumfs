@@ -802,6 +802,13 @@ func addInodeRef_(c *ctx, inodeId InodeId, owner refType) {
 
 	if owner != refChild {
 		if utils.BitFlagsSet(uint(refs), uint(owner)) {
+			// We don't care if we re-set the dirty bit, and we can't
+			// assume we'll get as many delRefs for it as we will
+			// addRef calls. We only ever get one delRef for refDirty.
+			if owner == refDirty {
+				return
+			}
+
 			c.elog("Special refcount %x already set on inode %d", owner,
 				inodeId)
 			owner = refChild
