@@ -942,7 +942,13 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	parent := asDirectory(p)
 	target := dst[len(dst)-1]
 
+	unlinkContext := *c.fuseCtx
+	unlinkContext.Owner.Uid = 0
+	unlinkContext.Owner.Gid = 0
+	origContext := c.fuseCtx
+	c.fuseCtx = &unlinkContext
 	status := parent.Unlink(c, target)
+	c.fuseCtx = origContext
 	if status != fuse.OK && status != fuse.ENOENT {
 		return api.queueErrorResponse(quantumfs.ErrorBadArgs,
 			"Inode %s should not exist, error unlinking %d", target,
