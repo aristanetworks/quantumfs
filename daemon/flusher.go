@@ -212,7 +212,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	var dirtyElement *list.Element
 
 	// doesn't grab any inode / parent lock, so is safe here
-	inode.addRef(c, refTransient)
+	inode.addRef(c, refFlusher)
 	flushSuccess := false
 	flusherUnlocked := false
 
@@ -232,7 +232,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 				}
 			}()
 			// we must do this without the flusher locked
-			inode.delRef(c, refTransient)
+			inode.delRef(c, refFlusher)
 
 		}()
 
