@@ -945,7 +945,7 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 
 	for _, inodeNum := range uninstantiated {
 		delete(qfs.parentOfUninstantiated, inodeNum)
-		qfs.releaseInodeId(c, inodeNum)
+		qfs.inodeIds.releaseInodeId(c, inodeNum)
 		c.vlog("Removing uninstantiated %d (%d)", inodeNum,
 			len(qfs.parentOfUninstantiated))
 	}
@@ -1117,11 +1117,6 @@ func (qfs *QuantumFs) newInodeId() InodeId {
 		}
 		return newId
 	}
-}
-
-// Free a now unused inode id
-func (qfs *QuantumFs) releaseInodeId(c *ctx, id InodeId) {
-	qfs.inodeIds.releaseInodeId(c, id)
 }
 
 // Retrieve a unique filehandle number
