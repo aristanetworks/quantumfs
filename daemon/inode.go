@@ -22,10 +22,10 @@ type refType int
 
 const (
 	refChild     = refType(1 << 0)  // References from children
+	refFlusher   = refType(1 << 27) // Transient flusher hold
 	refTransient = refType(1 << 28) // Transient directory create_
 	refDirty     = refType(1 << 29) // Reference from dirty queue
 	refLookups   = refType(1 << 30) // LookupCount > 0
-	refFlusher   = refType(1 << 31) // Transient flusher hold
 )
 
 // Inode represents a specific path in the tree which updates as the tree itself
