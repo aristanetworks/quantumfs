@@ -41,7 +41,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
 		inodeRefcounts:         make(map[InodeId]int32),
-		inodeIds:               newInodeIds(2*time.Minute, time.Minute*20),
+		inodeIds:               newInodeIds(time.Minute, time.Minute*5),
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
@@ -1126,16 +1126,7 @@ func (qfs *QuantumFs) newInodeId() InodeId {
 
 // Retrieve a unique filehandle number
 func (qfs *QuantumFs) newFileHandleId() FileHandleId {
-	//return FileHandleId(atomic.AddUint64(&qfs.fileHandleNum, 1))
-	rtn := atomic.AddUint64(&qfs.fileHandleNum, 1)
-	if uint32(rtn) == 0 {
-		if rtn != 0 {
-			qfs.c.elog("ROLLOVER 32bit FILEHANDLE")
-		} else {
-			qfs.c.elog("ZERO FILEHANDLE")
-		}
-	}
-	return FileHandleId(rtn)
+	return FileHandleId(atomic.AddUint64(&qfs.fileHandleNum, 1))
 }
 
 // Trigger all active workspaces to sync
