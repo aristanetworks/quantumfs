@@ -22,7 +22,7 @@ type refType int
 
 const (
 	refChild     = refType(1 << 0)  // References from children
-	refTransient = refType(1 << 28) // Transient directory create_
+	refTransient = refType(1 << 28) // Transient function refs
 	refDirty     = refType(1 << 29) // Reference from dirty queue
 	refLookups   = refType(1 << 30) // LookupCount > 0
 )
