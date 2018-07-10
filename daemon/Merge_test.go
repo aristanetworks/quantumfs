@@ -1058,9 +1058,9 @@ func TestMergeDeepMergeHardlinkPartial(t *testing.T) {
 
 func TestMergeLostBlock(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.LogExceptions = make(map[string]struct{})
-		test.LogExceptions["ERROR: "+getFailureLog] = struct{}{}
-		test.LogExceptions["ERROR: "+panicLog] = struct{}{}
+		test.ExpectedErrors = make(map[string]struct{})
+		test.ExpectedErrors["ERROR: "+getFailureLog] = struct{}{}
+		test.ExpectedErrors["ERROR: "+panicLog] = struct{}{}
 
 		workspace := test.NewWorkspace()
 		api := test.getApi()
