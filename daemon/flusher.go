@@ -213,7 +213,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 
 	// doesn't grab any inode / parent lock, so is safe here
 	inode.addRef(c, refTransient)
-	defer inode.delRef(c, refTransient)
+	defer inode.delRef(c, refTransient, nil)
 
 	flushSuccess := func() bool {
 		c.qfs.flusher.lock.Unlock()

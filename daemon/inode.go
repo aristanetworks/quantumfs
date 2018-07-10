@@ -22,7 +22,7 @@ type refType int
 
 const (
 	refChild     = refType(1 << 0)  // References from children
-	refTransient = refType(1 << 28) // Transient function refs
+	refTransient = refType(1 << 28) // Transient directory create_
 	refDirty     = refType(1 << 29) // Reference from dirty queue
 	refLookups   = refType(1 << 30) // LookupCount > 0
 )
@@ -203,7 +203,7 @@ type Inode interface {
 
 	// Reference counting to determine when an Inode may become uninstantiated.
 	addRef(c *ctx, owner refType)
-	delRef(c *ctx, owner refType)
+	delRef(c *ctx, owner refType, coupledWork func())
 }
 
 type inodeHolder interface {
@@ -519,7 +519,7 @@ func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
 
 	if inode.parentId != quantumfs.InodeIdInvalid {
 		oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
-		oldParent.delRef(c, refChild)
+		oldParent.delRef(c, refChild, nil)
 	}
 
 	inode.parentId = newParent.inodeNum()
@@ -546,7 +546,7 @@ func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
 
 	oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
-	oldParent.delRef(c, refChild)
+	oldParent.delRef(c, refChild, nil)
 
 	inode.parentId = inode.id
 	inode.setChildRecord(c, record)
@@ -865,7 +865,11 @@ func (inode *InodeCommon) delRef(c *ctx, owner refType, coupledWork func()) {
 			newInodePair(inode.inodeNum(), inode.parentId_())})
 		return true
 	}()
-	coupledWork()
+
+	if coupledWork != nil {
+		coupledWork()
+	}
+
 	if !release {
 		return
 	}
@@ -873,7 +877,7 @@ func (inode *InodeCommon) delRef(c *ctx, owner refType, coupledWork func()) {
 	// This Inode is now unlisted and unreachable
 
 	if !inode.isOrphaned_() {
-		inode.parent_(c).delRef(c, refChild)
+		inode.parent_(c).delRef(c, refChild, nil)
 	}
 
 	if dir, isDir := inode.self.(inodeHolder); isDir {
