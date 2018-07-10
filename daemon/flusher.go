@@ -244,7 +244,13 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 			// dirty it if it was already redirtied
 			inode.addRef(c, refDirty)
 		}
+
+		// If we were redirtied, we want to drop this entry since there's
+		// already another in the queue. If not, then we failed, so keep it.
+		return wasRedirtied
 	}
+
+	return true
 }
 
 func init() {
