@@ -825,7 +825,10 @@ func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 		"Increased from zero refcount!")
 }
 
-func (inode *InodeCommon) delRef(c *ctx, owner refType) {
+// coupledWork is a function enclosure of things that have to be done after we've
+// acquired the parentLock, while we're deleting the reference count, but
+// outside of the mapMutex lock to ensure mapMutex stays leaf
+func (inode *InodeCommon) delRef(c *ctx, owner refType, coupledWork func()) {
 	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
 		// These Inodes always exist
 		return
@@ -862,6 +865,7 @@ func (inode *InodeCommon) delRef(c *ctx, owner refType) {
 			newInodePair(inode.inodeNum(), inode.parentId_())})
 		return true
 	}()
+	coupledWork()
 	if !release {
 		return
 	}

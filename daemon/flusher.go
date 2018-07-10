@@ -212,54 +212,39 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	var dirtyElement *list.Element
 
 	// doesn't grab any inode / parent lock, so is safe here
-	inode.addRef(c, refTransient)
-	flushSuccess := false
-	flusherUnlocked := false
+	inode.addRef(c, refFlusher)
+	defer inode.delRef(c, refFlusher)
 
-	func() {
-		defer func() {
-			defer func() {
-				if flusherUnlocked {
-					c.qfs.flusher.lock.Lock()
-				}
+	flushSuccess := func() bool {
+		c.qfs.flusher.lock.Unlock()
+		defer c.qfs.flusher.lock.Lock()
 
-				// flushing the inode has failed, if the inode has
-				// been dirtied in the meantime, just drop this list
-				// entry as there is now another one
-				if !flushSuccess {
-					flushSuccess = true &&
-						inode.markUnclean_(dirtyElement)
-				}
-			}()
-			// we must do this without the flusher locked
-			inode.delRef(c, refTransient)
+		// Fully clean the inode before flushing, both in the inode and the
+		// refcount map, so we can detect if its re-dirtied
+		skipFlush := false
+		inode.delRef(c, refDirty, func() {
+			defer c.qfs.flusher.lock.Lock().Unlock()
+			dirtyElement = inode.markClean_()
+			skipFlush = dq.treeState.skipFlush
+		})
 
-		}()
-
-		// the inode should be marked clean before flushing so that any new
-		// attemps to write to the inode dirties it again. Even though the
-		// inode is clean, it cannot be uninstantiated as the lookupCount is
-		// incremented above.
-		dirtyElement = inode.markClean_()
-
-		if dq.treeState.skipFlush {
+		if skipFlush {
 			// Don't waste time flushing inodes in deleted workspaces
 			c.vlog("Skipping flush as workspace is deleted")
-			flushSuccess = true
-			return
+			return true
 		}
 
-		c.qfs.flusher.lock.Unlock()
-		flusherUnlocked = true
-
-		flushSuccess = c.qfs.flushInode_(c, inode)
-
-		if flushSuccess {
-			inode.delRef(c, refDirty) // Dirty queue reference
-		}
+		return c.qfs.flushInode_(c, inode)
 	}()
-
-	return flushSuccess
+	if !flushSuccess {
+		// re-dirty the inode since flushing failed
+		wasRedirtied := inode.markUnclean_(dirtyElement)
+		if !wasRedirtied {
+			// If we're redirtying the inode, ensure we don't double
+			// dirty it if it was already redirtied
+			inode.addRef(c, refDirty)
+		}
+	}
 }
 
 func init() {
