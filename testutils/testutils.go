@@ -41,7 +41,7 @@ type TestHelper struct {
 	TestName          string
 	CachePath         string
 	Logger            *qlog.Qlog
-	LogExceptions     map[string]struct{}
+	ExpectedErrors    map[string]struct{}
 	TempDir           string
 	TestResult        chan string
 	Failed            chan struct{}
@@ -459,7 +459,7 @@ var ErrorLogs []LogscanError
 func (th *TestHelper) Logscan() (foundErrors bool) {
 	// Check the format string map for the log first to speed this up
 	logFile := th.TempDir + "/ramfs/qlog"
-	errorsPresent := qlog.LogscanSkim(logFile, th.LogExceptions)
+	errorsPresent := qlog.LogscanSkim(logFile, th.ExpectedErrors)
 
 	// Nothing went wrong if either we should fail and there were errors,
 	// or we shouldn't fail and there weren't errors
