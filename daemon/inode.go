@@ -204,7 +204,7 @@ type Inode interface {
 
 	// Reference counting to determine when an Inode may become uninstantiated.
 	addRef(c *ctx, owner refType)
-	delRef(c *ctx, owner refType)
+	delRef(c *ctx, owner refType, coupledWork func())
 }
 
 type inodeHolder interface {
@@ -520,7 +520,7 @@ func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
 
 	if inode.parentId != quantumfs.InodeIdInvalid {
 		oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
-		oldParent.delRef(c, refChild)
+		oldParent.delRef(c, refChild, nil)
 	}
 
 	inode.parentId = newParent.inodeNum()
@@ -547,7 +547,7 @@ func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
 
 	oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
-	oldParent.delRef(c, refChild)
+	oldParent.delRef(c, refChild, nil)
 
 	inode.parentId = inode.id
 	inode.setChildRecord(c, record)
@@ -826,7 +826,10 @@ func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 		"Increased from zero refcount!")
 }
 
-func (inode *InodeCommon) delRef(c *ctx, owner refType) {
+// coupledWork is a function enclosure of things that have to be done after we've
+// acquired the parentLock, while we're deleting the reference count, but
+// outside of the mapMutex lock to ensure mapMutex stays leaf
+func (inode *InodeCommon) delRef(c *ctx, owner refType, coupledWork func()) {
 	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
 		// These Inodes always exist
 		return
@@ -863,6 +866,11 @@ func (inode *InodeCommon) delRef(c *ctx, owner refType) {
 			newInodePair(inode.inodeNum(), inode.parentId_())})
 		return true
 	}()
+
+	if coupledWork != nil {
+		coupledWork()
+	}
+
 	if !release {
 		return
 	}
@@ -870,7 +878,7 @@ func (inode *InodeCommon) delRef(c *ctx, owner refType) {
 	// This Inode is now unlisted and unreachable
 
 	if !inode.isOrphaned_() {
-		inode.parent_(c).delRef(c, refChild)
+		inode.parent_(c).delRef(c, refChild, nil)
 	}
 
 	if dir, isDir := inode.self.(inodeHolder); isDir {

@@ -808,7 +808,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 			defer qfs.lookupCountLock.Lock().Unlock()
 			if _, exists := qfs.lookupCounts[id]; !exists {
 				c.vlog("Removing speculative lookup reference")
-				inode.delRef(c, refLookups)
+				inode.delRef(c, refLookups, nil)
 			} else {
 				c.vlog("Retaining speculative lookup reference")
 			}
@@ -1053,7 +1053,7 @@ maybeReleaseRef:
 	if forgotten {
 		inode := qfs.inodeNoInstantiate(c, inodeId)
 		if inode != nil {
-			inode.delRef(c, refLookups)
+			inode.delRef(c, refLookups, nil)
 		} else {
 			c.vlog(alreadyUninstantiatedLog, inodeId)
 		}
