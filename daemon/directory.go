@@ -1850,7 +1850,7 @@ func createNewEntry(c *ctx, name string, mode uint32,
 	gid quantumfs.GID, type_ quantumfs.ObjectType,
 	key quantumfs.ObjectKey) quantumfs.DirectoryRecord {
 
-	defer c.FuncIn("DirectoryRecord::createNewEntry", "name %s", name).Out()
+	defer c.FuncIn("createNewEntry", "name %s", name).Out()
 
 	// set up the Inode record
 	now := time.Now()
