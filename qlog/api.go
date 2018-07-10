@@ -91,7 +91,7 @@ func ExtractFields(filepath string) (pastEndIdx uint64, dataArray []byte,
 
 	// create a safer map to use
 	strMapData := data[mmapHeaderSize+header.CircBuf.Size:]
-	strMap := make([]logStr, len(data)/LogStrSize)
+	strMap := make([]logStr, len(strMapData)/LogStrSize)
 	visitStrMap(strMapData, func(idx int, entry *logStr) {
 		strMap[idx] = *entry
 	})
