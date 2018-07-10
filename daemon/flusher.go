@@ -213,53 +213,25 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 
 	// doesn't grab any inode / parent lock, so is safe here
 	inode.addRef(c, refFlusher)
-	flushSuccess := false
-	flusherUnlocked := false
+	defer inode.delRef(c, refFlusher, nil)
 
-	func() {
-		defer func() {
-			defer func() {
-				if flusherUnlocked {
-					c.qfs.flusher.lock.Lock()
-				}
-
-				// flushing the inode has failed, if the inode has
-				// been dirtied in the meantime, just drop this list
-				// entry as there is now another one
-				if !flushSuccess {
-					flushSuccess = true &&
-						inode.markUnclean_(dirtyElement)
-				}
-			}()
-			// we must do this without the flusher locked
-			inode.delRef(c, refFlusher)
-
-		}()
-
-		// the inode should be marked clean before flushing so that any new
-		// attemps to write to the inode dirties it again. Even though the
-		// inode is clean, it cannot be uninstantiated as the lookupCount is
-		// incremented above.
-		dirtyElement = inode.markClean_()
-
-		if dq.treeState.skipFlush {
-			// Don't waste time flushing inodes in deleted workspaces
-			c.vlog("Skipping flush as workspace is deleted")
-			flushSuccess = true
-			return
-		}
-
-		c.qfs.flusher.lock.Unlock()
-		flusherUnlocked = true
-
-		flushSuccess = c.qfs.flushInode_(c, inode)
-
-		if flushSuccess {
-			inode.delRef(c, refDirty) // Dirty queue reference
-		}
+		return c.qfs.flushInode_(c, inode)
 	}()
+	if !flushSuccess {
+		// re-dirty the inode since flushing failed
+		wasRedirtied := inode.markUnclean_(dirtyElement)
+		if !wasRedirtied {
+			// If we're redirtying the inode, ensure we don't double
+			// dirty it if it was already redirtied
+			inode.addRef(c, refDirty)
+		}
 
-	return flushSuccess
+		// If we were redirtied, we want to drop this entry since there's
+		// already another in the queue. If not, then we failed, so keep it.
+		return wasRedirtied
+	}
+
+	return true
 }
 
 func init() {
