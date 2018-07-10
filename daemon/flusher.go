@@ -215,6 +215,25 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	inode.addRef(c, refFlusher)
 	defer inode.delRef(c, refFlusher, nil)
 
+	flushSuccess := func() bool {
+		c.qfs.flusher.lock.Unlock()
+		defer c.qfs.flusher.lock.Lock()
+
+		// Fully clean the inode before flushing, both in the inode and the
+		// refcount map, so we can detect if its re-dirtied
+		skipFlush := false
+		inode.delRef(c, refDirty, func() {
+			defer c.qfs.flusher.lock.Lock().Unlock()
+			dirtyElement = inode.markClean_()
+			skipFlush = dq.treeState.skipFlush
+		})
+
+		if skipFlush {
+			// Don't waste time flushing inodes in deleted workspaces
+			c.vlog("Skipping flush as workspace is deleted")
+			return true
+		}
+
 		return c.qfs.flushInode_(c, inode)
 	}()
 	if !flushSuccess {
