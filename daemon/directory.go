@@ -731,7 +731,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	c.qfs.setInode(c, inodeNum, newEntity)
 	func() {
 		defer c.qfs.mapMutex.Lock().Unlock()
-		addInodeRef_(c, inodeNum, refTransient)
+		addInodeRef_(c, inodeNum, refCreate)
 	}()
 	c.qfs.incrementLookupCount(c, inodeNum)
 
@@ -739,7 +739,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	// an Inode with a zero refcount as that indicates a counting issue. To do so
 	// we must initialize with a non-zero refcount so incrementLookupCount()
 	// above will succeed. Give back the temporary reference count here.
-	newEntity.delRef(c, refTransient, nil)
+	newEntity.delRef(c, refCreate, nil)
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum)
