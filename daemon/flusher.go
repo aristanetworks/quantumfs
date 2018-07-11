@@ -213,17 +213,39 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 
 	// doesn't grab any inode / parent lock, so is safe here
 	inode.addRef(c, refFlusher)
-	defer inode.delRef(c, refFlusher, nil)
+	// dereference is deferred in the next section since it cannot be called
+	// with the flusher lock without violating lock order
 
-	flushSuccess := func() bool {
+	flushSuccess := false
+	func() {
 		c.qfs.flusher.lock.Unlock()
-		defer c.qfs.flusher.lock.Lock()
+		defer inode.delRef(c, refFlusher, func(delFn func()) {
+			c.qfs.flusher.lock.Lock()
+			defer delFn()
+
+			if !flushSuccess {
+				// re-dirty the inode since flushing failed
+				wasRedirtied := inode.markUnclean_(dirtyElement)
+				if !wasRedirtied {
+					// Ensure we don't double dirty it if it
+					// was already redirtied
+					inode.addRef(c, refDirty)
+				}
+
+				// If we were redirtied, we want to drop this entry
+				// since there's already another in the queue.
+				// If not then we failed, so keep it.
+				flushSuccess = wasRedirtied
+			}
+		})
 
 		// Fully clean the inode before flushing, both in the inode and the
 		// refcount map, so we can detect if its re-dirtied
 		skipFlush := false
-		inode.delRef(c, refDirty, func() {
+		inode.delRef(c, refDirty, func(delFn func()) {
 			defer c.qfs.flusher.lock.Lock().Unlock()
+			defer delFn()
+
 			dirtyElement = inode.markClean_()
 			skipFlush = dq.treeState.skipFlush
 		})
@@ -231,26 +253,14 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		if skipFlush {
 			// Don't waste time flushing inodes in deleted workspaces
 			c.vlog("Skipping flush as workspace is deleted")
-			return true
+			flushSuccess = true
+			return
 		}
 
-		return c.qfs.flushInode_(c, inode)
+		flushSuccess = c.qfs.flushInode_(c, inode)
 	}()
-	if !flushSuccess {
-		// re-dirty the inode since flushing failed
-		wasRedirtied := inode.markUnclean_(dirtyElement)
-		if !wasRedirtied {
-			// If we're redirtying the inode, ensure we don't double
-			// dirty it if it was already redirtied
-			inode.addRef(c, refDirty)
-		}
 
-		// If we were redirtied, we want to drop this entry since there's
-		// already another in the queue. If not, then we failed, so keep it.
-		return wasRedirtied
-	}
-
-	return true
+	return flushSuccess
 }
 
 func init() {
