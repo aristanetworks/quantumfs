@@ -211,11 +211,28 @@ func mergeUploader(c *ctx, buffers chan ImmutableBuffer, rtnErr *error,
 
 const maxUploadBacklog = 1000
 const panicLog = "Panic during merge: %s"
+const breadcrumbLog = "BREADCRUMB"
+
+func addBreadcrumb(err error, path string) error {
+	if !strings.Contains(err.Error(), breadcrumbLog) {
+		return fmt.Errorf("%s. %s: %s", err, breadcrumbLog, path)
+	}
+
+	return err
+}
+
+func panicBreadcrumb(path string) {
+	if err := recover(); err != nil {
+		panic(addBreadcrumb(err.(error), path))
+	}
+}
 
 func panicRecovery(c *ctx, output *quantumfs.ObjectKey, base quantumfs.ObjectKey,
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey, wsr string) {
 
 	if err := recover(); err != nil {
+		err = addBreadcrumb(err.(error), wsr)
+
 		c.elog(panicLog, err)
 		data := "Please contact quantumfs-dev@arista.com as soon as " +
 			"possible to recover your data.\n\n"
@@ -381,6 +398,7 @@ func (merge *merger) mergeDirectory(dirName string, base quantumfs.ObjectKey,
 	defer merge.c.FuncIn("mergeDirectory", "%s skipPaths len %d mergeTime %s",
 		breadcrumb, len(skipPaths.paths),
 		time.Since(merge.start).String()).Out()
+	defer panicBreadcrumb(breadcrumb)
 
 	if !premergedID.IsEqualTo(quantumfs.ZeroKey) &&
 		!needDeeperMergeID(base, remote, local) {
@@ -727,6 +745,7 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 
 	breadcrumb += "/" + local.Filename()
 	defer merge.c.FuncIn("mergeRecord", "%s", breadcrumb).Out()
+	defer panicBreadcrumb(breadcrumb)
 
 	// Merge differently depending on if the type is preserved
 	localTypeChanged := base == nil || !local.Type().Matches(base.Type())

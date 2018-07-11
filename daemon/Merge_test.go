@@ -8,6 +8,7 @@ package daemon
 import (
 	"io/ioutil"
 	"os"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -1117,5 +1118,10 @@ func TestMergeLostBlock(t *testing.T) {
 		defer test.qfs.mutabilityLock.RLock().RUnlock()
 		test.Assert(test.qfs.workspaceMutability["test/test/"+
 			"branchB"] == workspaceImmutable, "Workspace not locked")
+
+		fileContents, err := ioutil.ReadFile(branchB + "/README")
+		test.AssertNoErr(err)
+		test.Assert(strings.Contains(string(fileContents), breadcrumbLog+
+			": "), "Path breadcrumb is missing %s", string(fileContents))
 	})
 }
