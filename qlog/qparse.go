@@ -82,7 +82,7 @@ func testStrMap(filepath string, exceptions map[string]struct{}) bool {
 		trimmed := strings.TrimRight(string(entry.Text[:]), "\000")
 
 		if _, exists := exceptions[trimmed]; !exists {
-			if string(entry.Text[:5]) == "ERROR" {
+			if bytes.Contains(entry.Text[:], []byte("ERROR: ")) {
 				foundErr = true
 			}
 		}
