@@ -203,7 +203,7 @@ type Inode interface {
 
 	// Reference counting to determine when an Inode may become uninstantiated.
 	addRef(c *ctx, owner refType)
-	delRef(c *ctx, owner refType, coupledWork func())
+	delRef(c *ctx, owner refType, coupledWork relCtx)
 }
 
 type inodeHolder interface {
@@ -825,10 +825,44 @@ func (inode *InodeCommon) addRef(c *ctx, owner refType) {
 		"Increased from zero refcount!")
 }
 
-// coupledWork is a function enclosure of things that have to be done after we've
-// acquired the parentLock, while we're deleting the reference count, but
-// outside of the mapMutex lock to ensure mapMutex stays leaf
-func (inode *InodeCommon) delRef(c *ctx, owner refType, coupledWork func()) {
+// inode's parentLock must be locked
+func (inode *InodeCommon) delRef_(c *ctx, owner refType) (released bool) {
+	defer c.qfs.mapMutex.Lock().Unlock()
+
+	refs := c.qfs.inodeRefcounts[inode.inodeNum()]
+
+	if owner != refChild {
+		if !utils.BitFlagsSet(uint(refs), uint(owner)) {
+			c.elog("Special refcount %x not set on inode %d",
+				owner, inode.inodeNum())
+			owner = refChild
+		}
+	}
+
+	c.qfs.inodeRefcounts[inode.inodeNum()] = refs - int32(owner)
+
+	c.vlog("D: %x refs on inode %d", refs, inode.inodeNum())
+	if refs != int32(owner) {
+		return false
+	}
+
+	c.vlog("Uninstantiating inode %d", inode.inodeNum())
+
+	c.qfs.setInode_(c, inode.inodeNum(), nil)
+	delete(c.qfs.inodeRefcounts, inode.inodeNum())
+
+	c.qfs.addUninstantiated_(c, []inodePair{
+		newInodePair(inode.inodeNum(), inode.parentId_())})
+	return true
+}
+
+type relCtx func(func())
+
+// releaseContext is a function enclosure of things that have to be done after we've
+// acquired the parentLock, around where we're deleting the reference count, but
+// outside of the mapMutex lock to ensure mapMutex stays leaf. This is primarily
+// for coordinating reference count deletion with something that it's coupled with.
+func (inode *InodeCommon) delRef(c *ctx, owner refType, releaseContext relCtx) {
 	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
 		// These Inodes always exist
 		return
@@ -836,38 +870,13 @@ func (inode *InodeCommon) delRef(c *ctx, owner refType, coupledWork func()) {
 
 	defer inode.parentLock.Lock().Unlock()
 
-	release := func() bool {
-		defer c.qfs.mapMutex.Lock().Unlock()
-
-		refs := c.qfs.inodeRefcounts[inode.inodeNum()]
-
-		if owner != refChild {
-			if !utils.BitFlagsSet(uint(refs), uint(owner)) {
-				c.elog("Special refcount %x not set on inode %d",
-					owner, inode.inodeNum())
-				owner = refChild
-			}
-		}
-
-		c.qfs.inodeRefcounts[inode.inodeNum()] = refs - int32(owner)
-
-		c.vlog("D: %x refs on inode %d", refs, inode.inodeNum())
-		if refs != int32(owner) {
-			return false
-		}
-
-		c.vlog("Uninstantiating inode %d", inode.inodeNum())
-
-		c.qfs.setInode_(c, inode.inodeNum(), nil)
-		delete(c.qfs.inodeRefcounts, inode.inodeNum())
-
-		c.qfs.addUninstantiated_(c, []inodePair{
-			newInodePair(inode.inodeNum(), inode.parentId_())})
-		return true
-	}()
-
-	if coupledWork != nil {
-		coupledWork()
+	release := false
+	if releaseContext != nil {
+		releaseContext(func() {
+			release = inode.delRef_(c, owner)
+		})
+	} else {
+		release = inode.delRef_(c, owner)
 	}
 
 	if !release {
