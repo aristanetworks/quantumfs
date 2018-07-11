@@ -213,9 +213,9 @@ const maxUploadBacklog = 1000
 const panicLog = "Panic during merge: %s"
 const breadcrumbLog = "BREADCRUMB"
 
-func addBreadcrumb(err error, path string) error {
-	if !strings.Contains(err.Error(), breadcrumbLog) {
-		return fmt.Errorf("%s. %s: %s", err, breadcrumbLog, path)
+func addBreadcrumb(err string, path string) string {
+	if !strings.Contains(err, breadcrumbLog) {
+		return fmt.Sprintf("%s. %s: %s", err, breadcrumbLog, path)
 	}
 
 	return err
@@ -223,7 +223,7 @@ func addBreadcrumb(err error, path string) error {
 
 func panicBreadcrumb(path string) {
 	if err := recover(); err != nil {
-		panic(addBreadcrumb(err.(error), path))
+		panic(addBreadcrumb(err.(string), path))
 	}
 }
 
@@ -231,7 +231,9 @@ func panicRecovery(c *ctx, output *quantumfs.ObjectKey, base quantumfs.ObjectKey
 	remote quantumfs.ObjectKey, local quantumfs.ObjectKey, wsr string) {
 
 	if err := recover(); err != nil {
-		err = addBreadcrumb(err.(error), wsr)
+		defer c.funcIn("panicRecovery").Out()
+
+		err = addBreadcrumb(err.(string), wsr)
 
 		c.elog(panicLog, err)
 		data := "Please contact quantumfs-dev@arista.com as soon as " +
@@ -255,9 +257,9 @@ func panicRecovery(c *ctx, output *quantumfs.ObjectKey, base quantumfs.ObjectKey
 		gid := c.fuseCtx.Owner.Gid
 		UID := quantumfs.ObjectUid(uid, uid)
 		GID := quantumfs.ObjectGid(gid, gid)
-		errorRecord := createNewEntry(c, "README", 0777, 0777, 0, 0, UID,
-			GID, quantumfs.ObjectTypeSmallFile,
-			errorFile.sync(c, publishNow))
+		errorRecord := createNewEntry(c, "README", 0777, 0777, 0,
+			errorFile.fileLength(c), UID, GID,
+			quantumfs.ObjectTypeSmallFile, errorFile.sync(c, publishNow))
 
 		panicDirectory := publishDirectoryRecords(c,
 			[]quantumfs.DirectoryRecord{errorRecord}, publishNow)

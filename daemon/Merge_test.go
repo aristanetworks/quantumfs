@@ -1122,6 +1122,7 @@ func TestMergeLostBlock(t *testing.T) {
 		fileContents, err := ioutil.ReadFile(branchB + "/README")
 		test.AssertNoErr(err)
 		test.Assert(strings.Contains(string(fileContents), breadcrumbLog+
-			": "), "Path breadcrumb is missing %s", string(fileContents))
+			": "), "Path breadcrumb is missing %d |%s|",
+			len(fileContents), string(fileContents))
 	})
 }
