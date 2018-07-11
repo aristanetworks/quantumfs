@@ -203,7 +203,7 @@ type Inode interface {
 
 	// Reference counting to determine when an Inode may become uninstantiated.
 	addRef(c *ctx, owner refType)
-	delRef(c *ctx, owner refType, coupledWork relCtx)
+	delRef(c *ctx, owner refType, releaseContext relCtx)
 }
 
 type inodeHolder interface {
