@@ -62,11 +62,13 @@ func init() {
 		MagicOwnership:   true,
 	}
 
+	fmt.Printf("QuantumFS version %s\n", version)
+}
+
+func initFlags() {
 	const (
 		defaultCacheSize = "24G"
 	)
-
-	fmt.Printf("QuantumFS version %s\n", version)
 
 	qflag = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
@@ -180,10 +182,17 @@ func loadWorkspaceDB() {
 }
 
 func parseConfigFile() {
-	confFlag := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-	confFlag.Usage = func() {} // Be silent
-	confFlag.StringVar(&configFile, "config", "", "")
-	confFlag.Parse(os.Args[1:])
+	captureFilename := false
+	for _, param := range os.Args[1:] {
+		if captureFilename {
+			configFile = param
+			break
+		}
+
+		if param == "-config" {
+			captureFilename = true
+		}
+	}
 
 	if configFile != "" {
 		file, err := os.Open(configFile)
@@ -223,6 +232,11 @@ func processArgs() {
 	// override those values if available.
 	parseConfigFile()
 
+	// Now that we've loaded the config file into the config, we can initialize
+	// the flags with those defaults, otherwise Parse will overwrite the config
+	initFlags()
+
+	// Parse any command line parameters, overwriting anything already set
 	qflag.Parse(os.Args[1:])
 
 	if showMaxSizes {
