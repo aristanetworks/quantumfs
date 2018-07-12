@@ -501,7 +501,6 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 func (inode *InodeCommon) setParent(c *ctx, newParent Inode) {
 	defer inode.parentLock.Lock().Unlock()
 	inode.setParent_(c, newParent)
-
 }
 
 // Must be called with parentLock locked for writing
