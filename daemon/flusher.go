@@ -219,31 +219,8 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	inode := dirtyInode.inode
 	var dirtyElement *list.Element
 
-<<<<<<< HEAD
-	// doesn't grab any inode / parent lock, so is safe here
-	inode.addRef(c, refFlusher)
-	// dereference is deferred in the next section since it cannot be called
-	// with the flusher lock without violating lock order
-
-	flushSuccess := false
-	func() {
-		c.qfs.flusher.lock.Unlock()
-		defer inode.delRef(c, refFlusher, func(delFn func()) {
-			c.qfs.flusher.lock.Lock()
-			defer delFn()
-
-			if !flushSuccess {
-				// re-dirty the inode since flushing failed
-				wasRedirtied := inode.markUnclean_(dirtyElement)
-				if !wasRedirtied {
-					// Ensure we don't double dirty it if it
-					// was already redirtied
-					inode.addRef(c, refDirty)
-				}
-=======
 	inode.addRef(c)
 	safelyDeref(c, inode)
->>>>>>> fixDeadlock
 
 	flushSuccess := func() bool {
 		// the inode should be marked clean before flushing so that any new
