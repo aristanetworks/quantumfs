@@ -212,52 +212,31 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	var dirtyElement *list.Element
 
 	inode.addRef(c)
-	defer inode.delRef(c)
-
-	flushSuccess := false
-	func() {
+	defer func() {
 		c.qfs.flusher.lock.Unlock()
-		defer inode.delRef(c, refTransient, func(delFn func()) {
-			c.qfs.flusher.lock.Lock()
-			defer delFn()
+		defer c.qfs.flusher.lock.Lock()
 
-			if !flushSuccess {
-				// re-dirty the inode since flushing failed
-				wasRedirtied := inode.markUnclean_(dirtyElement)
-				if !wasRedirtied {
-					// Ensure we don't double dirty it if it
-					// was already redirtied
-					inode.addRef(c, refDirty)
-				}
-
-				// If we were redirtied, we want to drop this entry
-				// since there's already another in the queue.
-				// If not then we failed, so keep it.
-				flushSuccess = wasRedirtied
-			}
-		})
-
-		// Fully clean the inode before flushing, both in the inode and the
-		// refcount map, so we can detect if its re-dirtied
-		skipFlush := false
-		inode.delRef(c, refDirty, func(delFn func()) {
-			defer c.qfs.flusher.lock.Lock().Unlock()
-			defer delFn()
-
-			dirtyElement = inode.markClean_()
-			skipFlush = dq.treeState.skipFlush
-		})
-
-		if skipFlush {
-			// Don't waste time flushing inodes in deleted workspaces
-			c.vlog("Skipping flush as workspace is deleted")
-			flushSuccess = true
-			return
-		}
-
-		flushSuccess = c.qfs.flushInode_(c, inode)
+		inode.delRef(c)
 	}()
 
+	flushSuccess := func() bool {
+		// the inode should be marked clean before flushing so that any new
+		// attemps to write to the inode dirties it again. Even though the
+		// inode is clean, it cannot be uninstantiated as the refCount is
+		// incremented above.
+		dirtyElement = inode.markClean_()
+
+		if dq.treeState.skipFlush {
+			// Don't waste time flushing inodes in deleted workspaces
+			c.vlog("Skipping flush as workspace is deleted")
+			return true
+		}
+
+		c.qfs.flusher.lock.Unlock()
+		defer c.qfs.flusher.lock.Lock()
+		flushSuccess := c.qfs.flushInode_(c, inode)
+		return flushSuccess
+	}()
 	if !flushSuccess {
 		// flushing the inode has failed, if the inode has been dirtied in
 		// the meantime, just drop this list entry as there is now another
@@ -265,9 +244,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		return inode.markUnclean_(dirtyElement)
 	}
 
-	inode.delRef(c) // Dirty queue reference
-
-	return flushSuccess
+	return true
 }
 
 func init() {

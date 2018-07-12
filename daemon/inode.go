@@ -810,27 +810,19 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		refs := c.qfs.inodeRefcounts[inode.inodeNum()] - 1
 		c.qfs.inodeRefcounts[inode.inodeNum()] = refs
 
-// releaseContext is a function enclosure of things that have to be done after we've
-// acquired the parentLock, around where we're deleting the reference count, but
-// outside of the mapMutex lock to ensure mapMutex stays leaf. This is primarily
-// for coordinating reference count deletion with something that it's coupled with.
-func (inode *InodeCommon) delRef(c *ctx, owner refType, releaseContext relCtx) {
-	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
-		// These Inodes always exist
-		return
-	}
+		if refs != 0 {
+			return false
+		}
 
-	defer inode.parentLock.Lock().Unlock()
+		c.vlog("Uninstantiating inode %d", inode.inodeNum())
 
-	release := false
-	if releaseContext != nil {
-		releaseContext(func() {
-			release = inode.delRef_(c, owner)
-		})
-	} else {
-		release = inode.delRef_(c, owner)
-	}
+		c.qfs.setInode_(c, inode.inodeNum(), nil)
+		delete(c.qfs.inodeRefcounts, inode.inodeNum())
 
+		c.qfs.addUninstantiated_(c, []inodePair{
+			newInodePair(inode.inodeNum(), inode.parentId_())})
+		return true
+	}()
 	if !release {
 		return
 	}
