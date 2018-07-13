@@ -944,6 +944,12 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 	defer qfs.mapMutex.Lock().Unlock()
 
 	for _, inodeNum := range uninstantiated {
+		if _, hasRefs := qfs.inodeRefcounts[inodeNum]; !hasRefs {
+			// It's only safe to release the inode id when it has been
+			// removed from both refcounting and parentOfUninstantiated
+			qfs.inodeIds.releaseInodeId(c, inodeNum)
+		}
+
 		delete(qfs.parentOfUninstantiated, inodeNum)
 		c.vlog("Removing uninstantiated %d (%d)", inodeNum,
 			len(qfs.parentOfUninstantiated))
