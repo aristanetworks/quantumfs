@@ -220,7 +220,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	var dirtyElement *list.Element
 
 	inode.addRef(c)
-	safelyDeref(c, inode)
+	defer safelyDeref(c, inode)
 
 	flushSuccess := func() bool {
 		// the inode should be marked clean before flushing so that any new
