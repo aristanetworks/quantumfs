@@ -51,6 +51,8 @@ func (store *dataStore) Freshen(c *ctx, key quantumfs.ObjectKey) error {
 	return store.durableStore.Freshen(&c.Ctx, key)
 }
 
+const getFailureLog = "Couldn't get from any store: %s Key %s"
+
 func (store *dataStore) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey) ImmutableBuffer {
 
@@ -77,8 +79,7 @@ func (store *dataStore) Get(c *quantumfs.Ctx,
 
 			err := store.durableStore.Get(c, key, &buf)
 			if err != nil {
-				c.Elog(qlog.LogDaemon, "Couldn't get from any "+
-					"store: %s Key %s", err.Error(),
+				c.Elog(qlog.LogDaemon, getFailureLog, err.Error(),
 					key.String())
 				return nil
 			}

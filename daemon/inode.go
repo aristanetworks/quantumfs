@@ -789,10 +789,17 @@ func (inode *InodeCommon) cleanup(c *ctx) {
 // Must hold mapMutex for write.
 func addInodeRef_(c *ctx, inodeId InodeId) {
 	defer c.FuncIn("addInodeRef_", "%d", inodeId).Out()
-	c.qfs.inodeRefcounts[inodeId]++
+	refs := c.qfs.inodeRefcounts[inodeId] + 1
+	c.qfs.inodeRefcounts[inodeId] = refs
+
+	c.vlog("A: %x refs on inode %d", refs, inodeId)
 }
 
 func (inode *InodeCommon) addRef(c *ctx) {
+	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
+		// These Inodes always exist
+		return
+	}
 	defer c.qfs.mapMutex.Lock().Unlock()
 	addInodeRef_(c, inode.inodeNum())
 
@@ -802,6 +809,11 @@ func (inode *InodeCommon) addRef(c *ctx) {
 
 func (inode *InodeCommon) delRef(c *ctx) {
 	defer c.FuncIn("InodeCommon::delRef", "%d", inode.inodeNum()).Out()
+	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
+		// These Inodes always exist
+		return
+	}
+
 	defer inode.parentLock.Lock().Unlock()
 
 	release := func() bool {
@@ -810,6 +822,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		refs := c.qfs.inodeRefcounts[inode.inodeNum()] - 1
 		c.qfs.inodeRefcounts[inode.inodeNum()] = refs
 
+		c.vlog("D: %x refs on inode %d", refs, inode.inodeNum())
 		if refs != 0 {
 			return false
 		}
