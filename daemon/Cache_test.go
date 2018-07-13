@@ -6,6 +6,7 @@ package daemon
 // Test the internal datastore cache
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -23,6 +24,10 @@ type testDataStore struct {
 	countLock utils.DeferableMutex
 	getCount  map[string]int
 	setCount  map[string]int
+
+	// Allows you to effectively delete blocks
+	holeLock utils.DeferableMutex
+	holes    map[string]struct{}
 }
 
 func newTestDataStore(test *testHelper) *testDataStore {
@@ -32,6 +37,7 @@ func newTestDataStore(test *testHelper) *testDataStore {
 		test:       test,
 		getCount:   make(map[string]int),
 		setCount:   make(map[string]int),
+		holes:      make(map[string]struct{}),
 	}
 }
 
@@ -45,6 +51,18 @@ func (store *testDataStore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 		defer store.countLock.Lock().Unlock()
 		store.getCount[key.String()]++
 	}()
+
+	err := func() error {
+		defer store.holeLock.Lock().Unlock()
+		if _, exists := store.holes[key.String()]; exists {
+			return fmt.Errorf("Key does not exist")
+		}
+
+		return nil
+	}()
+	if err != nil {
+		return err
+	}
 
 	return store.datastore.Get(c, key, buf)
 }
