@@ -425,8 +425,8 @@ func TestWalkPanicString(t *testing.T) {
 		test.Assert(err == nil, "Error getting rootID for %v: %v",
 			root, err)
 
-		wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
-			size uint64, isDir bool) error {
+		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+			objType quantumfs.ObjectType) error {
 
 			if strings.HasSuffix(path, "/panicFile") {
 				panic(expectedString)
@@ -464,8 +464,8 @@ func TestWalkPanicErr(t *testing.T) {
 		test.Assert(err == nil, "Error getting rootID for %v: %v",
 			root, err)
 
-		wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
-			size uint64, isDir bool) error {
+		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+			objType quantumfs.ObjectType) error {
 
 			if strings.HasSuffix(path, "/panicFile") {
 				panic(expectedErr)
@@ -503,8 +503,8 @@ func TestWalkErr(t *testing.T) {
 		test.Assert(err == nil, "Error getting rootID for %v: %v",
 			root, err)
 
-		wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
-			size uint64, isDir bool) error {
+		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+			objType quantumfs.ObjectType) error {
 
 			if strings.HasSuffix(path, "/errorFile") {
 				return expectedErr

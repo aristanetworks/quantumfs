@@ -493,6 +493,27 @@ func TestInsertInodeDirties(t *testing.T) {
 	})
 }
 
+func TestInsertInodeOverwriteNoPerm(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		filename1 := workspace + "/dir/file1"
+		filename2 := workspace + "/dir/file2"
+
+		test.MakeFile(filename1)
+		test.MakeFile(filename2)
+		test.AssertNoErr(os.Chown(filename2, 0, 0))
+		test.AssertNoErr(os.Chmod(filename2, 0000))
+		test.AssertNoErr(os.Chmod(workspace+"/dir", 1777))
+
+		defer test.SetUidGid(99, 99, nil).Revert()
+
+		key := getExtendedKeyHelper(test, filename1, "file")
+		api := test.getApi()
+		test.AssertNoErr(api.InsertInode(test.RelPath(filename2), key, 0777,
+			0, 0))
+	})
+}
+
 func TestApiNoRequestBlockingRead(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		api, err := os.OpenFile(test.AbsPath(quantumfs.ApiPath),
