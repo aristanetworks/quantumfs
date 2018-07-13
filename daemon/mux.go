@@ -1421,6 +1421,13 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 
 }
 
+func (qfs *QuantumFs) setWorkspaceImmutable(wsr string) {
+
+	defer qfs.mutabilityLock.RLock().RUnlock()
+
+	qfs.workspaceMutability[wsr] = workspaceImmutable
+}
+
 func (qfs *QuantumFs) invalidateInode(c *ctx, inodeId InodeId) {
 	qfs.toNotifyFuse <- FuseNotification{
 		c:     c,
