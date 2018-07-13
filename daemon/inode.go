@@ -831,7 +831,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 
 		c.qfs.setInode_(c, inode.inodeNum(), nil)
 		delete(c.qfs.inodeRefcounts, inode.inodeNum())
-		qfs.inodeIds.releaseInodeId(c, inode.inodeNum())
+		c.qfs.inodeIds.releaseInodeId(c, inode.inodeNum())
 
 		c.qfs.addUninstantiated_(c, []inodePair{
 			newInodePair(inode.inodeNum(), inode.parentId_())})

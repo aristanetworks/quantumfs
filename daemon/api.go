@@ -27,15 +27,6 @@ func NewApiInode(c *ctx, treeState *TreeState, parent Inode) Inode {
 		},
 	}
 	api.self = &api
-
-	func() {
-		defer c.qfs.mapMutex.Lock().Unlock()
-		// temporarily add a reference since the typespaceList won't have
-		// one of its own before this api file is created
-		addInodeRef_(c, parent.inodeNum())
-	}()
-	defer parent.delRef(c)
-
 	api.setParent(c, parent)
 	utils.Assert(api.treeState() != nil, "ApiInode treeState is nil at init")
 	return &api
