@@ -717,7 +717,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	gid := c.fuseCtx.Owner.Gid
 	UID := quantumfs.ObjectUid(uid, uid)
 	GID := quantumfs.ObjectGid(gid, gid)
-	entry := dir.createNewEntry(c, name, mode, umask, rdev,
+	entry := createNewEntry(c, name, mode, umask, rdev,
 		0, UID, GID, type_, key)
 	inodeNum := c.qfs.newInodeId()
 	newEntity := constructor(c, name, key, 0, inodeNum, dir.self,
@@ -1845,12 +1845,12 @@ func (dir *Directory) lookupChildRecord_(c *ctx, name string) (InodeId,
 	return inodeNum, record, nil
 }
 
-func (dir *Directory) createNewEntry(c *ctx, name string, mode uint32,
+func createNewEntry(c *ctx, name string, mode uint32,
 	umask uint32, rdev uint32, size uint64, uid quantumfs.UID,
 	gid quantumfs.GID, type_ quantumfs.ObjectType,
 	key quantumfs.ObjectKey) quantumfs.DirectoryRecord {
 
-	defer c.FuncIn("DirectoryRecord::createNewEntry", "name %s", name).Out()
+	defer c.FuncIn("createNewEntry", "name %s", name).Out()
 
 	// set up the Inode record
 	now := time.Now()
@@ -1880,7 +1880,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 
 	defer c.FuncIn("Directory::duplicateInode_", "name %s", name).Out()
 
-	entry := dir.createNewEntry(c, name, mode, umask, rdev, size,
+	entry := createNewEntry(c, name, mode, umask, rdev, size,
 		uid, gid, type_, key)
 
 	inodeNum := func() InodeId {

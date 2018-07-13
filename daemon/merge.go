@@ -210,13 +210,75 @@ func mergeUploader(c *ctx, buffers chan ImmutableBuffer, rtnErr *error,
 }
 
 const maxUploadBacklog = 1000
+const panicLog = "Panic during merge: %s"
+const breadcrumbLog = "BREADCRUMB"
+
+func addBreadcrumb(err string, path string) string {
+	if !strings.Contains(err, breadcrumbLog) {
+		return fmt.Sprintf("%s. %s: %s", err, breadcrumbLog, path)
+	}
+
+	return err
+}
+
+func panicBreadcrumb(path string) {
+	if err := recover(); err != nil {
+		panic(addBreadcrumb(err.(string), path))
+	}
+}
+
+func panicRecovery(c *ctx, output *quantumfs.ObjectKey, base quantumfs.ObjectKey,
+	remote quantumfs.ObjectKey, local quantumfs.ObjectKey, wsr string) {
+
+	if err := recover(); err != nil {
+		defer c.funcIn("panicRecovery").Out()
+
+		err = addBreadcrumb(err.(string), wsr)
+
+		c.elog(panicLog, err)
+		data := "Please contact quantumfs-dev@arista.com as soon as " +
+			"possible to recover your data.\n\n"
+		data += fmt.Sprintf("Fatal error during merge: %s\n", err)
+		data += fmt.Sprintf("Base rootID: %s\n", base.String())
+		data += fmt.Sprintf("Remote rootID: %s\n", remote.String())
+		data += fmt.Sprintf("Local rootID: %s\n", local.String())
+		if len(data) > quantumfs.MaxBlockSize {
+			data = data[:quantumfs.MaxBlockSize]
+		}
+
+		errorFile := newSmallAccessor(c, 0, quantumfs.EmptyBlockKey)
+		written, err := errorFile.writeBlock(c, 0, 0, []byte(data))
+		if written != len(data) || err != nil {
+			c.elog("Unable to write small accessor: %d %s", written, err)
+			return
+		}
+
+		uid := c.fuseCtx.Owner.Uid
+		gid := c.fuseCtx.Owner.Gid
+		UID := quantumfs.ObjectUid(uid, uid)
+		GID := quantumfs.ObjectGid(gid, gid)
+		errorRecord := createNewEntry(c, "README", 0777, 0777, 0,
+			errorFile.fileLength(c), UID, GID,
+			quantumfs.ObjectTypeSmallFile, errorFile.sync(c, publishNow))
+
+		panicDirectory := publishDirectoryRecords(c,
+			[]quantumfs.DirectoryRecord{errorRecord}, publishNow)
+		*output = publishWorkspaceRoot(c, panicDirectory,
+			make(map[quantumfs.FileId]*HardlinkTableEntry), publishNow)
+
+		c.qfs.setWorkspaceImmutable(wsr)
+	}
+}
 
 func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.ObjectKey,
 	local quantumfs.ObjectKey, prefer mergePreference,
-	skipPaths *mergeSkipPaths, breadcrumb string) (quantumfs.ObjectKey, error) {
+	skipPaths *mergeSkipPaths, breadcrumb string) (rtn quantumfs.ObjectKey,
+	rtnErr error) {
 
 	defer c.FuncIn("mergeWorkspaceRoot", "Prefer %d skip len %d wsr %s", prefer,
 		len(skipPaths.paths), breadcrumb).Out()
+
+	defer panicRecovery(c, &rtn, base, remote, local, breadcrumb)
 
 	toSet := make(chan ImmutableBuffer, maxUploadBacklog)
 	merge := newMerger(c, prefer, func(c *ctx,
@@ -268,7 +330,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 		return local, err
 	}
 
-	rtn := publishWorkspaceRoot(c, localDirectory, tracker.filterDeadEntries(),
+	rtn = publishWorkspaceRoot(c, localDirectory, tracker.filterDeadEntries(),
 		merge.pubFn)
 
 	return rtn, uploadErr
@@ -338,6 +400,7 @@ func (merge *merger) mergeDirectory(dirName string, base quantumfs.ObjectKey,
 	defer merge.c.FuncIn("mergeDirectory", "%s skipPaths len %d mergeTime %s",
 		breadcrumb, len(skipPaths.paths),
 		time.Since(merge.start).String()).Out()
+	defer panicBreadcrumb(breadcrumb)
 
 	if !premergedID.IsEqualTo(quantumfs.ZeroKey) &&
 		!needDeeperMergeID(base, remote, local) {
@@ -684,6 +747,7 @@ func (merge *merger) mergeRecord(base quantumfs.DirectoryRecord,
 
 	breadcrumb += "/" + local.Filename()
 	defer merge.c.FuncIn("mergeRecord", "%s", breadcrumb).Out()
+	defer panicBreadcrumb(breadcrumb)
 
 	// Merge differently depending on if the type is preserved
 	localTypeChanged := base == nil || !local.Type().Matches(base.Type())
