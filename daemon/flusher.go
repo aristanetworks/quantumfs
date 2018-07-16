@@ -200,6 +200,14 @@ func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushCmd, response chan error) erro
 	}
 }
 
+// delRef must not be called with the flusher lock to preserve lock order
+func safelyDeref(c *ctx, inode Inode) {
+	c.qfs.flusher.lock.Unlock()
+	defer c.qfs.flusher.lock.Lock()
+
+	inode.delRef(c)
+}
+
 // treeState lock and flusher lock must be locked R/W when calling this function
 func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	// We must release the flusher lock because when we flush
@@ -212,12 +220,12 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	var dirtyElement *list.Element
 
 	inode.addRef(c)
-	defer inode.delRef(c)
+	defer safelyDeref(c, inode)
 
 	flushSuccess := func() bool {
 		// the inode should be marked clean before flushing so that any new
 		// attemps to write to the inode dirties it again. Even though the
-		// inode is clean, it cannot be uninstantiated as the lookupCount is
+		// inode is clean, it cannot be uninstantiated as the refCount is
 		// incremented above.
 		dirtyElement = inode.markClean_()
 
@@ -239,7 +247,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 		return inode.markUnclean_(dirtyElement)
 	}
 
-	inode.delRef(c) // Dirty queue reference
+	safelyDeref(c, inode) // Dirty queue reference
 
 	return true
 }
