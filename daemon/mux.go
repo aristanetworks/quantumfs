@@ -41,7 +41,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		config:                 config,
 		inodes:                 make(map[InodeId]Inode),
 		inodeRefcounts:         make(map[InodeId]int32),
-		inodeNum:               quantumfs.InodeIdReservedEnd,
+		inodeIds:               newInodeIds(time.Minute, time.Minute*5),
 		fileHandleNum:          0,
 		flusher:                NewFlusher(),
 		parentOfUninstantiated: make(map[InodeId]InodeId),
@@ -114,7 +114,7 @@ type QuantumFs struct {
 	fuse.RawFileSystem
 	server        *fuse.Server
 	config        QuantumFsConfig
-	inodeNum      uint64
+	inodeIds      *inodeIds
 	fileHandleNum uint64
 	c             ctx
 
@@ -944,6 +944,12 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 	defer qfs.mapMutex.Lock().Unlock()
 
 	for _, inodeNum := range uninstantiated {
+		if _, hasRefs := qfs.inodeRefcounts[inodeNum]; !hasRefs {
+			// It's only safe to release the inode id when it has been
+			// removed from both refcounting and parentOfUninstantiated
+			qfs.inodeIds.releaseInodeId(c, inodeNum)
+		}
+
 		delete(qfs.parentOfUninstantiated, inodeNum)
 		c.vlog("Removing uninstantiated %d (%d)", inodeNum,
 			len(qfs.parentOfUninstantiated))
@@ -1059,6 +1065,10 @@ maybeReleaseRef:
 // Get a file handle in a thread safe way
 func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 	fileHandle, _ := qfs.fileHandles.Load(id)
+	if fileHandle == nil {
+		return nil
+	}
+
 	return fileHandle.(FileHandle)
 }
 
@@ -1086,9 +1096,32 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 	}
 }
 
-// Retrieve a unique inode number
+// Retrieves a unique inode number
 func (qfs *QuantumFs) newInodeId() InodeId {
-	return InodeId(atomic.AddUint64(&qfs.inodeNum, 1))
+	for {
+		// When we get a new id, it's possible that we're still using it.
+		// If it's still in use, grab another one instead
+		newId, reused := qfs.inodeIds.newInodeId(&qfs.c)
+
+		// If this is a reused id, then it's safe to use immediately
+		if reused {
+			return newId
+		}
+
+		// We expect that ids will be reused more often than not. To optimize
+		// for that case, we only lock the map mutex when we absolutely must
+		idIsFree := func() bool {
+			defer qfs.mapMutex.Lock().Unlock()
+
+			inode, inodeIdUsed := qfs.getInode_(&qfs.c, newId)
+			return inode == nil && !inodeIdUsed
+		}()
+
+		if !idIsFree {
+			continue
+		}
+		return newId
+	}
 }
 
 // Retrieve a unique filehandle number
@@ -2108,7 +2141,7 @@ func (qfs *QuantumFs) Read(input *fuse.ReadIn, buf []byte) (readRes fuse.ReadRes
 	defer unlock.RUnlock()
 	logFilehandleWorkspace(c, fileHandle)
 	if fileHandle == nil {
-		c.elog("Read failed %d", fileHandle)
+		c.elog("Read failed %d", input.Fh)
 		return nil, fuse.ENOENT
 	}
 
