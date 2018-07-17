@@ -7,11 +7,13 @@ package daemon
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
 )
 
@@ -185,5 +187,40 @@ func TestInodeIdsReuseCheck(t *testing.T) {
 		fileD := test.getInodeNum(workspace + "/dirA/fileD")
 		test.Assert(fileC == fileB+1, "inode id not incremented after GC")
 		test.Assert(fileD == fileC+1, "inode id not incremented after GC")
+	})
+}
+
+func TestInstantiationPanicRecovery(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		backingStore := newTestDataStore(test)
+		test.SetDataStore(backingStore)
+		// Make sure we cache nothing
+		test.qfs.c.dataStore.cache = newCombiningCache(0)
+
+		workspace := test.NewWorkspace()
+		api := test.getApi()
+		test.AssertNoErr(os.MkdirAll(workspace+"/dir", 0777))
+		test.MakeFile(workspace + "/dir/file")
+
+		test.SyncAllWorkspaces()
+
+		// Delete a block artificially from the datastore to cause a panic
+		// during loadAllChildren
+		key := make([]byte, quantumfs.ExtendedKeyLength)
+		_, err := syscall.Getxattr(workspace+"/dir",
+			quantumfs.XAttrTypeKey, key)
+		test.AssertNoErr(err)
+		func() {
+			defer backingStore.holeLock.Lock().Unlock()
+			binaryKey, _, _, err := quantumfs.DecodeExtendedKey("" +
+				string(key))
+			test.AssertNoErr(err)
+			backingStore.holes[binaryKey.String()] = struct{}{}
+		}()
+
+		test.AssertNoErr(api.Branch(test.RelPath(workspace),
+			"test/test/branchB"))
+
+		ioutil.ReadFile(test.AbsPath("test/test/branchB/dir/file"))
 	})
 }
