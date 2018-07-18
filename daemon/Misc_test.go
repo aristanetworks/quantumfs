@@ -192,6 +192,12 @@ func TestInodeIdsReuseCheck(t *testing.T) {
 
 func TestInstantiationPanicRecovery(t *testing.T) {
 	runTest(t, func(test *testHelper) {
+		test.ExpectedErrors = make(map[string]struct{})
+		test.ExpectedErrors["ERROR: Couldn't get from any store: "+
+			"%s Key %s"] = struct{}{}
+		test.ExpectedErrors["ERROR: PANIC (%d): 'No baseLayer object' "+
+			"BT: %v"] = struct{}{}
+
 		backingStore := newTestDataStore(test)
 		test.SetDataStore(backingStore)
 		// Make sure we cache nothing

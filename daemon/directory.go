@@ -101,13 +101,25 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	utils.Assert(dir.treeState() != nil, "Directory treeState nil at init")
 }
 
-func (dir *Directory) finishInit(c *ctx) []inodePair {
+func (dir *Directory) finishInit(c *ctx) (uninstantiated []inodePair) {
 	defer c.funcIn("Directory::finishInit").Out()
-	defer dir.childRecordLock.Unlock()
+	panicked := true
+	wsrInode := dir.hardlinkTable.getWorkspaceRoot().inodeNum()
+
+	defer func() {
+		if panicked {
+			// we can't allow the childRecord lock to be unlocked with
+			// a nil childContainer
+			dir.children, uninstantiated = newChildContainer(c, dir,
+				quantumfs.EmptyDirKey, wsrInode)
+		}
+		dir.childRecordLock.Unlock()
+	}()
+
 	utils.Assert(dir.children == nil, "children already loaded")
-	container, uninstantiated := newChildContainer(c, dir, dir.baseLayerId,
-		dir.hardlinkTable.getWorkspaceRoot().inodeNum())
-	dir.children = container
+	dir.children, uninstantiated = newChildContainer(c, dir, dir.baseLayerId,
+		wsrInode)
+	panicked = false
 	return uninstantiated
 }
 
