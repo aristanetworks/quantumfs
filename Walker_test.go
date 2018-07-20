@@ -236,3 +236,15 @@ func TestMapMaxLen(t *testing.T) {
 			"Max length not obeyed: %d", cacheLen)
 	})
 }
+
+// TestWorkspacePrunedAfterListing asserts that walk of
+// a workspace which has been pruned after walker daemon
+// sees the workspace in listing, doesn't result in error.
+func TestWorkspacePrunedAfterListing(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		// workspace t1/nw/w1 wasn't created
+		c := test.testCtx()
+		err := runWalker(c, "t1", "n1", "w1")
+		test.AssertNoErr(err)
+	})
+}

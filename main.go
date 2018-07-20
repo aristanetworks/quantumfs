@@ -312,6 +312,16 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 	start := time.Now()
 	if rootID, _, err = qubitutils.GetWorkspaceRootID(c.qctx, c.wsdb,
 		wsname); err != nil {
+		// walker daemon is asynchronous to pruner daemon and so
+		// it is possible that pruner daemon removed the workspace
+		// from workspaceDB in between walker daemon seeing it in
+		// the list of workspaces and starting the walk of the
+		// workspace.
+		if werr, ok := err.(quantumfs.WorkspaceDbErr); ok &&
+			werr.Code == quantumfs.WSDB_WORKSPACE_NOT_FOUND {
+			c.wlog("%s/%s/%s not found, might have been pruned", ts, ns, ws)
+			return nil
+		}
 		c.elog("Get rootID for %s/%s/%s, err(%s)", ts, ns, ws,
 			err.Error())
 		return err
