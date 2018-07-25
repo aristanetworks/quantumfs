@@ -818,14 +818,15 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 		}
 	}()
 
-	panicked := true
 	defer func() {
-		if panicked {
+		if panicErr := recover(); panicErr != nil {
 			// rollback instantiation
 			defer qfs.instantiationLock.Lock().Unlock()
 			defer qfs.mapMutex.Lock().Unlock()
 			qfs.parentOfUninstantiated[id] = parent
 			qfs.setInode_(c, id, nil)
+
+			panic(panicErr)
 		}
 	}()
 
@@ -836,7 +837,6 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 			qfs.addUninstantiated_(c, uninstantiated)
 		}
 	}
-	panicked = false
 
 	return inode
 }

@@ -103,23 +103,18 @@ func initDirectory(c *ctx, name string, dir *Directory,
 
 func (dir *Directory) finishInit(c *ctx) (uninstantiated []inodePair) {
 	defer c.funcIn("Directory::finishInit").Out()
-	panicked := true
-	wsrInode := dir.hardlinkTable.getWorkspaceRoot().inodeNum()
-
-	defer func() {
-		if panicked {
-			// we can't allow the childRecord lock to be unlocked with
-			// a nil childContainer
-			dir.children, uninstantiated = newChildContainer(c, dir,
-				quantumfs.EmptyDirKey, wsrInode)
-		}
-		dir.childRecordLock.Unlock()
-	}()
+	defer dir.childRecordLock.Unlock()
 
 	utils.Assert(dir.children == nil, "children already loaded")
+
+	wsrInode := dir.hardlinkTable.getWorkspaceRoot().inodeNum()
+	// pre-set child container to a safe instance to ensure we don't leave it nil
+	dir.children, uninstantiated = newChildContainer(c, dir,
+		quantumfs.EmptyDirKey, wsrInode)
+
+	// now attempt to load the children, which may panic / fail
 	dir.children, uninstantiated = newChildContainer(c, dir, dir.baseLayerId,
 		wsrInode)
-	panicked = false
 	return uninstantiated
 }
 
