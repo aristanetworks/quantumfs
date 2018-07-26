@@ -794,9 +794,12 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	// If we didn't find it, get the more expensive lock and check again. This
 	// will instantiate the Inode if necessary and possible.
 	instantiated := false
+	parent := InodeId(0)
 	func() {
 		defer qfs.instantiationLock.Lock().Unlock()
 		defer qfs.mapMutex.Lock().Unlock()
+
+		parent = qfs.parentOfUninstantiated[id]
 		inode, instantiated = qfs.inode_(c, id)
 	}()
 
@@ -812,6 +815,18 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 			} else {
 				c.vlog("Retaining speculative lookup reference")
 			}
+		}
+	}()
+
+	defer func() {
+		if panicErr := recover(); panicErr != nil {
+			// rollback instantiation
+			defer qfs.instantiationLock.Lock().Unlock()
+			defer qfs.mapMutex.Lock().Unlock()
+			qfs.parentOfUninstantiated[id] = parent
+			qfs.setInode_(c, id, nil)
+
+			panic(panicErr)
 		}
 	}()
 
@@ -1179,8 +1194,8 @@ func logRequestPanic(c *ctx) {
 
 	stackTrace := debug.Stack()
 
-	c.elog("PANIC serving request %d: '%s' Stacktrace: %v", c.RequestId,
-		fmt.Sprintf("%v", exception), utils.BytesToString(stackTrace))
+	c.elog("PANIC (%d): '"+fmt.Sprintf("%v", exception)+
+		"' BT: %v", c.RequestId, utils.BytesToString(stackTrace))
 }
 
 const FuseRequestWorkspace = "FUSE Request Workspace: %s"
