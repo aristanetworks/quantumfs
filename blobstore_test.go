@@ -34,7 +34,7 @@ func (s *storeTests) SetupTest() {
 	mocksession := &MockSession{}
 	mocksession.On("Close").Return()
 	mockcc.On("CreateSession").Return(mocksession, nil)
-	mockSchemaOk(mocksession, "blobStore", nil)
+	mockSchemaOk(mocksession, "ether", "blobStore", nil)
 
 	mockCfg := &Config{
 		Cluster: ClusterConfig{
@@ -365,7 +365,7 @@ func (s *storeTests) TestSchemaV2TableAbsent() {
 
 	// mock a scenario where the blobstore table does
 	// not exist yet (race)
-	mockSchemaCheckV2Table(mocksession, "blobstore", 0, nil)
+	mockSchemaCheckV2Table(mocksession, "ether", "blobstore", 0, nil)
 
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when no blobstore table")
@@ -384,7 +384,7 @@ func (s *storeTests) TestSchemaV2TableErr() {
 	// mock a scenario where the blobstore table does
 	// not exist yet (race)
 	expErr := errors.New("keyspace not found")
-	mockSchemaCheckV2Table(mocksession, "blobstore", 1, expErr)
+	mockSchemaCheckV2Table(mocksession, "ether", "blobstore", 1, expErr)
 
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when schema table check failed")
@@ -402,8 +402,8 @@ func (s *storeTests) TestSchemaV2PermsBad() {
 
 	// mock a scenario where the blobstore table does
 	// not exist yet (race)
-	mockSchemaCheckV2Table(mocksession, "blobstore", 1, nil)
-	mockSchemaCheckV2Perms(mocksession, "blobstore", nil, nil)
+	mockSchemaCheckV2Table(mocksession, "ether", "blobstore", 1, nil)
+	mockSchemaCheckV2Perms(mocksession, "ether", "blobstore", nil, nil)
 
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when no perms")
@@ -422,8 +422,8 @@ func (s *storeTests) TestSchemaV2PermsErr() {
 	// mock a scenario where the blobstore table does
 	// not exist yet (race)
 	expErr := errors.New("keyspace not found")
-	mockSchemaCheckV2Table(mocksession, "blobstore", 1, nil)
-	mockSchemaCheckV2Perms(mocksession, "blobstore", nil, expErr)
+	mockSchemaCheckV2Table(mocksession, "ether", "blobstore", 1, nil)
+	mockSchemaCheckV2Perms(mocksession, "ether", "blobstore", nil, expErr)
 
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when schema perm check failed")

@@ -50,12 +50,12 @@ func DoTableOp(sess *gocql.Session, op SchemaOp,
 				" publishtime bigint, immutable boolean,"+
 				" PRIMARY KEY ( typespace, namespace, workspace ))"+
 				" WITH compaction = { 'class': 'LeveledCompactionStrategy' };",
-				keyspace, wsdbName),
+				wsdbKeySpace(keyspace), wsdbName),
 		}
 	} else {
 		ddls = []string{
 			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s", keyspace, bsName),
-			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s", keyspace, wsdbName),
+			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s", wsdbKeySpace(keyspace), wsdbName),
 		}
 	}
 
@@ -126,6 +126,18 @@ func SetupIntegTestKeyspace(confFile string) error {
 
 	if err != nil {
 		return fmt.Errorf("error in creating keyspace %s: %s", cfg.Cluster.KeySpace, err.Error())
+	}
+
+	// workspacedb keyspace
+	keyspace := wsdbKeySpace(cfg.Cluster.KeySpace)
+	queryStr = fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = "+
+		"{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }", keyspace)
+
+	query = sess.Query(queryStr)
+	err = utils.ExecWithRetry(query, schemaRetries)
+
+	if err != nil {
+		return fmt.Errorf("error in creating keyspace %s: %s", keyspace, err.Error())
 	}
 
 	return nil

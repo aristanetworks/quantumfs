@@ -44,7 +44,7 @@ func newCqlBS(cluster Cluster, cfg *Config) (blobstore.BlobStore, error) {
 	}
 
 	bsName, _ := prefixToTblNames(os.Getenv("CFNAME_PREFIX"))
-	if err := isTablePresent(&store, cfg, bsName); err != nil {
+	if err := isTablePresent(&store, cfg, cfg.Cluster.KeySpace, bsName); err != nil {
 		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "%s", err.Error())
 	}
 

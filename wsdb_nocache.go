@@ -26,6 +26,10 @@ type noCacheWsdb struct {
 	cfName   string
 }
 
+func wsdbKeySpace(blobstoreKeyspace string) string {
+	return blobstoreKeyspace + "wsdb"
+}
+
 func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 	var store cqlStore
 	var err error
@@ -36,13 +40,16 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (wsdb.WorkspaceDB, error) {
 	}
 
 	_, wsdbName := prefixToTblNames(os.Getenv("CFNAME_PREFIX"))
-	if err := isTablePresent(&store, cfg, wsdbName); err != nil {
+	if err := isTablePresent(&store, cfg, wsdbKeySpace(cfg.Cluster.KeySpace),
+		wsdbName); err != nil {
 		return nil, wsdb.NewError(wsdb.ErrFatal, "%s", err.Error())
 	}
 
+	keyspace := wsdbKeySpace(cfg.Cluster.KeySpace)
+
 	wsdbInst := &noCacheWsdb{
 		store:    &store,
-		keyspace: cfg.Cluster.KeySpace,
+		keyspace: keyspace,
 		cfName:   wsdbName,
 	}
 

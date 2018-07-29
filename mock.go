@@ -342,7 +342,7 @@ func mockDbTypespaceGet(sess *MockSession, typespace string, err error) {
 
 	sess.On("Query", `
 SELECT typespace
-FROM ether.workspacedb
+FROM etherwsdb.workspacedb
 WHERE typespace = ? LIMIT 1`, typespace).Return(query)
 }
 
@@ -355,7 +355,7 @@ func mockDbNamespaceGet(sess *MockSession, typespace string,
 
 	sess.On("Query", `
 SELECT namespace
-FROM ether.workspacedb
+FROM etherwsdb.workspacedb
 WHERE typespace = ? AND namespace = ? LIMIT 1`, typespace, namespace).Return(query)
 }
 
@@ -365,7 +365,7 @@ func mockWsdbKeyDel(sess *MockSession, typespace string,
 	query := new(MockQuery)
 	stmt := `
 DELETE
-FROM ether.workspacedb
+FROM etherwsdb.workspacedb
 WHERE typespace=? AND namespace=? AND workspace=?`
 	sess.On("Query", stmt,
 		typespace, namespace, workspace).Return(query)
@@ -385,7 +385,7 @@ func mockWsdbWorkspaceLastWriteTime(sess *MockSession, typespace string,
 
 	sess.On("Query", `
 SELECT WRITETIME(key)
-FROM ether.workspacedb
+FROM etherwsdb.workspacedb
 WHERE typespace=? AND namespace=? AND workspace=?`,
 		typespace, namespace, workspace).Return(query)
 }
@@ -401,7 +401,7 @@ func mockWsdbKeyGet(sess *MockSession, typespace string,
 
 	sess.On("Query", `
 SELECT key, nonce, publishtime
-FROM ether.workspacedb
+FROM etherwsdb.workspacedb
 WHERE typespace = ? AND namespace = ? AND workspace = ?`,
 		typespace, namespace, workspace).Return(query)
 }
@@ -412,7 +412,7 @@ func mockWsdbKeyPut(sess *MockSession, typespace string,
 
 	query := new(MockQuery)
 	stmt := `
-INSERT INTO ether.workspacedb
+INSERT INTO etherwsdb.workspacedb
 (typespace, namespace, workspace, key, nonce, publishtime)
 VALUES (?,?,?,?,?,?)`
 
@@ -435,7 +435,7 @@ func mockWsdbImmutableGet(sess *MockSession, typespace string,
 
 	sess.On("Query", `
 SELECT immutable
-FROM ether.workspacedb
+FROM etherwsdb.workspacedb
 WHERE typespace = ? AND namespace = ? AND workspace = ?`,
 		typespace, namespace, workspace).Return(query)
 }
@@ -445,7 +445,7 @@ func mockWsdbImmutablePut(sess *MockSession, typespace string,
 
 	query := new(MockQuery)
 	stmt := `
-UPDATE ether.workspacedb
+UPDATE etherwsdb.workspacedb
 SET immutable = ?
 WHERE typespace = ? AND namespace = ? AND workspace = ?`
 
@@ -588,22 +588,22 @@ func mockWsdbCacheTypespaceFetchPanic(sess *MockSession) {
 
 	sess.On("Query", `
 SELECT distinct typespace
-FROM ether.workspacedb`).Return(fetchQuery)
+FROM etherwsdb.workspacedb`).Return(fetchQuery)
 
 }
 
 const cacheTypespaceFetchQuery = `
 SELECT distinct typespace
-FROM ether.workspacedb`
+FROM etherwsdb.workspacedb`
 
 const cacheNamespaceFetchQuery = `
 SELECT namespace
-FROM ether.workspacedb
+FROM etherwsdb.workspacedb
 WHERE typespace = ?`
 
 const cacheWorkspaceFetchQuery = `
 SELECT workspace, nonce, publishtime
-FROM ether.workspacedb
+FROM etherwsdb.workspacedb
 WHERE typespace = ? AND namespace = ?`
 
 func mockWsdbCacheTypespaceFetch(sess *MockSession,
@@ -661,23 +661,24 @@ func mockBranchWorkspace(sess *MockSession, srcTypespace string,
 		srcKey, wsdb.WorkspaceNonceInvalid, nil)
 }
 
-func mockSchemaOk(sess *MockSession, tableName string, err error) {
-	mockSchemaCheckV2(sess, tableName, 1, []string{"SELECT", "MODIFY"}, nil)
+func mockSchemaOk(sess *MockSession, keyspace, tableName string, err error) {
+	mockSchemaCheckV2(sess, keyspace, tableName, 1, []string{"SELECT", "MODIFY"}, nil)
 }
 
-func mockSchemaCheckV2(sess *MockSession, tableName string,
+func mockSchemaCheckV2(sess *MockSession, keyspace, tableName string,
 	count int, perms []string, err error) {
 
-	mockSchemaCheckV2Table(sess, tableName, count, err)
-	mockSchemaCheckV2Perms(sess, tableName, perms, err)
+	mockSchemaCheckV2Table(sess, keyspace, tableName, count, err)
+	mockSchemaCheckV2Perms(sess, keyspace, tableName, perms, err)
 }
 
-func mockSchemaCheckV2Table(sess *MockSession, tableName string, count int, err error) {
+func mockSchemaCheckV2Table(sess *MockSession, keyspace,
+	tableName string, count int, err error) {
 
 	mockquery := &MockQuery{}
 	checkTableQuery := fmt.Sprintf("SELECT count(*) FROM system.schema_columns "+
 		"WHERE keyspace_name='%s' AND columnfamily_name='%s'",
-		strings.ToLower(tstKeyspace), strings.ToLower(tableName))
+		strings.ToLower(keyspace), strings.ToLower(tableName))
 	sess.On("Query", checkTableQuery).Return(mockquery)
 	if err != nil {
 		mockquery.On("Scan", mock.AnythingOfType("*int")).Return(err)
@@ -687,13 +688,14 @@ func mockSchemaCheckV2Table(sess *MockSession, tableName string, count int, err 
 	}
 }
 
-func mockSchemaCheckV2Perms(sess *MockSession, tableName string, perms []string, err error) {
+func mockSchemaCheckV2Perms(sess *MockSession, keyspace,
+	tableName string, perms []string, err error) {
 
 	mockquery := &MockQuery{}
 	checkPermsQuery := fmt.Sprintf("SELECT permissions FROM system_auth.permissions "+
 		"WHERE username='%s' AND resource='data/%s'",
 		strings.ToLower(tstUsername),
-		strings.ToLower(tstKeyspace))
+		strings.ToLower(keyspace))
 	sess.On("Query", checkPermsQuery).Return(mockquery)
 	if err != nil {
 		mockquery.On("Scan", mock.AnythingOfType("*[]string")).Return(err)

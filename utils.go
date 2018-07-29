@@ -77,10 +77,10 @@ func readCqlConfig(fileName string) (*Config, error) {
 const schemaCheckSleep = 5 * time.Second
 
 // Check if the table is present. Loop (1 + cfg.Cluster.CheckSchemaRetries) times
-func isTablePresent(store *cqlStore, cfg *Config, tableName string) error {
+func isTablePresent(store *cqlStore, cfg *Config, keySpace, tableName string) error {
 	var err error
 	for retry := 0; retry <= cfg.Cluster.CheckSchemaRetries; retry++ {
-		if err = schemaOk(store, cfg, tableName); err != nil {
+		if err = schemaOk(store, cfg, keySpace, tableName); err != nil {
 			fmt.Fprintf(os.Stderr, "schemaCheck error: %v\n", err)
 			if retriesLeft := cfg.Cluster.CheckSchemaRetries - retry; retriesLeft > 0 {
 				fmt.Printf("schemaCheck will be retried after %s\n", schemaCheckSleep)
@@ -100,20 +100,20 @@ func isTablePresent(store *cqlStore, cfg *Config, tableName string) error {
 //
 // NOTE: "describe" is a cqlsh command and not a CQL protocol command
 //       so can't use it to check schema
-func schemaOk(store *cqlStore, cfg *Config, tableName string) error {
-	return schemaCheckV2(store, cfg, tableName)
+func schemaOk(store *cqlStore, cfg *Config, keySpace, tableName string) error {
+	return schemaCheckV2(store, cfg, keySpace, tableName)
 }
 
 // supports cassandraV2 system table schema
-func schemaCheckV2(store *cqlStore, cfg *Config, tableName string) error {
+func schemaCheckV2(store *cqlStore, cfg *Config, keySpace, tableName string) error {
 	// In CQL, all the keyspace and table names are always in lower case
 	checkTableQuery := fmt.Sprintf("SELECT count(*) FROM system.schema_columns "+
 		"WHERE keyspace_name='%s' AND columnfamily_name='%s'",
-		strings.ToLower(cfg.Cluster.KeySpace), strings.ToLower(tableName))
+		strings.ToLower(keySpace), strings.ToLower(tableName))
 	checkPermsQuery := fmt.Sprintf("SELECT permissions FROM system_auth.permissions "+
 		"WHERE username='%s' AND resource='data/%s'",
 		cfg.Cluster.Username, // username is case-sensitive
-		strings.ToLower(cfg.Cluster.KeySpace))
+		strings.ToLower(keySpace))
 
 	var countCols int
 	if err := store.session.Query(checkTableQuery).Scan(&countCols); err != nil {
