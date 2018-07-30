@@ -68,7 +68,7 @@ func setupCommonState() error {
 	if err != nil {
 		return cmdproc.NewPreCmdExitErr("Connection to workspaceDB failed: %s", err)
 	}
-	cs.cqldb = cql.NewWorkspaceDB(co.config)
+	cs.cqldb = cql.NewUncachedWorkspaceDB(co.config)
 
 	cs.ctx = newCtx()
 	return nil
