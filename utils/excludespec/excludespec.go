@@ -139,7 +139,7 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 
 		// Paths are obtained when line in exclude file passes
 		// parsing (syntax checks) and glob expansion.
-		paths, err := parseExcludeLine(base, line);
+		paths, err := parseExcludeLine(base, line)
 		if err == errIgnorePath {
 			continue
 		}

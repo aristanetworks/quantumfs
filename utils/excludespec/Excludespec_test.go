@@ -763,7 +763,6 @@ dir2
 			"dir1/blah4":            1,
 			"dir1/blah4/dir2":       1,
 			"dir1/blah4/dir2/file1": 0,
-
 		}
 
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
