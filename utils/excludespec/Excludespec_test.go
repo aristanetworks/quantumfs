@@ -723,3 +723,50 @@ file1
 		test.AssertNoErr(err)
 	})
 }
+
+// Path globbing tests.
+func TestGlobbingSpec(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		hierarchy := []string{
+			"dir1/blah1/dir2/file1",
+			"dir1/blah2/dir2/file1",
+			"dir1/blah3/dir2/file1",
+			"dir1/blah4/dir2/file1",
+			"dir1/blah1/dir2/file2",
+			"dir2/blah2/dir2/file1",
+			"dir1/blah3/dir3/file1",
+		}
+
+		content := `
+# exclude everything under dir1 apart from explicit includes
+dir1
+dir2
++dir1/*/dir2/file1
+`
+		expected := pathInfo{
+			"/": 1,
+
+			"dir1":                  4,
+			"dir1/blah1":            1,
+			"dir1/blah1/dir2":       1,
+			"dir1/blah1/dir2/file1": 0,
+
+			"dir1/blah2":            1,
+			"dir1/blah2/dir2":       1,
+			"dir1/blah2/dir2/file1": 0,
+
+			"dir1/blah3":            1,
+			"dir1/blah3/dir2":       1,
+			"dir1/blah3/dir2/file1": 0,
+
+			"dir1/blah4":            1,
+			"dir1/blah4/dir2":       1,
+			"dir1/blah4/dir2/file1": 0,
+
+		}
+
+		err := runSpecTest(test.TempDir, hierarchy, content, expected)
+		test.AssertNoErr(err)
+	})
+}
