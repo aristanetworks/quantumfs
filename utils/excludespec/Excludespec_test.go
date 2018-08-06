@@ -736,16 +736,27 @@ func TestGlobbingSpec(t *testing.T) {
 			"dir1/blah1/dir2/file2",
 			"dir2/blah2/dir2/file1",
 			"dir1/blah3/dir3/file1",
+			"dir2/subdir/fileA",
+			"dir2/subdir/fileB",
+			"dir2/otherdir/file",
 		}
 
 		content := `
-# exclude everything under dir1 apart from explicit includes
+# Exclude everything under dir1 apart from explicit includes
 dir1
 dir2
+
+# Include files matching pattern
 +dir1/*/dir2/file1
+
+# Include contents of the whole directory
++dir2/subdir/
+
+# Include just empty directory
++dir2/otherdir
 `
 		expected := pathInfo{
-			"/": 1,
+			"/": 2,
 
 			"dir1":                  4,
 			"dir1/blah1":            1,
@@ -763,6 +774,12 @@ dir2
 			"dir1/blah4":            1,
 			"dir1/blah4/dir2":       1,
 			"dir1/blah4/dir2/file1": 0,
+
+			"dir2":              2,
+			"dir2/subdir":       2,
+			"dir2/subdir/fileA": 0,
+			"dir2/subdir/fileB": 0,
+			"dir2/otherdir":     0,
 		}
 
 		err := runSpecTest(test.TempDir, hierarchy, content, expected)
