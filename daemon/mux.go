@@ -775,8 +775,9 @@ func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
 	return inode
 }
 
-// Get an inode in a thread safe way
-func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
+// Get an inode in a thread safe way. Release *must* be called when the inode is no
+// longer needed since a reference count is added to prevent uninstantiation.
+func (qfs *QuantumFs) inode(c *ctx, id InodeId) (Inode, release func()) {
 	// Handle the special case of invalid id
 	if id == quantumfs.InodeIdInvalid {
 		return nil
@@ -785,12 +786,20 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) Inode {
 	// First find the Inode under a cheaper lock
 	inode, _ := func() (Inode, bool) {
 		defer qfs.mapMutex.RLock().RUnlock()
-		return qfs.getInode_(c, id)
+		inode_ := qfs.getInode_(c, id)
+		if inode_ != nil {
+			addInodeRef_(c, id)
+		}
 	}()
-
 	if inode != nil {
-		return inode
+		return inode, func() {
+			// delRef can be done asynchronously, since it grabs locks,
+			// so that we don't need to worry about the functions we
+			// call release in
+			go inode.delRef(c)
+		}
 	}
+
 	// If we didn't find it, get the more expensive lock and check again. This
 	// will instantiate the Inode if necessary and possible.
 	instantiated := false
