@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -2062,5 +2063,44 @@ func TestMvChildCtime(t *testing.T) {
 		test.Assert(stat1.Ctim.Nano() < stat2.Ctim.Nano(),
 			"rename did not update ctime %d vs. %d",
 			stat1.Ctim.Nano(), stat2.Ctim.Nano())
+	})
+}
+
+func TestMvChildRace(t *testing.T) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		test.AssertNoErr(os.Mkdir(workspace+"/dirB", 0777))
+		test.AssertNoErr(os.Mkdir(workspace+"/dirA", 0777))
+		// We've now created an oddity: parent has a higher inode than child
+		test.AssertNoErr(os.Rename(workspace+"/dirB",
+			workspace+"/dirA/dirB"))
+		testutils.PrintToFile(workspace+"/dirA/dirB/file", "some data")
+
+		// sync workspace so we can order the dirty queue specifically
+		test.SyncAllWorkspaces()
+
+		// dirty dirB to cause it to flush (up operation)
+		test.AssertNoErr(os.Chmod(workspace+"/dirA/dirB", 0766))
+		time.Sleep(80 * time.Millisecond)
+		//	count := test.CountLogStrings("Directory::flush")
+
+		// Race between an up and what may be a down operation
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		//test.WaitForNLogStrings("Directory::flush", count+1,
+		//		"directory to flush data")
+
+		go func() {
+			time.Sleep(6 * time.Millisecond)
+			// Down operation between dirA and dirB
+			os.Rename(workspace+"/dirA/dirB/file",
+				workspace+"/dirA/file")
+			wg.Done()
+		}()
+
+		wg.Wait()
+		test.Assert(false, "ASD")
 	})
 }

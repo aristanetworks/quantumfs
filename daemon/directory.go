@@ -1300,6 +1300,10 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	// getLockOrder() to facilitate this.
 	firstLock, lastLock := getLockOrder(dst, dir)
 	defer firstLock.Lock().Unlock()
+	if oldName == "file" {
+		c.vlog("MVCHILD WAIT")
+		time.Sleep(50 * time.Millisecond)
+	}
 	defer lastLock.Lock().Unlock()
 
 	result = func() fuse.Status {
@@ -1958,6 +1962,12 @@ func (dir *Directory) flush(c *ctx) quantumfs.ObjectKey {
 	dir.parentSyncChild(c, func() (quantumfs.ObjectKey, *HardlinkDelta) {
 		defer dir.childRecordLock.Lock().Unlock()
 		dir.publish_(c)
+
+		if dir.name() == "dirB" {
+			c.vlog("FLUSH WAIT")
+			time.Sleep(50 * time.Millisecond)
+		}
+
 		return dir.baseLayerId, dir.hardlinkDelta
 	})
 
