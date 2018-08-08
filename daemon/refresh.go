@@ -382,7 +382,8 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 	defer cleanup()
 	utils.Assert(err == nil, "could not handle error %v", err)
 
-	srcInode := c.qfs.inode(c, parentId)
+	srcInode, release := c.qfs.inode(c, parentId)
+	defer release()
 
 	inode := c.qfs.inodeNoInstantiate(c, inodeId)
 

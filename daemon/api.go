@@ -930,7 +930,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	p, treeUnlock := c.qfs.RLockTreeGetInode(c, p.inodeNum())
-	defer treeUnlock.RUnlock()
+	defer treeUnlock()
 
 	// The parent may have been deleted between the search and locking its tree.
 	if p == nil {

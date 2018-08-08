@@ -399,7 +399,10 @@ func (dq *DirtyQueue) requeue_(c *ctx, inode Inode) {
 			if inode.isWorkspaceRoot() || inode.isOrphaned_() {
 				return true
 			}
-			inode = inode.parent_(c)
+			var release func()
+			inode, release = inode.parent_(c)
+			defer release()
+
 			return false
 		}()
 		if done {
