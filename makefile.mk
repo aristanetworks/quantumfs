@@ -2,13 +2,15 @@ COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthche
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
-PKGS_TO_TEST+=quantumfs/thirdparty_backends quantumfs/systemlocal
+PKGS_TO_TEST+=quantumfs/systemlocal
 PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/grpc
 PKGS_TO_TEST+=quantumfs/grpc/server quantumfs/qlogstats
 PKGS_TO_TEST+=quantumfs/cmd/qupload
 LIBRARIES=libqfs.so libqfs.h libqfs32.so libqfs32.h
+
+export GOCACHE=off
 
 # It's common practice to use a 'v' prefix on tags, but the prefix should be
 # removed when making the RPM version string.
@@ -61,8 +63,8 @@ update: check-dep-installed
 	$(fetch-cityhash)
 	@echo "Please review and commit any changes to Gopkg.toml and Gopkg.lock"
 
-vet: $(PKGS_TO_TEST) $(COMMANDS)
-	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./cmd -true -o -type d -print`
+vet:
+	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./cmd -true -o -type d -print`
 
 lockcheck:
 	./lockcheck.sh
