@@ -777,7 +777,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 
 	// First find the Inode under a cheaper lock
 	inode := func() Inode {
-		defer qfs.mapMutex.RLock().RUnlock()
+		defer qfs.mapMutex.Lock().Unlock()
 		inode_, _ := qfs.getInode_(c, id)
 		if inode_ != nil {
 			addInodeRef_(c, id)
@@ -786,7 +786,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	}()
 	if inode != nil {
 		return inode, func() {
-			inode.delRef(c)
+			go inode.delRef(c)
 		}
 	}
 
@@ -841,7 +841,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	}
 
 	return inode, func() {
-		inode.delRef(c)
+		go inode.delRef(c)
 	}
 }
 

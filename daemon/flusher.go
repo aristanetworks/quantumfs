@@ -382,6 +382,7 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 func (dq *DirtyQueue) requeue_(c *ctx, inode Inode) {
 	defer c.FuncIn("DirtyQueue::requeue_", "inode %d", inode.inodeNum()).Out()
 
+	var release func()
 	for {
 		dq.moveToBackOfQueue_(c, inode)
 
@@ -399,14 +400,14 @@ func (dq *DirtyQueue) requeue_(c *ctx, inode Inode) {
 			if inode.isWorkspaceRoot() || inode.isOrphaned_() {
 				return true
 			}
-			var release func()
 			inode, release = inode.parent_(c)
-			defer release()
 
 			return false
 		}()
 		if done {
 			return
+		} else {
+			defer release()
 		}
 	}
 }
