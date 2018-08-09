@@ -710,8 +710,8 @@ func (qfs *QuantumFs) RLockTreeGetInode(c *ctx, inodeId InodeId) (Inode, func())
 	inode.RLockTree()
 
 	return inode, func() {
-		release()
 		inode.treeState().RUnlock()
+		release()
 	}
 }
 
@@ -726,8 +726,8 @@ func (qfs *QuantumFs) LockTreeGetInode(c *ctx, inodeId InodeId) (Inode, func()) 
 	inode.LockTree()
 
 	return inode, func() {
-		release()
 		inode.treeState().Unlock()
+		release()
 	}
 }
 
@@ -767,6 +767,12 @@ func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
 	return inode
 }
 
+func releaserFn(c *ctx, inode Inode) func() {
+	return func() {
+		go inode.delRef(c)
+	}
+}
+
 // Get an inode in a thread safe way. Release *must* be called when the inode is no
 // longer needed since a reference count is added to prevent uninstantiation.
 func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func()) {
@@ -785,9 +791,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 		return inode_
 	}()
 	if inode != nil {
-		return inode, func() {
-			go inode.delRef(c)
-		}
+		return inode, releaserFn(c, inode)
 	}
 
 	// If we didn't find it, get the more expensive lock and check again. This
@@ -840,9 +844,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 		}
 	}
 
-	return inode, func() {
-		go inode.delRef(c)
-	}
+	return inode, releaserFn(c, inode)
 }
 
 // Must hold the instantiationLock and mapMutex for write
