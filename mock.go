@@ -663,16 +663,17 @@ func mockBranchWorkspace(sess *MockSession, srcTypespace string,
 
 func mockSchemaOk(sess *MockSession, keyspace, tableName string, err error) {
 	mockSchemaCheckV2(sess, keyspace, tableName, 1, []string{"SELECT", "MODIFY"}, nil)
+	mockSchemaCheckV3(sess, keyspace, tableName, 1, []string{"SELECT", "MODIFY"}, nil)
 }
 
 func mockSchemaCheckV2(sess *MockSession, keyspace, tableName string,
 	count int, perms []string, err error) {
 
-	mockSchemaCheckV2Table(sess, keyspace, tableName, count, err)
+	mockSchemaCheckV2Schema(sess, keyspace, tableName, count, err)
 	mockSchemaCheckV2Perms(sess, keyspace, tableName, perms, err)
 }
 
-func mockSchemaCheckV2Table(sess *MockSession, keyspace,
+func mockSchemaCheckV2Schema(sess *MockSession, keyspace,
 	tableName string, count int, err error) {
 
 	mockquery := &MockQuery{}
@@ -703,4 +704,34 @@ func mockSchemaCheckV2Perms(sess *MockSession, keyspace,
 		scanFunc := newMockQueryScanList(err, []interface{}{perms})
 		mockquery.On("Scan", mock.AnythingOfType("*[]string")).Return(scanFunc)
 	}
+}
+
+func mockSchemaCheckV3(sess *MockSession, keyspace, tableName string,
+	count int, perms []string, err error) {
+
+	mockSchemaCheckV3Schema(sess, keyspace, tableName, count, err)
+	mockSchemaCheckV3Perms(sess, keyspace, tableName, perms, err)
+}
+
+func mockSchemaCheckV3Schema(sess *MockSession, keyspace,
+	tableName string, count int, err error) {
+
+	mockquery := &MockQuery{}
+	checkTableQuery := fmt.Sprintf("SELECT count(*) FROM system_schema.columns "+
+		"WHERE keyspace_name='%s' AND table_name='%s'",
+		strings.ToLower(keyspace), strings.ToLower(tableName))
+	sess.On("Query", checkTableQuery).Return(mockquery)
+	if err != nil {
+		mockquery.On("Scan", mock.AnythingOfType("*int")).Return(err)
+	} else {
+		scanFunc := newMockQueryScanInts(err, []interface{}{count})
+		mockquery.On("Scan", mock.AnythingOfType("*int")).Return(scanFunc)
+	}
+}
+
+func mockSchemaCheckV3Perms(sess *MockSession, keyspace,
+	tableName string, perms []string, err error) {
+
+	// exactly same as v2 check
+	mockSchemaCheckV2Perms(sess, keyspace, tableName, perms, err)
 }
