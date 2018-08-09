@@ -27,6 +27,7 @@ Exclude spec file should be formatted as follows
  - One path per line.
  - Comments and empty lines are allowed. A comment is any line that starts with "#".
  - Path may or may not exist. Path must be relative to the base directory.
+ - Shell globbing syntax is allowed.
  - Absolute paths are not allowed.
  - Exclude path must not be "/" suffixed.
  - Path to be included is prefixed with "+".
@@ -66,6 +67,13 @@ directory "rootdir". In other words, the absolute path for dir1 is
  # include selective content dir2/subdir2/file2
  # inside excluded content (dir2/subdir2)
  +dir2/subdir2/file2
+
+ Example-3:
+
+ # exclude dir2
+ dir2
+ # include specific file from all subdirs of dir2
+ +dir2/*/file
 `
 
 var empty struct{}
@@ -119,7 +127,6 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 
 	s := bufio.NewScanner(file)
 	lineno := 0
-	word := ""
 	for s.Scan() {
 		line := s.Text()
 		line = strings.TrimSpace(line)
@@ -128,10 +135,11 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 		if len(line) == 0 || strings.HasPrefix(line, "#") {
 			continue
 		}
-		// Word is obtained when line in exclude file passes
-		// parsing (syntax checks). It retains special characters
-		// like "+". Hence its neither a path nor a line.
-		word, err = parseExcludeLine(base, line)
+		includePath := isIncludePath(line)
+
+		// Paths are obtained when line in exclude file passes
+		// parsing (syntax checks) and glob expansion.
+		paths, err := parseExcludeLine(base, line)
 		if err == errIgnorePath {
 			continue
 		}
@@ -139,14 +147,9 @@ func LoadExcludeInfo(base string, filename string) (*ExcludeInfo, error) {
 			return nil, fmt.Errorf("%s:%d Bad exclude line: %v",
 				filename, lineno, err)
 		}
-
-		includePath := false
-		if isIncludePath(word) {
-			includePath = true
-			word = strings.TrimPrefix(word, "+")
+		for _, path := range paths {
+			addWord(&exInfo, path, includePath)
 		}
-
-		addWord(&exInfo, word, includePath)
 	}
 
 	if err = s.Err(); err != nil {
@@ -168,36 +171,48 @@ func isIncludePath(word string) bool {
 
 var errIgnorePath = fmt.Errorf("ignore this path")
 
-func parseExcludeLine(base string, line string) (string, error) {
+func parseExcludeLine(base string, line string) ([]string, error) {
 	parts := strings.Split(line, " ")
+	hasTrailingSlash := strings.HasSuffix(line, "/")
 	// rules
 	switch {
 	case len(parts) > 1:
-		return "", fmt.Errorf("whitespace in a line")
+		return nil, fmt.Errorf("whitespace in a line")
 	// the slash and dot-dot are mainly to make sure that all paths
 	// are relative and under the base directory
 	case strings.HasPrefix(line, "/"):
-		return "", fmt.Errorf("path has / prefix")
+		return nil, fmt.Errorf("path has / prefix")
 	case strings.HasPrefix(line, ".."):
-		return "", fmt.Errorf("path has .. prefix")
-	case !isIncludePath(line) && strings.HasSuffix(line, "/"):
+		return nil, fmt.Errorf("path has .. prefix")
+	case !isIncludePath(line) && hasTrailingSlash:
 		// Exclude directive implies that both directory and its
 		// contents are excluded so there is no need for using
 		// slash suffix. Since include directives have specific
 		// behavior of slash suffix to avoid confusion, slash suffixes
 		// for exclude directives are prohibited.
-		return "", fmt.Errorf("exclude path has / suffix")
+		return nil, fmt.Errorf("exclude path has / suffix")
 	}
 
-	// ignore the path on any stat error
+	// Perform glob expansion, ignoring the path on any error
 	// if path is not ignored then computation of recordcount
 	// gets impacted. In other words, only valid paths are setup
 	// in the regexp checker
-	_, serr := os.Lstat(filepath.Join(base, strings.TrimPrefix(line, "+")))
-	if serr != nil {
-		return "", errIgnorePath
+	files, err := filepath.Glob(
+		filepath.Join(base, strings.TrimPrefix(parts[0], "+")))
+	if err != nil {
+		return nil, errIgnorePath
 	}
-	return parts[0], nil
+	// Convert paths to relative after globbing, add trailing slash if needed
+	for i, file := range files {
+		files[i], err = filepath.Rel(base, file)
+		if err != nil {
+			return nil, fmt.Errorf("Cannot convert path to relative")
+		}
+		if hasTrailingSlash {
+			files[i] += "/"
+		}
+	}
+	return files, nil
 }
 
 // Keep track of words by adding them to include and exclude maps.
