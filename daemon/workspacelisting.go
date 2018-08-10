@@ -542,7 +542,9 @@ func (tsl *TypespaceList) instantiateChild(c *ctx,
 	defer c.funcIn("TypespaceList::instantiateChild").Out()
 	defer tsl.Lock().Unlock()
 
-	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
+	defer release()
+	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode
 	}

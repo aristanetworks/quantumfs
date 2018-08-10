@@ -761,10 +761,32 @@ func (qfs *QuantumFs) LockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
 	return fileHandle, fileHandle.treeState().Unlock
 }
 
-func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
-	defer qfs.mapMutex.RLock().RUnlock()
-	inode, _ := qfs.getInode_(c, id)
-	return inode
+// If the inode returned isn't nil, then a reference is held to ensure the inode is
+// not uninstantiated before release() is called and work is done. If the inode
+// is nil, then the mapMutex is held until release() is called to prevent it from
+// being instantiated.
+func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
+	release func()) {
+
+	release := qfs.mapMutex.RLock().RUnlock
+
+	if qfs.inodes == nil {
+		release()
+		return nil, func() {}
+	}
+
+	inode, instantiated := qfs.inodes[id]
+	if instantiated {
+		// Ensure we release now, no matter what
+		defer release()
+		addInodeRef_(c, id)
+
+		return inode, func() {
+			go inode.delRef(c)
+		}
+	} else {
+		return nil, release
+	}
 }
 
 func releaserFn(c *ctx, inode Inode) func() {
