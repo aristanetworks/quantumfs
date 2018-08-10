@@ -10,8 +10,6 @@ PKGS_TO_TEST+=quantumfs/grpc/server quantumfs/qlogstats
 PKGS_TO_TEST+=quantumfs/cmd/qupload
 LIBRARIES=libqfs.so libqfs.h libqfs32.so libqfs32.h
 
-export GOCACHE=off
-
 # It's common practice to use a 'v' prefix on tags, but the prefix should be
 # removed when making the RPM version string.
 #
