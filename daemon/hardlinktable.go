@@ -262,7 +262,7 @@ func (ht *HardlinkTableImpl) instantiateHardlink(c *ctx, inodeId InodeId) Inode 
 		c.vlog("Someone has already instantiated inode %d", inodeId)
 		return inode
 	}
-	inode := ht.getWorkspaceRoot().Directory.recordToChild(c,
+	inode = ht.getWorkspaceRoot().Directory.recordToChild(c,
 		inodeId, hardlinkRecord)
 	return inode
 }

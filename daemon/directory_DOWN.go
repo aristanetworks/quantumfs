@@ -121,7 +121,7 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 			if inode != nil {
 				inode.Sync_DOWN(c)
 			}
-		}
+		}()
 	}
 
 	dir.flush(c)

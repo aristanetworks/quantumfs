@@ -465,7 +465,7 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 				c.vlog("Setting tree skipFlush")
 				wsr.treeState().skipFlush = true
 			}
-		}
+		}()
 
 		// In case the deletion has happened remotely, workspacelisting does
 		// not have the capability of orphaning the workspace if the
@@ -770,7 +770,7 @@ func (qfs *QuantumFs) LockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
 // is nil, then the mapMutex is held until release() is called to prevent it from
 // being instantiated.
 func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
-	release func()) {
+	release_ func()) {
 
 	release := qfs.mapMutex.RLock().RUnlock
 
