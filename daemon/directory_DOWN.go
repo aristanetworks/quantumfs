@@ -115,8 +115,12 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	})
 
 	for _, child := range children {
-		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
-			inode.Sync_DOWN(c)
+		func() {
+			inode, release := c.qfs.inodeNoInstantiate(c, child)
+			defer release()
+			if inode != nil {
+				inode.Sync_DOWN(c)
+			}
 		}
 	}
 
@@ -230,7 +234,8 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 
 	defer c.funcIn("Directory::normalizeHardlinks_DOWN_").Out()
 	inodeId := dir.children.inodeNum(localRecord.Filename())
-	inode := c.qfs.inodeNoInstantiate(c, inodeId)
+	inode, release := c.qfs.inode(c, inodeId)
+	defer release()
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
 		if inode != nil {
@@ -328,7 +333,9 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 	}
 	dir.children.setRecord(c, childId, remoteRecord)
 	dir.children.makePublishable(c, remoteRecord.Filename())
-	if inode := c.qfs.inodeNoInstantiate(c, childId); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, childId)
+	defer release()
+	if inode != nil {
 		reload(c, dir.hardlinkTable, rc, inode, remoteRecord)
 	}
 	c.qfs.invalidateInode(c, childId)
@@ -338,7 +345,10 @@ func updateMapDescend_DOWN(c *ctx, rc *RefreshContext,
 	inodeId InodeId, remoteRecord quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.funcIn("updateMapDescend_DOWN").Out()
-	if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
+	defer release()
+
+	if inode != nil {
 		subdir := inode.(*Directory)
 		var id *quantumfs.ObjectKey
 		if remoteRecord != nil && remoteRecord.Type() ==

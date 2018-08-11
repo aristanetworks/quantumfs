@@ -312,7 +312,8 @@ func detachInode(c *ctx, inode Inode, staleRecord *FileRemoveRecord) {
 func detachStaleDentries(c *ctx, rc *RefreshContext) {
 	defer c.funcIn("detachStaleDentries").Out()
 	for i, staleRecord := range rc.staleRecords {
-		inode := c.qfs.inodeNoInstantiate(c, staleRecord.parentId)
+		inode, release := c.qfs.inodeNoInstantiate(c, staleRecord.parentId)
+		defer release()
 		if inode != nil {
 			detachInode(c, inode, &staleRecord)
 			rc.staleRecords[i] = staleRecord
@@ -341,9 +342,9 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 		wsr.hardlinkTable.hardlinks[id] = entry
 
 		if !oldRecord.ID().IsEqualTo(hardlink.Record().ID()) {
-			if inode := c.qfs.inodeNoInstantiate(c,
-				entry.inodeId); inode != nil {
-
+			inode, release := c.qfs.inodeNoInstantiate(c, entry.inodeId)
+			defer release()
+			if inode != nil {
 				c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
 					oldRecord.ID().String(),
 					hardlink.Record().ID().String())
@@ -385,7 +386,10 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 	srcInode, release := c.qfs.inode(c, parentId)
 	defer release()
 
-	inode := c.qfs.inodeNoInstantiate(c, inodeId)
+	// We must instantiate the inode, since we'd need to hold the mapmutex lock
+	// if it wasn't instantiated.
+	inode, release := c.qfs.inode(c, inodeId)
+	defer release()
 
 	switch remoteRecord.Type() {
 	case quantumfs.ObjectTypeDirectory:
@@ -431,7 +435,10 @@ func (wsr *WorkspaceRoot) moveDentries_(c *ctx, rc *RefreshContext) {
 			wsr.moveDentry_(c, oldName, loadRecord.localRecord.Type(),
 				loadRecord.remoteRecord,
 				loadRecord.inodeId, loadRecord.parentId, path)
-			inode := c.qfs.inodeNoInstantiate(c, loadRecord.inodeId)
+			inode, release := c.qfs.inodeNoInstantiate(c,
+				loadRecord.inodeId)
+			defer release()
+
 			if inode != nil {
 				reload(c, wsr.hardlinkTable, rc, inode,
 					loadRecord.remoteRecord)
@@ -449,8 +456,10 @@ func unlinkStaleDentries(c *ctx, rc *RefreshContext) {
 		}
 		c.vlog("Unlinking entry %s type %d inodeId %d",
 			staleRecord.name, staleRecord.type_, staleRecord.inodeId)
-		if inode := c.qfs.inodeNoInstantiate(c,
-			staleRecord.inodeId); inode != nil {
+		inode, release := c.qfs.inodeNoInstantiate(c, staleRecord.inodeId)
+
+		if inode != nil {
+			defer release()
 
 			result := inode.deleteSelf(c,
 				func() (quantumfs.DirectoryRecord, fuse.Status) {
@@ -459,7 +468,11 @@ func unlinkStaleDentries(c *ctx, rc *RefreshContext) {
 			if result != fuse.OK {
 				panic("XXX handle deletion failure")
 			}
+		} else {
+			// release before we do something requiring the mapMutex
+			release()
 		}
+
 		c.qfs.removeUninstantiated(c, []InodeId{staleRecord.inodeId})
 	}
 }
@@ -475,8 +488,9 @@ func (wsr *WorkspaceRoot) unlinkStaleHardlinks(c *ctx,
 		if !exists {
 			c.vlog("Removing hardlink id %d, inode %d, nlink %d",
 				fileId, entry.inodeId, entry.nlink)
-			if inode := c.qfs.inodeNoInstantiate(c,
-				entry.inodeId); inode != nil {
+			inode, release := c.qfs.inodeNoInstantiate(c, entry.inodeId)
+			defer release()
+			if inode != nil {
 
 				inode.orphan(c, entry.record())
 			}

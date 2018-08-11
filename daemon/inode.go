@@ -265,9 +265,9 @@ func (inode *InodeCommon) parentId_() InodeId {
 // returned Inode is used
 func (inode *InodeCommon) parent_(c *ctx) (parent Inode, release func()) {
 	defer c.funcIn("InodeCommon::parent_").Out()
-	parent = c.qfs.inodeNoInstantiate(c, inode.parentId)
-	release = func() {}
+	parent, release = c.qfs.inodeNoInstantiate(c, inode.parentId)
 	if parent == nil {
+		release()
 		c.elog("Parent (%d) was unloaded before child (%d)!",
 			inode.parentId, inode.id)
 		parent, release = c.qfs.inode(c, inode.parentId)
@@ -540,7 +540,8 @@ func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
 	newParent.addRef(c)
 
 	if inode.parentId != quantumfs.InodeIdInvalid {
-		oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
+		oldParent, release := c.qfs.inodeNoInstantiate(c, inode.parentId)
+		defer release()
 		oldParent.delRef(c)
 	}
 
@@ -567,7 +568,8 @@ func (inode *InodeCommon) orphan(c *ctx, record quantumfs.DirectoryRecord) {
 func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
 
-	oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
+	oldParent, release := c.qfs.inodeNoInstantiate(c, inode.parentId)
+	defer release()
 	oldParent.delRef(c)
 
 	inode.parentId = inode.id

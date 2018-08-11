@@ -864,7 +864,9 @@ func (nsl *NamespaceList) instantiateChild(c *ctx,
 	defer c.funcIn("NamespaceList::instantiateChild").Out()
 	defer nsl.Lock().Unlock()
 
-	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
+	defer release()
+	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode
 	}
@@ -1251,7 +1253,9 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 	defer c.funcIn("WorkspaceList::instantiateChild").Out()
 	defer wsl.Lock().Unlock()
 
-	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
+	defer release()
+	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode
 	}

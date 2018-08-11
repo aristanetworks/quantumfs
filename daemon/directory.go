@@ -417,7 +417,9 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	defer c.FuncIn("Directory::normalizeChild", "%d", inodeId).Out()
 
 	defer c.qfs.instantiationLock.Lock().Unlock()
-	inode := c.qfs.inodeNoInstantiate(c, inodeId)
+	inode, release := c.qfs.inode(c, inodeId)
+	defer release()
+
 	if inode != nil {
 		defer inode.getParentLock().Lock().Unlock()
 	}
@@ -448,7 +450,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 			inode.setName(name)
 			inode.setParent_(c, dir)
 		} else {
-			c.qfs.addUninstantiated(c, []inodePair{
+			c.qfs.addUninstantiated_(c, []inodePair{
 				newInodePair(inodeId, dir.inodeNum()),
 			})
 		}
@@ -1120,7 +1122,9 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 
 	defer dir.updateSize(c, result)
 	overwrittenInodeId := dir.childInodeNum(newName)
-	overwrittenInode := c.qfs.inodeNoInstantiate(c, overwrittenInodeId)
+	overwrittenInode, release := c.qfs.inode(c, overwrittenInodeId)
+	defer release()
+
 	if overwrittenInode != nil {
 		defer overwrittenInode.getParentLock().Lock().Unlock()
 	}
@@ -1190,13 +1194,16 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	}
 
 	// update the inode name
-	if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
+	child, release := c.qfs.inodeNoInstantiate(c, oldInodeId)
+	if child != nil {
+		defer release()
 		child.setName(newName)
 		child.clearAccessedCache()
 
 		// The child has an effective record. Make sure it is not lost.
 		child.dirty(c)
 	} else {
+		release()
 		if _, isHardlink := record.(*HardlinkLeg); isHardlink {
 			dir.hardlinkTable.makePublishable(c, record.FileId())
 		} else {
@@ -1275,10 +1282,12 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		dst.updateSize(c, result)
 	}()
 	childInodeId := dir.childInodeNum(oldName)
-	childInode := c.qfs.inodeNoInstantiate(c, childInodeId)
+	childInode, release := c.qfs.inode(c, childInodeId)
+	defer release()
 
 	overwrittenInodeId := dst.childInodeNum(newName)
-	overwrittenInode := c.qfs.inodeNoInstantiate(c, overwrittenInodeId)
+	overwrittenInode, release := c.qfs.inode(c, overwrittenInodeId)
+	defer release()
 
 	c.vlog("Aquiring locks")
 	if childInode != nil && overwrittenInode != nil {
@@ -1755,7 +1764,9 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
 		dir.inodeNum()).Out()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
+	defer release()
+	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode
 	}

@@ -256,7 +256,9 @@ func (ht *HardlinkTableImpl) instantiateHardlink(c *ctx, inodeId InodeId) Inode 
 	if hardlinkRecord == nil {
 		return nil
 	}
-	if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
+	defer release()
+	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeId)
 		return inode
 	}

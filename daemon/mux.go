@@ -435,7 +435,8 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	// instantiating this inode
 	c.qfs.removeUninstantiated(c, []InodeId{id})
 
-	inode := qfs.inodeNoInstantiate(c, id)
+	inode, release := qfs.inodeNoInstantiate(c, id)
+	defer release()
 	if inode == nil {
 		return
 	}
@@ -457,10 +458,13 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	if err != nil {
 		c.elog("getting wsrLineage failed: %s", err.Error())
 	} else if len(wsrLineage) == 4 {
-		wsr := qfs.inodeNoInstantiate(c, wsrLineage[3])
-		if wsr != nil {
-			c.vlog("Setting tree skipFlush")
-			wsr.treeState().skipFlush = true
+		func() {
+			wsr, release := qfs.inodeNoInstantiate(c, wsrLineage[3])
+			defer release()
+			if wsr != nil {
+				c.vlog("Setting tree skipFlush")
+				wsr.treeState().skipFlush = true
+			}
 		}
 
 		// In case the deletion has happened remotely, workspacelisting does
@@ -1095,7 +1099,8 @@ func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 
 maybeReleaseRef:
 	if forgotten {
-		inode := qfs.inodeNoInstantiate(c, inodeId)
+		inode, release := qfs.inodeNoInstantiate(c, inodeId)
+		defer release()
 		if inode != nil {
 			inode.delRef(c)
 		} else {
@@ -1197,7 +1202,8 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 		return nil
 	}
 
-	inode := qfs.inodeNoInstantiate(c, ids[3])
+	inode, release := qfs.inodeNoInstantiate(c, ids[3])
+	defer release()
 	if inode == nil {
 		return nil
 	}
@@ -1288,7 +1294,8 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	var exists bool
 
 	ids = append(ids, quantumfs.InodeIdRoot)
-	inode := qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
+	inode, release := qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
+	defer release()
 	if inode == nil {
 		return nil, fmt.Errorf("root inode not instantiated")
 	}
@@ -1310,7 +1317,8 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	}
 
 	ids = append(ids, id)
-	inode = qfs.inodeNoInstantiate(c, id)
+	inode, release = qfs.inodeNoInstantiate(c, id)
+	defer release()
 	if inode == nil {
 		c.vlog("typespacelist inode %d not instantiated", id)
 		return
@@ -1332,7 +1340,8 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	}
 
 	ids = append(ids, id)
-	inode = qfs.inodeNoInstantiate(c, id)
+	inode, release = qfs.inodeNoInstantiate(c, id)
+	defer release()
 	if inode == nil {
 		c.vlog("namespacelist inode %d not instantiated", id)
 		return
