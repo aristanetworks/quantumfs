@@ -772,7 +772,7 @@ func (qfs *QuantumFs) LockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
 func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
 	release_ func()) {
 
-	release := qfs.mapMutex.RLock().RUnlock
+	release := qfs.mapMutex.Lock().Unlock
 
 	if qfs.inodes == nil {
 		release()
@@ -1228,7 +1228,7 @@ func logRequestPanic(c *ctx) {
 
 	stackTrace := debug.Stack()
 
-	c.elog("PANIC (%d): '"+fmt.Sprintf("%v", exception)+
+	c.elog("PANIC (%d): '"+fmt.Sprintf("%.36v", exception)+
 		"' BT: %v", c.RequestId, utils.BytesToString(stackTrace))
 }
 

@@ -543,7 +543,9 @@ func (tsl *TypespaceList) instantiateChild(c *ctx,
 	defer tsl.Lock().Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
-	defer release()
+	// release immediately. We can't hold the mapMutex while we instantiate,
+	// but it's okay since the instantiationLock should be held already.
+	release()
 	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode
@@ -865,7 +867,9 @@ func (nsl *NamespaceList) instantiateChild(c *ctx,
 	defer nsl.Lock().Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
-	defer release()
+	// release immediately. We can't hold the mapMutex while we instantiate,
+	// but it's okay since the instantiationLock should be held already.
+	release()
 	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode
@@ -1254,7 +1258,9 @@ func (wsl *WorkspaceList) instantiateChild(c *ctx,
 	defer wsl.Lock().Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
-	defer release()
+	// release immediately. We can't hold the mapMutex while we instantiate,
+	// but it's okay since the instantiationLock should be held already.
+	release()
 	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode

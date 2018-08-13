@@ -68,6 +68,13 @@ func (th *TestHelper) getInode(path string) Inode {
 	return newInode
 }
 
+func (th *TestHelper) inodeIsInstantiated(c *ctx, inodeId InodeId) bool {
+	inode, release := th.qfs.inodeNoInstantiate(&th.qfs.c, inodeId)
+	defer release()
+
+	return inode != nil
+}
+
 func (th *TestHelper) GetRecord(path string) quantumfs.ImmutableDirectoryRecord {
 	inode := th.getInode(path)
 

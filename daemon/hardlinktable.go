@@ -257,7 +257,9 @@ func (ht *HardlinkTableImpl) instantiateHardlink(c *ctx, inodeId InodeId) Inode 
 		return nil
 	}
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
-	defer release()
+	// release immediately. We can't hold the mapMutex while we instantiate,
+	// but it's okay since the instantiationLock should be held already.
+	release()
 	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeId)
 		return inode

@@ -416,10 +416,10 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 
 	defer c.FuncIn("Directory::normalizeChild", "%d", inodeId).Out()
 
-	defer c.qfs.instantiationLock.Lock().Unlock()
 	inode, release := c.qfs.inode(c, inodeId)
 	defer release()
 
+	defer c.qfs.instantiationLock.Lock().Unlock()
 	if inode != nil {
 		defer inode.getParentLock().Lock().Unlock()
 	}
@@ -1765,7 +1765,9 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
 	defer dir.childRecordLock.Lock().Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
-	defer release()
+	// release immediately. We can't hold the mapMutex while we instantiate,
+	// but it's okay since the instantiationLock should be held already.
+	release()
 	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode

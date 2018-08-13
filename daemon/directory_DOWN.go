@@ -234,7 +234,7 @@ func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
 
 	defer c.funcIn("Directory::normalizeHardlinks_DOWN_").Out()
 	inodeId := dir.children.inodeNum(localRecord.Filename())
-	inode, release := c.qfs.inode(c, inodeId)
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
 	defer release()
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {

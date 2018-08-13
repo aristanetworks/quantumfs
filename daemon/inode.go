@@ -855,7 +855,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 
 	defer inode.parentLock.Lock().Unlock()
 
-	release := func() bool {
+	toRelease := func() bool {
 		defer c.qfs.mapMutex.Lock().Unlock()
 
 		refs := c.qfs.inodeRefcounts[inode.inodeNum()] - 1
@@ -875,7 +875,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 			newInodePair(inode.inodeNum(), inode.parentId_())})
 		return true
 	}()
-	if !release {
+	if !toRelease {
 		return
 	}
 
