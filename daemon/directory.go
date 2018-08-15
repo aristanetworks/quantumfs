@@ -420,9 +420,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	defer release()
 
 	defer c.qfs.instantiationLock.Lock().Unlock()
-	if inode != nil {
-		defer inode.getParentLock().Lock().Unlock()
-	}
+	defer inode.getParentLock().Lock().Unlock()
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 	defer c.qfs.flusher.lock.Lock().Unlock()
@@ -434,7 +432,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	}
 	name := leg.Filename()
 
-	if inode != nil && inode.isDirty_(c) {
+	if inode.isDirty_(c) {
 		c.vlog("Will not normalize dirty inode %d yet", inodeId)
 		return
 	}
@@ -444,16 +442,10 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 		defer dir.hardlinkTable.invalidateNormalizedRecordLock(
 			fileId).Unlock()
 
-		if inode != nil {
-			c.vlog("Setting parent of inode %d from %d to %d",
-				inodeId, inode.parentId_(), dir.inodeNum())
-			inode.setName(name)
-			inode.setParent_(c, dir)
-		} else {
-			c.qfs.addUninstantiated_(c, []inodePair{
-				newInodePair(inodeId, dir.inodeNum()),
-			})
-		}
+		c.vlog("Setting parent of inode %d from %d to %d",
+			inodeId, inode.parentId_(), dir.inodeNum())
+		inode.setName(name)
+		inode.setParent_(c, dir)
 	}()
 
 	c.vlog("Normalizing child %s inode %d", name, inodeId)

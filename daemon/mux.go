@@ -783,7 +783,7 @@ func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
 	if instantiated {
 		// Ensure we release now, no matter what
 		defer release()
-		addInodeRef_(c, id)
+		inode.addRef(c)
 
 		return inode, func() {
 			go inode.delRef(c)

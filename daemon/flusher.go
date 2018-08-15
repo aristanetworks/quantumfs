@@ -219,14 +219,7 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 	inode := dirtyInode.inode
 	var dirtyElement *list.Element
 
-	func() {
-		// Some places may instantiate an inode and cause it to be dirty,
-		// but then be otherwise done with the inode and allow it to get to
-		// zero refcount. Such inodes will end up here, so we shouldn't care
-		// here about incrementing from zero refcount.
-		defer c.qfs.mapMutex.Lock().Unlock()
-		addInodeRef_(c, inode.inodeNum())
-	}()
+	inode.addRef(c)
 	defer safelyDeref(c, inode)
 
 	flushSuccess := func() bool {
@@ -592,10 +585,7 @@ func (flusher *Flusher) queueDirtyInode_(c *ctx, inode Inode) *list.Element {
 
 		dirtyElement = dq.PushBack_(dirtyNode)
 
-		func() {
-			defer c.qfs.mapMutex.Lock().Unlock()
-			addInodeRef_(c, inode.inodeNum())
-		}()
+		inode.addRef(c)
 	} else {
 		dirtyNode = dirtyElement.Value.(*dirtyInode)
 		c.vlog("Inode was already in the dirty queue %s",
