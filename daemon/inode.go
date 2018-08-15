@@ -194,6 +194,7 @@ type Inode interface {
 
 	// Reference counting to determine when an Inode may become uninstantiated.
 	addRef(c *ctx)
+	addRef_(c *ctx)
 	delRef(c *ctx)
 }
 
@@ -835,11 +836,17 @@ func addInodeRef_(c *ctx, inodeId InodeId) {
 }
 
 func (inode *InodeCommon) addRef(c *ctx) {
+	defer c.qfs.mapMutex.Lock().Unlock()
+
+	inode.addRef_(c)
+}
+
+func (inode *InodeCommon) addRef_(c *ctx) {
 	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
 		// These Inodes always exist
 		return
 	}
-	defer c.qfs.mapMutex.Lock().Unlock()
+
 	addInodeRef_(c, inode.inodeNum())
 
 	utils.Assert(c.qfs.inodeRefcounts[inode.inodeNum()] > 1,
