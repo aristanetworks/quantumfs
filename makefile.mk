@@ -205,12 +205,12 @@ clientRPM: check-fpm qfsclient
 		--depends openssl \
 		--depends libstdc++ \
 		QFSClient/libqfsclient.so=$(RPM_LIBDIR)/libqfsclient.so \
-		libqfs.so
+		libqfs.so=$(RPM_LIBDIR)/libqfs.so
 	$(FPM) -n $(RPM_BASENAME_CLIENT_DEVEL) \
 		--description='Development files for QuantumFS client API' \
 		--depends $(RPM_BASENAME_CLIENT) \
 		QFSClient/qfs_client.h=/usr/include/qfs_client.h \
-		libqfs.h
+		libqfs.h=/usr/include/libqfs.h
 
 clientRPM32: check-fpm libqfs32.so
 	@echo "Building i686 RPMs using mock. This can take several minutes"

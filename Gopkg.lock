@@ -25,9 +25,9 @@
     "utils/stats",
     "utils/stats/inmem"
   ]
-  revision = "d1de2e1b0134f0dc004efda46409fab8364d96d7"
+  revision = "11755f94e30373bc9f23aaa3e9cba8164dfa149e"
   source = "gerrit.corp.arista.io/ether"
-  version = "v0.15"
+  version = "v0.18"
 
 [[projects]]
   branch = "master"
@@ -68,7 +68,7 @@
     "internal/murmur",
     "internal/streams"
   ]
-  revision = "ffae44103aa14ada9e2b342329f44ce354f399fd"
+  revision = "a2c732f85a90e3b03df8088d7719488c8dc4d7d1"
 
 [[projects]]
   branch = "master"
@@ -231,6 +231,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0d19cd3b87a4b3fe57292156a2135fe87aed7d19dce39ecd72d8817a3560a780"
+  inputs-digest = "ebdb125730379dda857db75c6a48809c55e26d85e18087b8a54d69c31faf6dac"
   solver-name = "gps-cdcl"
   solver-version = 1
