@@ -794,6 +794,9 @@ func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
 }
 
 func releaserFn(c *ctx, inode Inode) func() {
+	// We want to call delRef asynchronously to ease the locking requirements.
+	// delRef calls a number of locks, and so calling this synchronously could
+	// cause deadlocks if the caller isn't careful about what they have locked.
 	return func() {
 		go inode.delRef(c)
 	}
@@ -852,7 +855,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
 			// rollback instantiation
-			go inode.delRef(c)
+			releaserFn(c, inode)()
 			defer qfs.instantiationLock.Lock().Unlock()
 			defer qfs.mapMutex.Lock().Unlock()
 			qfs.parentOfUninstantiated[id] = parent
