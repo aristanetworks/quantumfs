@@ -665,7 +665,8 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	if !dir.self.isWorkspaceRoot() {
 		func() {
 			defer dir.parentLock.RLock().RUnlock()
-			parent := dir.parent_(c)
+			parent, release := dir.parent_(c)
+			defer release()
 
 			if parent.isWorkspaceRoot() {
 				wsr := parent.(*WorkspaceRoot)
@@ -915,7 +916,8 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Unlink", "%s", name).Out()
 
 	childId := dir.childInodeNum(name)
-	child := c.qfs.inode(c, childId)
+	child, release := c.qfs.inode(c, childId)
+	defer release()
 
 	if child == nil {
 		return fuse.ENOENT
@@ -965,7 +967,8 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	defer c.FuncIn("Directory::Rmdir", "%s", name).Out()
 
 	childId := dir.childInodeNum(name)
-	child := c.qfs.inode(c, childId)
+	child, release := c.qfs.inode(c, childId)
+	defer release()
 
 	if child == nil {
 		return fuse.ENOENT
@@ -1828,7 +1831,9 @@ func (dir *Directory) lookupInternal(c *ctx, name string,
 	}
 	c.vlog("Directory::lookupInternal found inode %d Name %s", inodeNum, name)
 	c.qfs.incrementLookupCount(c, inodeNum)
-	child = c.qfs.inode(c, inodeNum)
+	child, release := c.qfs.inode(c, inodeNum)
+	defer release()
+
 	if child == nil {
 		c.qfs.shouldForget(c, inodeNum, 1)
 	}
@@ -1919,7 +1924,9 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 	path = dir.name() + "/" + path
 
 	defer dir.InodeCommon.parentLock.RLock().RUnlock()
-	parent := dir.InodeCommon.parent_(c)
+	parent, release := dir.InodeCommon.parent_(c)
+	defer release()
+
 	parentDir := asDirectory(parent)
 	parentDir.markHardlinkPath(c, path, fileId)
 }

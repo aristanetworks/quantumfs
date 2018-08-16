@@ -35,7 +35,9 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 			return nil, false, fuse.EPERM
 		}
 
-		srcParent = asDirectory(srcInode.parent_(c))
+		srcParent_, release := srcInode.parent_(c)
+		defer release()
+		srcParent = asDirectory(srcParent_)
 
 		// Ensure the source and dest are in the same workspace
 		if srcParent.hardlinkTable != dir.hardlinkTable {

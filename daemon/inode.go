@@ -119,7 +119,7 @@ type Inode interface {
 	// Note: parent_ must only be called with the parentLock R/W Lock-ed, and the
 	// parent Inode returned must only be used while that lock is held
 	parentId_() InodeId
-	parent_(c *ctx) Inode
+	parent_(c *ctx) (parent Inode, release func())
 	setParent(c *ctx, newParent Inode)
 	setParent_(c *ctx, newParent Inode)
 	getParentLock() *utils.DeferableRwMutex
@@ -263,16 +263,17 @@ func (inode *InodeCommon) parentId_() InodeId {
 
 // Must have the parentLock R/W Lock()-ed during the call and for the duration the
 // returned Inode is used
-func (inode *InodeCommon) parent_(c *ctx) Inode {
+func (inode *InodeCommon) parent_(c *ctx) (parent Inode, release func()) {
 	defer c.funcIn("InodeCommon::parent_").Out()
-	parent := c.qfs.inodeNoInstantiate(c, inode.parentId)
+	parent = c.qfs.inodeNoInstantiate(c, inode.parentId)
+	release = func() {}
 	if parent == nil {
 		c.elog("Parent (%d) was unloaded before child (%d)!",
 			inode.parentId, inode.id)
-		parent = c.qfs.inode(c, inode.parentId)
+		parent, release = c.qfs.inode(c, inode.parentId)
 	}
 
-	return parent
+	return parent, release
 }
 
 func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
@@ -291,7 +292,9 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 		return
 	}
 
-	parent := inode.parent_(c)
+	parent, release := inode.parent_(c)
+	defer release()
+
 	if wsr, isWorkspaceRoot := parent.(*WorkspaceRoot); isWorkspaceRoot {
 		isHardlink, fileId := wsr.hardlinkTable.checkHardlink(inode.id)
 		if isHardlink {
@@ -325,7 +328,10 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	// publish before we sync, once we know it's safe
 	baseLayerId, hardlinkDelta := publishFn()
 
-	inode.parent_(c).syncChild(c, inode.id, baseLayerId, hardlinkDelta)
+	parent, release := inode.parent_(c)
+	defer release()
+
+	parent.syncChild(c, inode.id, baseLayerId, hardlinkDelta)
 }
 
 func (inode *InodeCommon) parentUpdateSize(c *ctx,
@@ -342,8 +348,11 @@ func (inode *InodeCommon) parentUpdateSize(c *ctx,
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
-		return inode.parent_(c).setChildAttr(c, inode.inodeNum(), nil, &attr,
-			nil, true)
+		parent, release := inode.parent_(c)
+		defer release()
+
+		return parent.setChildAttr(c, inode.inodeNum(), nil, &attr, nil,
+			true)
 	} else {
 		return inode.setOrphanChildAttr(c, inode.inodeNum(), nil, &attr, nil,
 			true)
@@ -360,7 +369,10 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
-		return inode.parent_(c).setChildAttr(c, inodeNum, newType, attr, out,
+		parent, release := inode.parent_(c)
+		defer release()
+
+		return parent.setChildAttr(c, inodeNum, newType, attr, out,
 			updateMtime)
 	} else if inode.id == inodeNum {
 		return inode.setOrphanChildAttr(c, inodeNum, newType, attr, out,
@@ -378,7 +390,10 @@ func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,
 
 	defer inode.parentLock.RLock().RUnlock()
 	if !inode.isOrphaned_() {
-		return inode.parent_(c).getChildXAttrSize(c, inodeNum, attr)
+		parent, release := inode.parent_(c)
+		defer release()
+
+		return parent.getChildXAttrSize(c, inodeNum, attr)
 	} else if inode.id == inodeNum {
 		return inode.getOrphanChildXAttrSize(c, inodeNum, attr)
 	} else {
@@ -393,7 +408,10 @@ func (inode *InodeCommon) parentGetChildXAttrData(c *ctx, inodeNum InodeId,
 
 	defer inode.parentLock.RLock().RUnlock()
 	if !inode.isOrphaned_() {
-		return inode.parent_(c).getChildXAttrData(c, inodeNum, attr)
+		parent, release := inode.parent_(c)
+		defer release()
+
+		return parent.getChildXAttrData(c, inodeNum, attr)
 	} else if inode.id == inodeNum {
 		return inode.getOrphanChildXAttrData(c, inodeNum, attr)
 	} else {
@@ -408,7 +426,10 @@ func (inode *InodeCommon) parentListChildXAttr(c *ctx,
 
 	defer inode.parentLock.RLock().RUnlock()
 	if !inode.isOrphaned_() {
-		return inode.parent_(c).listChildXAttr(c, inodeNum)
+		parent, release := inode.parent_(c)
+		defer release()
+
+		return parent.listChildXAttr(c, inodeNum)
 	} else if inode.id == inodeNum {
 		return inode.listOrphanChildXAttr(c, inodeNum)
 	} else {
@@ -425,7 +446,10 @@ func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr str
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
-		return inode.parent_(c).setChildXAttr(c, inodeNum, attr, data)
+		parent, release := inode.parent_(c)
+		defer release()
+
+		return parent.setChildXAttr(c, inodeNum, attr, data)
 	} else if inode.id == inodeNum {
 		return inode.setOrphanChildXAttr(c, inodeNum, attr, data)
 	} else {
@@ -442,7 +466,10 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
-		return inode.parent_(c).removeChildXAttr(c, inodeNum, attr)
+		parent, release := inode.parent_(c)
+		defer release()
+
+		return parent.removeChildXAttr(c, inodeNum, attr)
 	} else if inode.id == inodeNum {
 		return inode.removeOrphanChildXAttr(c, inodeNum, attr)
 	} else {
@@ -458,7 +485,10 @@ func (inode *InodeCommon) parentGetChildAttr(c *ctx, inodeNum InodeId,
 	defer inode.parentLock.RLock().RUnlock()
 
 	if !inode.isOrphaned_() {
-		inode.parent_(c).getChildAttr(c, inodeNum, out, owner)
+		parent, release := inode.parent_(c)
+		defer release()
+
+		parent.getChildAttr(c, inodeNum, out, owner)
 	} else if inode.id == inodeNum {
 		inode.getOrphanChildAttr(c, inodeNum, out, owner)
 	} else {
@@ -482,7 +512,8 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 		return false
 	}
 
-	toCheck := inode.parent_(c)
+	toCheck, release := inode.parent_(c)
+	defer release()
 	for {
 		defer toCheck.getParentLock().RLock().RUnlock()
 
@@ -494,7 +525,8 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 			return false
 		}
 
-		toCheck = toCheck.parent_(c)
+		toCheck, release = toCheck.parent_(c)
+		defer release()
 	}
 }
 
@@ -601,7 +633,9 @@ func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) 
 		record = inode.unlinkRecord
 	} else {
 		var dir *Directory
-		parent := inode.parent_(c)
+		parent, release := inode.parent_(c)
+		defer release()
+
 		if parent.isWorkspaceRoot() {
 			dir = &parent.(*WorkspaceRoot).Directory
 		} else {
@@ -695,7 +729,10 @@ func (inode *InodeCommon) absPath_(c *ctx, path string) string {
 	} else {
 		path = inode.name() + "/" + path
 	}
-	return inode.parent_(c).absPath(c, path)
+	parent, release := inode.parent_(c)
+	defer release()
+
+	return parent.absPath(c, path)
 }
 
 func (inode *InodeCommon) absPath(c *ctx, path string) string {
@@ -843,7 +880,10 @@ func (inode *InodeCommon) delRef(c *ctx) {
 	// This Inode is now unlisted and unreachable
 
 	if !inode.isOrphaned_() {
-		inode.parent_(c).delRef(c)
+		parent, release := inode.parent_(c)
+		defer release()
+
+		parent.delRef(c)
 	}
 
 	if dir, isDir := inode.self.(inodeHolder); isDir {
