@@ -41,6 +41,8 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 		"nameSpace": w.ns,
 		"pass":      strconv.FormatBool(pass),
 		"keyspace":  c.keyspace,
+		"host":      c.host,
+		"name":      c.name,
 	}
 	fields := map[string]interface{}{
 		"workSpace": w.ws,
@@ -83,6 +85,8 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration) {
 	measurement := "walkerIteration"
 	tags := map[string]string{
 		"keyspace": c.keyspace,
+		"host":     c.host,
+		"name":     c.name,
 	}
 	fields := map[string]interface{}{
 		"walkTime":     uint(dur / time.Second),
@@ -121,6 +125,8 @@ func AddPointWalkerHeartBeat(c *Ctx) {
 	measurement := "walkerHeartBeat"
 	tags := map[string]string{
 		"keyspace": c.keyspace,
+		"host":     c.host,
+		"name":     c.name,
 	}
 	fields := map[string]interface{}{
 		"alive":        c.aliveCount,

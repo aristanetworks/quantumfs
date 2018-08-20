@@ -24,6 +24,8 @@ var requestID uint64
 // Ctx maintains context for the walker daemon.
 type Ctx struct {
 	context.Context
+	name        string
+	host        string
 	Influx      *influxlib.InfluxDBConnection
 	qctx        *quantumfs.Ctx
 	wsdb        quantumfs.WorkspaceDB
@@ -41,7 +43,7 @@ type Ctx struct {
 	skipMap     *utils.SkipMap
 }
 
-func getWalkerDaemonContext(influxServer string, influxPort uint16,
+func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 	influxDBName string, etherCfgFile string, wsdbCfgStr string,
 	logdir string, numwalkers int) *Ctx {
 
@@ -52,7 +54,7 @@ func getWalkerDaemonContext(influxServer string, influxPort uint16,
 		influx, err = influxlib.Connect(nil)
 		if err != nil {
 			fmt.Printf("Unable to connect to default influxDB err:%v\n", err)
-			os.Exit(1)
+			os.Exit(exitMiscError)
 		}
 	} else {
 		influxConfig := influxlib.DefaultConfig()
@@ -120,11 +122,20 @@ func getWalkerDaemonContext(influxServer string, influxPort uint16,
 	log, err := qlog.NewQlog(logdir)
 	if err != nil {
 		fmt.Printf("Error in initializing NewQlog: %v\n", err)
-		os.Exit(1)
+		os.Exit(exitMiscError)
+	}
+
+	// short hostname, not FQDN
+	host, err := os.Hostname()
+	if err != nil {
+		fmt.Printf("Failed to find hostname: %s\n", err.Error())
+		os.Exit(exitMiscError)
 	}
 
 	id := atomic.AddUint64(&requestID, 1)
 	return &Ctx{
+		name:        name,
+		host:        host,
 		Influx:      influx,
 		qctx:        newQCtx(log, id),
 		wsdb:        quantumfsWSDB,

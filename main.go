@@ -22,8 +22,9 @@ import (
 
 // Various exit reasons, will be returned to the shell as an exit code
 const (
-	exitOk        = iota
-	exitBadConfig = iota
+	exitOk = iota
+	exitBadConfig
+	exitMiscError
 )
 
 const maxNumWalkers = 4 // default num goroutines calling the actual walk lib.
@@ -69,10 +70,11 @@ func main() {
 	numWalkers := walkFlags.Int("numWalkers", maxNumWalkers,
 		"Number of parallel walks in the daemon")
 	useSkipMap := walkFlags.Bool("skipSeenKeys", false, "Skip keys seen in earlier walks")
+	name := walkFlags.String("name", "", "walker instance name, used when multiple instances are deployed")
 
 	walkFlags.Usage = func() {
 		fmt.Println("qubit-walkerd version", version)
-		fmt.Println("usage: qubit-walkerd -etherCfg <etherCfg> [-wsdbCfg <wsdb service name>] [-logdir dir]")
+		fmt.Println("usage: qubit-walkerd -name <name> -etherCfg <etherCfg> [-wsdbCfg <wsdb service name>] [-logdir dir]")
 		fmt.Println("                [-influxServer serverIP -influxPort port" +
 			" -influxDBName dbname] [-numWalkers num] [-skipSeenKeys]")
 		fmt.Println()
@@ -85,6 +87,12 @@ func main() {
 
 	if err := walkFlags.Parse(os.Args[1:]); err != nil {
 		fmt.Println("Parsing of flags failed err:", err)
+		os.Exit(exitBadConfig)
+	}
+
+	if *name == "" {
+		fmt.Println("Every walker daemon instance must have a name")
+		walkFlags.Usage()
 		os.Exit(exitBadConfig)
 	}
 
@@ -102,7 +110,7 @@ func main() {
 		os.Exit(exitBadConfig)
 	}
 
-	c := getWalkerDaemonContext(*influxServer, uint16(*influxPort), *influxDBName,
+	c := getWalkerDaemonContext(*name, *influxServer, uint16(*influxPort), *influxDBName,
 		*etherCfg, *wsdbCfg, *logdir, *numWalkers)
 
 	// Start heart beat messaging.
