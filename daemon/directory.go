@@ -40,7 +40,7 @@ type Directory struct {
 	// childRecordLock protects the maps inside childMap as well as the
 	// records contained within those maps themselves. This lock is not
 	// the same as the Directory Inode lock because these records must be
-	// accessible in instantiateChild(), which may be called indirectly
+	// accessible in instantiateChild_(), which may be called indirectly
 	// via qfs.inode() from a context where the Inode lock is already
 	// held.
 	childRecordLock utils.DeferableMutex
@@ -1751,8 +1751,8 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.OK
 }
 
-func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-	defer c.FuncIn("Directory::instantiateChild", "Inode %d of %d", inodeNum,
+func (dir *Directory) instantiateChild_(c *ctx, inodeNum InodeId) Inode {
+	defer c.FuncIn("Directory::instantiateChild_", "Inode %d of %d", inodeNum,
 		dir.inodeNum()).Out()
 	defer dir.childRecordLock.Lock().Unlock()
 
@@ -1774,7 +1774,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
 	// check if the child is a hardlink
 	isHardlink, _ := dir.hardlinkTable.checkHardlink(inodeNum)
 	if isHardlink {
-		return dir.hardlinkTable.instantiateHardlink(c, inodeNum)
+		return dir.hardlinkTable.instantiateHardlink_(c, inodeNum)
 	}
 
 	// add a check incase there's an inconsistency

@@ -286,8 +286,8 @@ func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fi.parentRemoveChildXAttr(c, fi.inodeNum(), attr)
 }
 
-func (fi *File) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-	c.elog("Invalid instantiateChild on File")
+func (fi *File) instantiateChild_(c *ctx, inodeNum InodeId) Inode {
+	c.elog("Invalid instantiateChild_ on File")
 	return nil
 }
 

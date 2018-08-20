@@ -259,8 +259,8 @@ func (lm *LowMemFile) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (lm *LowMemFile) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-	c.elog("Invalid instantiateChild on LowMemFile")
+func (lm *LowMemFile) instantiateChild_(c *ctx, inodeNum InodeId) Inode {
+	c.elog("Invalid instantiateChild_ on LowMemFile")
 	return nil
 }
 

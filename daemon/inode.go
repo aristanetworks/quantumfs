@@ -94,8 +94,9 @@ type Inode interface {
 
 	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 
-	// Instantiate the Inode for the given child on demand
-	instantiateChild(c *ctx, inodeNum InodeId) Inode
+	// Must be called with the instantiation lock
+	// Instantiate the Inode for the given child on demand.
+	instantiateChild_(c *ctx, inodeNum InodeId) Inode
 	finishInit(c *ctx) []inodePair
 
 	name() string
@@ -542,6 +543,7 @@ func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
 
 	if inode.parentId != quantumfs.InodeIdInvalid {
 		oldParent, release := c.qfs.inodeNoInstantiate(c, inode.parentId)
+		utils.Assert(oldParent != nil, "oldParent is nil")
 		defer release()
 		oldParent.delRef(c)
 	}
@@ -570,6 +572,7 @@ func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
 
 	oldParent, release := c.qfs.inodeNoInstantiate(c, inode.parentId)
+	utils.Assert(oldParent != nil, "oldParent is nil")
 	defer release()
 	oldParent.delRef(c)
 

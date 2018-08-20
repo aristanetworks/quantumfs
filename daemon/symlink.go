@@ -184,8 +184,8 @@ func (link *Symlink) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return link.parentRemoveChildXAttr(c, link.inodeNum(), attr)
 }
 
-func (link *Symlink) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-	c.elog("Invalid instantiateChild on Symlink")
+func (link *Symlink) instantiateChild_(c *ctx, inodeNum InodeId) Inode {
+	c.elog("Invalid instantiateChild_ on Symlink")
 	return nil
 }
 

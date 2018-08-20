@@ -228,26 +228,36 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 }
 
 // The caller must hold the childRecordLock
-func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
+// Normalize an inode that's a local hardlink, but remote regular file.
+// Link-ify an inode that's a local regular file, but remote hardlink.
+func (dir *Directory) convertHardlinks_DOWN_(c *ctx,
 	rc *RefreshContext, localRecord quantumfs.ImmutableDirectoryRecord,
 	remoteRecord quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
-	defer c.funcIn("Directory::normalizeHardlinks_DOWN_").Out()
+	defer c.funcIn("Directory::convertHardlinks_DOWN_").Out()
 	inodeId := dir.children.inodeNum(localRecord.Filename())
-	inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
-	defer release()
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
-		if inode != nil {
-			inode.setParent(c, dir)
-		}
+		func() {
+			inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
+			defer release()
+
+			if inode != nil {
+				inode.setParent(c, dir)
+			}
+		}()
 		return remoteRecord
 	}
+
+	// Convert a regular file into a hardlink
 	utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
-		"either local or remote should be hardlinks to be normalized")
+		"either local or remote should be hardlinks to be converted")
 
 	fileId := remoteRecord.FileId()
 	dir.hardlinkTable.updateHardlinkInodeId(c, fileId, inodeId)
+
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
+	defer release()
 	if inode != nil {
 		func() {
 			defer inode.getParentLock().Lock().Unlock()
@@ -328,7 +338,7 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 		underlyingTypeOf(dir.hardlinkTable, remoteRecord))
 
 	if !localRecord.Type().Matches(remoteRecord.Type()) {
-		remoteRecord = dir.normalizeHardlinks_DOWN_(c, rc, localRecord,
+		remoteRecord = dir.convertHardlinks_DOWN_(c, rc, localRecord,
 			remoteRecord)
 	}
 	dir.children.setRecord(c, childId, remoteRecord)

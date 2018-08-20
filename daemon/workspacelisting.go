@@ -536,10 +536,10 @@ func (tsl *TypespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (tsl *TypespaceList) instantiateChild(c *ctx,
+func (tsl *TypespaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
-	defer c.funcIn("TypespaceList::instantiateChild").Out()
+	defer c.funcIn("TypespaceList::instantiateChild_").Out()
 	defer tsl.Lock().Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
@@ -860,10 +860,10 @@ func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (nsl *NamespaceList) instantiateChild(c *ctx,
+func (nsl *NamespaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
-	defer c.funcIn("NamespaceList::instantiateChild").Out()
+	defer c.funcIn("NamespaceList::instantiateChild_").Out()
 	defer nsl.Lock().Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
@@ -1251,10 +1251,10 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (wsl *WorkspaceList) instantiateChild(c *ctx,
+func (wsl *WorkspaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
-	defer c.funcIn("WorkspaceList::instantiateChild").Out()
+	defer c.funcIn("WorkspaceList::instantiateChild_").Out()
 	defer wsl.Lock().Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)

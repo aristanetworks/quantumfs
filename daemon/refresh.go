@@ -312,12 +312,15 @@ func detachInode(c *ctx, inode Inode, staleRecord *FileRemoveRecord) {
 func detachStaleDentries(c *ctx, rc *RefreshContext) {
 	defer c.funcIn("detachStaleDentries").Out()
 	for i, staleRecord := range rc.staleRecords {
-		inode, release := c.qfs.inodeNoInstantiate(c, staleRecord.parentId)
-		defer release()
-		if inode != nil {
-			detachInode(c, inode, &staleRecord)
-			rc.staleRecords[i] = staleRecord
-		}
+		func() {
+			inode, release := c.qfs.inodeNoInstantiate(c,
+				staleRecord.parentId)
+			defer release()
+			if inode != nil {
+				detachInode(c, inode, &staleRecord)
+				rc.staleRecords[i] = staleRecord
+			}
+		}()
 	}
 }
 
@@ -435,15 +438,18 @@ func (wsr *WorkspaceRoot) moveDentries_(c *ctx, rc *RefreshContext) {
 			wsr.moveDentry_(c, oldName, loadRecord.localRecord.Type(),
 				loadRecord.remoteRecord,
 				loadRecord.inodeId, loadRecord.parentId, path)
-			inode, release := c.qfs.inodeNoInstantiate(c,
-				loadRecord.inodeId)
-			defer release()
 
-			if inode != nil {
-				reload(c, wsr.hardlinkTable, rc, inode,
-					loadRecord.remoteRecord)
-				c.qfs.invalidateInode(c, loadRecord.inodeId)
-			}
+			func() {
+				inode, release := c.qfs.inodeNoInstantiate(c,
+					loadRecord.inodeId)
+				defer release()
+
+				if inode != nil {
+					reload(c, wsr.hardlinkTable, rc, inode,
+						loadRecord.remoteRecord)
+					c.qfs.invalidateInode(c, loadRecord.inodeId)
+				}
+			}()
 		}
 	}
 }
@@ -488,13 +494,18 @@ func (wsr *WorkspaceRoot) unlinkStaleHardlinks(c *ctx,
 		if !exists {
 			c.vlog("Removing hardlink id %d, inode %d, nlink %d",
 				fileId, entry.inodeId, entry.nlink)
-			inode, release := c.qfs.inodeNoInstantiate(c, entry.inodeId)
-			defer release()
-			if inode != nil {
 
-				inode.orphan(c, entry.record())
-			}
-			wsr.hardlinkTable.removeHardlink_(fileId, entry.inodeId)
+			func() {
+				inode, release := c.qfs.inodeNoInstantiate(c,
+					entry.inodeId)
+				defer release()
+				if inode != nil {
+
+					inode.orphan(c, entry.record())
+				}
+				wsr.hardlinkTable.removeHardlink_(fileId,
+					entry.inodeId)
+			}()
 		} else if loadRecord.remoteRecord.Type() !=
 			quantumfs.ObjectTypeHardlink {
 

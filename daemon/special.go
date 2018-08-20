@@ -185,10 +185,10 @@ func (special *Special) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fuse.ENODATA
 }
 
-func (special *Special) instantiateChild(c *ctx,
+func (special *Special) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
-	c.elog("Invalid instantiateChild on Special")
+	c.elog("Invalid instantiateChild_ on Special")
 	return nil
 }
 

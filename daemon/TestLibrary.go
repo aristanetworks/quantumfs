@@ -86,6 +86,8 @@ func (th *TestHelper) GetRecord(path string) quantumfs.ImmutableDirectoryRecord 
 
 	parent, release := th.qfs.inodeNoInstantiate(&th.qfs.c, parentId)
 	defer release()
+
+	th.Assert(parent != nil, "Parent not instantiated")
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()

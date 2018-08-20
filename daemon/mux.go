@@ -906,7 +906,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 			defer qfs.mapMutex.Lock()
 			// without mapMutex the child could move underneath this
 			// parent, in such cases, find the new parent
-			inode = parent.instantiateChild(c, id)
+			inode = parent.instantiateChild_(c, id)
 		}()
 		if inode != nil {
 			break

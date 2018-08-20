@@ -63,7 +63,8 @@ type HardlinkTable interface {
 	makePublishable(c *ctx, fileId quantumfs.FileId)
 	setID(c *ctx, fileId quantumfs.FileId, key quantumfs.ObjectKey)
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
-	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
+	// Must be called with the instantiationLock
+	instantiateHardlink_(c *ctx, inodeNum InodeId) Inode
 	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
 	findHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId) InodeId
 	hardlinkDec(fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord)
@@ -238,8 +239,9 @@ func (ht *HardlinkTableImpl) newHardlink(c *ctx, inodeId InodeId,
 		quantumfs.NewTime(time.Now()), ht)
 }
 
-func (ht *HardlinkTableImpl) instantiateHardlink(c *ctx, inodeId InodeId) Inode {
-	defer c.FuncIn("HardlinkTableImpl::instantiateHardlink",
+// Must be called with the instantiationLock held
+func (ht *HardlinkTableImpl) instantiateHardlink_(c *ctx, inodeId InodeId) Inode {
+	defer c.FuncIn("HardlinkTableImpl::instantiateHardlink_",
 		"inode %d", inodeId).Out()
 
 	hardlinkRecord := func() quantumfs.DirectoryRecord {

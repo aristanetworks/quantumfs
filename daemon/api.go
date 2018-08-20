@@ -286,8 +286,8 @@ func (api *ApiInode) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (api *ApiInode) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-	c.elog("Invalid instantiateChild on ApiInode")
+func (api *ApiInode) instantiateChild_(c *ctx, inodeNum InodeId) Inode {
+	c.elog("Invalid instantiateChild_ on ApiInode")
 	return nil
 }
 
