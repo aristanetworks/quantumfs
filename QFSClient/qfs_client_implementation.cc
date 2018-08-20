@@ -271,10 +271,11 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 	// read up to 4k at a time, stopping on EOF
 	command->Reset();
 
-	util::AlignedMem<512> data(4096);
+	static const ssize_t BufferSize = 4096;
+	util::AlignedMem<512> data(BufferSize);
 
-	while(true) {
-		int num = read(this->fd, *data, data.Size());
+	for (ssize_t num = BufferSize; num == BufferSize;) {
+		num = read(this->fd, *data, data.Size());
 		if (num == 0) {
 			break;
 		}
@@ -282,10 +283,6 @@ Error ApiImpl::ReadResponse(CommandBuffer *command) {
 		if (num < 0) {
 			// any read failure *except* an EOF is a failure
 			return util::getError(kApiFileReadFail, this->path);
-		}
-
-		if (command->Size() % 512) {
-			return util::getError(kApiFileReadFail, "unaligned read");
 		}
 
 		err = command->Append(reinterpret_cast<const byte *>(*data), num);

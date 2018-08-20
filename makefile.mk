@@ -2,7 +2,7 @@ COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthche
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
-PKGS_TO_TEST+=quantumfs/thirdparty_backends quantumfs/systemlocal
+PKGS_TO_TEST+=quantumfs/systemlocal
 PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/grpc
@@ -61,8 +61,8 @@ update: check-dep-installed
 	$(fetch-cityhash)
 	@echo "Please review and commit any changes to Gopkg.toml and Gopkg.lock"
 
-vet: $(PKGS_TO_TEST) $(COMMANDS)
-	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./cmd -true -o -type d -print`
+vet:
+	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./cmd -true -o -type d -print`
 
 lockcheck:
 	./lockcheck.sh
@@ -205,12 +205,12 @@ clientRPM: check-fpm qfsclient
 		--depends openssl \
 		--depends libstdc++ \
 		QFSClient/libqfsclient.so=$(RPM_LIBDIR)/libqfsclient.so \
-		libqfs.so
+		libqfs.so=$(RPM_LIBDIR)/libqfs.so
 	$(FPM) -n $(RPM_BASENAME_CLIENT_DEVEL) \
 		--description='Development files for QuantumFS client API' \
 		--depends $(RPM_BASENAME_CLIENT) \
 		QFSClient/qfs_client.h=/usr/include/qfs_client.h \
-		libqfs.h
+		libqfs.h=/usr/include/libqfs.h
 
 clientRPM32: check-fpm libqfs32.so
 	@echo "Building i686 RPMs using mock. This can take several minutes"
