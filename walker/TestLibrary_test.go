@@ -259,6 +259,11 @@ func (th *testHelper) printMap(name string, m map[string]int) {
 	}
 }
 
+func expectWalkerErrors(test *testHelper) {
+	test.ExpectedErrors = make(map[string]struct{})
+	test.ExpectedErrors["ERROR: "+walkerMainErrLog] = struct{}{}
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 

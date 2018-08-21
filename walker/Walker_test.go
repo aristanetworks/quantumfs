@@ -403,7 +403,6 @@ func TestMiscWalkWithSkipDir(t *testing.T) {
 func TestWalkPanicString(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
-		test.ShouldFailLogscan = true
 		data := daemon.GenData(133)
 		workspace := test.NewWorkspace()
 		expectedString := "raised panic"
@@ -437,13 +436,13 @@ func TestWalkPanicString(t *testing.T) {
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
+		expectWalkerErrors(test)
 	})
 }
 
 func TestWalkPanicErr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
-		test.ShouldFailLogscan = true
 		data := daemon.GenData(133)
 		workspace := test.NewWorkspace()
 		expectedErr := fmt.Errorf("raised panic")
@@ -476,12 +475,12 @@ func TestWalkPanicErr(t *testing.T) {
 		test.Assert(err == expectedErr,
 			"Walk did not get the expectedErr value, instead got %v",
 			err)
+		expectWalkerErrors(test)
 	})
 }
 
 func TestWalkErr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
-		test.ShouldFailLogscan = true
 
 		data := daemon.GenData(133)
 		workspace := test.NewWorkspace()
@@ -515,6 +514,7 @@ func TestWalkErr(t *testing.T) {
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
+		expectWalkerErrors(test)
 	})
 }
 
