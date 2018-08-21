@@ -202,8 +202,8 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 }
 
 func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
-	key quantumfs.ObjectKey, wf WalkFunc,
-	keyChan chan<- *workerData) error {
+	key quantumfs.ObjectKey, typ quantumfs.ObjectType,
+	wf WalkFunc, keyChan chan<- *workerData) error {
 
 	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.Qctx, key, buf); err != nil {
@@ -214,21 +214,19 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 		"MultiBlockFile buffer %s", key.String())
 
 	if err := writeToChan(c, keyChan, path, key, uint64(buf.Size()),
-		quantumfs.ObjectTypeMediumFile); err != nil {
+		typ); err != nil {
 		return err
 	}
 
 	mbf := buf.AsMultiBlockFile()
 	keys := mbf.ListOfBlocks()
 	for i, k := range keys {
+		size := uint64(mbf.BlockSize())
 		if i == len(keys)-1 {
-			// Return, since this is last block
-			return writeToChan(c, keyChan, path, k,
-				uint64(mbf.SizeOfLastBlock()),
-				quantumfs.ObjectTypeSmallFile)
+			size = uint64(mbf.SizeOfLastBlock())
 		}
-		if err := writeToChan(c, keyChan, path, k, uint64(mbf.BlockSize()),
-			quantumfs.ObjectTypeSmallFile); err != nil {
+		if err := writeToChan(c, keyChan, path, k, size,
+			typ); err != nil {
 			return err
 		}
 	}
@@ -255,6 +253,7 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	vlf := buf.AsVeryLargeFile()
 	for part := 0; part < vlf.NumberOfParts(); part++ {
 		if err := handleMultiBlockFile(c, path, ds, vlf.LargeFileKey(part),
+			quantumfs.ObjectTypeVeryLargeFile,
 			wf, keyChan); err != nil && err != SkipEntry {
 
 			return err
@@ -326,10 +325,13 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	key := dr.ID()
 	switch dr.Type() {
 	case quantumfs.ObjectTypeMediumFile:
-		fallthrough
+		return handleMultiBlockFile(c, fpath,
+			ds, key, quantumfs.ObjectTypeMediumFile,
+			wf, keyChan)
 	case quantumfs.ObjectTypeLargeFile:
 		return handleMultiBlockFile(c, fpath,
-			ds, key, wf, keyChan)
+			ds, key, quantumfs.ObjectTypeLargeFile,
+			wf, keyChan)
 	case quantumfs.ObjectTypeVeryLargeFile:
 		return handleVeryLargeFile(c, fpath,
 			ds, key, wf, keyChan)
@@ -401,6 +403,9 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"Attributes List buffer %s", key.String())
 
+		// The ObjectType of the single block pointed by an extended
+		// attribute is considered as ObjectTypeSmallFile since
+		// ObjectTypeExtendedAttribute doesn't make sense.
 		err := writeToChan(c, keyChan, fpath, key,
 			uint64(buf.Size()), quantumfs.ObjectTypeSmallFile)
 		if err != nil {
