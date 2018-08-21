@@ -578,9 +578,10 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 
 	defer dir.RLock().RUnlock()
 
-	inodeNum := func() InodeId {
+	inodeNum, inodeGen := func() (InodeId, uint64) {
 		defer dir.childRecordLock.Lock().Unlock()
-		return dir.children.inodeNum(name).id
+		rtn := dir.children.inodeNum(name)
+		return rtn.id, rtn.generation
 	}()
 	if inodeNum == quantumfs.InodeIdInvalid {
 		c.vlog("Inode not found")
@@ -591,6 +592,7 @@ func (dir *Directory) Lookup(c *ctx, name string, out *fuse.EntryOut) fuse.Statu
 	c.qfs.incrementLookupCount(c, inodeNum)
 
 	out.NodeId = uint64(inodeNum)
+	out.Generation = inodeGen
 	fillEntryOutCacheData(c, out)
 	defer dir.childRecordLock.Lock().Unlock()
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
@@ -753,6 +755,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	fillEntryOutCacheData(c, out)
 	out.NodeId = uint64(inodeNum.id)
+	out.Generation = inodeNum.generation
 	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum.id, c.fuseCtx.Owner, entry)
 
 	newEntity.dirty(c)

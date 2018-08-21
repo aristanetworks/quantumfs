@@ -90,11 +90,11 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	c.vlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
-	inodeNum := srcInode.inodeNum()
-	out.NodeId = uint64(inodeNum)
-	c.qfs.incrementLookupCount(c, inodeNum)
+	out.NodeId = uint64(inodeInfo.id)
+	out.Generation = inodeInfo.generation
+	c.qfs.incrementLookupCount(c, inodeInfo.id)
 	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeInfo.id, c.fuseCtx.Owner,
 		newRecord)
 
 	dir.self.dirty(c)
