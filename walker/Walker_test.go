@@ -4,17 +4,18 @@
 package walker
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
-	"strings"
 	"syscall"
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/daemon"
 )
+
+// This file contains test cases which do not
+// generate any errors.
 
 // The steps followed are the same in all the tests:
 //  1. Mount a QFS instance a create files/links/dirs in it.
@@ -25,6 +26,8 @@ import (
 //  4. Then walk the tree using the walker. Store all the walked keys.
 //  5. Compare the set of keys intercepted in both the walks. They
 //     should be the same.
+
+// TestFileWalk is a basic test of walking one small file.
 func TestFileWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -41,6 +44,7 @@ func TestFileWalk(t *testing.T) {
 	})
 }
 
+// TestSpecialFileWalk tests walk of a special file.
 func TestSpecialFileWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
@@ -55,6 +59,7 @@ func TestSpecialFileWalk(t *testing.T) {
 	})
 }
 
+// TestEmptyWSR tests the walk of an empty WSR.
 func TestEmptyWSR(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -66,6 +71,8 @@ func TestEmptyWSR(t *testing.T) {
 	})
 }
 
+// TestDirWalk tests the walk of a directory
+// without any files in it.
 func TestDirWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -80,6 +87,8 @@ func TestDirWalk(t *testing.T) {
 	})
 }
 
+// TestMaxDirRecordsWalk tests the walk of a
+// directory with maximum number of records.
 func TestMaxDirRecordsWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -103,6 +112,10 @@ func TestMaxDirRecordsWalk(t *testing.T) {
 	})
 }
 
+// TestChainedDirEntriesWalk tests walk of
+// chained directory entry objects. Chaining occurs
+// since a directory has more than max directory
+// records.
 func TestChainedDirEntriesWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -126,6 +139,8 @@ func TestChainedDirEntriesWalk(t *testing.T) {
 	})
 }
 
+// TestDirFilesWalk tests the walk of directory
+// with files in it.
 func TestDirFilesWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -159,6 +174,7 @@ func TestDirFilesWalk(t *testing.T) {
 	})
 }
 
+// TestSoftLink tests walk of a soft-link.
 func TestSoftLink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -181,6 +197,7 @@ func TestSoftLink(t *testing.T) {
 	})
 }
 
+// TestHardLink tests walk of hard-link.
 func TestHardLink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -207,6 +224,8 @@ func TestHardLink(t *testing.T) {
 	})
 }
 
+// TestHardLinkHardLink tests wlk of a hard-link
+// pointing to a hard-link.
 func TestHardLinkHardLink(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -241,6 +260,11 @@ func TestHardLinkHardLink(t *testing.T) {
 		test.checkSmallFileHardlinkKey(workspace, hardlinks)
 	})
 }
+
+// TestChainedHardLinkEntries tests walk of chained
+// hard-link entry objects. Chaining occurs when there are
+// more than max directory records count of hard-links in
+// a workspace.
 func TestChainedHardLinkEntries(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -268,6 +292,7 @@ func TestChainedHardLinkEntries(t *testing.T) {
 	})
 }
 
+// TestLargeFileWalk tests walk of a large file.
 func TestLargeFileWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -284,6 +309,8 @@ func TestLargeFileWalk(t *testing.T) {
 	})
 }
 
+// TestLargeFileLinkWalk tests walk of a hard-link to
+// large file.
 func TestLargeFileLinkWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -308,6 +335,8 @@ func TestLargeFileLinkWalk(t *testing.T) {
 	})
 }
 
+// TestMiscWalk tests walk of workspace with a directory
+// containing files and hard-links.
 func TestMiscWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -354,6 +383,9 @@ func TestMiscWalk(t *testing.T) {
 	})
 }
 
+// TestMiscWalkWithSkipDir tests walk of a
+// workspace containing directory with files and
+// hard-links while using the skip option.
 func TestMiscWalkWithSkipDir(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -400,127 +432,8 @@ func TestMiscWalkWithSkipDir(t *testing.T) {
 	})
 }
 
-func TestWalkPanicString(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-
-		data := daemon.GenData(133)
-		workspace := test.NewWorkspace()
-		expectedString := "raised panic"
-		expectedErr := fmt.Errorf(expectedString)
-
-		// Write File 1
-		filename := workspace + "/panicFile"
-		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
-		test.Assert(err == nil, "Write failed (%s): %s",
-			filename, err)
-
-		test.SyncAllWorkspaces()
-		db := test.GetWorkspaceDB()
-		ds := test.GetDataStore()
-		// Use Walker to walk all the blocks in the workspace.
-		c := &test.TestCtx().Ctx
-		root := strings.Split(test.RelPath(workspace), "/")
-		rootID, _, err := db.Workspace(c, root[0], root[1], root[2])
-		test.Assert(err == nil, "Error getting rootID for %v: %v",
-			root, err)
-
-		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			objType quantumfs.ObjectType) error {
-
-			if strings.HasSuffix(path, "/panicFile") {
-				panic(expectedString)
-			}
-			return nil
-		}
-		err = Walk(c, ds, rootID, wf)
-		test.Assert(err.Error() == expectedErr.Error(),
-			"Walk did not get the %v, instead got %v", expectedErr,
-			err)
-		expectWalkerErrors(test, []string{walkerMainErrLog,
-			panicErrLog})
-	})
-}
-
-func TestWalkPanicErr(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-
-		data := daemon.GenData(133)
-		workspace := test.NewWorkspace()
-		expectedErrString := "raised panic"
-		expectedErr := fmt.Errorf(expectedErrString)
-
-		// Write File 1
-		filename := workspace + "/panicFile"
-		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
-		test.Assert(err == nil, "Write failed (%s): %s",
-			filename, err)
-
-		test.SyncAllWorkspaces()
-		db := test.GetWorkspaceDB()
-		ds := test.GetDataStore()
-		// Use Walker to walk all the blocks in the workspace.
-		c := &test.TestCtx().Ctx
-		root := strings.Split(test.RelPath(workspace), "/")
-		rootID, _, err := db.Workspace(c, root[0], root[1], root[2])
-		test.Assert(err == nil, "Error getting rootID for %v: %v",
-			root, err)
-
-		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			objType quantumfs.ObjectType) error {
-
-			if strings.HasSuffix(path, "/panicFile") {
-				panic(expectedErr)
-			}
-			return nil
-		}
-		err = Walk(c, ds, rootID, wf)
-		test.Assert(err == expectedErr,
-			"Walk did not get the expectedErr value, instead got %v",
-			err)
-		expectWalkerErrors(test, []string{walkerMainErrLog,
-			panicErrLog})
-	})
-}
-
-func TestWalkErr(t *testing.T) {
-	runTest(t, func(test *testHelper) {
-
-		data := daemon.GenData(133)
-		workspace := test.NewWorkspace()
-		expectedErr := fmt.Errorf("send error")
-
-		// Write File 1
-		filename := workspace + "/errorFile"
-		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
-		test.Assert(err == nil, "Write failed (%s): %s",
-			filename, err)
-
-		test.SyncAllWorkspaces()
-		db := test.GetWorkspaceDB()
-		ds := test.GetDataStore()
-		// Use Walker to walk all the blocks in the workspace.
-		c := &test.TestCtx().Ctx
-		root := strings.Split(test.RelPath(workspace), "/")
-		rootID, _, err := db.Workspace(c, root[0], root[1], root[2])
-		test.Assert(err == nil, "Error getting rootID for %v: %v",
-			root, err)
-
-		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			objType quantumfs.ObjectType) error {
-
-			if strings.HasSuffix(path, "/errorFile") {
-				return expectedErr
-			}
-			return nil
-		}
-		err = Walk(c, ds, rootID, wf)
-		test.Assert(err.Error() == expectedErr.Error(),
-			"Walk did not get the %v, instead got %v", expectedErr,
-			err)
-		expectWalkerErrors(test, []string{walkerMainErrLog, workerErrLog})
-	})
-}
-
+// TestExtendedAttributesWalk tests walk of extended
+// attributes.
 func TestExtendedAttributesWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -541,6 +454,8 @@ func TestExtendedAttributesWalk(t *testing.T) {
 	})
 }
 
+// TestExtendedAttributesiAddRemoveWalk tests if the
+// walk is ok after adding and removing extended attributes.
 func TestExtendedAttributesiAddRemoveWalk(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
