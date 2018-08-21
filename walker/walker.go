@@ -45,6 +45,8 @@ type workerData struct {
 	objType quantumfs.ObjectType
 }
 
+const panicErrLog = "PANIC %s\n%v"
+
 func panicHandler(c *Ctx, err *error) {
 	exception := recover()
 	if exception == nil {
@@ -65,7 +67,7 @@ func panicHandler(c *Ctx, err *error) {
 	}
 
 	trace := utils.BytesToString(debug.Stack())
-	c.Qctx.Elog(qlog.LogTool, "%s\n%v", result, trace)
+	c.Qctx.Elog(qlog.LogTool, panicErrLog, result, trace)
 }
 
 const walkerMainErrLog = "Walk error: %s"

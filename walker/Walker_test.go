@@ -437,7 +437,7 @@ func TestWalkPanicString(t *testing.T) {
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
 		expectWalkerErrors(test, []string{walkerMainErrLog,
-			expectedString})
+			panicErrLog})
 	})
 }
 
@@ -478,7 +478,7 @@ func TestWalkPanicErr(t *testing.T) {
 			"Walk did not get the expectedErr value, instead got %v",
 			err)
 		expectWalkerErrors(test, []string{walkerMainErrLog,
-			expectedErrString})
+			panicErrLog})
 	})
 }
 
