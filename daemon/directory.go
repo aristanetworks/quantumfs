@@ -456,7 +456,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 
 	c.vlog("Normalizing child %s inode %d", name, inodeId)
 
-	inodeIdInfo := dir.hardlinkTable.findHardlinkInodeId(c, fileId)
+	inodeIdInfo := dir.children.inodeNum(name)
 
 	// Bubble up the -1 as we are inheriting the hardlink
 	// from the root now.
