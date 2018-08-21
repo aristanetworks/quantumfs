@@ -18,6 +18,17 @@ import (
 
 type InodeId uint64
 
+type InodeIdInfo struct {
+	id		InodeId
+	generation	uint64
+}
+
+func invalidIdInfo() InodeIdInfo {
+	return InodeIdInfo {
+		id:	quantumfs.InodeIdInvalid,
+	}
+}
+
 // Inode represents a specific path in the tree which updates as the tree itself
 // changes.
 type Inode interface {
@@ -219,6 +230,7 @@ type InodeCommon struct {
 	// These fields are constant once instantiated
 	self Inode // Leaf subclass instance
 	id   InodeId
+	idGeneration uint64
 
 	nameLock sync.Mutex
 	name_    string // '/' if WorkspaceRoot

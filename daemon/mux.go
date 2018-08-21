@@ -185,6 +185,8 @@ type QuantumFs struct {
 	stopWaitingForSignals chan struct{}
 
 	inLowMemoryMode bool
+
+	inodeIdGeneration uint64
 }
 
 func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
@@ -1120,8 +1122,31 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 	}
 }
 
+func (qfs *QuantumFs) newInodeIdInfo(id InodeId) InodeIdInfo {
+	rtn := InodeIdInfo {
+		id:		id,
+	}
+
+	if id != quantumfs.InodeIdInvalid {
+		// We increment a generation counter since its faster than a
+		// random number function. We don't care if this wraps, only that it
+		// is never zero so we can detect undefined generation. We need this
+		// generation counter to prevent the kernel from confusing inodes
+		// when we reuse inode ids.
+		newGen := atomic.AddUint64(&qfs.inodeIdGeneration, 1)
+		if newGen == 0 {
+			newGen = atomic.AddUint64(&qfs.inodeIdGeneration, 1)
+			utils.Assert(newGen != 0,
+				"Double add resulted in zero both times")
+		}
+		rtn.generation = newGen
+	}
+
+	return rtn
+}
+
 // Retrieves a unique inode number
-func (qfs *QuantumFs) newInodeId() InodeId {
+func (qfs *QuantumFs) newInodeId() InodeIdInfo {
 	for {
 		// When we get a new id, it's possible that we're still using it.
 		// If it's still in use, grab another one instead
@@ -1129,7 +1154,7 @@ func (qfs *QuantumFs) newInodeId() InodeId {
 
 		// If this is a reused id, then it's safe to use immediately
 		if reused {
-			return newId
+			return qfs.newInodeIdInfo(newId)
 		}
 
 		// We expect that ids will be reused more often than not. To optimize
@@ -1144,7 +1169,7 @@ func (qfs *QuantumFs) newInodeId() InodeId {
 		if !idIsFree {
 			continue
 		}
-		return newId
+		return qfs.newInodeIdInfo(newId)
 	}
 }
 
@@ -1279,7 +1304,8 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	}
 	keepSearching := func() bool {
 		defer typespacelist.RLock().RUnlock()
-		id, exists = typespacelist.typespacesByName[typespace]
+		idInfo, exists := typespacelist.typespacesByName[typespace]
+		id = idInfo.id
 		if !exists {
 			c.vlog("typespace %s does not exist", typespace)
 			return false
@@ -1302,7 +1328,8 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	}
 	keepSearching = func() bool {
 		defer namespacelist.RLock().RUnlock()
-		id, exists = namespacelist.namespacesByName[namespace]
+		idInfo, exists := namespacelist.namespacesByName[namespace]
+		id = idInfo.id
 		if !exists {
 			return false
 		}
@@ -1335,7 +1362,7 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 		return
 	}
 
-	ids = append(ids, wsrInfo.id)
+	ids = append(ids, wsrInfo.id.id)
 	return
 }
 

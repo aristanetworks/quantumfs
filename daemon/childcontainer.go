@@ -10,11 +10,12 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
+
 // The combination of the effective and published views gives us a coherent
 // filesystem state from a local user's perspective
 type ChildContainer struct {
 	dir      *Directory
-	children map[string]InodeId
+	children map[string]InodeIdInfo
 
 	// Publishable contains a view of the children that is always consistent
 	// The records can be updated in publishable once we are sure they are
@@ -36,7 +37,7 @@ func newChildContainer(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
 
 	container := &ChildContainer{
 		dir:         dir,
-		children:    make(map[string]InodeId),
+		children:    make(map[string]InodeIdInfo),
 		publishable: make(map[InodeId]map[string]quantumfs.DirectoryRecord),
 		effective:   make(map[InodeId]map[string]quantumfs.DirectoryRecord),
 	}
@@ -110,12 +111,14 @@ func (container *ChildContainer) loadChild(c *ctx,
 	// Since we do not have an inodeId this child is/will not be instantiated and
 	// so it is placed in the publishable set.
 
-	var inodeId InodeId
+	var inodeId InodeIdInfo
 	if record.Type() == quantumfs.ObjectTypeHardlink {
 		// The hardlink table will have/create an InodeId for us
 		fileId := record.FileId()
-		inodeId = container.dir.hardlinkTable.findHardlinkInodeId(c,
-			fileId, quantumfs.InodeIdInvalid)
+		inodeId = container.dir.hardlinkTable.updateHardlinkInodeId(c,
+			fileId, invalidIdInfo())
+		utils.Assert(inodeId.id != quantumfs.InodeIdInvalid,
+			"hardlink not known by hardlink table")
 		record = newHardlinkLegFromRecord(record,
 			container.dir.hardlinkTable)
 		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
@@ -123,32 +126,32 @@ func (container *ChildContainer) loadChild(c *ctx,
 		inodeId = c.qfs.newInodeId()
 	}
 
-	addToMap(container.publishable, inodeId, record)
+	addToMap(container.publishable, inodeId.id, record)
 	container.children[record.Filename()] = inodeId
 
-	return inodeId
+	return inodeId.id
 }
 
 // Use this when you know the child's InodeId. Either the child must be instantiated
 // and dirty, or markPublishable() must be called immediately afterwards for the
 // changes set here to eventually be published.
-func (container *ChildContainer) setRecord(c *ctx, inodeId InodeId,
+func (container *ChildContainer) setRecord(c *ctx, inodeId InodeIdInfo,
 	record quantumfs.DirectoryRecord) {
 
-	defer c.FuncIn("ChildContainer::setRecord", "inode %d name %s", inodeId,
+	defer c.FuncIn("ChildContainer::setRecord", "inode %d name %s", inodeId.id,
 		record.Filename()).Out()
 
 	// Since we have an inodeId this child is or will be instantiated and so is
 	// placed in the effective set.
 
-	utils.Assert(inodeId != quantumfs.InodeIdInvalid,
+	utils.Assert(inodeId.id != quantumfs.InodeIdInvalid,
 		"setRecord without inodeId")
 
 	_, isHardlinkLeg := record.(*HardlinkLeg)
 	utils.Assert(record.Type() != quantumfs.ObjectTypeHardlink || isHardlinkLeg,
 		"setRecord with naked hardlink record")
 
-	addToMap(container.effective, inodeId, record)
+	addToMap(container.effective, inodeId.id, record)
 	container.children[record.Filename()] = inodeId
 
 	// Build the hardlink path list if we just set a hardlink record
@@ -174,7 +177,7 @@ func (container *ChildContainer) _recordByName(c *ctx,
 
 	defer c.FuncIn("ChildContainer::_recordByName", "%s", name).Out()
 
-	inodeId := container.inodeNum(name)
+	inodeId := container.inodeNum(name).id
 	records := container.effective[inodeId]
 	if records == nil {
 		records = container.publishable[inodeId]
@@ -225,12 +228,12 @@ func (container *ChildContainer) _recordByInodeId(c *ctx,
 	return nil
 }
 
-func (container *ChildContainer) inodeNum(name string) InodeId {
+func (container *ChildContainer) inodeNum(name string) InodeIdInfo {
 	if inodeId, exists := container.children[name]; exists {
 		return inodeId
 	}
 
-	return quantumfs.InodeIdInvalid
+	return invalidIdInfo()
 }
 
 func (container *ChildContainer) count() uint64 {
@@ -238,7 +241,7 @@ func (container *ChildContainer) count() uint64 {
 }
 
 func (container *ChildContainer) foreachChild(c *ctx, fxn func(name string,
-	inodeId InodeId)) {
+	inodeId InodeIdInfo)) {
 
 	for name, inodeId := range container.children {
 		fxn(name, inodeId)
@@ -250,7 +253,7 @@ func (container *ChildContainer) deleteChild(c *ctx,
 
 	defer c.FuncIn("ChildContainer::deleteChild", "name %s", name).Out()
 
-	inodeId := container.inodeNum(name)
+	inodeId := container.inodeNum(name).id
 	if inodeId == quantumfs.InodeIdInvalid {
 		c.vlog("name %s does not exist", name)
 		return nil
@@ -272,11 +275,11 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 		oldName, newName).Out()
 	utils.Assert(oldName != newName,
 		"Identical names must have been handled")
-	utils.Assert(container.inodeNum(newName) == quantumfs.InodeIdInvalid,
+	utils.Assert(container.inodeNum(newName).id == quantumfs.InodeIdInvalid,
 		"The newName must have been already removed")
 
 	inodeId := container.inodeNum(oldName)
-	c.vlog("child %s has inode %d", oldName, inodeId)
+	c.vlog("child %s has inode %d", oldName, inodeId.id)
 	record := container.deleteChild(c, oldName)
 	if record == nil {
 		c.vlog("oldName doesn't exist")
@@ -313,7 +316,7 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 		// have an effective entry we must create one. Hardlinks are always
 		// publishable, so do not create an effective entry for those types.
 		record = quantumfs.ToThinRecord(record)
-		container.setRecord(c, inodeId, record)
+		container.setRecord(c, container.inodeNum(record.Filename()), record)
 	}
 
 	modify(record)
@@ -322,7 +325,9 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 type inodeVisitFn func(InodeId) bool
 
 func (container *ChildContainer) foreachDirectInode(c *ctx, visit inodeVisitFn) {
-	for name, inodeId := range container.children {
+	for name, inodeIdInfo := range container.children {
+		inodeId := inodeIdInfo.id
+
 		records := container.effective[inodeId]
 		if records == nil {
 			records = container.publishable[inodeId]
@@ -360,7 +365,9 @@ func (container *ChildContainer) publishableRecords(
 func (c *ChildContainer) records() map[string]quantumfs.ImmutableDirectoryRecord {
 	records := make(map[string]quantumfs.ImmutableDirectoryRecord, c.count())
 
-	for name, inodeId := range c.children {
+	for name, inodeIdInfo := range c.children {
+		inodeId := inodeIdInfo.id
+
 		if effective, exists := c.effective[inodeId]; exists {
 			records[name] = effective[name]
 		} else {
@@ -374,7 +381,7 @@ func (c *ChildContainer) records() map[string]quantumfs.ImmutableDirectoryRecord
 func (container *ChildContainer) makePublishable(c *ctx, name string) {
 	defer c.FuncIn("ChildContainer::makePublishable", "%s", name).Out()
 
-	inodeId := container.inodeNum(name)
+	inodeId := container.inodeNum(name).id
 	utils.Assert(inodeId != quantumfs.InodeIdInvalid, "No such child %s", name)
 
 	record := container.effective[inodeId][name]
