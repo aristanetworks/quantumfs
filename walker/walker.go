@@ -276,8 +276,8 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"DirectoryEntry buffer %s", key.String())
 
-		// When wf returns ErrSkipDirectory for a DirectoryEntry, we can skip the
-		// DirectoryRecords in that DirectoryEntry
+		// When wf returns ErrSkipDirectory for a DirectoryEntry,
+		// we can skip the DirectoryRecords in that DirectoryEntry
 		if err := wf(c, path, key, uint64(buf.Size()),
 			quantumfs.ObjectTypeDirectory); err != nil {
 			if err == ErrSkipDirectory {
