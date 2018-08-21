@@ -436,7 +436,8 @@ func TestWalkPanicString(t *testing.T) {
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
-		expectWalkerErrors(test, []string{walkerMainErrLog})
+		expectWalkerErrors(test, []string{walkerMainErrLog,
+			expectedString})
 	})
 }
 
@@ -445,7 +446,8 @@ func TestWalkPanicErr(t *testing.T) {
 
 		data := daemon.GenData(133)
 		workspace := test.NewWorkspace()
-		expectedErr := fmt.Errorf("raised panic")
+		expectedErrString := "raised panic"
+		expectedErr := fmt.Errorf(expectedErrString)
 
 		// Write File 1
 		filename := workspace + "/panicFile"
@@ -475,7 +477,8 @@ func TestWalkPanicErr(t *testing.T) {
 		test.Assert(err == expectedErr,
 			"Walk did not get the expectedErr value, instead got %v",
 			err)
-		expectWalkerErrors(test, []string{walkerMainErrLog})
+		expectWalkerErrors(test, []string{walkerMainErrLog,
+			expectedErrString})
 	})
 }
 
