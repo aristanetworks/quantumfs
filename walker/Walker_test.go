@@ -436,7 +436,7 @@ func TestWalkPanicString(t *testing.T) {
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
-		expectWalkerErrors(test)
+		expectWalkerErrors(test, []string{walkerMainErrLog})
 	})
 }
 
@@ -475,7 +475,7 @@ func TestWalkPanicErr(t *testing.T) {
 		test.Assert(err == expectedErr,
 			"Walk did not get the expectedErr value, instead got %v",
 			err)
-		expectWalkerErrors(test)
+		expectWalkerErrors(test, []string{walkerMainErrLog})
 	})
 }
 
@@ -514,7 +514,7 @@ func TestWalkErr(t *testing.T) {
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
-		expectWalkerErrors(test)
+		expectWalkerErrors(test, []string{walkerMainErrLog, workerErrLog})
 	})
 }
 

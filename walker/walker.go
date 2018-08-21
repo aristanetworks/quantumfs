@@ -69,6 +69,7 @@ func panicHandler(c *Ctx, err *error) {
 }
 
 const walkerMainErrLog = "Walk error: %s"
+const workerErrLog = "Worker error: %s"
 
 // Walk the workspace hierarchy
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
@@ -113,7 +114,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			defer panicHandler(c, &err)
 			err = worker(c, keyChan, wf)
 			if err != nil {
-				cq.Elog(qlog.LogTool, "Worker error: %s",
+				cq.Elog(qlog.LogTool, workerErrLog,
 					err.Error())
 			}
 			return err
