@@ -215,9 +215,7 @@ func TestInodeIdsReuseIdsRecycled(t *testing.T) {
 		test.Assert(fileB == fileA+1, "inode id not simply incremented")
 
 		// Artificially trigger Forget early
-		test.qfs.Forget(uint64(fileA), 1)
-		test.qfs.Forget(uint64(fileB), 1)
-		test.qfs.Forget(uint64(dirB), 1)
+		test.ForceForget(dirB)
 
 		// Give the flusher time
 		time.Sleep(150 * time.Millisecond)
