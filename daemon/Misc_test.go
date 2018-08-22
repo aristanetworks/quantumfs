@@ -190,6 +190,67 @@ func TestInodeIdsReuseCheck(t *testing.T) {
 	})
 }
 
+func TestInodeIdsReuseIdsRecycled(t *testing.T) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		func() {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.reusableDelay = time.Millisecond * 2
+			// We want inode id GC to happen after we've flushed so
+			// that when the flusher releases the ids they go into the
+			// reuse queue instead of being gc'ed
+			test.qfs.inodeIds.gcPeriod = time.Millisecond * 150
+		}()
+
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA/dirB", 0777))
+		test.MakeFile(workspace + "/dirA/dirB/fileA")
+		test.MakeFile(workspace + "/dirA/dirB/fileB")
+
+		fileA := test.getInodeNum(workspace + "/dirA/dirB/fileA")
+		fileB := test.getInodeNum(workspace + "/dirA/dirB/fileB")
+		dirB := test.getInodeNum(workspace + "/dirA/dirB")
+		test.Assert(fileA == dirB+1, "inode id not simply incremented")
+		test.Assert(fileB == fileA+1, "inode id not simply incremented")
+
+		// Artificially trigger Forget early
+		test.qfs.Forget(uint64(fileA), 1)
+		test.qfs.Forget(uint64(fileB), 1)
+		test.qfs.Forget(uint64(dirB), 1)
+
+		// Give the flusher time
+		time.Sleep(150 * time.Millisecond)
+
+		c := test.newCtx()
+		// wait for garbage collection to happen
+		test.WaitFor("inode ids to be garbage collected", func() bool {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.testHighmark_(c)
+			// Wait for all three inode ids to be ready for reuse
+			return test.qfs.inodeIds.highMark < uint64(fileA)
+		})
+
+		idsReseen := 0
+		newIds := make(map[InodeId]struct{})
+		for i := 0; i < 10; i++ {
+			file := fmt.Sprintf("file%d", i)
+			test.MakeFile(workspace + "/" + file)
+			inodeId := test.getInodeNum(workspace + "/" + file)
+
+			_, exists := newIds[inodeId]
+			test.Assert(!exists, "Duplicate inode id given %d", inodeId)
+			newIds[inodeId] = struct{}{}
+
+			if inodeId == fileA || inodeId == fileB {
+				idsReseen++
+			}
+		}
+
+		test.Assert(idsReseen == 2, "Didn't see all inode ids reused: %d",
+			idsReseen)
+	})
+}
+
 func TestInstantiationPanicRecovery(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.ExpectedErrors = make(map[string]struct{})
