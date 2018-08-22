@@ -278,7 +278,8 @@ func handleVeryLargeFile(c *Ctx, path string, dsGet WalkDsGet,
 	}
 	vlf := buf.AsVeryLargeFile()
 	for part := 0; part < vlf.NumberOfParts(); part++ {
-		if err := handleMultiBlockFile(c, path, dsGet, vlf.LargeFileKey(part),
+		if err := handleMultiBlockFile(c, path, dsGet,
+			vlf.LargeFileKey(part),
 			quantumfs.ObjectTypeVeryLargeFile,
 			wf, keyChan); err != nil && err != ErrSkipDirectory {
 
@@ -349,7 +350,9 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet WalkDsGet,
 	//       meaningless info, the default values work fine.
 	fpath := filepath.Join(path, dr.Filename())
 
-	if err := handleExtendedAttributes(c, fpath, dsGet, dr, keyChan); err != nil {
+	if err := handleExtendedAttributes(c, fpath, dsGet,
+		dr, keyChan); err != nil {
+
 		return err
 	}
 
@@ -401,7 +404,8 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet WalkDsGet,
 		} else {
 			// hldr could be of any of the supported ObjectTypes so
 			// handle the directoryRecord accordingly
-			return handleDirectoryRecord(c, fpath, dsGet, hldr, wf, keyChan)
+			return handleDirectoryRecord(c, fpath, dsGet,
+				hldr, wf, keyChan)
 		}
 	default:
 		return writeToChan(c, keyChan, fpath, key, dr.Size(), dr.Type())
