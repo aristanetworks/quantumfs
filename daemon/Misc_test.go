@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -304,8 +303,6 @@ func (test *testHelper) getGenerationNumber(dir string, file string) uint64 {
 	status := test.qfs.Lookup(&header, file, &out)
 	test.Assert(status == fuse.OK, "Lookup on %s/%s failed", dir, file)
 
-	defer test.qfs.Forget(uint64(inodeNum), 1)
-
 	return out.Generation
 }
 
@@ -316,67 +313,44 @@ func TestInodeIdsReuseGeneration(t *testing.T) {
 		func() {
 			defer test.qfs.inodeIds.lock.Lock().Unlock()
 			test.qfs.inodeIds.reusableDelay = time.Millisecond * 2
-			test.qfs.inodeIds.gcPeriod = time.Millisecond * 20
+			test.qfs.inodeIds.gcPeriod = time.Millisecond * 2000
 		}()
 
 		api := test.getApi()
 
-		test.MakeFile(workspace + "/fileA")
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA", 0777))
+		test.AssertNoErr(testutils.PrintToFile(workspace + "/dirA/fileA",
+			"some data"))
 
-		// Make a map to record generations for each inode id
-		generations := make(map[InodeId]uint64)
-		generations[test.getInodeNum(workspace + "/fileA")] =
-			test.getGenerationNumber(workspace, "fileA")
-
-		wsrToken := strings.Split(test.RelPath(workspace), "/")
-		generations[test.getInodeNum(workspace)] =
-			test.getGenerationNumber(workspace+"/../", wsrToken[2])
-
-		generations[test.getInodeNum(workspace+"/../")] =
-			test.getGenerationNumber(workspace+"/../../", wsrToken[1])
-
-		generations[test.getInodeNum(workspace+"/../../")] =
-			test.getGenerationNumber(workspace+"/../../../", wsrToken[0])
-
-		// grab what should be the lowest inode number, the typespace
-		typespaceInode := test.getInodeNum(workspace+"/../../")
-
-		c := test.newCtx()
-		// wait for garbage collection to happen
-		test.WaitFor("inode ids to be garbage collected", func() bool {
-			defer test.qfs.inodeIds.lock.Lock().Unlock()
-			test.qfs.inodeIds.testHighmark_(c)
-			test.qfs.c.vlog("WAITING %d %d", test.qfs.inodeIds.highMark, uint64(typespaceInode))
-			return test.qfs.inodeIds.highMark < uint64(typespaceInode)
-		})
-
+		// Branch into a new workspace so that nothing is instantiated
 		test.AssertNoErr(api.Branch(test.RelPath(workspace),
 			"test/test/test"))
 		test.AssertNoErr(api.EnableRootWrite("test/test/test"))
+		workspace = test.AbsPath("test/test/test")
 
-		workspace = test.AbsPath("test/test/test/")
-		inodesReseen := 0
-		for i := 0; i < 10; i++ {
-			file := fmt.Sprintf("file%d", i)
-			test.MakeFile(workspace + "/" + file)
+		dirA := test.getInodeNum(workspace + "/dirA")
+		fileAGen := test.getGenerationNumber(workspace + "/dirA", "fileA")
+		fileA := test.getInodeNum(workspace + "/dirA/fileA")
 
-			inodeId := test.getInodeNum(workspace + "/" + file)
-			gen := test.getGenerationNumber(workspace, file)
-			lastGen, exists := generations[inodeId]
-			if !exists {
-				// Not an inode id we're watching
-				test.qfs.c.vlog("Skipping inode %d", inodeId)
-				continue
-			}
+		// Trigger Forget early
+		test.qfs.Forget(uint64(fileA), 2)
+		test.qfs.Forget(uint64(dirA), 1)
 
-			test.Assert(lastGen != gen,
-				"generation not changed for inode %d", inodeId)
-			inodesReseen++
-		}
+		// Give the flusher time
+		time.Sleep(150 * time.Millisecond)
 
-		test.Assert(inodesReseen == len(generations),
-			"Only saw %d of %d inode ids reused", inodesReseen,
-			len(generations))
+		// We expect the first inode we make to be the reused fileA inode
+		test.AssertNoErr(testutils.PrintToFile(workspace + "/newFile",
+			"some data"))
+
+		newInodeId := test.getInodeNum(workspace + "/newFile")
+		test.Assert(newInodeId == fileA, "inode id not reused %d %d",
+			newInodeId, fileA)
+
+		newInodeGen := test.getGenerationNumber(workspace, "newFile")
+		test.Assert(newInodeGen != fileAGen,
+			"generation number not different %d %d", newInodeGen,
+			fileAGen)
 	})
 }
 
