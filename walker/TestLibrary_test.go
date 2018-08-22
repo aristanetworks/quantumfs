@@ -147,7 +147,7 @@ func (th *testHelper) checkSmallFileHardlinkKey(workspace string,
 		return nil
 	}
 
-	err = Walk(c, ds, rootID, wf)
+	err = Walk(c, tstDsGetter(ds), rootID, wf)
 	th.Assert(err == nil, "Error in walk: %v", err)
 }
 
@@ -240,7 +240,7 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 		return nil
 	}
 
-	err = Walk(c, ds, rootID, wf)
+	err = Walk(c, tstDsGetter(ds), rootID, wf)
 	th.Assert(err == nil, "Error in walk: %v", err)
 
 	eq := reflect.DeepEqual(getMap, walkerMap)
@@ -263,6 +263,21 @@ func expectWalkerErrors(test *testHelper, errs []string) {
 	test.ExpectedErrors = make(map[string]struct{})
 	for _, e := range errs {
 		test.ExpectedErrors["ERROR: "+e] = struct{}{}
+	}
+}
+
+func tstDsGetter(ds quantumfs.DataStore) WalkDsGet {
+	return func(cq *quantumfs.Ctx, path string,
+		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
+		buf quantumfs.Buffer) error {
+		return ds.Get(cq, key, buf)
+	}
+}
+
+func tstNopWalkFn() WalkFunc {
+	return func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+		objType quantumfs.ObjectType) error {
+		return nil
 	}
 }
 

@@ -4,6 +4,7 @@
 package walker
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -13,9 +14,7 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/aristanetworks/quantumfs/utils/aggregatedatastore"
 	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
-	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -28,6 +27,12 @@ var ErrSkipDirectory = errors.New("skip this directory")
 // Workspace.
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 	size uint64, objType quantumfs.ObjectType) error
+
+// WalkDsGet enables mocking datastore Get in test routines and
+// also limits walker to using Get API for datastore.
+type WalkDsGet func(cq *quantumfs.Ctx, path string,
+	key quantumfs.ObjectKey, typ quantumfs.ObjectType,
+	buf quantumfs.Buffer) error
 
 // Ctx maintains context for the walker library.
 type Ctx struct {
@@ -74,17 +79,30 @@ func panicHandler(c *Ctx, err *error) {
 const walkFailedLog = "Walk failed: %s"
 const walkerErrLog = "desc: %s key: %s err: %s"
 
+// aggregateDsGetter returns a datastore getter function that
+// first checks in ConstantStore and then falls back to the
+// provied datastore getter.
+func aggregateDsGetter(dsGet WalkDsGet) WalkDsGet {
+	return func(cq *quantumfs.Ctx, path string,
+		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
+		buf quantumfs.Buffer) error {
+		if err := quantumfs.ConstantStore.Get(cq, key, buf); err != nil {
+			return dsGet(cq, path, key, typ, buf)
+		}
+		return nil
+	}
+}
+
 // Walk the workspace hierarchy
-func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
+func Walk(cq *quantumfs.Ctx, dsGet WalkDsGet, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
 
-	// encompass the provided datastore in an
-	// AggregateDataStore
-	ads := aggregatedatastore.New(ds)
+	adsGet := aggregateDsGetter(dsGet)
 
 	var err error
 	buf := simplebuffer.New(nil, rootID)
-	if err = ads.Get(cq, rootID, buf); err != nil {
+	if err = adsGet(cq, "wsr", rootID,
+		quantumfs.ObjectTypeWorkspaceRoot, buf); err != nil {
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
@@ -131,7 +149,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			return err
 		}
 
-		if err = handleHardLinks(c, ads, wsr.HardlinkEntry(), wf,
+		if err = handleHardLinks(c, adsGet, wsr.HardlinkEntry(), wf,
 			keyChan); err != nil {
 
 			return err
@@ -142,7 +160,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		// enable lookup for fileID in directoryRecord of the
 		// path which represents the hardlink
 
-		if err = handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
+		if err = handleDirectoryEntry(c, "/", adsGet, wsr.BaseLayer(), wf,
 			keyChan); err != nil {
 
 			return err
@@ -158,7 +176,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	return err
 }
 
-func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
+func handleHardLinks(c *Ctx, dsGet WalkDsGet,
 	hle quantumfs.HardlinkEntry, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -169,8 +187,8 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 			hlr := hle.Entry(idx)
 			dr := hlr.Record()
 			linkPath := dr.Filename()
-			err := handleDirectoryRecord(c, linkPath, ds, dr, wf,
-				keyChan)
+			err := handleDirectoryRecord(c, linkPath,
+				dsGet, dr, wf, keyChan)
 			if err != nil {
 				return err
 			}
@@ -183,7 +201,8 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 
 		key := hle.Next()
 		buf := simplebuffer.New(nil, key)
-		if err := ds.Get(c.Qctx, key, buf); err != nil {
+		if err := dsGet(c.Qctx, "[hardlink table]",
+			key, quantumfs.ObjectTypeHardlink, buf); err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
 				"[hardlink table]", key, err)
 			return err
@@ -203,12 +222,12 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
+func handleMultiBlockFile(c *Ctx, path string, dsGet WalkDsGet,
 	key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 	wf WalkFunc, keyChan chan<- *workerData) error {
 
 	buf := simplebuffer.New(nil, key)
-	if err := ds.Get(c.Qctx, key, buf); err != nil {
+	if err := dsGet(c.Qctx, path, key, typ, buf); err != nil {
 		c.Qctx.Elog(qlog.LogTool, walkerErrLog,
 			path, key, err)
 		return err
@@ -238,12 +257,13 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
+func handleVeryLargeFile(c *Ctx, path string, dsGet WalkDsGet,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	buf := simplebuffer.New(nil, key)
-	if err := ds.Get(c.Qctx, key, buf); err != nil {
+	if err := dsGet(c.Qctx, path, key,
+		quantumfs.ObjectTypeVeryLargeFile, buf); err != nil {
 		c.Qctx.Elog(qlog.LogTool, walkerErrLog,
 			path, key, err)
 		return err
@@ -258,7 +278,7 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	}
 	vlf := buf.AsVeryLargeFile()
 	for part := 0; part < vlf.NumberOfParts(); part++ {
-		if err := handleMultiBlockFile(c, path, ds, vlf.LargeFileKey(part),
+		if err := handleMultiBlockFile(c, path, dsGet, vlf.LargeFileKey(part),
 			quantumfs.ObjectTypeVeryLargeFile,
 			wf, keyChan); err != nil && err != ErrSkipDirectory {
 
@@ -269,13 +289,14 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
+func handleDirectoryEntry(c *Ctx, path string, dsGet WalkDsGet,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
 	for {
 		buf := simplebuffer.New(nil, key)
-		if err := ds.Get(c.Qctx, key, buf); err != nil {
+		if err := dsGet(c.Qctx, path, key,
+			quantumfs.ObjectTypeDirectory, buf); err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
 				path, key, err)
 			return err
@@ -298,8 +319,8 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 
 		de := buf.AsDirectoryEntry()
 		for i := 0; i < de.NumEntries(); i++ {
-			if err := handleDirectoryRecord(c, path, ds, de.Entry(i), wf,
-				keyChan); err != nil {
+			if err := handleDirectoryRecord(c, path, dsGet,
+				de.Entry(i), wf, keyChan); err != nil {
 
 				return err
 			}
@@ -313,7 +334,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 	return nil
 }
 
-func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
+func handleDirectoryRecord(c *Ctx, path string, dsGet WalkDsGet,
 	dr *quantumfs.EncodedDirectoryRecord, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -328,7 +349,7 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	//       meaningless info, the default values work fine.
 	fpath := filepath.Join(path, dr.Filename())
 
-	if err := handleExtendedAttributes(c, fpath, ds, dr, keyChan); err != nil {
+	if err := handleExtendedAttributes(c, fpath, dsGet, dr, keyChan); err != nil {
 		return err
 	}
 
@@ -336,18 +357,18 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	switch dr.Type() {
 	case quantumfs.ObjectTypeMediumFile:
 		return handleMultiBlockFile(c, fpath,
-			ds, key, quantumfs.ObjectTypeMediumFile,
+			dsGet, key, quantumfs.ObjectTypeMediumFile,
 			wf, keyChan)
 	case quantumfs.ObjectTypeLargeFile:
 		return handleMultiBlockFile(c, fpath,
-			ds, key, quantumfs.ObjectTypeLargeFile,
+			dsGet, key, quantumfs.ObjectTypeLargeFile,
 			wf, keyChan)
 	case quantumfs.ObjectTypeVeryLargeFile:
 		return handleVeryLargeFile(c, fpath,
-			ds, key, wf, keyChan)
+			dsGet, key, wf, keyChan)
 	case quantumfs.ObjectTypeDirectory:
 		return handleDirectoryEntry(c, fpath,
-			ds, key, wf, keyChan)
+			dsGet, key, wf, keyChan)
 		// The default case handles the following as well:
 		// quantumfs.ObjectTypeSpecial:
 		// quantumfs.ObjectTypeSmallFile:
@@ -380,14 +401,14 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 		} else {
 			// hldr could be of any of the supported ObjectTypes so
 			// handle the directoryRecord accordingly
-			return handleDirectoryRecord(c, fpath, ds, hldr, wf, keyChan)
+			return handleDirectoryRecord(c, fpath, dsGet, hldr, wf, keyChan)
 		}
 	default:
 		return writeToChan(c, keyChan, fpath, key, dr.Size(), dr.Type())
 	}
 }
 
-func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
+func handleExtendedAttributes(c *Ctx, fpath string, dsGet WalkDsGet,
 	dr quantumfs.DirectoryRecord, keyChan chan<- *workerData) error {
 
 	extKey := dr.ExtendedAttributes()
@@ -396,7 +417,8 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 	}
 
 	buf := simplebuffer.New(nil, extKey)
-	if err := ds.Get(c.Qctx, extKey, buf); err != nil {
+	if err := dsGet(c.Qctx, fpath, extKey,
+		quantumfs.ObjectTypeExtendedAttribute, buf); err != nil {
 		c.Qctx.Elog(qlog.LogTool, walkerErrLog,
 			"extattr "+fpath, extKey, err)
 		return err
@@ -415,7 +437,8 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 		_, key := attributeList.Attribute(i)
 
 		buf := simplebuffer.New(nil, key)
-		if err := ds.Get(c.Qctx, key, buf); err != nil {
+		if err := dsGet(c.Qctx, fpath, key,
+			quantumfs.ObjectTypeExtendedAttribute, buf); err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
 				"extattr attr "+fpath, key, err)
 			return err
@@ -423,11 +446,8 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"Attributes List buffer %s", key.String())
 
-		// The ObjectType of the single block pointed by an extended
-		// attribute is considered as ObjectTypeSmallFile since
-		// ObjectTypeExtendedAttribute doesn't make sense.
 		err := writeToChan(c, keyChan, fpath, key,
-			uint64(buf.Size()), quantumfs.ObjectTypeSmallFile)
+			uint64(buf.Size()), quantumfs.ObjectTypeExtendedAttribute)
 		if err != nil {
 			return err
 		}
