@@ -158,6 +158,45 @@ func TestInodeIdsReuseCheck(t *testing.T) {
 		func() {
 			defer test.qfs.inodeIds.lock.Lock().Unlock()
 			test.qfs.inodeIds.reusableDelay = time.Millisecond * 2
+			test.qfs.inodeIds.gcPeriod = time.Millisecond * 20
+		}()
+
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA/dirB", 0777))
+		test.MakeFile(workspace + "/dirA/dirB/fileA")
+
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA/dirC", 0777))
+		test.MakeFile(workspace + "/dirA/dirC/fileB")
+
+		fileA := test.getInodeNum(workspace + "/dirA/dirB/fileA")
+		dirC := test.getInodeNum(workspace + "/dirA/dirC")
+		fileB := test.getInodeNum(workspace + "/dirA/dirC/fileB")
+		test.Assert(dirC == fileA+1, "inode id not simply incremented")
+		test.Assert(fileB == dirC+1, "inode id not simply incremented")
+
+		c := test.newCtx()
+		// wait for garbage collection to happen at least once
+		test.WaitFor("inode ids to be garbage collected", func() bool {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.testHighmark_(c)
+			return test.qfs.inodeIds.highMark < uint64(fileB)
+		})
+
+		test.MakeFile(workspace + "/dirA/fileC")
+		test.MakeFile(workspace + "/dirA/fileD")
+		fileC := test.getInodeNum(workspace + "/dirA/fileC")
+		fileD := test.getInodeNum(workspace + "/dirA/fileD")
+		test.Assert(fileC == fileB+1, "inode id not incremented after GC")
+		test.Assert(fileD == fileC+1, "inode id not incremented after GC")
+	})
+}
+
+func TestInodeIdsReuseIdsRecycled(t *testing.T) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		func() {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.reusableDelay = time.Millisecond * 2
 			// We want inode id GC to happen after we've flushed so
 			// that when the flusher releases the ids they go into the
 			// reuse queue instead of being gc'ed
