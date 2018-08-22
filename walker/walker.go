@@ -19,10 +19,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// SkipEntry is used as a return value from WalkFunc to indicate that
-// the entry named in the call is to be skipped. It is not returned
-// as an error by any function.
-var SkipEntry = errors.New("skip this key")
+// ErrSkipDirectory is a special error from WalkFunc to indicate that
+// the directory named in the call is to be skipped.
+// This error will not be treated as an error during workspace walk.
+var ErrSkipDirectory = errors.New("skip this directory")
 
 // WalkFunc is the type of the function called for each data block under the
 // Workspace.
@@ -143,7 +143,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		// path which represents the hardlink
 
 		if err = handleDirectoryEntry(c, "/", ads, wsr.BaseLayer(), wf,
-			keyChan); err != nil && err != SkipEntry {
+			keyChan); err != nil {
 
 			return err
 		}
@@ -171,7 +171,7 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 			linkPath := dr.Filename()
 			err := handleDirectoryRecord(c, linkPath, ds, dr, wf,
 				keyChan)
-			if err != nil && err != SkipEntry {
+			if err != nil {
 				return err
 			}
 			// add an entry to enable lookup based on FileId
@@ -204,8 +204,8 @@ func handleHardLinks(c *Ctx, ds quantumfs.DataStore,
 }
 
 func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
-	key quantumfs.ObjectKey, wf WalkFunc,
-	keyChan chan<- *workerData) error {
+	key quantumfs.ObjectKey, typ quantumfs.ObjectType,
+	wf WalkFunc, keyChan chan<- *workerData) error {
 
 	buf := simplebuffer.New(nil, key)
 	if err := ds.Get(c.Qctx, key, buf); err != nil {
@@ -218,21 +218,19 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 		"MultiBlockFile buffer %s", key.String())
 
 	if err := writeToChan(c, keyChan, path, key, uint64(buf.Size()),
-		quantumfs.ObjectTypeMediumFile); err != nil {
+		typ); err != nil {
 		return err
 	}
 
 	mbf := buf.AsMultiBlockFile()
 	keys := mbf.ListOfBlocks()
 	for i, k := range keys {
+		size := uint64(mbf.BlockSize())
 		if i == len(keys)-1 {
-			// Return, since this is last block
-			return writeToChan(c, keyChan, path, k,
-				uint64(mbf.SizeOfLastBlock()),
-				quantumfs.ObjectTypeSmallFile)
+			size = uint64(mbf.SizeOfLastBlock())
 		}
-		if err := writeToChan(c, keyChan, path, k, uint64(mbf.BlockSize()),
-			quantumfs.ObjectTypeSmallFile); err != nil {
+		if err := writeToChan(c, keyChan, path, k, size,
+			typ); err != nil {
 			return err
 		}
 	}
@@ -261,7 +259,8 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	vlf := buf.AsVeryLargeFile()
 	for part := 0; part < vlf.NumberOfParts(); part++ {
 		if err := handleMultiBlockFile(c, path, ds, vlf.LargeFileKey(part),
-			wf, keyChan); err != nil && err != SkipEntry {
+			quantumfs.ObjectTypeVeryLargeFile,
+			wf, keyChan); err != nil && err != ErrSkipDirectory {
 
 			return err
 		}
@@ -285,11 +284,11 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"DirectoryEntry buffer %s", key.String())
 
-		// When wf returns SkipEntry for a DirectoryEntry, we can skip the
-		// DirectoryRecords in that DirectoryEntry
+		// When wf returns ErrSkipDirectory for a DirectoryEntry,
+		// we can skip the DirectoryRecords in that DirectoryEntry
 		if err := wf(c, path, key, uint64(buf.Size()),
 			quantumfs.ObjectTypeDirectory); err != nil {
-			if err == SkipEntry {
+			if err == ErrSkipDirectory {
 				return nil
 			}
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
@@ -300,7 +299,7 @@ func handleDirectoryEntry(c *Ctx, path string, ds quantumfs.DataStore,
 		de := buf.AsDirectoryEntry()
 		for i := 0; i < de.NumEntries(); i++ {
 			if err := handleDirectoryRecord(c, path, ds, de.Entry(i), wf,
-				keyChan); err != nil && err != SkipEntry {
+				keyChan); err != nil {
 
 				return err
 			}
@@ -336,10 +335,13 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	key := dr.ID()
 	switch dr.Type() {
 	case quantumfs.ObjectTypeMediumFile:
-		fallthrough
+		return handleMultiBlockFile(c, fpath,
+			ds, key, quantumfs.ObjectTypeMediumFile,
+			wf, keyChan)
 	case quantumfs.ObjectTypeLargeFile:
 		return handleMultiBlockFile(c, fpath,
-			ds, key, wf, keyChan)
+			ds, key, quantumfs.ObjectTypeLargeFile,
+			wf, keyChan)
 	case quantumfs.ObjectTypeVeryLargeFile:
 		return handleVeryLargeFile(c, fpath,
 			ds, key, wf, keyChan)
@@ -355,6 +357,10 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 		// directoryRecord reached from directoryEntry and not
 		// when walking from hardlinkEntry table hence use the
 		// key from the hardlinkRecord.
+		//
+		// hardlinks cannot be made to directories so its safe
+		// to just log the error if below checks fail and continue
+		// walking other directory records in the caller.
 		hldr, exists := c.hlkeys[dr.FileId()]
 
 		if !exists {
@@ -363,14 +369,14 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 				fpath, dr.FileId())
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog, fpath, key,
 				fmt.Errorf("%s", errStr))
-			return SkipEntry
+			return nil
 		} else if hldr.Type() == quantumfs.ObjectTypeHardlink {
 			errStr := fmt.Sprintf("Hardlink object type found in"+
 				"WSR hardlink info for path: %s fileID: %d", fpath,
 				dr.FileId())
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog, fpath, key,
 				fmt.Errorf("%s", errStr))
-			return SkipEntry
+			return nil
 		} else {
 			// hldr could be of any of the supported ObjectTypes so
 			// handle the directoryRecord accordingly
@@ -417,6 +423,9 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"Attributes List buffer %s", key.String())
 
+		// The ObjectType of the single block pointed by an extended
+		// attribute is considered as ObjectTypeSmallFile since
+		// ObjectTypeExtendedAttribute doesn't make sense.
 		err := writeToChan(c, keyChan, fpath, key,
 			uint64(buf.Size()), quantumfs.ObjectTypeSmallFile)
 		if err != nil {
@@ -439,7 +448,7 @@ func worker(c *Ctx, keyChan <-chan *workerData, wf WalkFunc) error {
 			}
 		}
 		if err := wf(c, keyItem.path, keyItem.key, keyItem.size,
-			keyItem.objType); err != nil && err != SkipEntry {
+			keyItem.objType); err != nil && err != ErrSkipDirectory {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog, keyItem.path,
 				keyItem.key, err)
 			return err
