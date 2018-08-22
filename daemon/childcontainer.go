@@ -10,7 +10,6 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-
 // The combination of the effective and published views gives us a coherent
 // filesystem state from a local user's perspective
 type ChildContainer struct {

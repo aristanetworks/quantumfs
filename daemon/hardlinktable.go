@@ -209,7 +209,8 @@ func (ht *HardlinkTableImpl) removeHardlink_(fileId quantumfs.FileId,
 func (ht *HardlinkTableImpl) newHardlink(c *ctx, inodeId InodeIdInfo,
 	record quantumfs.DirectoryRecord) *HardlinkLeg {
 
-	defer c.FuncIn("HardlinkTableImpl::newHardlink", "inode %d", inodeId.id).Out()
+	defer c.FuncIn("HardlinkTableImpl::newHardlink", "inode %d",
+		inodeId.id).Out()
 
 	if _, isLink := record.(*HardlinkLeg); isLink {
 		panic("newHardlink called on existing hardlink")
