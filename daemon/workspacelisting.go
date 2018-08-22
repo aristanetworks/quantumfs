@@ -176,7 +176,6 @@ func fillAttr(attr *fuse.Attr, inodeNum InodeId, numChildren uint32) {
 }
 
 func fillEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
-	out.Generation = 1
 	out.EntryValid = c.config.CacheTimeSeconds
 	out.EntryValidNsec = c.config.CacheTimeNsecs
 	out.AttrValid = c.config.CacheTimeSeconds
@@ -184,7 +183,6 @@ func fillEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
 }
 
 func clearEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
-	out.Generation = 0
 	out.EntryValid = 0
 	out.EntryValidNsec = 0
 	out.AttrValid = 0
@@ -208,7 +206,8 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeIdInfo,
 	for _, name := range names {
 		if _, exists := (*inodeMap)[name]; !exists {
 			inodeId := c.qfs.newInodeId()
-			c.vlog("Adding new child %s inodeId %d", name, inodeId.id)
+			c.vlog("Adding new child %s inodeId %d generation %d", name,
+				inodeId.id, inodeId.generation)
 			(*inodeMap)[name] = inodeId
 			(*nameMap)[inodeId.id] = name
 
@@ -378,7 +377,6 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	if !exists {
 		return fuse.ENOENT
 	}
-	c.vlog("Typespace exists")
 
 	inodeNum := tsl.typespacesByName[name]
 	c.qfs.incrementLookupCount(c, inodeNum.id)

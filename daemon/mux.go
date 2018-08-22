@@ -1142,6 +1142,8 @@ func (qfs *QuantumFs) newInodeIdInfo(id InodeId) InodeIdInfo {
 		rtn.generation = newGen
 	}
 
+	qfs.c.vlog("Generation for inode %d is %d", id, rtn.generation)
+
 	return rtn
 }
 

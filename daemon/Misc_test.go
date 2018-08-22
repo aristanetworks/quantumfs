@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 func TestUnknownInodeId(t *testing.T) {
@@ -230,3 +232,90 @@ func TestInstantiationPanicRecovery(t *testing.T) {
 		ioutil.ReadFile(test.AbsPath("test/test/branchB/dir/file"))
 	})
 }
+
+func (test *testHelper) getGenerationNumber(dir string, file string) uint64 {
+	inodeNum := test.getInodeNum(dir)
+	test.Assert(inodeNum != quantumfs.InodeIdInvalid, "Invalid inode")
+
+	var header fuse.InHeader
+	header.NodeId = uint64(inodeNum)
+	var out fuse.EntryOut
+	status := test.qfs.Lookup(&header, file, &out)
+	test.Assert(status == fuse.OK, "Lookup on %s/%s failed", dir, file)
+
+	defer test.qfs.Forget(uint64(inodeNum), 1)
+
+	return out.Generation
+}
+
+func TestInodeIdsReuseGeneration(t *testing.T) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		func() {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.reusableDelay = time.Millisecond * 2
+			test.qfs.inodeIds.gcPeriod = time.Millisecond * 20
+		}()
+
+		api := test.getApi()
+
+		test.MakeFile(workspace + "/fileA")
+
+		// Make a map to record generations for each inode id
+		generations := make(map[InodeId]uint64)
+		generations[test.getInodeNum(workspace + "/fileA")] =
+			test.getGenerationNumber(workspace, "fileA")
+
+		wsrToken := strings.Split(test.RelPath(workspace), "/")
+		generations[test.getInodeNum(workspace)] =
+			test.getGenerationNumber(workspace+"/../", wsrToken[2])
+
+		generations[test.getInodeNum(workspace+"/../")] =
+			test.getGenerationNumber(workspace+"/../../", wsrToken[1])
+
+		generations[test.getInodeNum(workspace+"/../../")] =
+			test.getGenerationNumber(workspace+"/../../../", wsrToken[0])
+
+		// grab what should be the lowest inode number, the typespace
+		typespaceInode := test.getInodeNum(workspace+"/../../")
+
+		c := test.newCtx()
+		// wait for garbage collection to happen
+		test.WaitFor("inode ids to be garbage collected", func() bool {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.testHighmark_(c)
+			test.qfs.c.vlog("WAITING %d %d", test.qfs.inodeIds.highMark, uint64(typespaceInode))
+			return test.qfs.inodeIds.highMark < uint64(typespaceInode)
+		})
+
+		test.AssertNoErr(api.Branch(test.RelPath(workspace),
+			"test/test/test"))
+		test.AssertNoErr(api.EnableRootWrite("test/test/test"))
+
+		workspace = test.AbsPath("test/test/test/")
+		inodesReseen := 0
+		for i := 0; i < 10; i++ {
+			file := fmt.Sprintf("file%d", i)
+			test.MakeFile(workspace + "/" + file)
+
+			inodeId := test.getInodeNum(workspace + "/" + file)
+			gen := test.getGenerationNumber(workspace, file)
+			lastGen, exists := generations[inodeId]
+			if !exists {
+				// Not an inode id we're watching
+				test.qfs.c.vlog("Skipping inode %d", inodeId)
+				continue
+			}
+
+			test.Assert(lastGen != gen,
+				"generation not changed for inode %d", inodeId)
+			inodesReseen++
+		}
+
+		test.Assert(inodesReseen == len(generations),
+			"Only saw %d of %d inode ids reused", inodesReseen,
+			len(generations))
+	})
+}
+
