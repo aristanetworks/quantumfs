@@ -1123,8 +1123,8 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 }
 
 func (qfs *QuantumFs) newInodeIdInfo(id InodeId) InodeIdInfo {
-	rtn := InodeIdInfo {
-		id:		id,
+	rtn := InodeIdInfo{
+		id: id,
 	}
 
 	if id != quantumfs.InodeIdInvalid {

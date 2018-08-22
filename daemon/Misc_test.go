@@ -319,7 +319,7 @@ func TestInodeIdsReuseGeneration(t *testing.T) {
 		api := test.getApi()
 
 		test.AssertNoErr(os.MkdirAll(workspace+"/dirA", 0777))
-		test.AssertNoErr(testutils.PrintToFile(workspace + "/dirA/fileA",
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileA",
 			"some data"))
 
 		// Branch into a new workspace so that nothing is instantiated
@@ -329,7 +329,7 @@ func TestInodeIdsReuseGeneration(t *testing.T) {
 		workspace = test.AbsPath("test/test/test")
 
 		dirA := test.getInodeNum(workspace + "/dirA")
-		fileAGen := test.getGenerationNumber(workspace + "/dirA", "fileA")
+		fileAGen := test.getGenerationNumber(workspace+"/dirA", "fileA")
 		fileA := test.getInodeNum(workspace + "/dirA/fileA")
 
 		// Trigger Forget early
@@ -340,7 +340,7 @@ func TestInodeIdsReuseGeneration(t *testing.T) {
 		time.Sleep(150 * time.Millisecond)
 
 		// We expect the first inode we make to be the reused fileA inode
-		test.AssertNoErr(testutils.PrintToFile(workspace + "/newFile",
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/newFile",
 			"some data"))
 
 		newInodeId := test.getInodeNum(workspace + "/newFile")
@@ -353,4 +353,3 @@ func TestInodeIdsReuseGeneration(t *testing.T) {
 			fileAGen)
 	})
 }
-
