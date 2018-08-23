@@ -412,6 +412,7 @@ func kernelCacheNegativeEntry(c *ctx, out *fuse.EntryOut) fuse.Status {
 	// success with a zero NodeId. See struct fuse_entry_param in libfuse.
 	fillEntryOutCacheData(c, out)
 	out.NodeId = 0
+	out.Generation = 0
 	return fuse.OK
 }
 

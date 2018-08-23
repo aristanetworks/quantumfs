@@ -353,6 +353,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 	if name == quantumfs.ApiPath {
 		out.NodeId = quantumfs.InodeIdApi
+		out.Generation = 0
 		fillEntryOutCacheData(c, out)
 		fillApiAttr(c, &out.Attr)
 		return fuse.OK

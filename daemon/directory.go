@@ -699,6 +699,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 		fillAttrWithDirectoryRecord(c, &children[i].attr,
 			dir.children.inodeNum(filename).id, c.fuseCtx.Owner, entry)
 		children[i].fuseType = children[i].attr.Mode
+		children[i].generation = dir.children.inodeNum(filename).generation
 		i++
 	}
 
@@ -1993,9 +1994,10 @@ func (dir *Directory) hardlinkDec_(
 
 type directoryContents struct {
 	// All immutable after creation
-	filename string
-	fuseType uint32 // One of fuse.S_IFDIR, S_IFREG, etc
-	attr     fuse.Attr
+	filename   string
+	fuseType   uint32 // One of fuse.S_IFDIR, S_IFREG, etc
+	attr       fuse.Attr
+	generation uint64
 }
 
 type directorySnapshotSource interface {
@@ -2059,6 +2061,7 @@ func (ds *directorySnapshot) ReadDirPlus(c *ctx, input *fuse.ReadIn,
 		}
 
 		details.NodeId = child.attr.Ino
+		details.Generation = child.generation
 		if ds._generation == ds.src.generation() {
 			fillEntryOutCacheData(c, details)
 		} else {
