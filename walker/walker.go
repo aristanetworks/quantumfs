@@ -372,10 +372,6 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet WalkDsGet,
 	case quantumfs.ObjectTypeDirectory:
 		return handleDirectoryEntry(c, fpath,
 			dsGet, key, wf, keyChan)
-		// The default case handles the following as well:
-		// quantumfs.ObjectTypeSpecial:
-		// quantumfs.ObjectTypeSmallFile:
-		// quantumfs.ObjectTypeSymlink:
 	case quantumfs.ObjectTypeHardlink:
 		// This ObjectType will only be seen when looking at a
 		// directoryRecord reached from directoryEntry and not
@@ -408,6 +404,10 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet WalkDsGet,
 				hldr, wf, keyChan)
 		}
 	default:
+		// The default case handles the following as well:
+		// quantumfs.ObjectTypeSpecial:
+		// quantumfs.ObjectTypeSmallFile:
+		// quantumfs.ObjectTypeSymlink:
 		return writeToChan(c, keyChan, fpath, key, dr.Size(), dr.Type())
 	}
 }
