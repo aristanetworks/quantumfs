@@ -342,10 +342,6 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	case quantumfs.ObjectTypeDirectory:
 		return handleDirectoryEntry(c, fpath,
 			ds, key, wf, keyChan)
-		// The default case handles the following as well:
-		// quantumfs.ObjectTypeSpecial:
-		// quantumfs.ObjectTypeSmallFile:
-		// quantumfs.ObjectTypeSymlink:
 	case quantumfs.ObjectTypeHardlink:
 		// This ObjectType will only be seen when looking at a
 		// directoryRecord reached from directoryEntry and not
@@ -375,6 +371,10 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 			return handleDirectoryRecord(c, fpath, ds, hldr, wf, keyChan)
 		}
 	default:
+		// The default case handles the following as well:
+		// quantumfs.ObjectTypeSpecial:
+		// quantumfs.ObjectTypeSmallFile:
+		// quantumfs.ObjectTypeSymlink:
 		return writeToChan(c, keyChan, fpath, key, dr.Size(), dr.Type())
 	}
 }
@@ -411,11 +411,8 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"Attributes List buffer %s", key.String())
 
-		// The ObjectType of the single block pointed by an extended
-		// attribute is considered as ObjectTypeSmallFile since
-		// ObjectTypeExtendedAttribute doesn't make sense.
 		err := writeToChan(c, keyChan, fpath, key,
-			uint64(buf.Size()), quantumfs.ObjectTypeSmallFile)
+			uint64(buf.Size()), quantumfs.ObjectTypeExtendedAttribute)
 		if err != nil {
 			return err
 		}
