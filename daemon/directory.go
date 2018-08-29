@@ -864,7 +864,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	}()
 
 	if result == fuse.OK {
-		newDir.markSelfAccessed(c, quantumfs.PathCreated |
+		newDir.markSelfAccessed(c, quantumfs.PathCreated|
 			quantumfs.PathIsDir)
 	}
 
