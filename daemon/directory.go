@@ -206,12 +206,6 @@ func (dir *Directory) delChild_(c *ctx,
 		return dir.prepareForOrphaning_(c, name, detachedChild)
 	}()
 
-	pathFlags := quantumfs.PathFlags(quantumfs.PathDeleted)
-	if record != nil {
-		pathFlags = markType(record.Type(), pathFlags)
-	}
-	dir.self.markAccessed(c, name, pathFlags)
-
 	return record
 }
 
@@ -969,6 +963,9 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 
 		return dir.delChild_(c, name), fuse.OK
 	})
+	if result == fuse.OK {
+		dir.self.markAccessed(c, name, quantumfs.PathDeleted)
+	}
 
 	dir.updateSize(c, result)
 	return result
@@ -1020,6 +1017,10 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 
 		return dir.delChild_(c, name), fuse.OK
 	})
+	if result == fuse.OK {
+		dir.self.markAccessed(c, name, quantumfs.PathDeleted |
+			quantumfs.PathIsDir)
+	}
 
 	dir.updateSize(c, result)
 	return result
@@ -1135,9 +1136,34 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 }
 
 func (dir *Directory) RenameChild(c *ctx, oldName string,
-	newName string) (result fuse.Status) {
+	newName string) fuse.Status {
 
 	defer c.FuncIn("Directory::RenameChild", "%s -> %s", oldName, newName).Out()
+
+	fileType, overwritten, result := dir.RenameChild_(c, oldName, newName)
+	if result == fuse.OK {
+		if overwritten != nil {
+			dir.self.markAccessed(c, overwritten.Filename(),
+				markType(overwritten.Type(),
+					quantumfs.PathDeleted))
+		}
+
+		// Conceptually we remove any entry in the way before we move
+		// the source file in its place, so update the accessed list
+		// mark in that order to ensure mark logic produces the
+		// correct result.
+		dir.self.markAccessed(c, oldName,
+			markType(fileType, quantumfs.PathDeleted))
+		dir.self.markAccessed(c, newName,
+			markType(fileType, quantumfs.PathCreated))
+	}
+
+	return result
+}
+
+func (dir *Directory) RenameChild_(c *ctx, oldName string,
+	newName string) (fileType quantumfs.ObjectType,
+	overwrittenRecord quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
 
 	defer dir.updateSize(c, result)
 	overwrittenInodeId := dir.childInodeNum(newName).id
@@ -1176,7 +1202,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 			return quantumfs.InodeIdInvalid, nil, fuse.OK
 		}
 		oldInodeId_ := dir.children.inodeNum(oldName).id
-		dir.orphanChild_(c, newName, overwrittenInode)
+		overwrittenRecord = dir.orphanChild_(c, newName, overwrittenInode)
 		dir.children.renameChild(c, oldName, newName)
 
 		now := quantumfs.NewTime(time.Now())
@@ -1195,14 +1221,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 				})
 		}
 
-		// Conceptually we remove any entry in the way before we move
-		// the source file in its place, so update the accessed list
-		// mark in that order to ensure mark logic produces the
-		// correct result.
-		dir.self.markAccessed(c, oldName,
-			markType(record.Type(), quantumfs.PathDeleted))
-		dir.self.markAccessed(c, newName,
-			markType(record.Type(), quantumfs.PathCreated))
+		fileType = record.Type()
 
 		return oldInodeId_, record, fuse.OK
 	}()
@@ -1234,7 +1253,9 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 
 // Must hold dir and dir.childRecordLock
 // Must hold the child's parentLock if inode is not nil
-func (dir *Directory) orphanChild_(c *ctx, name string, inode Inode) {
+func (dir *Directory) orphanChild_(c *ctx, name string,
+	inode Inode) (rtn quantumfs.ImmutableDirectoryRecord) {
+
 	defer c.FuncIn("Directory::orphanChild_", "%s", name).Out()
 
 	removedId := dir.children.inodeNum(name).id
@@ -1243,9 +1264,7 @@ func (dir *Directory) orphanChild_(c *ctx, name string, inode Inode) {
 		return
 	}
 
-	dir.self.markAccessed(c, name,
-		markType(removedRecord.Type(),
-			quantumfs.PathDeleted))
+	rtn = removedRecord.AsImmutable()
 
 	removedRecord = dir.prepareForOrphaning_(c, name, removedRecord)
 	if removedId == quantumfs.InodeIdInvalid || removedRecord == nil {
@@ -1260,6 +1279,8 @@ func (dir *Directory) orphanChild_(c *ctx, name string, inode Inode) {
 	} else {
 		inode.orphan_(c, removedRecord)
 	}
+
+	return
 }
 
 func (dir *Directory) childInodeNum(name string) InodeIdInfo {
@@ -1273,20 +1294,43 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	defer c.FuncIn("Directory::MvChild", "%s -> %s", oldName, newName).Out()
 
-	// check write permission for both directories
-	err := hasDirectoryWritePerm(c, dstInode)
-	if err != fuse.OK {
-		return err
+	fileType, overwritten, result := dir.MvChild_(c, dstInode, oldName, newName)
+	if result == fuse.OK {
+		if overwritten != nil {
+			dir.self.markAccessed(c, overwritten.Filename(),
+				markType(overwritten.Type(),
+					quantumfs.PathDeleted))
+		}
+
+		// This is the same entry just moved, so we can use the same
+		// record for both the old and new paths.
+		dir.self.markAccessed(c, oldName,
+			markType(fileType, quantumfs.PathDeleted))
+		AsDirectory(dstInode).self.markAccessed(c, newName,
+			markType(fileType, quantumfs.PathCreated))
 	}
 
-	err = func() fuse.Status {
+	return
+}
+
+func (dir *Directory) MvChild_(c *ctx, dstInode Inode, oldName string,
+	newName string) (fileType quantumfs.ObjectType,
+	overwritten quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
+
+	// check write permission for both directories
+	result = hasDirectoryWritePerm(c, dstInode)
+	if result != fuse.OK {
+		return
+	}
+
+	result = func() fuse.Status {
 		defer dir.childRecordLock.Lock().Unlock()
 
 		record := dir.children.recordByName(c, oldName)
 		return hasDirectoryWritePermSticky(c, dir, record.Owner())
 	}()
-	if err != fuse.OK {
-		return err
+	if result != fuse.OK {
+		return
 	}
 
 	dst := asDirectory(dstInode)
@@ -1387,7 +1431,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 	c.vlog("Adding to destination directory")
 	func() {
 		defer dst.childRecordLock.Lock().Unlock()
-		dst.orphanChild_(c, newName, overwrittenInode)
+		overwritten = dst.orphanChild_(c, newName, overwrittenInode)
 		dst.children.setRecord(c, childInodeId, newEntry)
 
 		// Being inserted means you need to be synced to be publishable. If
@@ -1406,12 +1450,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		dst.self.dirty(c)
 	}()
 
-	// This is the same entry just moved, so we can use the same
-	// record for both the old and new paths.
-	dir.self.markAccessed(c, oldName,
-		markType(newEntry.Type(), quantumfs.PathDeleted))
-	dst.self.markAccessed(c, newName,
-		markType(newEntry.Type(), quantumfs.PathCreated))
+	fileType = newEntry.Type()
 
 	// Set entry in new directory. If the renamed inode is
 	// uninstantiated, we swizzle the parent here. If it's a hardlink, it's
@@ -1928,8 +1967,6 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	c.qfs.addUninstantiated(c, []inodePair{newInodePair(inodeNum, parent)})
 
 	c.qfs.noteChildCreated(c, dir.inodeNum(), name)
-
-	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
 }
 
 func (dir *Directory) markHardlinkPath(c *ctx, path string,
