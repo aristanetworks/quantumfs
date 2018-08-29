@@ -1296,8 +1296,9 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	fileType, overwritten, result := dir.MvChild_(c, dstInode, oldName, newName)
 	if result == fuse.OK {
+		dst := AsDirectory(dstInode)
 		if overwritten != nil {
-			dir.self.markAccessed(c, overwritten.Filename(),
+			dst.self.markAccessed(c, overwritten.Filename(),
 				markType(overwritten.Type(),
 					quantumfs.PathDeleted))
 		}
@@ -1306,7 +1307,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 		// record for both the old and new paths.
 		dir.self.markAccessed(c, oldName,
 			markType(fileType, quantumfs.PathDeleted))
-		AsDirectory(dstInode).self.markAccessed(c, newName,
+		dst.self.markAccessed(c, newName,
 			markType(fileType, quantumfs.PathCreated))
 	}
 
