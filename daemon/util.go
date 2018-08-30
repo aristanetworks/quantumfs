@@ -459,8 +459,8 @@ func publishNow(c *ctx, buf ImmutableBuffer) (quantumfs.ObjectKey, error) {
 func AsDirectory(inode Inode) *Directory {
 	wsr, isWsr := inode.(*WorkspaceRoot)
 	if isWsr {
-		dir := wsr.Directory
-		return &dir
+		dir := &(wsr.Directory)
+		return dir
 	}
 
 	return inode.(*Directory)
