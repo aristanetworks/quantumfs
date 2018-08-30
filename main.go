@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -56,6 +57,17 @@ func (c *Ctx) elog(format string, args ...interface{}) {
 	c.qctx.Elog(qlog.LogTool, "Error:  "+format, args...)
 }
 
+func getPrefixMatcher(prefix string, negate bool) func(s string) bool {
+	if negate {
+		return func(s string) bool {
+			return !strings.HasPrefix(s, prefix)
+		}
+	}
+	return func(s string) bool {
+		return strings.HasPrefix(s, prefix)
+	}
+}
+
 func main() {
 
 	walkFlags = flag.NewFlagSet("Walker daemon", flag.ExitOnError)
@@ -71,12 +83,17 @@ func main() {
 		"Number of parallel walks in the daemon")
 	useSkipMap := walkFlags.Bool("skipSeenKeys", false, "Skip keys seen in earlier walks")
 	name := walkFlags.String("name", "", "walker instance name, used when multiple instances are deployed")
+	prefix := walkFlags.String("wsPrefixMatch", "", "all workspace names with this prefix are handled. Others"+
+		" are skipped. The negWsPrefixMatch option reverses the check")
+	negPrefixMatch := walkFlags.Bool("negWsPrefixMatch", false, "negate the prefix match checking. All workspaces"+
+		" with names not matching the prefix are handled.")
 
 	walkFlags.Usage = func() {
 		fmt.Println("qubit-walkerd version", version)
 		fmt.Println("usage: qubit-walkerd -name <name> -etherCfg <etherCfg> [-wsdbCfg <wsdb service name>] [-logdir dir]")
 		fmt.Println("                [-influxServer serverIP -influxPort port" +
-			" -influxDBName dbname] [-numWalkers num] [-skipSeenKeys]")
+			" -influxDBName dbname] [-numWalkers num] [-skipSeenKeys]" +
+			" [-wsPrefixMatch prefix] [-negWsPrefixMatch]")
 		fmt.Println()
 		fmt.Println("This daemon periodically walks all the workspaces,")
 		fmt.Println("updates the TTL of each block as per the config file and")
@@ -96,6 +113,8 @@ func main() {
 		os.Exit(exitBadConfig)
 	}
 
+	matcher := getPrefixMatcher(*prefix, *negPrefixMatch)
+
 	if *etherCfg == "" {
 		walkFlags.Usage()
 		os.Exit(exitBadConfig)
@@ -111,7 +130,7 @@ func main() {
 	}
 
 	c := getWalkerDaemonContext(*name, *influxServer, uint16(*influxPort), *influxDBName,
-		*etherCfg, *wsdbCfg, *logdir, *numWalkers)
+		*etherCfg, *wsdbCfg, *logdir, *numWalkers, matcher)
 
 	// Start heart beat messaging.
 	timer := time.Tick(heartBeatInterval)
@@ -251,6 +270,12 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 				continue
 			}
 			for ws := range wsMap {
+				wsFullPath := fmt.Sprintf("%s/%s/%s", ts, ns, ws)
+				if !c.wsNameMatcher(wsFullPath) {
+					c.vlog("skipped walk of ws %s due to ws name match rule",
+						wsFullPath)
+					continue
+				}
 				if err := queueWorkspace(c, workChan, ts, ns, ws); err != nil {
 					c.elog("Error from queueWorkspace (%s/%s/%s): %s",
 						ts, ns, ws, err.Error())

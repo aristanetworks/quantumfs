@@ -5,7 +5,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,6 +60,43 @@ func (th *testHelper) testHelperUpcast(
 	return func(test testutils.TestArg) {
 		testFn(th)
 	}
+}
+
+// Use the context of the actual test case.
+// th.testCtx() creates a new context.
+func (th *testHelper) setupPrefixMatchTest(c *Ctx,
+	count int) (workspaces []string, files []string, oldTTLs []int64) {
+
+	workspaces = make([]string, count)
+	files = make([]string, count)
+	oldTTLs = make([]int64, count)
+	// create test workspaces
+	for i := 0; i < count; i++ {
+		absWorkspace := th.NewWorkspace()
+		relWorkspace := th.RelPath(absWorkspace)
+		parts := strings.Split(relWorkspace, "/")
+		th.Assert(len(parts) == 3,
+			"bad number of parts in workspace path %d %s",
+			len(parts), relWorkspace)
+		workspaces[i] = relWorkspace
+		fpath := filepath.Join(absWorkspace, fmt.Sprintf("file-%d", i))
+		files[i] = fpath
+
+		// some content thats unique to each file
+		th.AssertNoErr(testutils.PrintToFile(fpath,
+			fmt.Sprintf("file-%d", i)))
+		th.SyncAllWorkspaces()
+		oldTTLs[i] = th.getTTL(c, fpath)
+	}
+
+	// use non-optimal walk to ensure that all keys
+	// are walked irrespective of the skipmap cache.
+	c.skipMap = nil
+	// In legacy mode, TTLRefreshTime is saved as ms into
+	// SkipMapResetAfter_ms. This test sets the threshold
+	// to a large values to force a refresh.
+	c.ttlCfg.SkipMapResetAfter_ms = 200000
+	return workspaces, files, oldTTLs
 }
 
 func TestMain(m *testing.M) {

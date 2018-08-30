@@ -24,28 +24,30 @@ var requestID uint64
 // Ctx maintains context for the walker daemon.
 type Ctx struct {
 	context.Context
-	name        string
-	host        string
-	Influx      *influxlib.InfluxDBConnection
-	qctx        *quantumfs.Ctx
-	wsdb        quantumfs.WorkspaceDB
-	ds          quantumfs.DataStore
-	cqlds       blobstore.BlobStore
-	ttlCfg      *qubitutils.TTLConfig
-	etherConfig string
-	wsdbConfig  string
-	numSuccess  uint32
-	numError    uint32
-	numWalkers  int
-	iteration   uint
-	keyspace    string
-	aliveCount  int64
-	skipMap     *utils.SkipMap
+	name          string
+	host          string
+	Influx        *influxlib.InfluxDBConnection
+	qctx          *quantumfs.Ctx
+	wsdb          quantumfs.WorkspaceDB
+	ds            quantumfs.DataStore
+	cqlds         blobstore.BlobStore
+	ttlCfg        *qubitutils.TTLConfig
+	etherConfig   string
+	wsdbConfig    string
+	numSuccess    uint32
+	numError      uint32
+	numWalkers    int
+	iteration     uint
+	keyspace      string
+	aliveCount    int64
+	skipMap       *utils.SkipMap
+	wsNameMatcher func(s string) bool
 }
 
 func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 	influxDBName string, etherCfgFile string, wsdbCfgStr string,
-	logdir string, numwalkers int) *Ctx {
+	logdir string, numwalkers int,
+	matcher func(s string) bool) *Ctx {
 
 	// Connect to InfluxDB
 	var influx *influxlib.InfluxDBConnection
@@ -134,18 +136,19 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 
 	id := atomic.AddUint64(&requestID, 1)
 	return &Ctx{
-		name:        name,
-		host:        host,
-		Influx:      influx,
-		qctx:        newQCtx(log, id),
-		wsdb:        quantumfsWSDB,
-		ds:          quantumfsDS,
-		cqlds:       cqlDS,
-		ttlCfg:      ttlConfig,
-		etherConfig: etherCfgFile,
-		wsdbConfig:  wsdbCfgStr,
-		numWalkers:  numwalkers,
-		keyspace:    keyspace,
+		name:          name,
+		host:          host,
+		Influx:        influx,
+		qctx:          newQCtx(log, id),
+		wsdb:          quantumfsWSDB,
+		ds:            quantumfsDS,
+		cqlds:         cqlDS,
+		ttlCfg:        ttlConfig,
+		etherConfig:   etherCfgFile,
+		wsdbConfig:    wsdbCfgStr,
+		numWalkers:    numwalkers,
+		keyspace:      keyspace,
+		wsNameMatcher: matcher,
 	}
 }
 

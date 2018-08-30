@@ -32,7 +32,8 @@ func (t *testHelper) testCtx() *Ctx {
 			SkipMapResetAfter_ms: 500,
 			TTLNew:               600,
 		},
-		numWalkers: 1,
+		numWalkers:    1,
+		wsNameMatcher: func(s string) bool { return true },
 	}
 }
 
@@ -246,5 +247,55 @@ func TestWorkspacePrunedAfterListing(t *testing.T) {
 		c := test.testCtx()
 		err := runWalker(c, "t1", "n1", "w1")
 		test.AssertNoErr(err)
+	})
+}
+
+// TestWsNameMatcher checks if the workspaces are
+// included in the walks based on the prefix.
+func TestWsNameMatcher(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		c := test.testCtx()
+		workspaces, files, oldTTLs := test.setupPrefixMatchTest(c, 2)
+		c.wsNameMatcher = getPrefixMatcher(workspaces[0], false)
+
+		walkFullWSDBSetup(c)
+
+		newTTL0 := test.getTTL(c, files[0])
+		newTTL1 := test.getTTL(c, files[1])
+
+		// check that refresh happened only in first workspace
+		test.Assert(newTTL0 > oldTTLs[0],
+			"TTL for file-0 not refreshed, old: %d new: %d",
+			oldTTLs[0], newTTL0)
+		test.Assert(newTTL1 <= oldTTLs[1],
+			"TTL for file-1 got refreshed, old: %d new:%d",
+			oldTTLs[1], newTTL1)
+
+	})
+}
+
+// TestWsNameNegMatcher checks if the workspaces are
+// included in the walks based on the prefix.
+func TestWsNameNegMatcher(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		c := test.testCtx()
+		workspaces, files, oldTTLs := test.setupPrefixMatchTest(c, 2)
+		c.wsNameMatcher = getPrefixMatcher(workspaces[0], true)
+
+		walkFullWSDBSetup(c)
+
+		newTTL0 := test.getTTL(c, files[0])
+		newTTL1 := test.getTTL(c, files[1])
+
+		// check that refresh happened only in second workspace
+		test.Assert(newTTL0 <= oldTTLs[0],
+			"TTL for file-0 got refreshed, old: %d new:%d",
+			oldTTLs[0], newTTL0)
+		test.Assert(newTTL1 > oldTTLs[1],
+			"TTL for file-1 not refreshed, old: %d new: %d",
+			oldTTLs[1], newTTL1)
+
 	})
 }
