@@ -194,7 +194,7 @@ func TestHLGetErr(t *testing.T) {
 		test.Assert(err.Error() == hleGetError.Error(),
 			"Walk did not get the %v, instead got %v", hleGetError,
 			err)
-		expectWalkerErrors(test, []string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
 	})
 }
 
@@ -241,7 +241,7 @@ func TestDEGetErr(t *testing.T) {
 		test.Assert(err.Error() == deGetError.Error(),
 			"Walk did not get the %v, instead got %v", deGetError,
 			err)
-		expectWalkerErrors(test, []string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
 	})
 }
 
@@ -293,7 +293,7 @@ func TestEAGetErr(t *testing.T) {
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
-		expectWalkerErrors(test, []string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
 	})
 }
 
@@ -356,7 +356,7 @@ func TestEAAttrGetErr(t *testing.T) {
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
-		expectWalkerErrors(test, []string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
 	})
 }
 
@@ -408,7 +408,7 @@ func TestMultiBlockGetErr(t *testing.T) {
 		test.Assert(err.Error() == mbGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", mbGetBlock0Error,
 			err)
-		expectWalkerErrors(test, []string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
 	})
 }
 
@@ -463,7 +463,7 @@ func TestVLFileGetFirstErr(t *testing.T) {
 		test.Assert(err.Error() == vlGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock0Error,
 			err)
-		expectWalkerErrors(test, []string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
 
 	})
 }
@@ -524,6 +524,6 @@ func TestVLFileGetNextErr(t *testing.T) {
 		test.Assert(err.Error() == vlGetBlock1Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock1Error,
 			err)
-		expectWalkerErrors(test, []string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
 	})
 }
