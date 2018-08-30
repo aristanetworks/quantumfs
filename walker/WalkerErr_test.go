@@ -52,7 +52,7 @@ func TestWalkPanicString(t *testing.T) {
 			}
 			return nil
 		}
-		err = Walk(c, tstDsGetter(ds), rootID, wf)
+		err = Walk(c, ds, rootID, wf)
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
@@ -95,7 +95,7 @@ func TestWalkPanicErr(t *testing.T) {
 			}
 			return nil
 		}
-		err = Walk(c, tstDsGetter(ds), rootID, wf)
+		err = Walk(c, ds, rootID, wf)
 		test.Assert(err == expectedErr,
 			"Walk did not get the expectedErr value, instead got %v",
 			err)
@@ -137,7 +137,7 @@ func TestWalkErr(t *testing.T) {
 			}
 			return nil
 		}
-		err = Walk(c, tstDsGetter(ds), rootID, wf)
+		err = Walk(c, ds, rootID, wf)
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
@@ -190,7 +190,7 @@ func TestHLGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = Walk(c, dsHLGet, rootID, tstNopWalkFn())
+		err = walk(c, dsHLGet, rootID, tstNopWalkFn())
 		test.Assert(err.Error() == hleGetError.Error(),
 			"Walk did not get the %v, instead got %v", hleGetError,
 			err)
@@ -237,7 +237,7 @@ func TestDEGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = Walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walk(c, dsGet, rootID, tstNopWalkFn())
 		test.Assert(err.Error() == deGetError.Error(),
 			"Walk did not get the %v, instead got %v", deGetError,
 			err)
@@ -289,7 +289,7 @@ func TestEAGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = Walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walk(c, dsGet, rootID, tstNopWalkFn())
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
@@ -335,7 +335,7 @@ func TestEAAttrGetErr(t *testing.T) {
 		test.AssertNoErr(err)
 
 		eaGetError := fmt.Errorf("extended attributes error")
-		// setup dsGetHelper return error upon Get of
+		// setup dsGetHelper to return error upon Get of
 		// second extattr on file-0.
 		countAttrGet := 0
 		dsGet := func(c *quantumfs.Ctx, path string,
@@ -352,7 +352,7 @@ func TestEAAttrGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = Walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walk(c, dsGet, rootID, tstNopWalkFn())
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
@@ -389,21 +389,22 @@ func TestMultiBlockGetErr(t *testing.T) {
 		test.AssertNoErr(err)
 
 		mbGetBlock0Error := fmt.Errorf("multiblock error")
-		// setup dsGetHelper return error upon first Get
-		// on file-0.
-		countGet := 0
+		// setup dsGetHelper return error upon Get of multiblock
+		// buffer on file-0. Since large file has 1 multiblock
+		// metadata block, failing to get that causes other
+		// data blocks in that file to be skipped.
 		dsGet := func(c *quantumfs.Ctx, path string,
 			key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 			buf quantumfs.Buffer) error {
 
 			if typ == quantumfs.ObjectTypeLargeFile &&
-				path == "/file-0" && countGet == 0 {
+				path == "/file-0" {
 				return mbGetBlock0Error
 			}
 			return ds.Get(c, key, buf)
 		}
 
-		err = Walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walk(c, dsGet, rootID, tstNopWalkFn())
 		test.Assert(err.Error() == mbGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", mbGetBlock0Error,
 			err)
@@ -412,7 +413,7 @@ func TestMultiBlockGetErr(t *testing.T) {
 }
 
 // TestVLFileGetFirstErr tests that Walk aborts
-// when first data store get of VL file fails.
+// when get of first metdata block fails.
 func TestVLFileGetFirstErr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -446,7 +447,7 @@ func TestVLFileGetFirstErr(t *testing.T) {
 
 		vlGetBlock0Error := fmt.Errorf("verylarge block0 error")
 		// setup dsGetHelper return error upon Get of block0
-		// on file-0.
+		// (multiblock metadata block) on file-0.
 		dsGet := func(c *quantumfs.Ctx, path string,
 			key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 			buf quantumfs.Buffer) error {
@@ -458,7 +459,7 @@ func TestVLFileGetFirstErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = Walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walk(c, dsGet, rootID, tstNopWalkFn())
 		test.Assert(err.Error() == vlGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock0Error,
 			err)
@@ -468,7 +469,8 @@ func TestVLFileGetFirstErr(t *testing.T) {
 }
 
 // TestVLFileGetNextErr tests that Walk aborts
-// when next data store get of VL file fails.
+// when get of second level multiblock metadata
+// block fails.
 func TestVLFileGetNextErr(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
@@ -502,7 +504,7 @@ func TestVLFileGetNextErr(t *testing.T) {
 
 		vlGetBlock1Error := fmt.Errorf("verylarge block1 error")
 		// setup dsGetHelper return error upon Get of block1
-		// on file-0.
+		// (second level multiblock metadata block) on file-0.
 		countGet := 0
 		dsGet := func(c *quantumfs.Ctx, path string,
 			key quantumfs.ObjectKey, typ quantumfs.ObjectType,
@@ -518,7 +520,7 @@ func TestVLFileGetNextErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = Walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walk(c, dsGet, rootID, tstNopWalkFn())
 		test.Assert(err.Error() == vlGetBlock1Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock1Error,
 			err)
