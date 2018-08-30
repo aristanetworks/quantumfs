@@ -365,11 +365,13 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 			// handle the directoryRecord accordingly
 			return handleDirectoryRecord(c, fpath, ds, hldr, wf, keyChan)
 		}
+	case quantumfs.ObjectTypeSpecial:
+		fallthrough
+	case quantumfs.ObjectTypeSmallFile:
+		fallthrough
+	case quantumfs.ObjectTypeSymlink:
+		fallthrough
 	default:
-		// The default case handles the following as well:
-		// quantumfs.ObjectTypeSpecial:
-		// quantumfs.ObjectTypeSmallFile:
-		// quantumfs.ObjectTypeSymlink:
 		return writeToChan(c, keyChan, fpath, key, dr.Size(), dr.Type())
 	}
 }
