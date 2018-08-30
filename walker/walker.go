@@ -103,7 +103,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		return ds.Get(cq, key, buf)
 	}
 	// since test routines directly call walk()
-	// ensure that Walk() don't add anything
+	// ensure that Walk() doesn't add anything
 	// else here.
 	return walk(cq, getter, rootID, wf)
 }
