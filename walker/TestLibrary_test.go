@@ -259,10 +259,10 @@ func (th *testHelper) printMap(name string, m map[string]int) {
 	}
 }
 
-func expectWalkerErrors(test *testHelper, errs []string) {
-	test.ExpectedErrors = make(map[string]struct{})
+func (th *testHelper) expectWalkerErrors(errs []string) {
+	th.ExpectedErrors = make(map[string]struct{})
 	for _, e := range errs {
-		test.ExpectedErrors["ERROR: "+e] = struct{}{}
+		th.ExpectedErrors["ERROR: "+e] = struct{}{}
 	}
 }
 

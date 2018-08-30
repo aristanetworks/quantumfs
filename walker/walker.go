@@ -72,8 +72,7 @@ func panicHandler(c *Ctx, err *error) {
 	}
 
 	trace := utils.BytesToString(debug.Stack())
-	c.Qctx.Elog(qlog.LogTool, panicErrLog,
-		result, trace)
+	c.Qctx.Elog(qlog.LogTool, panicErrLog, result, trace)
 }
 
 const walkFailedLog = "Walk failed: %s"
@@ -428,11 +427,13 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet WalkDsGet,
 			return handleDirectoryRecord(c, fpath, dsGet,
 				hldr, wf, keyChan)
 		}
+	case quantumfs.ObjectTypeSpecial:
+		fallthrough
+	case quantumfs.ObjectTypeSmallFile:
+		fallthrough
+	case quantumfs.ObjectTypeSymlink:
+		fallthrough
 	default:
-		// The default case handles the following as well:
-		// quantumfs.ObjectTypeSpecial:
-		// quantumfs.ObjectTypeSmallFile:
-		// quantumfs.ObjectTypeSymlink:
 		return writeToChan(c, keyChan, fpath, key, dr.Size(), dr.Type())
 	}
 }
