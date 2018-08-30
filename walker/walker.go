@@ -67,8 +67,7 @@ func panicHandler(c *Ctx, err *error) {
 	}
 
 	trace := utils.BytesToString(debug.Stack())
-	c.Qctx.Elog(qlog.LogTool, panicErrLog,
-		result, trace)
+	c.Qctx.Elog(qlog.LogTool, panicErrLog, result, trace)
 }
 
 const walkFailedLog = "Walk failed: %s"
