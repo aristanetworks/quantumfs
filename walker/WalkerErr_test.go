@@ -140,6 +140,6 @@ func TestWalkErr(t *testing.T) {
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
-		test.expectWalkerErrors([]string{walkerFailedLog, workerErrLog})
+		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
 	})
 }
