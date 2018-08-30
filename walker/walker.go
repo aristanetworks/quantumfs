@@ -28,9 +28,8 @@ var ErrSkipDirectory = errors.New("skip this directory")
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 	size uint64, objType quantumfs.ObjectType) error
 
-// WalkDsGet enables mocking datastore Get in test routines and
-// also limits walker to using Get API for datastore.
-type WalkDsGet func(cq *quantumfs.Ctx, path string,
+// walkDsGet enables mocking datastore Get in test routines.
+type walkDsGet func(cq *quantumfs.Ctx, path string,
 	key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 	buf quantumfs.Buffer) error
 
@@ -81,7 +80,7 @@ const walkerErrLog = "desc: %s key: %s err: %s"
 // aggregateDsGetter returns a datastore getter function that
 // first checks in ConstantStore and then falls back to the
 // provied datastore getter.
-func aggregateDsGetter(dsGet WalkDsGet) WalkDsGet {
+func aggregateDsGetter(dsGet walkDsGet) walkDsGet {
 	return func(cq *quantumfs.Ctx, path string,
 		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 		buf quantumfs.Buffer) error {
@@ -112,7 +111,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 // walk is the core walker routine which accepts a walkDsGet.
 // This enables test routines to mock datastore get errors while
 // keeping the user API simple.
-func walk(cq *quantumfs.Ctx, dsGet WalkDsGet, rootID quantumfs.ObjectKey,
+func walk(cq *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
 
 	adsGet := aggregateDsGetter(dsGet)
@@ -194,7 +193,7 @@ func walk(cq *quantumfs.Ctx, dsGet WalkDsGet, rootID quantumfs.ObjectKey,
 	return err
 }
 
-func handleHardLinks(c *Ctx, dsGet WalkDsGet,
+func handleHardLinks(c *Ctx, dsGet walkDsGet,
 	hle quantumfs.HardlinkEntry, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -242,7 +241,7 @@ func handleHardLinks(c *Ctx, dsGet WalkDsGet,
 	return nil
 }
 
-func handleMultiBlockFile(c *Ctx, path string, dsGet WalkDsGet,
+func handleMultiBlockFile(c *Ctx, path string, dsGet walkDsGet,
 	key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 	wf WalkFunc, keyChan chan<- *workerData) error {
 
@@ -277,7 +276,7 @@ func handleMultiBlockFile(c *Ctx, path string, dsGet WalkDsGet,
 	return nil
 }
 
-func handleVeryLargeFile(c *Ctx, path string, dsGet WalkDsGet,
+func handleVeryLargeFile(c *Ctx, path string, dsGet walkDsGet,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -312,7 +311,7 @@ func handleVeryLargeFile(c *Ctx, path string, dsGet WalkDsGet,
 	return nil
 }
 
-func handleDirectoryEntry(c *Ctx, path string, dsGet WalkDsGet,
+func handleDirectoryEntry(c *Ctx, path string, dsGet walkDsGet,
 	key quantumfs.ObjectKey, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -359,7 +358,7 @@ func handleDirectoryEntry(c *Ctx, path string, dsGet WalkDsGet,
 	return nil
 }
 
-func handleDirectoryRecord(c *Ctx, path string, dsGet WalkDsGet,
+func handleDirectoryRecord(c *Ctx, path string, dsGet walkDsGet,
 	dr *quantumfs.EncodedDirectoryRecord, wf WalkFunc,
 	keyChan chan<- *workerData) error {
 
@@ -438,7 +437,7 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet WalkDsGet,
 	}
 }
 
-func handleExtendedAttributes(c *Ctx, fpath string, dsGet WalkDsGet,
+func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 	dr quantumfs.DirectoryRecord, keyChan chan<- *workerData) error {
 
 	extKey := dr.ExtendedAttributes()
