@@ -1018,7 +1018,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 		return dir.delChild_(c, name), fuse.OK
 	})
 	if result == fuse.OK {
-		dir.self.markAccessed(c, name, quantumfs.PathDeleted |
+		dir.self.markAccessed(c, name, quantumfs.PathDeleted|
 			quantumfs.PathIsDir)
 	}
 
