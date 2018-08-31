@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aristanetworks/ether/cql"
 	"github.com/aristanetworks/quantumfs/testutils"
@@ -297,5 +298,42 @@ func TestWsNameNegMatcher(t *testing.T) {
 			"TTL for file-1 not refreshed, old: %d new: %d",
 			oldTTLs[1], newTTL1)
 
+	})
+}
+
+// TestWriteStatPoints_NonOptimal checks if the information in
+// context can be converted to stat information
+func TestWriteStatPoints_NonOptimal(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		c := test.testCtx()
+		w := wsDetails{
+			ts:     "t",
+			ns:     "n",
+			ws:     "w",
+			rootID: "xx",
+		}
+		AddPointWalkerHeartBeat(c)
+		AddPointWalkerWorkspace(c, w, true, 1*time.Second, "no errors")
+		AddPointWalkerIteration(c, 1*time.Second)
+	})
+}
+
+// TestWriteStatPoints_Optimal checks if the information in
+// context can be converted to stat information
+func TestWriteStatPoints_Optimal(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		c := test.testCtx()
+		c.skipMap = utils.NewSkipMap(5)
+		w := wsDetails{
+			ts:     "t",
+			ns:     "n",
+			ws:     "w",
+			rootID: "xx",
+		}
+		AddPointWalkerHeartBeat(c)
+		AddPointWalkerWorkspace(c, w, true, 1*time.Second, "no errors")
+		AddPointWalkerIteration(c, 1*time.Second)
 	})
 }

@@ -26,7 +26,7 @@ type Ctx struct {
 	context.Context
 	name          string
 	host          string
-	Influx        *influxlib.InfluxDBConnection
+	influx        *influxlib.InfluxDBConnection
 	qctx          *quantumfs.Ctx
 	wsdb          quantumfs.WorkspaceDB
 	ds            quantumfs.DataStore
@@ -138,7 +138,7 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 	return &Ctx{
 		name:          name,
 		host:          host,
-		Influx:        influx,
+		influx:        influx,
 		qctx:          newQCtx(log, id),
 		wsdb:          quantumfsWSDB,
 		ds:            quantumfsDS,
@@ -172,4 +172,14 @@ func (c *Ctx) newRequestID() *Ctx {
 	newCtx.qctx = newQCtx(c.qctx.Qlog, id)
 
 	return &newCtx
+}
+
+func (c *Ctx) WriteStatPoint(measurement string,
+	tags map[string]string, fields map[string]interface{}) error {
+
+	if c.influx == nil {
+		return nil
+	}
+	return c.influx.WritePoint(measurement, tags, fields)
+
 }

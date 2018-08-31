@@ -31,10 +31,6 @@ type wsDetails struct {
 func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 	dur time.Duration, walkErr string) {
 
-	if c.Influx == nil {
-		return
-	}
-
 	measurement := "walkerWorkspace"
 	tags := map[string]string{
 		"typeSpace": w.ts,
@@ -52,7 +48,7 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 		"errStr":    walkErr,
 	}
 
-	err := c.Influx.WritePoint(measurement, tags, fields)
+	err := c.WriteStatPoint(measurement, tags, fields)
 	if err != nil {
 		c.elog("InfluxDB %s=%s %s/%s/%s (%s) iteration=%d "+
 			"walkSuccess=%v walkErrMsg=(%q) InfluxErr:%s\n",
@@ -77,11 +73,6 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 //         countError   - Num failed walks
 //
 func AddPointWalkerIteration(c *Ctx, dur time.Duration) {
-
-	if c.Influx == nil {
-		return
-	}
-
 	measurement := "walkerIteration"
 	tags := map[string]string{
 		"keyspace": c.keyspace,
@@ -94,7 +85,7 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration) {
 		"countSuccess": c.numSuccess,
 		"countError":   c.numError,
 	}
-	err := c.Influx.WritePoint(measurement, tags, fields)
+	err := c.WriteStatPoint(measurement, tags, fields)
 	if err != nil {
 		c.elog("InfluxDB %s=%s iteration=%d numSuccess=%d numError=%d "+
 			"InfluxErr: %s\n",
@@ -115,12 +106,11 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration) {
 //         skipLRULen - Num elements in skipMap LRU
 //
 func AddPointWalkerHeartBeat(c *Ctx) {
-
-	if c.Influx == nil {
-		return
-	}
 	c.aliveCount += 1
-	skipLRULen, skipMapLen := c.skipMap.Len()
+	var skipLRULen, skipMapLen int
+	if c.skipMap != nil {
+		skipLRULen, skipMapLen = c.skipMap.Len()
+	}
 
 	measurement := "walkerHeartBeat"
 	tags := map[string]string{
@@ -137,7 +127,7 @@ func AddPointWalkerHeartBeat(c *Ctx) {
 		"skipLRULen":   skipLRULen,
 	}
 
-	err := c.Influx.WritePoint(measurement, tags, fields)
+	err := c.WriteStatPoint(measurement, tags, fields)
 	if err != nil {
 		c.elog("InfluxDB %s aliveCount=%d iteration=%d numSuccess=%d numError=%d "+
 			"skipMapLen=%d skipLRULen=%d InfluxErr=%s\n",

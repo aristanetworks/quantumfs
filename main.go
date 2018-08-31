@@ -369,7 +369,10 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 
 	// Use a local SkipMap to hold keys we visit during a single workspace's walk.
 	// If the walk fails we do not merge these keys with the the global SkipMap.
-	localSkipMap := utils.NewSkipMap(oldC.ttlCfg.SkipMapMaxLen)
+	var localSkipMap *utils.SkipMap
+	if c.skipMap != nil {
+		localSkipMap = utils.NewSkipMap(oldC.ttlCfg.SkipMapMaxLen)
+	}
 
 	// Every call to Walk() needs a walkFunc
 	walkFunc := func(cw *walker.Ctx, path string,
