@@ -455,13 +455,3 @@ type publishFn func(*ctx, ImmutableBuffer) (quantumfs.ObjectKey, error)
 func publishNow(c *ctx, buf ImmutableBuffer) (quantumfs.ObjectKey, error) {
 	return buf.Key(&c.Ctx)
 }
-
-func AsDirectory(inode Inode) *Directory {
-	wsr, isWsr := inode.(*WorkspaceRoot)
-	if isWsr {
-		dir := &(wsr.Directory)
-		return dir
-	}
-
-	return inode.(*Directory)
-}

@@ -648,7 +648,7 @@ func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) 
 		parent, release := inode.parent_(c)
 		defer release()
 
-		dir = AsDirectory(parent)
+		dir = asDirectory(parent)
 
 		defer dir.RLock().RUnlock()
 		defer dir.childRecordLock.Lock().Unlock()

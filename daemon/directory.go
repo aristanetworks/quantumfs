@@ -1296,7 +1296,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	fileType, overwritten, result := dir.MvChild_(c, dstInode, oldName, newName)
 	if result == fuse.OK {
-		dst := AsDirectory(dstInode)
+		dst := asDirectory(dstInode)
 		if overwritten != nil {
 			dst.self.markAccessed(c, overwritten.Filename(),
 				markType(overwritten.Type(),
