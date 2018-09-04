@@ -537,6 +537,7 @@ func (tsl *TypespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
+// Must be called with the instantiation lock
 func (tsl *TypespaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
@@ -862,6 +863,7 @@ func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
+// Must be called with the instantiation lock
 func (nsl *NamespaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
@@ -1254,6 +1256,7 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
+// Must be called with the instantiation lock
 func (wsl *WorkspaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 

@@ -286,6 +286,7 @@ func (fi *File) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fi.parentRemoveChildXAttr(c, fi.inodeNum(), attr)
 }
 
+// Must be called with the instantiation lock
 func (fi *File) instantiateChild_(c *ctx, inodeNum InodeId) Inode {
 	c.elog("Invalid instantiateChild_ on File")
 	return nil

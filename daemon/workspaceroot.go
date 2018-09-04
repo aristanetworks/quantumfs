@@ -89,6 +89,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	return &wsr
 }
 
+// Must be called with the instantiation lock
 func (wsr *WorkspaceRoot) instantiateChild_(c *ctx, inodeId InodeId) Inode {
 
 	defer c.FuncIn("WorkspaceRoot::instantiateChild_", "inode %d", inodeId).Out()

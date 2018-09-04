@@ -185,6 +185,7 @@ func (special *Special) RemoveXAttr(c *ctx, attr string) fuse.Status {
 	return fuse.ENODATA
 }
 
+// Must be called with the instantiation lock
 func (special *Special) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 

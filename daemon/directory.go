@@ -1758,6 +1758,7 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.OK
 }
 
+// Must be called with the instantiation lock
 func (dir *Directory) instantiateChild_(c *ctx, inodeNum InodeId) Inode {
 	defer c.FuncIn("Directory::instantiateChild_", "Inode %d of %d", inodeNum,
 		dir.inodeNum()).Out()

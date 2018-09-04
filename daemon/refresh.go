@@ -346,18 +346,23 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 		wsr.hardlinkTable.hardlinks[id] = entry
 
 		if !oldRecord.ID().IsEqualTo(hardlink.Record().ID()) {
-			inode, release := c.qfs.inodeNoInstantiate(c,
-				entry.inodeId.id)
-			defer release()
-			if inode != nil {
-				c.vlog("Reloading inode %d: %s -> %s",
-					entry.inodeId.id, oldRecord.ID().String(),
-					hardlink.Record().ID().String())
-				utils.Assert(!hardlink.Record().Type().IsImmutable(),
-					"An immutable type cannot be reloaded.")
-				reload(c, wsr.hardlinkTable, rc, inode,
-					hardlink.Record())
-			}
+			func () {
+				inode, release := c.qfs.inodeNoInstantiate(c,
+					entry.inodeId.id)
+				defer release()
+				if inode != nil {
+					c.vlog("Reloading inode %d: %s -> %s",
+						entry.inodeId.id,
+						oldRecord.ID().String(),
+						hardlink.Record().ID().String())
+
+					linkType := hardlink.Record().Type()
+					utils.Assert(!linkType.IsImmutable(),
+						"Immutable type cannot be reloaded.")
+					reload(c, wsr.hardlinkTable, rc, inode,
+						hardlink.Record())
+				}
+			} ()
 		}
 
 		c.qfs.invalidateInode(c, entry.inodeId.id)
@@ -465,10 +470,15 @@ func unlinkStaleDentries(c *ctx, rc *RefreshContext) {
 		}
 		c.vlog("Unlinking entry %s type %d inodeId %d",
 			staleRecord.name, staleRecord.type_, staleRecord.inodeId)
-		inode, release := c.qfs.inodeNoInstantiate(c, staleRecord.inodeId)
 
-		if inode != nil {
+		func () {
+			inode, release := c.qfs.inodeNoInstantiate(c,
+				staleRecord.inodeId)
 			defer release()
+
+			if inode == nil {
+				return
+			}
 
 			result := inode.deleteSelf(c,
 				func() (quantumfs.DirectoryRecord, fuse.Status) {
@@ -477,10 +487,7 @@ func unlinkStaleDentries(c *ctx, rc *RefreshContext) {
 			if result != fuse.OK {
 				panic("XXX handle deletion failure")
 			}
-		} else {
-			// release before we do something requiring the mapMutex
-			release()
-		}
+		} ()
 
 		c.qfs.removeUninstantiated(c, []InodeId{staleRecord.inodeId})
 	}
