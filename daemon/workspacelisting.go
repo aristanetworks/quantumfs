@@ -176,7 +176,6 @@ func fillAttr(attr *fuse.Attr, inodeNum InodeId, numChildren uint32) {
 }
 
 func fillEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
-	out.Generation = 1
 	out.EntryValid = c.config.CacheTimeSeconds
 	out.EntryValidNsec = c.config.CacheTimeNsecs
 	out.AttrValid = c.config.CacheTimeSeconds
@@ -184,7 +183,6 @@ func fillEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
 }
 
 func clearEntryOutCacheData(c *ctx, out *fuse.EntryOut) {
-	out.Generation = 0
 	out.EntryValid = 0
 	out.EntryValidNsec = 0
 	out.AttrValid = 0
@@ -208,7 +206,8 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeIdInfo,
 	for _, name := range names {
 		if _, exists := (*inodeMap)[name]; !exists {
 			inodeId := c.qfs.newInodeId()
-			c.vlog("Adding new child %s inodeId %d", name, inodeId.id)
+			c.vlog("Adding new child %s inodeId %d generation %d", name,
+				inodeId.id, inodeId.generation)
 			(*inodeMap)[name] = inodeId
 			(*nameMap)[inodeId.id] = name
 
@@ -354,6 +353,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 	if name == quantumfs.ApiPath {
 		out.NodeId = quantumfs.InodeIdApi
+		out.Generation = 1
 		fillEntryOutCacheData(c, out)
 		fillApiAttr(c, &out.Attr)
 		return fuse.OK
@@ -378,13 +378,13 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	if !exists {
 		return fuse.ENOENT
 	}
-	c.vlog("Typespace exists")
 
-	inodeNum := tsl.typespacesByName[name].id
-	c.qfs.incrementLookupCount(c, inodeNum)
-	out.NodeId = uint64(inodeNum)
+	inodeNum := tsl.typespacesByName[name]
+	c.qfs.incrementLookupCount(c, inodeNum.id)
+	out.NodeId = uint64(inodeNum.id)
+	out.Generation = inodeNum.generation
 	fillEntryOutCacheData(c, out)
-	fillTypespaceAttr(c, &out.Attr, inodeNum, name, "")
+	fillTypespaceAttr(c, &out.Attr, inodeNum.id, name, "")
 
 	return fuse.OK
 }
@@ -700,11 +700,12 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	}
 	c.vlog("Namespace exists")
 
-	inodeNum := nsl.namespacesByName[name].id
-	c.qfs.incrementLookupCount(c, inodeNum)
-	out.NodeId = uint64(inodeNum)
+	inodeNum := nsl.namespacesByName[name]
+	c.qfs.incrementLookupCount(c, inodeNum.id)
+	out.NodeId = uint64(inodeNum.id)
+	out.Generation = inodeNum.generation
 	fillEntryOutCacheData(c, out)
-	fillNamespaceAttr(c, &out.Attr, inodeNum, nsl.typespaceName, name)
+	fillNamespaceAttr(c, &out.Attr, inodeNum.id, nsl.typespaceName, name)
 
 	return fuse.OK
 }
@@ -1087,6 +1088,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	inodeInfo := wsl.workspacesByName[name]
 	c.qfs.incrementLookupCount(c, inodeInfo.id.id)
 	out.NodeId = uint64(inodeInfo.id.id)
+	out.Generation = inodeInfo.id.generation
 	fillEntryOutCacheData(c, out)
 	fillWorkspaceAttrFake(c, &out.Attr, inodeInfo.id.id, "", "")
 

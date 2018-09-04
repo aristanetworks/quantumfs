@@ -15,6 +15,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 func TestUnknownInodeId(t *testing.T) {
@@ -287,5 +288,66 @@ func TestInstantiationPanicRecovery(t *testing.T) {
 			"test/test/branchB"))
 
 		ioutil.ReadFile(test.AbsPath("test/test/branchB/dir/file"))
+	})
+}
+
+func (test *testHelper) getGenerationNumber(dir string, file string) uint64 {
+	inodeNum := test.getInodeNum(dir)
+	test.Assert(inodeNum != quantumfs.InodeIdInvalid, "Invalid inode")
+
+	var header fuse.InHeader
+	header.NodeId = uint64(inodeNum)
+	var out fuse.EntryOut
+	status := test.qfs.Lookup(&header, file, &out)
+	test.Assert(status == fuse.OK, "Lookup on %s/%s failed", dir, file)
+
+	return out.Generation
+}
+
+func TestInodeIdsReuseGeneration(t *testing.T) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		func() {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.reusableDelay = time.Millisecond * 2
+			test.qfs.inodeIds.gcPeriod = time.Millisecond * 2000
+		}()
+
+		api := test.getApi()
+
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA", 0777))
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileA",
+			"some data"))
+
+		// Branch into a new workspace so that nothing is instantiated
+		test.AssertNoErr(api.Branch(test.RelPath(workspace),
+			"test/test/test"))
+		test.AssertNoErr(api.EnableRootWrite("test/test/test"))
+		workspace = test.AbsPath("test/test/test")
+
+		dirA := test.getInodeNum(workspace + "/dirA")
+		fileAGen := test.getGenerationNumber(workspace+"/dirA", "fileA")
+		fileA := test.getInodeNum(workspace + "/dirA/fileA")
+
+		// Trigger Forget early
+		test.qfs.Forget(uint64(fileA), 2)
+		test.qfs.Forget(uint64(dirA), 1)
+
+		// Give the flusher time
+		time.Sleep(150 * time.Millisecond)
+
+		// We expect the first inode we make to be the reused fileA inode
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/newFile",
+			"some data"))
+
+		newInodeId := test.getInodeNum(workspace + "/newFile")
+		test.Assert(newInodeId == fileA, "inode id not reused %d %d",
+			newInodeId, fileA)
+
+		newInodeGen := test.getGenerationNumber(workspace, "newFile")
+		test.Assert(newInodeGen != fileAGen,
+			"generation number not different %d %d", newInodeGen,
+			fileAGen)
 	})
 }
