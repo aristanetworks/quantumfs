@@ -346,7 +346,7 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 		wsr.hardlinkTable.hardlinks[id] = entry
 
 		if !oldRecord.ID().IsEqualTo(hardlink.Record().ID()) {
-			func () {
+			func() {
 				inode, release := c.qfs.inodeNoInstantiate(c,
 					entry.inodeId.id)
 				defer release()
@@ -362,7 +362,7 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 					reload(c, wsr.hardlinkTable, rc, inode,
 						hardlink.Record())
 				}
-			} ()
+			}()
 		}
 
 		c.qfs.invalidateInode(c, entry.inodeId.id)
@@ -471,7 +471,7 @@ func unlinkStaleDentries(c *ctx, rc *RefreshContext) {
 		c.vlog("Unlinking entry %s type %d inodeId %d",
 			staleRecord.name, staleRecord.type_, staleRecord.inodeId)
 
-		func () {
+		func() {
 			inode, release := c.qfs.inodeNoInstantiate(c,
 				staleRecord.inodeId)
 			defer release()
@@ -487,7 +487,7 @@ func unlinkStaleDentries(c *ctx, rc *RefreshContext) {
 			if result != fuse.OK {
 				panic("XXX handle deletion failure")
 			}
-		} ()
+		}()
 
 		c.qfs.removeUninstantiated(c, []InodeId{staleRecord.inodeId})
 	}
@@ -504,7 +504,6 @@ func (wsr *WorkspaceRoot) unlinkStaleHardlinks(c *ctx,
 		if !exists {
 			c.vlog("Removing hardlink id %d, inode %d, nlink %d",
 				fileId, entry.inodeId, entry.nlink)
-
 
 			func() {
 				inode, release := c.qfs.inodeNoInstantiate(c,

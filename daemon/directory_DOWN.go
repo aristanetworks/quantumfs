@@ -350,13 +350,13 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 	dir.children.setRecord(c, childId, remoteRecord)
 	dir.children.makePublishable(c, remoteRecord.Filename())
 
-	func () {
+	func() {
 		inode, release := c.qfs.inodeNoInstantiate(c, childId.id)
 		defer release()
 		if inode != nil {
 			reload(c, dir.hardlinkTable, rc, inode, remoteRecord)
 		}
-	} ()
+	}()
 
 	c.qfs.invalidateInode(c, childId.id)
 }
