@@ -18,12 +18,12 @@ import (
 
 func verifyWorkspacelistingInodeStatus(c *ctx, test *testHelper,
 	name string, space string, mustBeInstantiated bool,
-	inodeMap *map[string]InodeId) InodeId {
+	inodeMap *map[string]InodeIdInfo) InodeId {
 
-	id, exists := (*inodeMap)[name]
+	idInfo, exists := (*inodeMap)[name]
 	test.Assert(exists, "Fail to get the inodeId of %s", space)
 
-	inode, release := test.qfs.inodeNoInstantiate(c, id)
+	inode, release := test.qfs.inodeNoInstantiate(c, idInfo.id)
 	defer release()
 	if mustBeInstantiated {
 		test.Assert(inode != nil,
@@ -33,7 +33,7 @@ func verifyWorkspacelistingInodeStatus(c *ctx, test *testHelper,
 			"The %s should be uninstantiated", space)
 	}
 
-	return id
+	return idInfo.id
 }
 
 func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
@@ -82,7 +82,8 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 		defer release()
 		wsl := wslInode.(*WorkspaceList)
 
-		namesAndIds := make(map[string]InodeId, len(wsl.workspacesByName))
+		namesAndIds := make(map[string]InodeIdInfo,
+			len(wsl.workspacesByName))
 		for name, info := range wsl.workspacesByName {
 			namesAndIds[name] = info.id
 		}

@@ -24,15 +24,15 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	srcInode.Sync_DOWN(c)
 
 	var srcParent *Directory
-	newRecord, needsSync, err := func() (quantumfs.DirectoryRecord,
-		bool, fuse.Status) {
+	newRecord, inodeInfo, needsSync, err := func() (quantumfs.DirectoryRecord,
+		InodeIdInfo, bool, fuse.Status) {
 
 		defer srcInode.getParentLock().Lock().Unlock()
 
 		// ensure we're not orphaned
 		if srcInode.isOrphaned_() {
 			c.wlog("Can't hardlink an orphaned file")
-			return nil, false, fuse.EPERM
+			return nil, invalidIdInfo(), false, fuse.EPERM
 		}
 
 		srcParent_, release := srcInode.parent_(c)
@@ -42,20 +42,20 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		// Ensure the source and dest are in the same workspace
 		if srcParent.hardlinkTable != dir.hardlinkTable {
 			c.dlog("Source and dest are different workspaces.")
-			return nil, false, fuse.EPERM
+			return nil, invalidIdInfo(), false, fuse.EPERM
 		}
 
-		newRecord, needsSync, err :=
+		newRecord, needsSync, inodeInfo, err :=
 			srcParent.makeHardlink_DOWN_(c, srcInode)
 		if err != fuse.OK {
 			c.elog("Link Failed with srcInode record")
-			return nil, false, err
+			return nil, invalidIdInfo(), false, err
 		}
 
 		// We need to reparent under the srcInode lock
 		dir.hardlinkTable.claimAsChild_(c, srcInode)
 
-		return newRecord, needsSync, fuse.OK
+		return newRecord, inodeInfo, needsSync, fuse.OK
 	}()
 	if err != fuse.OK {
 		return err
@@ -82,7 +82,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	func() {
 		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.setRecord(c, srcInode.inodeNum(), newRecord)
+		dir.children.setRecord(c, inodeInfo, newRecord)
 	}()
 
 	dir.self.markAccessed(c, newName,
@@ -90,11 +90,11 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 	c.vlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
-	inodeNum := srcInode.inodeNum()
-	out.NodeId = uint64(inodeNum)
-	c.qfs.incrementLookupCount(c, inodeNum)
+	out.NodeId = uint64(inodeInfo.id)
+	out.Generation = inodeInfo.generation
+	c.qfs.incrementLookupCount(c, inodeInfo.id)
 	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeNum, c.fuseCtx.Owner,
+	fillAttrWithDirectoryRecord(c, &out.Attr, inodeInfo.id, c.fuseCtx.Owner,
 		newRecord)
 
 	dir.self.dirty(c)
@@ -163,24 +163,28 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
 	return currDir, cleanup, nil
 }
 
-func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
-	childId InodeId) (copy quantumfs.DirectoryRecord,
-	needsSync bool, err fuse.Status) {
+func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
+	childname string) (copy quantumfs.DirectoryRecord, needsSync bool,
+	inodeIdInfo InodeIdInfo, err fuse.Status) {
 
 	defer c.FuncIn("Directory::convertToHardlinkLeg_DOWN",
-		"inode %d name %s", childId, childname).Out()
+		"name %s", childname).Out()
+
+	childId := dir.children.inodeNum(childname)
+
+	c.vlog("Converting inode %d to hardlink", childId.id)
 
 	child := dir.children.recordByName(c, childname)
 	if child == nil {
 		c.elog("No child record for name %s", childname)
-		return nil, false, fuse.ENOENT
+		return nil, false, invalidIdInfo(), fuse.ENOENT
 	}
 
 	// If it's already a hardlink, great no more work is needed
 	if link, isLink := child.(*HardlinkLeg); isLink {
 		c.vlog("Already a hardlink")
 		recordCopy := *link
-		return &recordCopy, false, fuse.OK
+		return &recordCopy, false, invalidIdInfo(), fuse.OK
 	}
 
 	// record must be a file type to be hardlinked
@@ -189,7 +193,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 		child.Type() != quantumfs.ObjectTypeSpecial {
 
 		c.vlog("Cannot hardlink %s - not a file", child.Filename())
-		return nil, false, fuse.EINVAL
+		return nil, false, invalidIdInfo(), fuse.EINVAL
 	}
 
 	// remove the record from the childmap before donating it to be a hardlink
@@ -203,13 +207,13 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx, childname string,
 	dir.children.setRecord(c, childId, linkSrcCopy)
 
 	newLink.setCreationTime(quantumfs.NewTime(time.Now()))
-	return newLink, true, fuse.OK
+	return newLink, true, childId, fuse.OK
 }
 
 // the toLink parentLock must be locked
 func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	toLink Inode) (copy quantumfs.DirectoryRecord, needsSync bool,
-	err fuse.Status) {
+	inodeIdInfo InodeIdInfo, err fuse.Status) {
 
 	defer c.funcIn("Directory::makeHardlink_DOWN_").Out()
 
@@ -218,13 +222,14 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	if isHardlink {
 		linkCopy := newHardlinkLeg(toLink.name(), id,
 			quantumfs.NewTime(time.Now()), dir.hardlinkTable)
-		return linkCopy, false, fuse.OK
+		return linkCopy, false, dir.hardlinkTable.findHardlinkInodeId(c, id),
+			fuse.OK
 	}
 
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.convertToHardlinkLeg_DOWN(c, toLink.name(), toLink.inodeNum())
+	return dir.convertToHardlinkLeg_DOWN(c, toLink.name())
 }
 
 // The caller must hold the childRecordLock
@@ -239,7 +244,7 @@ func (dir *Directory) convertHardlinks_DOWN_(c *ctx,
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
 		func() {
-			inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
+			inode, release := c.qfs.inodeNoInstantiate(c, inodeId.id)
 			defer release()
 
 			if inode != nil {
@@ -256,7 +261,7 @@ func (dir *Directory) convertHardlinks_DOWN_(c *ctx,
 	fileId := remoteRecord.FileId()
 	dir.hardlinkTable.updateHardlinkInodeId(c, fileId, inodeId)
 
-	inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeId.id)
 	defer release()
 	if inode != nil {
 		func() {
@@ -270,14 +275,15 @@ func (dir *Directory) convertHardlinks_DOWN_(c *ctx,
 
 // The caller must hold the childRecordLock
 func (dir *Directory) loadNewChild_DOWN_(c *ctx,
-	remoteRecord quantumfs.DirectoryRecord, inodeId InodeId) InodeId {
+	remoteRecord quantumfs.DirectoryRecord, inodeId InodeIdInfo) InodeId {
 
 	defer c.FuncIn("Directory::loadNewChild_DOWN_", "%d : %s : %d",
-		dir.inodeNum(), remoteRecord.Filename(), inodeId).Out()
+		dir.inodeNum(), remoteRecord.Filename(), inodeId.id).Out()
 
-	if inodeId == quantumfs.InodeIdInvalid {
+	rtn := inodeId.id
+	if inodeId.id == quantumfs.InodeIdInvalid {
 		// Allocate a new inode for regular files
-		inodeId = dir.children.loadChild(c, remoteRecord)
+		rtn = dir.children.loadChild(c, remoteRecord)
 	} else {
 		// An already existing inode for hardlinks to existing inodes
 		utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
@@ -286,7 +292,7 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 		dir.children.setRecord(c, inodeId, hll)
 	}
 	c.qfs.noteChildCreated(c, dir.id, remoteRecord.Filename())
-	return inodeId
+	return rtn
 }
 
 // This function is a simplified alternative to Rename/Move which is called
@@ -294,10 +300,10 @@ func (dir *Directory) loadNewChild_DOWN_(c *ctx,
 // function have to update the hardlink table and normalize the source and
 // destination of the operation
 func (dir *Directory) moveHardlinkLeg_DOWN(c *ctx, newParent Inode, oldName string,
-	remoteRecord quantumfs.DirectoryRecord, inodeId InodeId) {
+	remoteRecord quantumfs.DirectoryRecord, inodeId InodeIdInfo) {
 
 	defer c.FuncIn("Directory::moveHardlinkLeg_DOWN", "%d : %s : %d",
-		dir.inodeNum(), remoteRecord.Filename(), inodeId).Out()
+		dir.inodeNum(), remoteRecord.Filename(), inodeId.id).Out()
 
 	// Unlike regular rename, we throw away the result of deleteChild and
 	// just use the new remote record for creating the move destination
@@ -313,7 +319,7 @@ func (dir *Directory) moveHardlinkLeg_DOWN(c *ctx, newParent Inode, oldName stri
 
 // The caller must hold the childRecordLock
 func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
-	localRecord quantumfs.ImmutableDirectoryRecord, childId InodeId,
+	localRecord quantumfs.ImmutableDirectoryRecord, childId InodeIdInfo,
 	remoteRecord quantumfs.DirectoryRecord) {
 
 	childname := remoteRecord.Filename()
@@ -343,12 +349,12 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 	}
 	dir.children.setRecord(c, childId, remoteRecord)
 	dir.children.makePublishable(c, remoteRecord.Filename())
-	inode, release := c.qfs.inodeNoInstantiate(c, childId)
+	inode, release := c.qfs.inodeNoInstantiate(c, childId.id)
 	defer release()
 	if inode != nil {
 		reload(c, dir.hardlinkTable, rc, inode, remoteRecord)
 	}
-	c.qfs.invalidateInode(c, childId)
+	c.qfs.invalidateInode(c, childId.id)
 }
 
 func updateMapDescend_DOWN(c *ctx, rc *RefreshContext,
@@ -414,7 +420,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 			})
 	}
 
-	dir.children.foreachChild(c, func(childname string, childId InodeId) {
+	dir.children.foreachChild(c, func(childname string, childId InodeIdInfo) {
 		localRecord := dir.children.recordByName(c, childname)
 		remoteRecord := remoteEntries[childname]
 
@@ -424,7 +430,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 		if rc.isLocalRecordUsable(c, localRecord, remoteRecord) {
 			if shouldHideLocalRecord(localRecord, remoteRecord) {
 				localRecord = dir.hideEntry_DOWN_(c, localRecord,
-					childId)
+					childId.id)
 			}
 			moved := remoteRecord == nil ||
 				remoteRecord.FileId() != localRecord.FileId()
@@ -433,7 +439,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 			if fileId != localRecord.FileId() {
 				// Don't be wasteful, only modify if a change
 				// occurred
-				dir.children.modifyChildWithFunc(c, childId,
+				dir.children.modifyChildWithFunc(c, childId.id,
 					func(record quantumfs.DirectoryRecord) {
 
 						record.SetFileId(fileId)
@@ -442,22 +448,22 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 					localRecord.Filename())
 			}
 		} else {
-			rc.addStaleEntry(c, dir.inodeNum(), childId, localRecord)
+			rc.addStaleEntry(c, dir.inodeNum(), childId.id, localRecord)
 		}
 
 		// Ensure we ignore any subdirectories that haven't changed
 		if localRecord.Type() == quantumfs.ObjectTypeDirectory &&
 			!skipDir(localRecord, remoteRecord) {
 
-			updateMapDescend_DOWN(c, rc, childId, remoteRecord)
+			updateMapDescend_DOWN(c, rc, childId.id, remoteRecord)
 		}
 	})
 }
 
 // The caller must hold the childRecordLock
 func (dir *Directory) findLocalMatch_DOWN_(c *ctx, rc *RefreshContext,
-	record quantumfs.DirectoryRecord, localEntries map[string]InodeId) (
-	localRecord quantumfs.ImmutableDirectoryRecord, inodeId InodeId,
+	record quantumfs.DirectoryRecord, localEntries map[string]InodeIdInfo) (
+	localRecord quantumfs.ImmutableDirectoryRecord, inodeId InodeIdInfo,
 	missingDentry bool) {
 
 	localRecord = dir.children.recordByName(c, record.Filename())
@@ -477,9 +483,9 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	defer c.funcIn("Directory::refresh_DOWN").Out()
 	uninstantiated := make([]inodePair, 0)
 
-	localEntries := make(map[string]InodeId, 0)
+	localEntries := make(map[string]InodeIdInfo, 0)
 	defer dir.childRecordLock.Lock().Unlock()
-	dir.children.foreachChild(c, func(childname string, childId InodeId) {
+	dir.children.foreachChild(c, func(childname string, childId InodeIdInfo) {
 		localEntries[childname] = childId
 	})
 	foreachDentry(c, baseLayerId, func(
