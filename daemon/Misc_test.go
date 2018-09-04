@@ -15,6 +15,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/testutils"
+	"github.com/hanwen/go-fuse/fuse"
 )
 
 func TestUnknownInodeId(t *testing.T) {
@@ -190,6 +191,65 @@ func TestInodeIdsReuseCheck(t *testing.T) {
 	})
 }
 
+func TestInodeIdsReuseIdsRecycled(t *testing.T) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		func() {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.reusableDelay = time.Millisecond * 2
+			// We want inode id GC to happen after we've flushed so
+			// that when the flusher releases the ids they go into the
+			// reuse queue instead of being gc'ed
+			test.qfs.inodeIds.gcPeriod = time.Millisecond * 150
+		}()
+
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA/dirB", 0777))
+		test.MakeFile(workspace + "/dirA/dirB/fileA")
+		test.MakeFile(workspace + "/dirA/dirB/fileB")
+
+		fileA := test.getInodeNum(workspace + "/dirA/dirB/fileA")
+		fileB := test.getInodeNum(workspace + "/dirA/dirB/fileB")
+		dirB := test.getInodeNum(workspace + "/dirA/dirB")
+		test.Assert(fileA == dirB+1, "inode id not simply incremented")
+		test.Assert(fileB == fileA+1, "inode id not simply incremented")
+
+		// Artificially trigger Forget early
+		test.ForceForget(dirB)
+
+		// Give the flusher time
+		time.Sleep(150 * time.Millisecond)
+
+		c := test.newCtx()
+		// wait for garbage collection to happen
+		test.WaitFor("inode ids to be garbage collected", func() bool {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.testHighmark_(c)
+			// Wait for all three inode ids to be ready for reuse
+			return test.qfs.inodeIds.highMark < uint64(fileA)
+		})
+
+		idsReseen := 0
+		newIds := make(map[InodeId]struct{})
+		for i := 0; i < 10; i++ {
+			file := fmt.Sprintf("file%d", i)
+			test.MakeFile(workspace + "/" + file)
+			inodeId := test.getInodeNum(workspace + "/" + file)
+
+			_, exists := newIds[inodeId]
+			test.Assert(!exists, "Duplicate inode id given %d", inodeId)
+			newIds[inodeId] = struct{}{}
+
+			if inodeId == fileA || inodeId == fileB {
+				idsReseen++
+			}
+		}
+
+		test.Assert(idsReseen == 2, "Didn't see all inode ids reused: %d",
+			idsReseen)
+	})
+}
+
 func TestInstantiationPanicRecovery(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.ExpectedErrors = make(map[string]struct{})
@@ -228,5 +288,66 @@ func TestInstantiationPanicRecovery(t *testing.T) {
 			"test/test/branchB"))
 
 		ioutil.ReadFile(test.AbsPath("test/test/branchB/dir/file"))
+	})
+}
+
+func (test *testHelper) getGenerationNumber(dir string, file string) uint64 {
+	inodeNum := test.getInodeNum(dir)
+	test.Assert(inodeNum != quantumfs.InodeIdInvalid, "Invalid inode")
+
+	var header fuse.InHeader
+	header.NodeId = uint64(inodeNum)
+	var out fuse.EntryOut
+	status := test.qfs.Lookup(&header, file, &out)
+	test.Assert(status == fuse.OK, "Lookup on %s/%s failed", dir, file)
+
+	return out.Generation
+}
+
+func TestInodeIdsReuseGeneration(t *testing.T) {
+	runTestCustomConfig(t, dirtyDelay100Ms, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+
+		func() {
+			defer test.qfs.inodeIds.lock.Lock().Unlock()
+			test.qfs.inodeIds.reusableDelay = time.Millisecond * 2
+			test.qfs.inodeIds.gcPeriod = time.Millisecond * 2000
+		}()
+
+		api := test.getApi()
+
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA", 0777))
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/dirA/fileA",
+			"some data"))
+
+		// Branch into a new workspace so that nothing is instantiated
+		test.AssertNoErr(api.Branch(test.RelPath(workspace),
+			"test/test/test"))
+		test.AssertNoErr(api.EnableRootWrite("test/test/test"))
+		workspace = test.AbsPath("test/test/test")
+
+		dirA := test.getInodeNum(workspace + "/dirA")
+		fileAGen := test.getGenerationNumber(workspace+"/dirA", "fileA")
+		fileA := test.getInodeNum(workspace + "/dirA/fileA")
+
+		// Trigger Forget early
+		test.qfs.Forget(uint64(fileA), 2)
+		test.qfs.Forget(uint64(dirA), 1)
+
+		// Give the flusher time
+		time.Sleep(150 * time.Millisecond)
+
+		// We expect the first inode we make to be the reused fileA inode
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/newFile",
+			"some data"))
+
+		newInodeId := test.getInodeNum(workspace + "/newFile")
+		test.Assert(newInodeId == fileA, "inode id not reused %d %d",
+			newInodeId, fileA)
+
+		newInodeGen := test.getGenerationNumber(workspace, "newFile")
+		test.Assert(newInodeGen != fileAGen,
+			"generation number not different %d %d", newInodeGen,
+			fileAGen)
 	})
 }
