@@ -45,7 +45,7 @@ func interpretListingError(c *ctx, err error, cmd string) fuse.Status {
 func NewTypespaceList() Inode {
 	tsl := TypespaceList{
 		InodeCommon:      InodeCommon{id: quantumfs.InodeIdRoot},
-		typespacesByName: make(map[string]InodeId),
+		typespacesByName: make(map[string]InodeIdInfo),
 		typespacesById:   make(map[InodeId]string),
 		realTreeState: &TreeState{
 			name: "",
@@ -61,7 +61,7 @@ type TypespaceList struct {
 	InodeCommon
 
 	// Map from child name to Inode ID
-	typespacesByName map[string]InodeId
+	typespacesByName map[string]InodeIdInfo
 	typespacesById   map[InodeId]string
 
 	realTreeState *TreeState
@@ -197,7 +197,7 @@ func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 }
 
 // Update the internal namespaces list with the most recent available listing
-func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
+func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeIdInfo,
 	nameMap *map[InodeId]string, parent Inode) {
 
 	defer c.FuncIn("updateChildren", "Parent Inode %d",
@@ -208,12 +208,12 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 	for _, name := range names {
 		if _, exists := (*inodeMap)[name]; !exists {
 			inodeId := c.qfs.newInodeId()
-			c.vlog("Adding new child %s inodeId %d", name, inodeId)
+			c.vlog("Adding new child %s inodeId %d", name, inodeId.id)
 			(*inodeMap)[name] = inodeId
-			(*nameMap)[inodeId] = name
+			(*nameMap)[inodeId.id] = name
 
 			c.qfs.addUninstantiated(c, []inodePair{
-				newInodePair(inodeId, parent.inodeNum())})
+				newInodePair(inodeId.id, parent.inodeNum())})
 		}
 		touched[name] = true
 	}
@@ -227,13 +227,14 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeId,
 			// from their parents and let the kernel forget them
 			// naturally.
 			delete(*inodeMap, name)
-			delete(*nameMap, id)
-			c.qfs.handleMetaInodeRemoval(c, id, name, parent.inodeNum())
+			delete(*nameMap, id.id)
+			c.qfs.handleMetaInodeRemoval(c, id.id, name,
+				parent.inodeNum())
 		}
 	}
 }
 
-func snapshotChildren(c *ctx, inode Inode, children *map[string]InodeId,
+func snapshotChildren(c *ctx, inode Inode, children *map[string]InodeIdInfo,
 	typespace string, namespace string, fillChildren listingAttrFill,
 	fillMe listingAttrFill, fillParent listingAttrFill) []directoryContents {
 
@@ -271,9 +272,9 @@ func snapshotChildren(c *ctx, inode Inode, children *map[string]InodeId,
 		}
 
 		if typespace == "" {
-			fillChildren(c, &child.attr, inode, name, "")
+			fillChildren(c, &child.attr, inode.id, name, "")
 		} else {
-			fillChildren(c, &child.attr, inode, typespace, name)
+			fillChildren(c, &child.attr, inode.id, typespace, name)
 		}
 
 		out = append(out, child)
@@ -379,7 +380,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	}
 	c.vlog("Typespace exists")
 
-	inodeNum := tsl.typespacesByName[name]
+	inodeNum := tsl.typespacesByName[name].id
 	c.qfs.incrementLookupCount(c, inodeNum)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
@@ -573,7 +574,7 @@ func newNamespaceList(c *ctx, typespace string, namespace string, workspace stri
 	nsl := NamespaceList{
 		InodeCommon:      InodeCommon{id: inodeNum},
 		typespaceName:    typespace,
-		namespacesByName: make(map[string]InodeId),
+		namespacesByName: make(map[string]InodeIdInfo),
 		namespacesById:   make(map[InodeId]string),
 		realTreeState: &TreeState{
 			name: typespace,
@@ -591,7 +592,7 @@ type NamespaceList struct {
 	typespaceName string
 
 	// Map from child name to Inode ID
-	namespacesByName map[string]InodeId
+	namespacesByName map[string]InodeIdInfo
 	namespacesById   map[InodeId]string
 
 	realTreeState *TreeState
@@ -699,7 +700,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	}
 	c.vlog("Namespace exists")
 
-	inodeNum := nsl.namespacesByName[name]
+	inodeNum := nsl.namespacesByName[name].id
 	c.qfs.incrementLookupCount(c, inodeNum)
 	out.NodeId = uint64(inodeNum)
 	fillEntryOutCacheData(c, out)
@@ -918,7 +919,7 @@ func newWorkspaceList(c *ctx, typespace string, namespace string,
 }
 
 type workspaceInfo struct {
-	id    InodeId
+	id    InodeIdInfo
 	nonce quantumfs.WorkspaceNonce
 }
 
@@ -1004,8 +1005,8 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 			// Note: do not uninstantiate them now - remove them
 			// from their parents
 			delete(wsl.workspacesByName, name)
-			delete(wsl.workspacesById, info.id)
-			c.qfs.handleMetaInodeRemoval(c, info.id, name,
+			delete(wsl.workspacesById, info.id.id)
+			c.qfs.handleMetaInodeRemoval(c, info.id.id, name,
 				wsl.inodeNum())
 		}
 	}
@@ -1019,10 +1020,10 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 				id:    inodeId,
 				nonce: nonce,
 			}
-			wsl.workspacesById[inodeId] = name
+			wsl.workspacesById[inodeId.id] = name
 
 			c.qfs.addUninstantiated(c, []inodePair{
-				newInodePair(inodeId, wsl.inodeNum())})
+				newInodePair(inodeId.id, wsl.inodeNum())})
 		}
 	}
 
@@ -1046,7 +1047,7 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 		wsl.updateChildren(c, workspaces)
 	}
 
-	namesAndIds := make(map[string]InodeId, len(wsl.workspacesByName))
+	namesAndIds := make(map[string]InodeIdInfo, len(wsl.workspacesByName))
 	for name, info := range wsl.workspacesByName {
 		namesAndIds[name] = info.id
 	}
@@ -1084,10 +1085,10 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	c.vlog("Workspace exists")
 
 	inodeInfo := wsl.workspacesByName[name]
-	c.qfs.incrementLookupCount(c, inodeInfo.id)
-	out.NodeId = uint64(inodeInfo.id)
+	c.qfs.incrementLookupCount(c, inodeInfo.id.id)
+	out.NodeId = uint64(inodeInfo.id.id)
 	fillEntryOutCacheData(c, out)
-	fillWorkspaceAttrFake(c, &out.Attr, inodeInfo.id, "", "")
+	fillWorkspaceAttrFake(c, &out.Attr, inodeInfo.id.id, "", "")
 
 	return fuse.OK
 }

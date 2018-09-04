@@ -15,7 +15,7 @@ type HardlinkTableEntry struct {
 	publishableRecord quantumfs.DirectoryRecord
 	effectiveRecord   quantumfs.DirectoryRecord
 	nlink             int64
-	inodeId           InodeId
+	inodeId           InodeIdInfo
 	paths             []string
 
 	// delta shows the changes made to the nlink in the tree that
@@ -43,7 +43,7 @@ func (hte *HardlinkTableEntry) record() quantumfs.DirectoryRecord {
 
 func (hte *HardlinkTableEntry) setID(c *ctx, key quantumfs.ObjectKey) {
 	defer c.FuncIn("HardlinkTableEntry::setID", "inode %d newKey %s",
-		hte.inodeId, key.String())
+		hte.inodeId.id, key.String())
 
 	record := hte.record()
 	record.SetID(key)
@@ -65,12 +65,13 @@ type HardlinkTable interface {
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
 	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
 	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
-	findHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId) InodeId
+	findHardlinkInodeId(c *ctx, fileId quantumfs.FileId) InodeIdInfo
 	hardlinkDec(fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord)
 	hardlinkInc(fileId quantumfs.FileId)
-	newHardlink(c *ctx, inodeId InodeId,
+	newHardlink(c *ctx, inodeId InodeIdInfo,
 		record quantumfs.DirectoryRecord) *HardlinkLeg
-	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId, inodeId InodeId)
+	updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId,
+		inodeId InodeIdInfo) InodeIdInfo
 	nlinks(fileId quantumfs.FileId) uint32
 	claimAsChild_(c *ctx, inode Inode)
 	claimAsChild(c *ctx, inode Inode)
@@ -94,7 +95,7 @@ func newLinkEntry(record_ quantumfs.DirectoryRecord) *HardlinkTableEntry {
 	return &HardlinkTableEntry{
 		publishableRecord: record_,
 		nlink:             1,
-		inodeId:           quantumfs.InodeIdInvalid,
+		inodeId:           invalidIdInfo(),
 		delta:             0,
 	}
 }
@@ -205,10 +206,11 @@ func (ht *HardlinkTableImpl) removeHardlink_(fileId quantumfs.FileId,
 	}
 }
 
-func (ht *HardlinkTableImpl) newHardlink(c *ctx, inodeId InodeId,
+func (ht *HardlinkTableImpl) newHardlink(c *ctx, inodeId InodeIdInfo,
 	record quantumfs.DirectoryRecord) *HardlinkLeg {
 
-	defer c.FuncIn("HardlinkTableImpl::newHardlink", "inode %d", inodeId).Out()
+	defer c.FuncIn("HardlinkTableImpl::newHardlink", "inode %d",
+		inodeId.id).Out()
 
 	if _, isLink := record.(*HardlinkLeg); isLink {
 		panic("newHardlink called on existing hardlink")
@@ -228,7 +230,7 @@ func (ht *HardlinkTableImpl) newHardlink(c *ctx, inodeId InodeId,
 	utils.Assert(!exists, "newHardlink on pre-existing FileId %d", fileId)
 
 	ht.hardlinks[fileId] = newEntry
-	ht.inodeToLink[inodeId] = fileId
+	ht.inodeToLink[inodeId.id] = fileId
 
 	// Don't reparent the inode, the caller must do so while holding the inode's
 	// parent lock
@@ -266,37 +268,19 @@ func (ht *HardlinkTableImpl) instantiateHardlink(c *ctx, inodeId InodeId) Inode 
 }
 
 func (ht *HardlinkTableImpl) findHardlinkInodeId(c *ctx,
-	fileId quantumfs.FileId, inodeId InodeId) InodeId {
+	fileId quantumfs.FileId) InodeIdInfo {
 
-	defer c.FuncIn("HardlinkTableImpl::findHardlinkInodeId", "%d inode %d",
-		fileId, inodeId).Out()
+	defer c.FuncIn("HardlinkTableImpl::findHardlinkInodeId", "%d",
+		fileId).Out()
 	defer ht.linkLock.Lock().Unlock()
 
 	hardlink, exists := ht.hardlinks[fileId]
 	if !exists {
 		c.vlog("fileId isn't a hardlink")
-		return inodeId
-	}
-	if hardlink.inodeId != quantumfs.InodeIdInvalid {
-		if inodeId != quantumfs.InodeIdInvalid {
-			utils.Assert(inodeId == hardlink.inodeId,
-				"requested hardlink inode %d exists as %d",
-				inodeId, hardlink.inodeId)
-		}
-		c.vlog("filedId a hardlink with inode %d", hardlink.inodeId)
-		return hardlink.inodeId
+		return invalidIdInfo()
 	}
 
-	if inodeId != quantumfs.InodeIdInvalid {
-		return inodeId
-	}
-
-	inodeId = c.qfs.newInodeId()
-	hardlink.inodeId = inodeId
-	ht.inodeToLink[inodeId] = fileId
-
-	c.vlog("Allocated new inode %d for hardlink", inodeId)
-	return inodeId
+	return hardlink.inodeId
 }
 
 // Ensure we don't return the vanilla record, enclose it in a hardlink wrapper so
@@ -334,23 +318,33 @@ func (ht *HardlinkTableImpl) recordByFileId(fileId quantumfs.FileId) (
 }
 
 func (ht *HardlinkTableImpl) updateHardlinkInodeId(c *ctx, fileId quantumfs.FileId,
-	inodeId InodeId) {
+	inodeId InodeIdInfo) InodeIdInfo {
 
 	defer c.FuncIn("HardlinkTableImpl::updateHardlinkInodeId", "%d: %d",
-		fileId, inodeId).Out()
+		fileId, inodeId.id).Out()
 	defer ht.linkLock.Lock().Unlock()
 
 	hardlink, exists := ht.hardlinks[fileId]
 	utils.Assert(exists, "Hardlink id %d does not exist.", fileId)
 
-	if hardlink.inodeId == inodeId {
-		return
+	if hardlink.inodeId.id != quantumfs.InodeIdInvalid {
+		// If there is an existing inode id, inodeId must be invalid or the
+		// same, otherwise we're trying to change an existing inode id.
+		utils.Assert(inodeId.id == quantumfs.InodeIdInvalid ||
+			hardlink.inodeId.id == inodeId.id,
+			"Hardlink id %d already has associated inodeid %d",
+			fileId, hardlink.inodeId.id)
+
+		// inodeId is invalid, so this is a request for a new / existing id
+		return hardlink.inodeId
+	} else if inodeId.id == quantumfs.InodeIdInvalid {
+		inodeId = c.qfs.newInodeId()
+		c.vlog("Allocated new inode %d for hardlink", inodeId.id)
 	}
-	utils.Assert(hardlink.inodeId == quantumfs.InodeIdInvalid,
-		"Hardlink id %d already has associated inodeid %d",
-		fileId, hardlink.inodeId)
+
 	hardlink.inodeId = inodeId
-	ht.inodeToLink[inodeId] = fileId
+	ht.inodeToLink[inodeId.id] = fileId
+	return inodeId
 }
 
 func (ht *HardlinkTableImpl) modifyChildWithFunc(c *ctx, inodeId InodeId,
@@ -466,7 +460,7 @@ func (ht *HardlinkTableImpl) apply(c *ctx, hardlinkDelta *HardlinkDelta) {
 		entry.delta = entry.delta - delta.additions + delta.deletions
 		entry.numDeltas -= delta.additions + delta.deletions
 		if entry.nlink == 0 && entry.numDeltas == 0 {
-			ht.removeHardlink_(fileId, entry.inodeId)
+			ht.removeHardlink_(fileId, entry.inodeId.id)
 		}
 	})
 	hardlinkDelta.reset()
@@ -501,7 +495,7 @@ func (ht *HardlinkTableImpl) invalidateNormalizedRecordLock(
 	link, exists := ht.hardlinks[fileId]
 	utils.Assert(exists, "did not find %d in the hardlink table", fileId)
 
-	delete(ht.inodeToLink, link.inodeId)
-	link.inodeId = quantumfs.InodeIdInvalid
+	delete(ht.inodeToLink, link.inodeId.id)
+	link.inodeId = invalidIdInfo()
 	return
 }
