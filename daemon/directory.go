@@ -1140,7 +1140,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 
 	defer c.FuncIn("Directory::RenameChild", "%s -> %s", oldName, newName).Out()
 
-	fileType, overwritten, result := dir.RenameChild_(c, oldName, newName)
+	fileType, overwritten, result := dir.renameChild(c, oldName, newName)
 	if result == fuse.OK {
 		if overwritten != nil {
 			dir.self.markAccessed(c, overwritten.Filename(),
@@ -1161,7 +1161,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 	return result
 }
 
-func (dir *Directory) RenameChild_(c *ctx, oldName string,
+func (dir *Directory) renameChild(c *ctx, oldName string,
 	newName string) (fileType quantumfs.ObjectType,
 	overwrittenRecord quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
 
@@ -1280,7 +1280,7 @@ func (dir *Directory) orphanChild_(c *ctx, name string,
 		inode.orphan_(c, removedRecord)
 	}
 
-	return
+	return rtn
 }
 
 func (dir *Directory) childInodeNum(name string) InodeIdInfo {
@@ -1294,7 +1294,7 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 
 	defer c.FuncIn("Directory::MvChild", "%s -> %s", oldName, newName).Out()
 
-	fileType, overwritten, result := dir.MvChild_(c, dstInode, oldName, newName)
+	fileType, overwritten, result := dir.mvChild(c, dstInode, oldName, newName)
 	if result == fuse.OK {
 		dst := asDirectory(dstInode)
 		if overwritten != nil {
@@ -1311,10 +1311,10 @@ func (dir *Directory) MvChild(c *ctx, dstInode Inode, oldName string,
 			markType(fileType, quantumfs.PathCreated))
 	}
 
-	return
+	return result
 }
 
-func (dir *Directory) MvChild_(c *ctx, dstInode Inode, oldName string,
+func (dir *Directory) mvChild(c *ctx, dstInode Inode, oldName string,
 	newName string) (fileType quantumfs.ObjectType,
 	overwritten quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
 
