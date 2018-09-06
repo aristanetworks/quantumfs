@@ -3,6 +3,13 @@
 
 package main
 
+// By successfully building this dummy command based
+// on walker library we ensure that there are no
+// accidental test dependencies included in the library
+// code.
+//
+// This command is not expected to be successfully runnable.
+
 import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/walker"
