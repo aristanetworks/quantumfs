@@ -20,3 +20,11 @@ func (link *Symlink) Sync_DOWN(c *ctx) fuse.Status {
 
 	return fuse.OK
 }
+
+func (link *Symlink) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.wlog("Invalid MvChild_DOWN on Symlink")
+	return fuse.ENOSYS
+}
+

@@ -148,13 +148,6 @@ func (link *Symlink) RenameChild(c *ctx, oldName string,
 	return fuse.ENOSYS
 }
 
-func (link *Symlink) MvChild(c *ctx, dstInode Inode, oldName string,
-	newName string) fuse.Status {
-
-	c.wlog("Invalid MvChild on Symlink")
-	return fuse.ENOSYS
-}
-
 func (link *Symlink) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 

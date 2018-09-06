@@ -18,6 +18,13 @@ func (wsl *WorkspaceList) Sync_DOWN(c *ctx) fuse.Status {
 	return fuse.OK
 }
 
+func (wsl *WorkspaceList) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild_DOWN on WorkspaceList")
+	return fuse.ENOSYS
+}
+
 func (nsl *NamespaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 	out *fuse.EntryOut) fuse.Status {
 
@@ -27,6 +34,13 @@ func (nsl *NamespaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 
 func (nsl *NamespaceList) Sync_DOWN(c *ctx) fuse.Status {
 	return fuse.OK
+}
+
+func (nsl *NamespaceList) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild_DOWN on NamespaceList")
+	return fuse.ENOSYS
 }
 
 func (tsl *TypespaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
@@ -39,3 +53,11 @@ func (tsl *TypespaceList) link_DOWN(c *ctx, srcInode Inode, newName string,
 func (tsl *TypespaceList) Sync_DOWN(c *ctx) fuse.Status {
 	return fuse.OK
 }
+
+func (tsl *TypespaceList) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild_DOWN on TypespaceList")
+	return fuse.ENOSYS
+}
+

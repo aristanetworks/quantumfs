@@ -67,8 +67,6 @@ type Inode interface {
 
 	RenameChild(c *ctx, oldName string, newName string) fuse.Status
 
-	MvChild(c *ctx, dstInode Inode, oldName string, newName string) fuse.Status
-
 	GetXAttrSize(c *ctx, attr string) (size int, result fuse.Status)
 
 	GetXAttrData(c *ctx, attr string) (data []byte, result fuse.Status)
@@ -182,6 +180,8 @@ type Inode interface {
 	// datastore and update the parent with the new key.
 	flush(c *ctx) quantumfs.ObjectKey
 
+	MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
+		newName string) fuse.Status
 	Sync_DOWN(c *ctx) fuse.Status
 	link_DOWN(c *ctx, srcInode Inode, newName string,
 		out *fuse.EntryOut) fuse.Status

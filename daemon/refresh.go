@@ -412,7 +412,7 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 		} else if parentId == newParent.inodeNum() {
 			srcInode.RenameChild(c, oldName, remoteRecord.Filename())
 		} else {
-			srcInode.MvChild(c, newParent, oldName,
+			srcInode.MvChild_DOWN(c, newParent, oldName,
 				remoteRecord.Filename())
 		}
 	}

@@ -2089,9 +2089,6 @@ func TestMvChildRace(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 
-		//test.WaitForNLogStrings("Directory::flush", count+1,
-		//		"directory to flush data")
-
 		go func() {
 			time.Sleep(6 * time.Millisecond)
 			// Down operation between dirA and dirB
@@ -2101,6 +2098,5 @@ func TestMvChildRace(t *testing.T) {
 		}()
 
 		wg.Wait()
-		test.Assert(false, "ASD")
 	})
 }

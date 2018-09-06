@@ -19,3 +19,11 @@ func (fi *File) Sync_DOWN(c *ctx) fuse.Status {
 	fi.flush(c)
 	return fuse.OK
 }
+
+func (fi *File) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.elog("Invalid MvChild_DOWN on File")
+	return fuse.ENOSYS
+}
+

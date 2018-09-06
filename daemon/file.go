@@ -245,13 +245,6 @@ func (fi *File) RenameChild(c *ctx, oldName string, newName string) fuse.Status 
 	return fuse.ENOSYS
 }
 
-func (fi *File) MvChild(c *ctx, dstInode Inode, oldName string,
-	newName string) fuse.Status {
-
-	c.elog("Invalid MvChild on File")
-	return fuse.ENOSYS
-}
-
 func (fi *File) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 

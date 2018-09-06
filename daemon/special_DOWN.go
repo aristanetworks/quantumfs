@@ -20,3 +20,10 @@ func (special *Special) Sync_DOWN(c *ctx) fuse.Status {
 
 	return fuse.OK
 }
+
+func (special *Special) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
+	newName string) fuse.Status {
+
+	c.wlog("Invalid MvChild_DOWN on Special")
+	return fuse.ENOSYS
+}
