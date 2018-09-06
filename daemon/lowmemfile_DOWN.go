@@ -25,4 +25,3 @@ func (lm *LowMemFile) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	c.elog("Invalid MvChild_DOWN on LowMemFile")
 	return fuse.ENOSYS
 }
-

@@ -27,4 +27,3 @@ func (link *Symlink) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	c.wlog("Invalid MvChild_DOWN on Symlink")
 	return fuse.ENOSYS
 }
-

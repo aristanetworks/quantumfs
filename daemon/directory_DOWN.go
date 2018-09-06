@@ -658,4 +658,3 @@ func (dir *Directory) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	result = fuse.OK
 	return
 }
-

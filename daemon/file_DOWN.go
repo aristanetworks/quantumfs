@@ -26,4 +26,3 @@ func (fi *File) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	c.elog("Invalid MvChild_DOWN on File")
 	return fuse.ENOSYS
 }
-

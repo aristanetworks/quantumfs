@@ -60,4 +60,3 @@ func (tsl *TypespaceList) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	c.elog("Invalid MvChild_DOWN on TypespaceList")
 	return fuse.ENOSYS
 }
-
