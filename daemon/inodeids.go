@@ -88,7 +88,7 @@ func (ids *inodeIds) releaseInodeId(c *ctx, id InodeId) {
 	ids.push_(id)
 }
 
-const inodeIdsGb = "Garbage collected highmark"
+const inodeIdsGb = "Garbage collected highmark %d %d"
 
 // The inodeids lock must be held
 func (ids *inodeIds) testHighmark_(c *ctx) {
