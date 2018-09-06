@@ -537,13 +537,18 @@ func (tsl *TypespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (tsl *TypespaceList) instantiateChild(c *ctx,
+// Must be called with the instantiation lock
+func (tsl *TypespaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
-	defer c.funcIn("TypespaceList::instantiateChild").Out()
+	defer c.funcIn("TypespaceList::instantiateChild_").Out()
 	defer tsl.Lock().Unlock()
 
-	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
+	// release immediately. We can't hold the mapMutex while we instantiate,
+	// but it's okay since the instantiationLock should be held already.
+	release()
+	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode
 	}
@@ -858,13 +863,18 @@ func (nsl *NamespaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (nsl *NamespaceList) instantiateChild(c *ctx,
+// Must be called with the instantiation lock
+func (nsl *NamespaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
-	defer c.funcIn("NamespaceList::instantiateChild").Out()
+	defer c.funcIn("NamespaceList::instantiateChild_").Out()
 	defer nsl.Lock().Unlock()
 
-	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
+	// release immediately. We can't hold the mapMutex while we instantiate,
+	// but it's okay since the instantiationLock should be held already.
+	release()
+	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode
 	}
@@ -1246,13 +1256,18 @@ func (wsl *WorkspaceList) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (wsl *WorkspaceList) instantiateChild(c *ctx,
+// Must be called with the instantiation lock
+func (wsl *WorkspaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
-	defer c.funcIn("WorkspaceList::instantiateChild").Out()
+	defer c.funcIn("WorkspaceList::instantiateChild_").Out()
 	defer wsl.Lock().Unlock()
 
-	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
+	// release immediately. We can't hold the mapMutex while we instantiate,
+	// but it's okay since the instantiationLock should be held already.
+	release()
+	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode
 	}

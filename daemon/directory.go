@@ -40,7 +40,7 @@ type Directory struct {
 	// childRecordLock protects the maps inside childMap as well as the
 	// records contained within those maps themselves. This lock is not
 	// the same as the Directory Inode lock because these records must be
-	// accessible in instantiateChild(), which may be called indirectly
+	// accessible in instantiateChild_(), which may be called indirectly
 	// via qfs.inode() from a context where the Inode lock is already
 	// held.
 	childRecordLock utils.DeferableMutex
@@ -410,11 +410,11 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 
 	defer c.FuncIn("Directory::normalizeChild", "%d", inodeId).Out()
 
+	inode, release := c.qfs.inode(c, inodeId)
+	defer release()
+
 	defer c.qfs.instantiationLock.Lock().Unlock()
-	inode := c.qfs.inodeNoInstantiate(c, inodeId)
-	if inode != nil {
-		defer inode.getParentLock().Lock().Unlock()
-	}
+	defer inode.getParentLock().Lock().Unlock()
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 	defer c.qfs.flusher.lock.Lock().Unlock()
@@ -426,7 +426,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	}
 	name := leg.Filename()
 
-	if inode != nil && inode.isDirty_(c) {
+	if inode.isDirty_(c) {
 		c.vlog("Will not normalize dirty inode %d yet", inodeId)
 		return
 	}
@@ -436,16 +436,10 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 		defer dir.hardlinkTable.invalidateNormalizedRecordLock(
 			fileId).Unlock()
 
-		if inode != nil {
-			c.vlog("Setting parent of inode %d from %d to %d",
-				inodeId, inode.parentId_(), dir.inodeNum())
-			inode.setName(name)
-			inode.setParent_(c, dir)
-		} else {
-			c.qfs.addUninstantiated(c, []inodePair{
-				newInodePair(inodeId, dir.inodeNum()),
-			})
-		}
+		c.vlog("Setting parent of inode %d from %d to %d",
+			inodeId, inode.parentId_(), dir.inodeNum())
+		inode.setName(name)
+		inode.setParent_(c, dir)
 	}()
 
 	c.vlog("Normalizing child %s inode %d", name, inodeId)
@@ -1167,7 +1161,9 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 
 	defer dir.updateSize(c, result)
 	overwrittenInodeId := dir.childInodeNum(newName).id
-	overwrittenInode := c.qfs.inodeNoInstantiate(c, overwrittenInodeId)
+	overwrittenInode, release := c.qfs.inode(c, overwrittenInodeId)
+	defer release()
+
 	if overwrittenInode != nil {
 		defer overwrittenInode.getParentLock().Lock().Unlock()
 	}
@@ -1230,13 +1226,16 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 	}
 
 	// update the inode name
-	if child := c.qfs.inodeNoInstantiate(c, oldInodeId); child != nil {
+	child, release := c.qfs.inodeNoInstantiate(c, oldInodeId)
+	if child != nil {
+		defer release()
 		child.setName(newName)
 		child.clearAccessedCache()
 
 		// The child has an effective record. Make sure it is not lost.
 		child.dirty(c)
 	} else {
+		release()
 		if _, isHardlink := record.(*HardlinkLeg); isHardlink {
 			dir.hardlinkTable.makePublishable(c, record.FileId())
 		} else {
@@ -1341,10 +1340,12 @@ func (dir *Directory) mvChild(c *ctx, dstInode Inode, oldName string,
 		dst.updateSize(c, result)
 	}()
 	childInodeId := dir.childInodeNum(oldName)
-	childInode := c.qfs.inodeNoInstantiate(c, childInodeId.id)
+	childInode, release := c.qfs.inode(c, childInodeId.id)
+	defer release()
 
 	overwrittenInodeId := dst.childInodeNum(newName).id
-	overwrittenInode := c.qfs.inodeNoInstantiate(c, overwrittenInodeId)
+	overwrittenInode, release := c.qfs.inode(c, overwrittenInodeId)
+	defer release()
 
 	c.vlog("Aquiring locks")
 	if childInode != nil && overwrittenInode != nil {
@@ -1811,12 +1812,17 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.OK
 }
 
-func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-	defer c.FuncIn("Directory::instantiateChild", "Inode %d of %d", inodeNum,
+// Must be called with the instantiation lock
+func (dir *Directory) instantiateChild_(c *ctx, inodeNum InodeId) Inode {
+	defer c.FuncIn("Directory::instantiateChild_", "Inode %d of %d", inodeNum,
 		dir.inodeNum()).Out()
 	defer dir.childRecordLock.Lock().Unlock()
 
-	if inode := c.qfs.inodeNoInstantiate(c, inodeNum); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
+	// release immediately. We can't hold the mapMutex while we instantiate,
+	// but it's okay since the instantiationLock should be held already.
+	release()
+	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeNum)
 		return inode
 	}
@@ -1830,7 +1836,7 @@ func (dir *Directory) instantiateChild(c *ctx, inodeNum InodeId) Inode {
 	// check if the child is a hardlink
 	isHardlink, _ := dir.hardlinkTable.checkHardlink(inodeNum)
 	if isHardlink {
-		return dir.hardlinkTable.instantiateHardlink(c, inodeNum)
+		return dir.hardlinkTable.instantiateHardlink_(c, inodeNum)
 	}
 
 	// add a check incase there's an inconsistency

@@ -259,7 +259,7 @@ func (th *testHelper) WaitToBeUninstantiated(inode InodeId) {
 
 	msg := fmt.Sprintf("inode %d to be uninstantiated", inode)
 	th.WaitFor(msg, func() bool {
-		if nil == th.qfs.inodeNoInstantiate(&th.qfs.c, inode) {
+		if !th.inodeIsInstantiated(&th.qfs.c, inode) {
 			return true
 		}
 		th.SyncAllWorkspaces()

@@ -105,8 +105,9 @@ type Inode interface {
 
 	removeChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 
-	// Instantiate the Inode for the given child on demand
-	instantiateChild(c *ctx, inodeNum InodeId) Inode
+	// Must be called with the instantiation lock
+	// Instantiate the Inode for the given child on demand.
+	instantiateChild_(c *ctx, inodeNum InodeId) Inode
 	finishInit(c *ctx) []inodePair
 
 	name() string
@@ -205,6 +206,7 @@ type Inode interface {
 
 	// Reference counting to determine when an Inode may become uninstantiated.
 	addRef(c *ctx)
+	addRef_(c *ctx)
 	delRef(c *ctx)
 }
 
@@ -277,9 +279,9 @@ func (inode *InodeCommon) parentId_() InodeId {
 // returned Inode is used
 func (inode *InodeCommon) parent_(c *ctx) (parent Inode, release func()) {
 	defer c.funcIn("InodeCommon::parent_").Out()
-	parent = c.qfs.inodeNoInstantiate(c, inode.parentId)
-	release = func() {}
+	parent, release = c.qfs.inodeNoInstantiate(c, inode.parentId)
 	if parent == nil {
+		release()
 		c.elog("Parent (%d) was unloaded before child (%d)!",
 			inode.parentId, inode.id)
 		parent, release = c.qfs.inode(c, inode.parentId)
@@ -552,7 +554,9 @@ func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
 	newParent.addRef(c)
 
 	if inode.parentId != quantumfs.InodeIdInvalid {
-		oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
+		oldParent, release := c.qfs.inodeNoInstantiate(c, inode.parentId)
+		utils.Assert(oldParent != nil, "oldParent is nil")
+		defer release()
 		oldParent.delRef(c)
 	}
 
@@ -579,7 +583,9 @@ func (inode *InodeCommon) orphan(c *ctx, record quantumfs.DirectoryRecord) {
 func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
 
-	oldParent := c.qfs.inodeNoInstantiate(c, inode.parentId)
+	oldParent, release := c.qfs.inodeNoInstantiate(c, inode.parentId)
+	utils.Assert(oldParent != nil, "oldParent is nil")
+	defer release()
 	oldParent.delRef(c)
 
 	inode.parentId = inode.id
@@ -841,11 +847,17 @@ func addInodeRef_(c *ctx, inodeId InodeId) {
 }
 
 func (inode *InodeCommon) addRef(c *ctx) {
+	defer c.qfs.mapMutex.Lock().Unlock()
+
+	inode.addRef_(c)
+}
+
+func (inode *InodeCommon) addRef_(c *ctx) {
 	if inode.inodeNum() <= quantumfs.InodeIdReservedEnd {
 		// These Inodes always exist
 		return
 	}
-	defer c.qfs.mapMutex.Lock().Unlock()
+
 	addInodeRef_(c, inode.inodeNum())
 
 	utils.Assert(c.qfs.inodeRefcounts[inode.inodeNum()] > 1,
@@ -861,7 +873,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 
 	defer inode.parentLock.Lock().Unlock()
 
-	release := func() bool {
+	toRelease := func() bool {
 		defer c.qfs.mapMutex.Lock().Unlock()
 
 		refs := c.qfs.inodeRefcounts[inode.inodeNum()] - 1
@@ -881,7 +893,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 			newInodePair(inode.inodeNum(), inode.parentId_())})
 		return true
 	}()
-	if !release {
+	if !toRelease {
 		return
 	}
 
