@@ -1258,7 +1258,8 @@ func logRequestPanic(c *ctx) {
 
 	stackTrace := debug.Stack()
 
-	c.elog("PANIC (%d): '"+fmt.Sprintf("%.36v", exception)+
+	c.vlog("Panic details: %s", fmt.Sprintf("%v", exception))
+	c.elog("PANIC (%d): '"+fmt.Sprintf("%0.25v", exception)+
 		"' BT: %v", c.RequestId, utils.BytesToString(stackTrace))
 }
 
