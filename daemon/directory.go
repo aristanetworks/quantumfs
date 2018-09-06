@@ -761,11 +761,6 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 		entry)
 
 	newEntity.dirty(c)
-	pathFlags := quantumfs.PathFlags(quantumfs.PathCreated)
-	if type_ == quantumfs.ObjectTypeDirectory {
-		pathFlags |= quantumfs.PathIsDir
-	}
-	newEntity.markSelfAccessed(c, pathFlags)
 
 	return newEntity
 }
@@ -814,6 +809,9 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 		return result
 	}
 
+	// mark the child as being accessed
+	file.markSelfAccessed(c, quantumfs.PathCreated)
+
 	dir.updateSize(c, result)
 
 	fileHandleNum := c.qfs.newFileHandleId()
@@ -842,6 +840,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 	defer c.funcIn("Directory::Mkdir").Out()
 
+	var newDir Inode
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
@@ -855,7 +854,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 			return err
 		}
 
-		newDir := dir.create_(c, name, input.Mode, input.Umask, 0,
+		newDir = dir.create_(c, name, input.Mode, input.Umask, 0,
 			newDirectory, quantumfs.ObjectTypeDirectory,
 			quantumfs.EmptyDirKey, out)
 		if newDir != nil {
@@ -863,6 +862,11 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 		}
 		return fuse.OK
 	}()
+
+	if result == fuse.OK {
+		newDir.markSelfAccessed(c, quantumfs.PathCreated|
+			quantumfs.PathIsDir)
+	}
 
 	dir.updateSize(c, result)
 	c.vlog("Directory::Mkdir created inode %d", out.NodeId)
@@ -1026,6 +1030,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	defer c.funcIn("Directory::Symlink").Out()
 
+	var inode Inode
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
@@ -1039,7 +1044,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return result
 		}
 
-		inode := dir.create_(c, name, 0777, 0777, 0, newSymlink,
+		inode = dir.create_(c, name, 0777, 0777, 0, newSymlink,
 			quantumfs.ObjectTypeSymlink, quantumfs.EmptyBlockKey, out)
 
 		link := inode.(*Symlink)
@@ -1062,6 +1067,10 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 		return fuse.OK
 	}()
 
+	if result == fuse.OK {
+		inode.markSelfAccessed(c, quantumfs.PathCreated)
+	}
+
 	dir.updateSize(c, result)
 	return result
 }
@@ -1083,6 +1092,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 
 	defer c.funcIn("Directory::Mknod").Out()
 
+	var inode Inode
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 
@@ -1102,11 +1112,11 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFBLK) ||
 			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFCHR) {
 
-			dir.create_(c, name, input.Mode, input.Umask, input.Rdev,
-				newSpecial, quantumfs.ObjectTypeSpecial,
+			inode = dir.create_(c, name, input.Mode, input.Umask,
+				input.Rdev, newSpecial, quantumfs.ObjectTypeSpecial,
 				zeroSpecial, out)
 		} else if utils.BitFlagsSet(uint(input.Mode), syscall.S_IFREG) {
-			dir.create_(c, name, input.Mode, input.Umask, 0,
+			inode = dir.create_(c, name, input.Mode, input.Umask, 0,
 				newSmallFile, quantumfs.ObjectTypeSmallFile,
 				quantumfs.EmptyBlockKey, out)
 		} else {
@@ -1115,6 +1125,10 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 		}
 		return fuse.OK
 	}()
+
+	if result == fuse.OK {
+		inode.markSelfAccessed(c, quantumfs.PathCreated)
+	}
 
 	dir.updateSize(c, result)
 	return result
@@ -1914,8 +1928,6 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	c.qfs.addUninstantiated(c, []inodePair{newInodePair(inodeNum, parent)})
 
 	c.qfs.noteChildCreated(c, dir.inodeNum(), name)
-
-	dir.self.markAccessed(c, name, markType(type_, quantumfs.PathCreated))
 }
 
 func (dir *Directory) markHardlinkPath(c *ctx, path string,
