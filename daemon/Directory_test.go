@@ -2083,7 +2083,6 @@ func TestMvChildRace(t *testing.T) {
 		// dirty dirB to cause it to flush (up operation)
 		test.AssertNoErr(os.Chmod(workspace+"/dirA/dirB", 0766))
 		time.Sleep(80 * time.Millisecond)
-		//	count := test.CountLogStrings("Directory::flush")
 
 		// Race between an up and what may be a down operation
 		var wg sync.WaitGroup
