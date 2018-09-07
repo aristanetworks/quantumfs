@@ -53,6 +53,7 @@ func TestWalkPanicString(t *testing.T) {
 			return nil
 		}
 		err = Walk(c, ds, rootID, wf)
+		test.AssertErr(err)
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
@@ -96,6 +97,7 @@ func TestWalkPanicErr(t *testing.T) {
 			return nil
 		}
 		err = Walk(c, ds, rootID, wf)
+		test.AssertErr(err)
 		test.Assert(err == expectedErr,
 			"Walk did not get the expectedErr value, instead got %v",
 			err)
@@ -138,6 +140,7 @@ func TestWalkErr(t *testing.T) {
 			return nil
 		}
 		err = Walk(c, ds, rootID, wf)
+		test.AssertErr(err)
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
@@ -191,6 +194,7 @@ func TestHLGetErr(t *testing.T) {
 		}
 
 		err = walk(c, dsHLGet, rootID, tstNopWalkFn())
+		test.AssertErr(err)
 		test.Assert(err.Error() == hleGetError.Error(),
 			"Walk did not get the %v, instead got %v", hleGetError,
 			err)
@@ -238,6 +242,7 @@ func TestDEGetErr(t *testing.T) {
 		}
 
 		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		test.AssertErr(err)
 		test.Assert(err.Error() == deGetError.Error(),
 			"Walk did not get the %v, instead got %v", deGetError,
 			err)
@@ -290,6 +295,7 @@ func TestEAGetErr(t *testing.T) {
 		}
 
 		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		test.AssertErr(err)
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
@@ -353,6 +359,7 @@ func TestEAAttrGetErr(t *testing.T) {
 		}
 
 		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		test.AssertErr(err)
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
@@ -405,6 +412,7 @@ func TestMultiBlockGetErr(t *testing.T) {
 		}
 
 		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		test.AssertErr(err)
 		test.Assert(err.Error() == mbGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", mbGetBlock0Error,
 			err)
@@ -460,6 +468,7 @@ func TestVLFileGetFirstErr(t *testing.T) {
 		}
 
 		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		test.AssertErr(err)
 		test.Assert(err.Error() == vlGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock0Error,
 			err)
@@ -505,22 +514,27 @@ func TestVLFileGetNextErr(t *testing.T) {
 		vlGetBlock1Error := fmt.Errorf("verylarge block1 error")
 		// setup dsGetHelper return error upon Get of block1
 		// (second level multiblock metadata block) on file-0.
-		countGet := 0
+		seenVLFblock := false
 		dsGet := func(c *quantumfs.Ctx, path string,
 			key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 			buf quantumfs.Buffer) error {
 
 			if typ == quantumfs.ObjectTypeVeryLargeFile &&
 				path == "/file-0" {
-				countGet++
-				if countGet == 2 {
-					return vlGetBlock1Error
-				}
+				seenVLFblock = true
+			}
+
+			if typ == quantumfs.ObjectTypeLargeFile &&
+				path == "/file-0" &&
+				seenVLFblock {
+				seenVLFblock = false
+				return vlGetBlock1Error
 			}
 			return ds.Get(c, key, buf)
 		}
 
 		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		test.AssertErr(err)
 		test.Assert(err.Error() == vlGetBlock1Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock1Error,
 			err)
