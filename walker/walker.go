@@ -212,6 +212,7 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	simplebuffer.AssertNonZeroBuf(buf,
 		"MultiBlockFile buffer %s", key.String())
 
+	// indicate metadata block's ObjectType
 	if err := writeToChan(c, keyChan, path, key, uint64(buf.Size()),
 		typ); err != nil {
 		return err
@@ -224,8 +225,10 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 		if i == len(keys)-1 {
 			size = uint64(mbf.SizeOfLastBlock())
 		}
+		// multi-block files are always made up of
+		// small files
 		if err := writeToChan(c, keyChan, path, k, size,
-			typ); err != nil {
+			quantumfs.ObjectTypeSmallFile); err != nil {
 			return err
 		}
 	}
@@ -326,14 +329,10 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	key := dr.ID()
 	switch dr.Type() {
 	case quantumfs.ObjectTypeMediumFile:
-		// ObjectTypeMediumFile consists of ObjectTypeSmallFile
-		return handleMultiBlockFile(c, fpath,
-			ds, key, quantumfs.ObjectTypeSmallFile,
-			wf, keyChan)
+		// fall-through
 	case quantumfs.ObjectTypeLargeFile:
-		// ObjectTypeLargeFile consists of ObjectTypeSmallFile
 		return handleMultiBlockFile(c, fpath,
-			ds, key, quantumfs.ObjectTypeSmallFile,
+			ds, key, dr.Type(),
 			wf, keyChan)
 	case quantumfs.ObjectTypeVeryLargeFile:
 		return handleVeryLargeFile(c, fpath,
