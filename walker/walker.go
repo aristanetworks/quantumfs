@@ -377,6 +377,8 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	default:
 		return writeToChan(c, keyChan, fpath, key, dr.Size(), dr.Type())
 	}
+
+	return nil
 }
 
 func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
