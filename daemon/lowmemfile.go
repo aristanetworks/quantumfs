@@ -180,13 +180,6 @@ func (lm *LowMemFile) RenameChild(c *ctx, oldName string,
 	return fuse.ENOSYS
 }
 
-func (lm *LowMemFile) MvChild(c *ctx, dstInode Inode, oldName string,
-	newName string) fuse.Status {
-
-	c.elog("Invalid MvChild on LowMemFile")
-	return fuse.ENOSYS
-}
-
 func (lm *LowMemFile) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 

@@ -452,13 +452,6 @@ func (tsl *TypespaceList) RenameChild(c *ctx, oldName string,
 	return fuse.ENOSYS
 }
 
-func (tsl *TypespaceList) MvChild(c *ctx, dstInode Inode, oldName string,
-	newName string) fuse.Status {
-
-	c.elog("Invalid MvChild on TypespaceList")
-	return fuse.ENOSYS
-}
-
 func (tsl *TypespaceList) GetXAttrSize(c *ctx,
 	attr string) (size int, result fuse.Status) {
 
@@ -775,13 +768,6 @@ func (nsl *NamespaceList) RenameChild(c *ctx, oldName string,
 	newName string) fuse.Status {
 
 	c.elog("Invalid RenameChild on NamespaceList")
-	return fuse.ENOSYS
-}
-
-func (nsl *NamespaceList) MvChild(c *ctx, dstInode Inode, oldName string,
-	newName string) fuse.Status {
-
-	c.elog("Invalid MvChild on NamespaceList")
 	return fuse.ENOSYS
 }
 
@@ -1165,13 +1151,6 @@ func (wsl *WorkspaceList) RenameChild(c *ctx, oldName string,
 	newName string) fuse.Status {
 
 	c.elog("Invalid RenameChild on WorkspaceList")
-	return fuse.ENOSYS
-}
-
-func (wsl *WorkspaceList) MvChild(c *ctx, dstInode Inode, oldName string,
-	newName string) fuse.Status {
-
-	c.elog("Invalid MvChild on WorkspaceList")
 	return fuse.ENOSYS
 }
 
