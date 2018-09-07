@@ -329,7 +329,7 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	key := dr.ID()
 	switch dr.Type() {
 	case quantumfs.ObjectTypeMediumFile:
-		// fall-through
+		fallthrough
 	case quantumfs.ObjectTypeLargeFile:
 		return handleMultiBlockFile(c, fpath,
 			ds, key, dr.Type(),
