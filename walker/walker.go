@@ -45,6 +45,8 @@ type workerData struct {
 	objType quantumfs.ObjectType
 }
 
+const panicErrLog = "PANIC %s\n%v"
+
 func panicHandler(c *Ctx, err *error) {
 	exception := recover()
 	if exception == nil {
@@ -65,8 +67,11 @@ func panicHandler(c *Ctx, err *error) {
 	}
 
 	trace := utils.BytesToString(debug.Stack())
-	c.Qctx.Elog(qlog.LogTool, "%s\n%v", result, trace)
+	c.Qctx.Elog(qlog.LogTool, panicErrLog, result, trace)
 }
+
+const walkerMainErrLog = "Walk error: %s"
+const workerErrLog = "Worker error: %s"
 
 // Walk the workspace hierarchy
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
@@ -111,7 +116,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 			defer panicHandler(c, &err)
 			err = worker(c, keyChan, wf)
 			if err != nil {
-				cq.Elog(qlog.LogTool, "Worker error: %s",
+				cq.Elog(qlog.LogTool, workerErrLog,
 					err.Error())
 			}
 			return err
@@ -152,7 +157,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 	err = group.Wait()
 	if err != nil {
-		cq.Elog(qlog.LogTool, "Walk error: %s", err.Error())
+		cq.Elog(qlog.LogTool, walkerMainErrLog, err.Error())
 	}
 	return err
 }
