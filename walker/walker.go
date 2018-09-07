@@ -216,6 +216,7 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 	simplebuffer.AssertNonZeroBuf(buf,
 		"MultiBlockFile buffer %s", key.String())
 
+	// indicate metadata block's ObjectType
 	if err := writeToChan(c, keyChan, path, key, uint64(buf.Size()),
 		typ); err != nil {
 		return err
@@ -228,8 +229,10 @@ func handleMultiBlockFile(c *Ctx, path string, ds quantumfs.DataStore,
 		if i == len(keys)-1 {
 			size = uint64(mbf.SizeOfLastBlock())
 		}
+		// multi-block files are always made up of
+		// small files
 		if err := writeToChan(c, keyChan, path, k, size,
-			typ); err != nil {
+			quantumfs.ObjectTypeSmallFile); err != nil {
 			return err
 		}
 	}
@@ -258,7 +261,9 @@ func handleVeryLargeFile(c *Ctx, path string, ds quantumfs.DataStore,
 	vlf := buf.AsVeryLargeFile()
 	for part := 0; part < vlf.NumberOfParts(); part++ {
 		if err := handleMultiBlockFile(c, path, ds, vlf.LargeFileKey(part),
-			quantumfs.ObjectTypeVeryLargeFile,
+			// ObjectTypeVeryLargeFile contains multiple
+			// ObjectTypeLargeFile objects
+			quantumfs.ObjectTypeLargeFile,
 			wf, keyChan); err != nil && err != ErrSkipDirectory {
 
 			return err
@@ -334,12 +339,10 @@ func handleDirectoryRecord(c *Ctx, path string, ds quantumfs.DataStore,
 	key := dr.ID()
 	switch dr.Type() {
 	case quantumfs.ObjectTypeMediumFile:
-		return handleMultiBlockFile(c, fpath,
-			ds, key, quantumfs.ObjectTypeMediumFile,
-			wf, keyChan)
+		fallthrough
 	case quantumfs.ObjectTypeLargeFile:
 		return handleMultiBlockFile(c, fpath,
-			ds, key, quantumfs.ObjectTypeLargeFile,
+			ds, key, dr.Type(),
 			wf, keyChan)
 	case quantumfs.ObjectTypeVeryLargeFile:
 		return handleVeryLargeFile(c, fpath,
@@ -424,8 +427,10 @@ func handleExtendedAttributes(c *Ctx, fpath string, ds quantumfs.DataStore,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"Attributes List buffer %s", key.String())
 
+		// ObjectTypeExtendedAttribute is made up of
+		// ObjectTypeSmallFile
 		err := writeToChan(c, keyChan, fpath, key,
-			uint64(buf.Size()), quantumfs.ObjectTypeExtendedAttribute)
+			uint64(buf.Size()), quantumfs.ObjectTypeSmallFile)
 		if err != nil {
 			return err
 		}

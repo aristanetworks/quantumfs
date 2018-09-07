@@ -89,16 +89,17 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 	return &wsr
 }
 
-func (wsr *WorkspaceRoot) instantiateChild(c *ctx, inodeId InodeId) Inode {
+// Must be called with the instantiation lock
+func (wsr *WorkspaceRoot) instantiateChild_(c *ctx, inodeId InodeId) Inode {
 
-	defer c.FuncIn("WorkspaceRoot::instantiateChild", "inode %d", inodeId).Out()
+	defer c.FuncIn("WorkspaceRoot::instantiateChild_", "inode %d", inodeId).Out()
 
-	inode := wsr.hardlinkTable.instantiateHardlink(c, inodeId)
+	inode := wsr.hardlinkTable.instantiateHardlink_(c, inodeId)
 	if inode != nil {
 		return inode
 	}
 	// This isn't a hardlink, so proceed as normal
-	return wsr.Directory.instantiateChild(c, inodeId)
+	return wsr.Directory.instantiateChild_(c, inodeId)
 }
 
 func (wsr *WorkspaceRoot) finishInit(c *ctx) []inodePair {
@@ -331,6 +332,7 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 
 	if name == quantumfs.ApiPath {
 		out.NodeId = quantumfs.InodeIdApi
+		out.Generation = 1
 		fillEntryOutCacheData(c, out)
 		fillApiAttr(c, &out.Attr)
 		return fuse.OK
@@ -338,6 +340,7 @@ func (wsr *WorkspaceRoot) Lookup(c *ctx, name string,
 
 	if c.qfs.inLowMemoryMode && name == quantumfs.LowMemFileName {
 		out.NodeId = quantumfs.InodeIdLowMemMarker
+		out.Generation = 1
 		fillEntryOutCacheData(c, out)
 		fillLowMemAttr(c, &out.Attr)
 		return fuse.OK
