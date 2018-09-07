@@ -14,7 +14,7 @@ import (
 type FileLoadRecord struct {
 	remoteRecord  quantumfs.DirectoryRecord
 	localRecord   quantumfs.ImmutableDirectoryRecord
-	inodeId       InodeId
+	inodeId       InodeIdInfo
 	parentId      InodeId
 	newParentPath string
 	moved         bool
@@ -77,11 +77,12 @@ func (rc *RefreshContext) addStaleEntry(c *ctx, parentId InodeId, inodeId InodeI
 }
 
 func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
-	inodeId InodeId, moved bool, localRecord quantumfs.ImmutableDirectoryRecord,
+	inodeId InodeIdInfo, moved bool,
+	localRecord quantumfs.ImmutableDirectoryRecord,
 	remoteRecord quantumfs.DirectoryRecord) quantumfs.FileId {
 
 	defer c.FuncIn("RefreshContext::attachLocalRecord", "name %s inode %d",
-		localRecord.Filename(), inodeId).Out()
+		localRecord.Filename(), inodeId.id).Out()
 	fileId := localRecord.FileId()
 	loadRecord, found := rc.fileMap[fileId]
 	if !found {
@@ -110,8 +111,8 @@ func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
 		if remoteRecord.Type() != quantumfs.ObjectTypeHardlink {
 			// remote record is not a hardlink, so it can only have
 			// one match
-			rc.addStaleEntry(c, loadRecord.parentId, loadRecord.inodeId,
-				loadRecord.localRecord)
+			rc.addStaleEntry(c, loadRecord.parentId,
+				loadRecord.inodeId.id, loadRecord.localRecord)
 		}
 
 	}
@@ -212,7 +213,7 @@ func (rc *RefreshContext) buildRefreshMapWsr(c *ctx, localRootId quantumfs.Objec
 
 		rc.fileMap[fileId] = &FileLoadRecord{
 			remoteRecord:  record,
-			inodeId:       quantumfs.InodeIdInvalid,
+			inodeId:       invalidIdInfo(),
 			parentId:      quantumfs.InodeIdInvalid,
 			newParentPath: "",
 			moved:         false,
@@ -242,7 +243,7 @@ func (rc *RefreshContext) buildRefreshMap(c *ctx, localDir quantumfs.ObjectKey,
 
 		rc.fileMap[record.FileId()] = &FileLoadRecord{
 			remoteRecord:  record.Clone(),
-			inodeId:       quantumfs.InodeIdInvalid,
+			inodeId:       invalidIdInfo(),
 			parentId:      quantumfs.InodeIdInvalid,
 			newParentPath: path,
 			moved:         false,
@@ -312,11 +313,15 @@ func detachInode(c *ctx, inode Inode, staleRecord *FileRemoveRecord) {
 func detachStaleDentries(c *ctx, rc *RefreshContext) {
 	defer c.funcIn("detachStaleDentries").Out()
 	for i, staleRecord := range rc.staleRecords {
-		inode := c.qfs.inodeNoInstantiate(c, staleRecord.parentId)
-		if inode != nil {
-			detachInode(c, inode, &staleRecord)
-			rc.staleRecords[i] = staleRecord
-		}
+		func() {
+			inode, release := c.qfs.inodeNoInstantiate(c,
+				staleRecord.parentId)
+			defer release()
+			if inode != nil {
+				detachInode(c, inode, &staleRecord)
+				rc.staleRecords[i] = staleRecord
+			}
+		}()
 	}
 }
 
@@ -341,20 +346,26 @@ func (wsr *WorkspaceRoot) refreshRemoteHardlink_(c *ctx,
 		wsr.hardlinkTable.hardlinks[id] = entry
 
 		if !oldRecord.ID().IsEqualTo(hardlink.Record().ID()) {
-			if inode := c.qfs.inodeNoInstantiate(c,
-				entry.inodeId); inode != nil {
+			func() {
+				inode, release := c.qfs.inodeNoInstantiate(c,
+					entry.inodeId.id)
+				defer release()
+				if inode != nil {
+					c.vlog("Reloading inode %d: %s -> %s",
+						entry.inodeId.id,
+						oldRecord.ID().String(),
+						hardlink.Record().ID().String())
 
-				c.vlog("Reloading inode %d: %s -> %s", entry.inodeId,
-					oldRecord.ID().String(),
-					hardlink.Record().ID().String())
-				utils.Assert(!hardlink.Record().Type().IsImmutable(),
-					"An immutable type cannot be reloaded.")
-				reload(c, wsr.hardlinkTable, rc, inode,
-					hardlink.Record())
-			}
+					linkType := hardlink.Record().Type()
+					utils.Assert(!linkType.IsImmutable(),
+						"Immutable type cannot be reloaded.")
+					reload(c, wsr.hardlinkTable, rc, inode,
+						hardlink.Record())
+				}
+			}()
 		}
 
-		c.qfs.invalidateInode(c, entry.inodeId)
+		c.qfs.invalidateInode(c, entry.inodeId.id)
 	}
 }
 
@@ -372,10 +383,10 @@ func (wsr *WorkspaceRoot) refreshHardlinks(c *ctx,
 // The caller must hold the tree lock
 func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 	oldType quantumfs.ObjectType, remoteRecord quantumfs.DirectoryRecord,
-	inodeId InodeId, parentId InodeId, path string) {
+	inodeId InodeIdInfo, parentId InodeId, path string) {
 
 	defer c.FuncIn("WorkspaceRoot::moveDentry_", "%s %d %d",
-		oldName, parentId, inodeId).Out()
+		oldName, parentId, inodeId.id).Out()
 
 	pathElements := strings.Split(path, "/")
 	newParent, cleanup, err := wsr.followPath_DOWN(c, pathElements)
@@ -385,7 +396,10 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 	srcInode, release := c.qfs.inode(c, parentId)
 	defer release()
 
-	inode := c.qfs.inodeNoInstantiate(c, inodeId)
+	// We must instantiate the inode, since we'd need to hold the mapmutex lock
+	// if it wasn't instantiated.
+	inode, release := c.qfs.inode(c, inodeId.id)
+	defer release()
 
 	switch remoteRecord.Type() {
 	case quantumfs.ObjectTypeDirectory:
@@ -416,7 +430,7 @@ func (wsr *WorkspaceRoot) moveDentry_(c *ctx, oldName string,
 		}
 	}
 
-	c.qfs.noteDeletedInode(c, srcInode.inodeNum(), inodeId, oldName)
+	c.qfs.noteDeletedInode(c, srcInode.inodeNum(), inodeId.id, oldName)
 	c.qfs.noteChildCreated(c, newParent.inodeNum(), remoteRecord.Filename())
 }
 
@@ -431,12 +445,19 @@ func (wsr *WorkspaceRoot) moveDentries_(c *ctx, rc *RefreshContext) {
 			wsr.moveDentry_(c, oldName, loadRecord.localRecord.Type(),
 				loadRecord.remoteRecord,
 				loadRecord.inodeId, loadRecord.parentId, path)
-			inode := c.qfs.inodeNoInstantiate(c, loadRecord.inodeId)
-			if inode != nil {
-				reload(c, wsr.hardlinkTable, rc, inode,
-					loadRecord.remoteRecord)
-				c.qfs.invalidateInode(c, loadRecord.inodeId)
-			}
+
+			func() {
+				inode, release := c.qfs.inodeNoInstantiate(c,
+					loadRecord.inodeId.id)
+				defer release()
+
+				if inode != nil {
+					reload(c, wsr.hardlinkTable, rc, inode,
+						loadRecord.remoteRecord)
+					c.qfs.invalidateInode(c,
+						loadRecord.inodeId.id)
+				}
+			}()
 		}
 	}
 }
@@ -449,8 +470,15 @@ func unlinkStaleDentries(c *ctx, rc *RefreshContext) {
 		}
 		c.vlog("Unlinking entry %s type %d inodeId %d",
 			staleRecord.name, staleRecord.type_, staleRecord.inodeId)
-		if inode := c.qfs.inodeNoInstantiate(c,
-			staleRecord.inodeId); inode != nil {
+
+		func() {
+			inode, release := c.qfs.inodeNoInstantiate(c,
+				staleRecord.inodeId)
+			defer release()
+
+			if inode == nil {
+				return
+			}
 
 			result := inode.deleteSelf(c,
 				func() (quantumfs.DirectoryRecord, fuse.Status) {
@@ -459,7 +487,8 @@ func unlinkStaleDentries(c *ctx, rc *RefreshContext) {
 			if result != fuse.OK {
 				panic("XXX handle deletion failure")
 			}
-		}
+		}()
+
 		c.qfs.removeUninstantiated(c, []InodeId{staleRecord.inodeId})
 	}
 }
@@ -475,16 +504,22 @@ func (wsr *WorkspaceRoot) unlinkStaleHardlinks(c *ctx,
 		if !exists {
 			c.vlog("Removing hardlink id %d, inode %d, nlink %d",
 				fileId, entry.inodeId, entry.nlink)
-			if inode := c.qfs.inodeNoInstantiate(c,
-				entry.inodeId); inode != nil {
 
-				inode.orphan(c, entry.record())
-			}
-			wsr.hardlinkTable.removeHardlink_(fileId, entry.inodeId)
+			func() {
+				inode, release := c.qfs.inodeNoInstantiate(c,
+					entry.inodeId.id)
+				defer release()
+				if inode != nil {
+
+					inode.orphan(c, entry.record())
+				}
+				wsr.hardlinkTable.removeHardlink_(fileId,
+					entry.inodeId.id)
+			}()
 		} else if loadRecord.remoteRecord.Type() !=
 			quantumfs.ObjectTypeHardlink {
 
-			wsr.hardlinkTable.removeHardlink_(fileId, entry.inodeId)
+			wsr.hardlinkTable.removeHardlink_(fileId, entry.inodeId.id)
 		}
 	}
 }
