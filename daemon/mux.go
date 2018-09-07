@@ -185,6 +185,8 @@ type QuantumFs struct {
 	stopWaitingForSignals chan struct{}
 
 	inLowMemoryMode bool
+
+	inodeIdGeneration uint64
 }
 
 func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
@@ -435,7 +437,8 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	// instantiating this inode
 	c.qfs.removeUninstantiated(c, []InodeId{id})
 
-	inode := qfs.inodeNoInstantiate(c, id)
+	inode, release := qfs.inodeNoInstantiate(c, id)
+	defer release()
 	if inode == nil {
 		return
 	}
@@ -457,11 +460,14 @@ func (qfs *QuantumFs) handleDeletedWorkspace(c *ctx, name string) {
 	if err != nil {
 		c.elog("getting wsrLineage failed: %s", err.Error())
 	} else if len(wsrLineage) == 4 {
-		wsr := qfs.inodeNoInstantiate(c, wsrLineage[3])
-		if wsr != nil {
-			c.vlog("Setting tree skipFlush")
-			wsr.treeState().skipFlush = true
-		}
+		func() {
+			wsr, release := qfs.inodeNoInstantiate(c, wsrLineage[3])
+			defer release()
+			if wsr != nil {
+				c.vlog("Setting tree skipFlush")
+				wsr.treeState().skipFlush = true
+			}
+		}()
 
 		// In case the deletion has happened remotely, workspacelisting does
 		// not have the capability of orphaning the workspace if the
@@ -761,10 +767,32 @@ func (qfs *QuantumFs) LockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
 	return fileHandle, fileHandle.treeState().Unlock
 }
 
-func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) Inode {
-	defer qfs.mapMutex.RLock().RUnlock()
-	inode, _ := qfs.getInode_(c, id)
-	return inode
+// If the inode returned isn't nil, then a reference is held to ensure the inode is
+// not uninstantiated before release() is called and work is done. If the inode
+// is nil, then the mapMutex is held until release() is called to prevent it from
+// being instantiated.
+func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
+	release_ func()) {
+
+	release := qfs.mapMutex.Lock().Unlock
+
+	if qfs.inodes == nil {
+		release()
+		return nil, func() {}
+	}
+
+	inode, instantiated := qfs.inodes[id]
+	if instantiated {
+		// Ensure we release now, no matter what
+		defer release()
+		inode.addRef_(c)
+
+		return inode, func() {
+			go inode.delRef(c)
+		}
+	} else {
+		return nil, release
+	}
 }
 
 func releaserFn(c *ctx, inode Inode) func() {
@@ -880,7 +908,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 			defer qfs.mapMutex.Lock()
 			// without mapMutex the child could move underneath this
 			// parent, in such cases, find the new parent
-			inode = parent.instantiateChild(c, id)
+			inode = parent.instantiateChild_(c, id)
 		}()
 		if inode != nil {
 			break
@@ -1076,7 +1104,8 @@ func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 
 maybeReleaseRef:
 	if forgotten {
-		inode := qfs.inodeNoInstantiate(c, inodeId)
+		inode, release := qfs.inodeNoInstantiate(c, inodeId)
+		defer release()
 		if inode != nil {
 			inode.delRef(c)
 		} else {
@@ -1120,8 +1149,33 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 	}
 }
 
+func (qfs *QuantumFs) newInodeIdInfo(id InodeId) InodeIdInfo {
+	rtn := InodeIdInfo{
+		id: id,
+	}
+
+	if id != quantumfs.InodeIdInvalid {
+		// We increment a generation counter since its faster than a
+		// random number function. We don't care if this wraps, only that it
+		// is never zero so we can detect undefined generation. We need this
+		// generation counter to prevent the kernel from confusing inodes
+		// when we reuse inode ids.
+		newGen := atomic.AddUint64(&qfs.inodeIdGeneration, 1)
+		if newGen == 0 {
+			newGen = atomic.AddUint64(&qfs.inodeIdGeneration, 1)
+			utils.Assert(newGen != 0,
+				"Double add resulted in zero both times")
+		}
+		rtn.generation = newGen
+	}
+
+	qfs.c.vlog("Generation for inode %d is %d", id, rtn.generation)
+
+	return rtn
+}
+
 // Retrieves a unique inode number
-func (qfs *QuantumFs) newInodeId() InodeId {
+func (qfs *QuantumFs) newInodeId() InodeIdInfo {
 	for {
 		// When we get a new id, it's possible that we're still using it.
 		// If it's still in use, grab another one instead
@@ -1129,7 +1183,7 @@ func (qfs *QuantumFs) newInodeId() InodeId {
 
 		// If this is a reused id, then it's safe to use immediately
 		if reused {
-			return newId
+			return qfs.newInodeIdInfo(newId)
 		}
 
 		// We expect that ids will be reused more often than not. To optimize
@@ -1144,7 +1198,7 @@ func (qfs *QuantumFs) newInodeId() InodeId {
 		if !idIsFree {
 			continue
 		}
-		return newId
+		return qfs.newInodeIdInfo(newId)
 	}
 }
 
@@ -1178,7 +1232,8 @@ func (qfs *QuantumFs) syncWorkspace(c *ctx, workspace string) error {
 		return nil
 	}
 
-	inode := qfs.inodeNoInstantiate(c, ids[3])
+	inode, release := qfs.inodeNoInstantiate(c, ids[3])
+	defer release()
 	if inode == nil {
 		return nil
 	}
@@ -1203,7 +1258,8 @@ func logRequestPanic(c *ctx) {
 
 	stackTrace := debug.Stack()
 
-	c.elog("PANIC (%d): '"+fmt.Sprintf("%v", exception)+
+	c.vlog("Panic details: %s", fmt.Sprintf("%v", exception))
+	c.elog("PANIC (%d): '"+fmt.Sprintf("%0.25v", exception)+
 		"' BT: %v", c.RequestId, utils.BytesToString(stackTrace))
 }
 
@@ -1269,7 +1325,8 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	var exists bool
 
 	ids = append(ids, quantumfs.InodeIdRoot)
-	inode := qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
+	inode, release := qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
+	defer release()
 	if inode == nil {
 		return nil, fmt.Errorf("root inode not instantiated")
 	}
@@ -1279,7 +1336,8 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	}
 	keepSearching := func() bool {
 		defer typespacelist.RLock().RUnlock()
-		id, exists = typespacelist.typespacesByName[typespace]
+		idInfo, exists := typespacelist.typespacesByName[typespace]
+		id = idInfo.id
 		if !exists {
 			c.vlog("typespace %s does not exist", typespace)
 			return false
@@ -1291,7 +1349,8 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	}
 
 	ids = append(ids, id)
-	inode = qfs.inodeNoInstantiate(c, id)
+	inode, release = qfs.inodeNoInstantiate(c, id)
+	defer release()
 	if inode == nil {
 		c.vlog("typespacelist inode %d not instantiated", id)
 		return
@@ -1302,7 +1361,8 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	}
 	keepSearching = func() bool {
 		defer namespacelist.RLock().RUnlock()
-		id, exists = namespacelist.namespacesByName[namespace]
+		idInfo, exists := namespacelist.namespacesByName[namespace]
+		id = idInfo.id
 		if !exists {
 			return false
 		}
@@ -1313,7 +1373,8 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	}
 
 	ids = append(ids, id)
-	inode = qfs.inodeNoInstantiate(c, id)
+	inode, release = qfs.inodeNoInstantiate(c, id)
+	defer release()
 	if inode == nil {
 		c.vlog("namespacelist inode %d not instantiated", id)
 		return
@@ -1335,7 +1396,7 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 		return
 	}
 
-	ids = append(ids, wsrInfo.id)
+	ids = append(ids, wsrInfo.id.id)
 	return
 }
 

@@ -61,7 +61,18 @@ func (th *TestHelper) getInodeNum(path string) InodeId {
 // Retrieve the Inode from Quantumfs. Returns nil is not instantiated
 func (th *TestHelper) getInode(path string) Inode {
 	inodeNum := th.getInodeNum(path)
-	return th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
+	newInode, release := th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
+	// For now, we don't care too much about the inode being uninstantiated
+	// early during a test
+	release()
+	return newInode
+}
+
+func (th *TestHelper) inodeIsInstantiated(c *ctx, inodeId InodeId) bool {
+	inode, release := th.qfs.inodeNoInstantiate(&th.qfs.c, inodeId)
+	defer release()
+
+	return inode != nil
 }
 
 func (th *TestHelper) GetRecord(path string) quantumfs.ImmutableDirectoryRecord {
@@ -73,7 +84,10 @@ func (th *TestHelper) GetRecord(path string) quantumfs.ImmutableDirectoryRecord 
 		return inode.parentId_()
 	}()
 
-	parent := th.qfs.inodeNoInstantiate(&th.qfs.c, parentId)
+	parent, release := th.qfs.inodeNoInstantiate(&th.qfs.c, parentId)
+	defer release()
+
+	th.Assert(parent != nil, "Parent not instantiated")
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()

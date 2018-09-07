@@ -18,12 +18,13 @@ import (
 
 func verifyWorkspacelistingInodeStatus(c *ctx, test *testHelper,
 	name string, space string, mustBeInstantiated bool,
-	inodeMap *map[string]InodeId) InodeId {
+	inodeMap *map[string]InodeIdInfo) InodeId {
 
-	id, exists := (*inodeMap)[name]
+	idInfo, exists := (*inodeMap)[name]
 	test.Assert(exists, "Fail to get the inodeId of %s", space)
 
-	inode := test.qfs.inodeNoInstantiate(c, id)
+	inode, release := test.qfs.inodeNoInstantiate(c, idInfo.id)
+	defer release()
 	if mustBeInstantiated {
 		test.Assert(inode != nil,
 			"The %s should be instantiated", space)
@@ -32,14 +33,16 @@ func verifyWorkspacelistingInodeStatus(c *ctx, test *testHelper,
 			"The %s should be uninstantiated", space)
 	}
 
-	return id
+	return idInfo.id
 }
 
 func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
 		c := test.newCtx()
-		tslInode := test.qfs.inodeNoInstantiate(c, quantumfs.InodeIdRoot)
+		tslInode, release := test.qfs.inodeNoInstantiate(c,
+			quantumfs.InodeIdRoot)
+		defer release()
 		tsl := tslInode.(*TypespaceList)
 
 		workspace := test.NewWorkspace()
@@ -69,15 +72,18 @@ func TestWorkspacelistingInstantiateOnDemand(t *testing.T) {
 
 		nslId := verifyWorkspacelistingInodeStatus(c, test, type_,
 			"typespace", true, &tsl.typespacesByName)
-		nslInode := test.qfs.inodeNoInstantiate(c, nslId)
+		nslInode, release := test.qfs.inodeNoInstantiate(c, nslId)
+		defer release()
 		nsl := nslInode.(*NamespaceList)
 
 		wslId := verifyWorkspacelistingInodeStatus(c, test, name_,
 			"namespace", true, &nsl.namespacesByName)
-		wslInode := test.qfs.inodeNoInstantiate(c, wslId)
+		wslInode, release := test.qfs.inodeNoInstantiate(c, wslId)
+		defer release()
 		wsl := wslInode.(*WorkspaceList)
 
-		namesAndIds := make(map[string]InodeId, len(wsl.workspacesByName))
+		namesAndIds := make(map[string]InodeIdInfo,
+			len(wsl.workspacesByName))
 		for name, info := range wsl.workspacesByName {
 			namesAndIds[name] = info.id
 		}

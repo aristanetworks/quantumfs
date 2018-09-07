@@ -100,13 +100,12 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 		fileId := test.getInodeNum(fileName)
 
 		test.ForceForget(fileId)
-		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
-		test.Assert(fileInode == nil,
+		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, fileId),
 			"Failed to forget file inode")
 
 		test.WaitFor("wsr inode to be uninstantiated", func() bool {
 			test.SyncWorkspace(test.RelPath(workspace))
-			return test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId) == nil
+			return !test.inodeIsInstantiated(&test.qfs.c, wsrId)
 		})
 
 		// Verify the mutability is preserved
@@ -236,13 +235,12 @@ func TestLookupCountAfterCommand(t *testing.T) {
 		test.Assert(err == nil, "Failed call the command")
 
 		test.ForceForget(fileId)
-		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
-		test.Assert(fileInode == nil,
+		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, fileId),
 			"Failed to forget file inode")
 
 		test.WaitFor("wsr inode to be uninstantiated", func() bool {
 			test.SyncWorkspace(test.RelPath(workspace))
-			return test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId) == nil
+			return !test.inodeIsInstantiated(&test.qfs.c, wsrId)
 		})
 	})
 }
@@ -281,13 +279,12 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
-		fileInode := test.qfs.inodeNoInstantiate(&test.qfs.c, fileId)
-		test.Assert(fileInode == nil,
+		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, fileId),
 			"Failed to forget directory inode")
 
 		test.WaitFor("wsr inode to be uninstantiated", func() bool {
 			test.SyncWorkspace(test.RelPath(dstWorkspace))
-			return test.qfs.inodeNoInstantiate(&test.qfs.c, wsrId) == nil
+			return !test.inodeIsInstantiated(&test.qfs.c, wsrId)
 		})
 	})
 }
@@ -345,16 +342,13 @@ func TestForgetMarking(t *testing.T) {
 
 		// We need to trigger, ourselves, the kind of Forget sequence where
 		// markings are necessary: parent, childA, then childB
-		parent := test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.Assert(parent != nil,
+		test.Assert(test.inodeIsInstantiated(&test.qfs.c, parentId),
 			"Parent not loaded when expected")
 
-		childA := test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
-		test.Assert(childA != nil,
+		test.Assert(test.inodeIsInstantiated(&test.qfs.c, childIdA),
 			"ChildA not loaded when expected")
 
-		childB := test.qfs.inodeNoInstantiate(&test.qfs.c, childIdB)
-		test.Assert(childB != nil,
+		test.Assert(test.inodeIsInstantiated(&test.qfs.c, childIdB),
 			"ChildB not loaded when expected")
 
 		// Now start Forgetting
@@ -362,8 +356,7 @@ func TestForgetMarking(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// Parent should still be loaded
-		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.Assert(parent != nil,
+		test.Assert(test.inodeIsInstantiated(&test.qfs.c, parentId),
 			"Parent forgotten while children are loaded")
 
 		// Forget one child, not enough to forget the parent
@@ -375,12 +368,11 @@ func TestForgetMarking(t *testing.T) {
 			childIdA)
 		test.WaitForLogString(uninstMsg, "childA uninstantiation")
 
-		parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-		test.Assert(parent != nil,
+		test.Assert(test.inodeIsInstantiated(&test.qfs.c, parentId),
 			"Parent forgotten when only 1/2 children unloaded")
 
-		childA = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
-		test.Assert(childA == nil, "ChildA not forgotten when requested")
+		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, childIdA),
+			"ChildA not forgotten when requested")
 
 		// Now forget the last child, which should unload the parent also
 		test.qfs.Forget(uint64(childIdB), 1)
@@ -390,16 +382,14 @@ func TestForgetMarking(t *testing.T) {
 			childIdB)
 		test.WaitForLogString(uninstMsg, "childB uninstantiation")
 
-		childA = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdA)
-		test.Assert(childA == nil, "ChildA not forgotten when requested")
+		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, childIdA),
+			"ChildA not forgotten when requested")
 
-		childB = test.qfs.inodeNoInstantiate(&test.qfs.c, childIdB)
-		test.Assert(childB == nil, "ChildB not forgotten when requested")
+		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, childIdB),
+			"ChildB not forgotten when requested")
 
 		test.WaitFor("parent uninstantiation", func() bool {
-			parent = test.qfs.inodeNoInstantiate(&test.qfs.c, parentId)
-			test.qfs.c.vlog("parent is nil: %t", parent == nil)
-			return parent == nil
+			return !test.inodeIsInstantiated(&test.qfs.c, parentId)
 		})
 	})
 }
