@@ -116,9 +116,13 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	})
 
 	for _, child := range children {
-		if inode := c.qfs.inodeNoInstantiate(c, child); inode != nil {
-			inode.Sync_DOWN(c)
-		}
+		func() {
+			inode, release := c.qfs.inodeNoInstantiate(c, child)
+			defer release()
+			if inode != nil {
+				inode.Sync_DOWN(c)
+			}
+		}()
 	}
 
 	dir.flush(c)
@@ -230,25 +234,36 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 }
 
 // The caller must hold the childRecordLock
-func (dir *Directory) normalizeHardlinks_DOWN_(c *ctx,
+// Normalize an inode that's a local hardlink, but remote regular file.
+// Link-ify an inode that's a local regular file, but remote hardlink.
+func (dir *Directory) convertHardlinks_DOWN_(c *ctx,
 	rc *RefreshContext, localRecord quantumfs.ImmutableDirectoryRecord,
 	remoteRecord quantumfs.DirectoryRecord) quantumfs.DirectoryRecord {
 
-	defer c.funcIn("Directory::normalizeHardlinks_DOWN_").Out()
+	defer c.funcIn("Directory::convertHardlinks_DOWN_").Out()
 	inodeId := dir.children.inodeNum(localRecord.Filename())
-	inode := c.qfs.inodeNoInstantiate(c, inodeId.id)
 
 	if localRecord.Type() == quantumfs.ObjectTypeHardlink {
-		if inode != nil {
-			inode.setParent(c, dir)
-		}
+		func() {
+			inode, release := c.qfs.inodeNoInstantiate(c, inodeId.id)
+			defer release()
+
+			if inode != nil {
+				inode.setParent(c, dir)
+			}
+		}()
 		return remoteRecord
 	}
+
+	// Convert a regular file into a hardlink
 	utils.Assert(remoteRecord.Type() == quantumfs.ObjectTypeHardlink,
-		"either local or remote should be hardlinks to be normalized")
+		"either local or remote should be hardlinks to be converted")
 
 	fileId := remoteRecord.FileId()
 	dir.hardlinkTable.updateHardlinkInodeId(c, fileId, inodeId)
+
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeId.id)
+	defer release()
 	if inode != nil {
 		func() {
 			defer inode.getParentLock().Lock().Unlock()
@@ -330,14 +345,20 @@ func (dir *Directory) refreshChild_DOWN_(c *ctx, rc *RefreshContext,
 		underlyingTypeOf(dir.hardlinkTable, remoteRecord))
 
 	if !localRecord.Type().Matches(remoteRecord.Type()) {
-		remoteRecord = dir.normalizeHardlinks_DOWN_(c, rc, localRecord,
+		remoteRecord = dir.convertHardlinks_DOWN_(c, rc, localRecord,
 			remoteRecord)
 	}
 	dir.children.setRecord(c, childId, remoteRecord)
 	dir.children.makePublishable(c, remoteRecord.Filename())
-	if inode := c.qfs.inodeNoInstantiate(c, childId.id); inode != nil {
-		reload(c, dir.hardlinkTable, rc, inode, remoteRecord)
-	}
+
+	func() {
+		inode, release := c.qfs.inodeNoInstantiate(c, childId.id)
+		defer release()
+		if inode != nil {
+			reload(c, dir.hardlinkTable, rc, inode, remoteRecord)
+		}
+	}()
+
 	c.qfs.invalidateInode(c, childId.id)
 }
 
@@ -345,7 +366,10 @@ func updateMapDescend_DOWN(c *ctx, rc *RefreshContext,
 	inodeId InodeId, remoteRecord quantumfs.ImmutableDirectoryRecord) {
 
 	defer c.funcIn("updateMapDescend_DOWN").Out()
-	if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
+	defer release()
+
+	if inode != nil {
 		subdir := inode.(*Directory)
 		var id *quantumfs.ObjectKey
 		if remoteRecord != nil && remoteRecord.Type() ==
@@ -505,22 +529,47 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 func (dir *Directory) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	newName string) (result fuse.Status) {
 
-	defer c.FuncIn("Directory::MvChild_DOWN", "%s -> %s", oldName, newName).Out()
+	defer c.FuncIn("Directory::MvChild", "%s -> %s", oldName, newName).Out()
 
-	// check write permission for both directories
-	err := hasDirectoryWritePerm(c, dstInode)
-	if err != fuse.OK {
-		return err
+	fileType, overwritten, result := dir.mvChild_DOWN(c, dstInode, oldName,
+		newName)
+	if result == fuse.OK {
+		dst := asDirectory(dstInode)
+		if overwritten != nil {
+			dst.self.markAccessed(c, overwritten.Filename(),
+				markType(overwritten.Type(),
+					quantumfs.PathDeleted))
+		}
+
+		// This is the same entry just moved, so we can use the same
+		// record for both the old and new paths.
+		dir.self.markAccessed(c, oldName,
+			markType(fileType, quantumfs.PathDeleted))
+		dst.self.markAccessed(c, newName,
+			markType(fileType, quantumfs.PathCreated))
 	}
 
-	err = func() fuse.Status {
+	return result
+}
+
+func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
+	newName string) (fileType quantumfs.ObjectType,
+	overwritten quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
+
+	// check write permission for both directories
+	result = hasDirectoryWritePerm(c, dstInode)
+	if result != fuse.OK {
+		return
+	}
+
+	result = func() fuse.Status {
 		defer dir.childRecordLock.Lock().Unlock()
 
 		record := dir.children.recordByName(c, oldName)
 		return hasDirectoryWritePermSticky(c, dir, record.Owner())
 	}()
-	if err != fuse.OK {
-		return err
+	if result != fuse.OK {
+		return
 	}
 
 	dst := asDirectory(dstInode)
@@ -530,10 +579,12 @@ func (dir *Directory) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 		dst.updateSize(c, result)
 	}()
 	childInodeId := dir.childInodeNum(oldName)
-	childInode := c.qfs.inodeNoInstantiate(c, childInodeId.id)
+	childInode, release := c.qfs.inode(c, childInodeId.id)
+	defer release()
 
 	overwrittenInodeId := dst.childInodeNum(newName).id
-	overwrittenInode := c.qfs.inodeNoInstantiate(c, overwrittenInodeId)
+	overwrittenInode, release := c.qfs.inode(c, overwrittenInodeId)
+	defer release()
 
 	c.vlog("Aquiring locks")
 	if childInode != nil && overwrittenInode != nil {
@@ -621,7 +672,7 @@ func (dir *Directory) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	c.vlog("Adding to destination directory")
 	func() {
 		defer dst.childRecordLock.Lock().Unlock()
-		dst.orphanChild_(c, newName, overwrittenInode)
+		overwritten = dst.orphanChild_(c, newName, overwrittenInode)
 		dst.children.setRecord(c, childInodeId, newEntry)
 
 		// Being inserted means you need to be synced to be publishable. If
@@ -640,12 +691,7 @@ func (dir *Directory) MvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 		dst.self.dirty(c)
 	}()
 
-	// This is the same entry just moved, so we can use the same
-	// record for both the old and new paths.
-	dir.self.markAccessed(c, oldName,
-		markType(newEntry.Type(), quantumfs.PathDeleted))
-	dst.self.markAccessed(c, newName,
-		markType(newEntry.Type(), quantumfs.PathCreated))
+	fileType = newEntry.Type()
 
 	// Set entry in new directory. If the renamed inode is
 	// uninstantiated, we swizzle the parent here. If it's a hardlink, it's

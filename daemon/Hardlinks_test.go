@@ -862,6 +862,19 @@ func TestRenameOverridesLastHardlinkLeg(t *testing.T) {
 	})
 }
 
+func checkParentOfInstantiated(test *testHelper, wsrPath string, dirPath string,
+	filename string) {
+
+	ioutil.ReadDir(wsrPath + "/" + dirPath)
+	link := test.getInode(wsrPath + "/" + dirPath + "/" + filename)
+	defer link.getParentLock().Lock().Unlock()
+	parent, release := link.parent_(&test.qfs.c)
+	defer release()
+
+	test.Assert(parent.isWorkspaceRoot(),
+		"Hardlink parent isn't workspace root")
+}
+
 func checkParentOfUninstantiated(test *testHelper, wsrPath string, dirPath string,
 	filename string) {
 
@@ -910,7 +923,8 @@ func TestHardlinkParentMoved(t *testing.T) {
 		absBranch := test.AbsPath("test/test/test")
 		test.AssertNoErr(os.Rename(absBranch+"/dir/link", absBranch+
 			"/dirB/linkB"))
-		checkParentOfUninstantiated(test, absBranch, "dirB", "linkB")
+
+		checkParentOfInstantiated(test, absBranch, "dirB", "linkB")
 	})
 }
 

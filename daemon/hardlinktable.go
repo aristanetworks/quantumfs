@@ -63,7 +63,8 @@ type HardlinkTable interface {
 	makePublishable(c *ctx, fileId quantumfs.FileId)
 	setID(c *ctx, fileId quantumfs.FileId, key quantumfs.ObjectKey)
 	checkHardlink(inodeId InodeId) (bool, quantumfs.FileId)
-	instantiateHardlink(c *ctx, inodeNum InodeId) Inode
+	// Must be called with the instantiationLock
+	instantiateHardlink_(c *ctx, inodeNum InodeId) Inode
 	markHardlinkPath(c *ctx, path string, fileId quantumfs.FileId)
 	findHardlinkInodeId(c *ctx, fileId quantumfs.FileId) InodeIdInfo
 	hardlinkDec(fileId quantumfs.FileId) (effective quantumfs.DirectoryRecord)
@@ -240,8 +241,9 @@ func (ht *HardlinkTableImpl) newHardlink(c *ctx, inodeId InodeIdInfo,
 		quantumfs.NewTime(time.Now()), ht)
 }
 
-func (ht *HardlinkTableImpl) instantiateHardlink(c *ctx, inodeId InodeId) Inode {
-	defer c.FuncIn("HardlinkTableImpl::instantiateHardlink",
+// Must be called with the instantiationLock held
+func (ht *HardlinkTableImpl) instantiateHardlink_(c *ctx, inodeId InodeId) Inode {
+	defer c.FuncIn("HardlinkTableImpl::instantiateHardlink_",
 		"inode %d", inodeId).Out()
 
 	hardlinkRecord := func() quantumfs.DirectoryRecord {
@@ -258,11 +260,15 @@ func (ht *HardlinkTableImpl) instantiateHardlink(c *ctx, inodeId InodeId) Inode 
 	if hardlinkRecord == nil {
 		return nil
 	}
-	if inode := c.qfs.inodeNoInstantiate(c, inodeId); inode != nil {
+	inode, release := c.qfs.inodeNoInstantiate(c, inodeId)
+	// release immediately. We can't hold the mapMutex while we instantiate,
+	// but it's okay since the instantiationLock should be held already.
+	release()
+	if inode != nil {
 		c.vlog("Someone has already instantiated inode %d", inodeId)
 		return inode
 	}
-	inode := ht.getWorkspaceRoot().Directory.recordToChild(c,
+	inode = ht.getWorkspaceRoot().Directory.recordToChild(c,
 		inodeId, hardlinkRecord)
 	return inode
 }

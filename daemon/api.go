@@ -279,8 +279,9 @@ func (api *ApiInode) removeChildXAttr(c *ctx, inodeNum InodeId,
 	return fuse.ENODATA
 }
 
-func (api *ApiInode) instantiateChild(c *ctx, inodeNum InodeId) Inode {
-	c.elog("Invalid instantiateChild on ApiInode")
+// Must be called with the instantiation lock
+func (api *ApiInode) instantiateChild_(c *ctx, inodeNum InodeId) Inode {
+	c.elog("Invalid instantiateChild_ on ApiInode")
 	return nil
 }
 
@@ -962,6 +963,8 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		parent.duplicateInode_(c, target, permissions, 0, 0, size,
 			quantumfs.UID(uid), quantumfs.GID(gid), type_, key)
 	}()
+
+	parent.self.markAccessed(c, target, markType(type_, quantumfs.PathCreated))
 
 	parent.updateSize(c, fuse.OK)
 	return api.queueErrorResponse(quantumfs.ErrorOK, "Insert Inode Succeeded")
