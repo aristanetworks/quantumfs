@@ -270,6 +270,15 @@ func main() {
 				})
 		} else if patternFile != "" {
 			filterLogOut(inFile, patternFile, true, tabSpaces)
+		} else if tabSpaces == 0 {
+			// If no tabbing is requested, we can output with less
+			// memory usage and skip formatting
+			reader := qlog.NewReader(inFile)
+
+			reader.ProcessLogs(qlog.ReadOnly,
+				func(log *qlog.LogOutput) {
+					fmt.Fprintf(outFh, log.String())
+				})
 		} else {
 			err := qlog.ParseLogsExt(inFile, tabSpaces, maxThreads,
 				(outFile != ""),
