@@ -134,6 +134,7 @@ type QuantumFs struct {
 	inodes         map[InodeId]Inode
 	inodeRefcounts map[InodeId]int32
 
+	// Must only be manipulated via setFileHandle_
 	fileHandles sync.Map // map[FileHandleId]FileHandle
 
 	flusher *Flusher
@@ -1136,13 +1137,24 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHand
 func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 	fileHandle FileHandle) {
 
+	fh, _ := qfs.fileHandles.Load(id)
+
 	if fileHandle != nil {
+		if fh == nil {
+			// If we're setting a new handle, add a ref count
+			addInodeRef_(c, fileHandle.file.inodeNum())
+		}
+
 		qfs.fileHandles.Store(id, fileHandle)
 	} else {
 		// clean up any remaining response queue size from the apiFileSize
-		fh, _ := qfs.fileHandles.Load(id)
 		if api, ok := fh.(*ApiHandle); ok {
 			api.drainResponseData(c)
+		}
+
+		// Release the refcount as we clear
+		if fh != nil {
+			go fh.file.delRef(c)
 		}
 
 		qfs.fileHandles.Delete(id)
