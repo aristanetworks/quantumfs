@@ -295,7 +295,7 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 	defer c.funcIn("TypespaceList::OpenDir").Out()
 
 	ds := newDirectorySnapshot(c, tsl)
-	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
+	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds, tsl)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 
@@ -630,7 +630,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	defer c.funcIn("NamespaceList::OpenDir").Out()
 
 	ds := newDirectorySnapshot(c, nsl)
-	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
+	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds, nsl)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 
@@ -967,7 +967,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	defer c.funcIn("WorkspaceList::OpenDir").Out()
 
 	ds := newDirectorySnapshot(c, wsl)
-	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
+	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds, wsl)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
 

@@ -110,6 +110,11 @@ type MetaInodeDeletionRecord struct {
 	name     string
 }
 
+type fileHandleReferenced struct {
+	fh	FileHandle
+	source	Inode
+}
+
 type QuantumFs struct {
 	fuse.RawFileSystem
 	server        *fuse.Server
@@ -135,7 +140,7 @@ type QuantumFs struct {
 	inodeRefcounts map[InodeId]int32
 
 	// Must only be manipulated via setFileHandle_
-	fileHandles sync.Map // map[FileHandleId]FileHandle
+	fileHandles sync.Map // map[FileHandleId]fileHandleReferenced
 
 	flusher *Flusher
 
@@ -212,7 +217,7 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	}
 
 	go qfs.adjustKernelKnobs()
-	go batchProcessor(qfs.toBeReleased, qfs.fileHandleReleaser)
+	go batchProcessor(&qfs.c, qfs.toBeReleased, qfs.fileHandleReleaser)
 	go qfs.fuseNotifier()
 	go qfs.waitForSignals()
 
@@ -228,11 +233,15 @@ func (qfs *QuantumFs) fileHandleReleaser(ids []uint64) {
 	defer qfs.c.statsFuncIn(ReleaseFileHandleLog).Out()
 	defer qfs.mapMutex.Lock().Unlock()
 	for _, id := range ids {
-		qfs.setFileHandle_(&qfs.c, FileHandleId(id), nil)
+		qfs.setFileHandle_(&qfs.c, FileHandleId(id), nil, nil)
 	}
 }
 
-func batchProcessor(inputChan <-chan uint64, handleBatch func(ids []uint64)) {
+func batchProcessor(c *ctx, inputChan <-chan uint64,
+	handleBatch func(ids []uint64)) {
+
+	defer logRequestPanic(c)
+
 	const maxPerCycle = 1000
 	i := 0
 	ids := make([]uint64, 0, maxPerCycle)
@@ -1123,38 +1132,51 @@ func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 		return nil
 	}
 
-	return fileHandle.(FileHandle)
+	return fileHandle.(fileHandleReferenced).fh
 }
 
 // Set a file handle in a thread safe way, set to nil to delete
-func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
-	defer c.funcIn("Mux::setFileHandle").Out()
+func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle,
+	source Inode) {
 
-	qfs.setFileHandle_(c, id, fileHandle)
+	defer c.funcIn("Mux::setFileHandle").Out()
+	defer qfs.mapMutex.Lock().Unlock()
+
+	qfs.setFileHandle_(c, id, fileHandle, source)
 }
 
 // Must hold mapMutex exclusively
 func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
-	fileHandle FileHandle) {
+	fileHandle FileHandle, source Inode) {
 
-	fh, _ := qfs.fileHandles.Load(id)
+	var handle fileHandleReferenced
+	exists := false
+	lastHandle, exists := qfs.fileHandles.Load(id)
+	if lastHandle != nil {
+		handle = lastHandle.(fileHandleReferenced)
+	}
 
 	if fileHandle != nil {
-		if fh == nil {
+		utils.Assert(source != nil, "Setting a fh with nil inode")
+		if !exists {
 			// If we're setting a new handle, add a ref count
-			addInodeRef_(c, fileHandle.file.inodeNum())
+			addInodeRef_(c, source.inodeNum())
 		}
 
-		qfs.fileHandles.Store(id, fileHandle)
+		qfs.fileHandles.Store(id,
+			fileHandleReferenced {
+				fh:	fileHandle,
+				source:	source,
+		})
 	} else {
-		// clean up any remaining response queue size from the apiFileSize
-		if api, ok := fh.(*ApiHandle); ok {
-			api.drainResponseData(c)
-		}
+		if exists {
+			// clean remaining response queue size from the apiFileSize
+			if api, ok := handle.fh.(*ApiHandle); ok {
+				api.drainResponseData(c)
+			}
 
-		// Release the refcount as we clear
-		if fh != nil {
-			go fh.file.delRef(c)
+			// Release the refcount as we clear
+			go handle.source.delRef(c)
 		}
 
 		qfs.fileHandles.Delete(id)

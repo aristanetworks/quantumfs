@@ -153,7 +153,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 
 	out.OpenFlags = 0
 	handle := newApiHandle(c, api.treeState())
-	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
+	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle, api)
 
 	c.vlog(OpenedInodeDebug, api.id, handle.id)
 

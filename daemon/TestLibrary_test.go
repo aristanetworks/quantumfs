@@ -239,7 +239,8 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 	defer th.qfs.mapMutex.Lock().Unlock()
 
 	th.qfs.fileHandles.Range(func(k interface{}, file interface{}) bool {
-		fh, ok := file.(*FileDescriptor)
+		fhRef, ok := file.(fileHandleReferenced)
+		fh, ok := fhRef.fh.(*FileDescriptor)
 		if !ok {
 			return true
 		}

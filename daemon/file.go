@@ -130,7 +130,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeState())
-	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
+	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor, fi)
 
 	c.vlog(OpenedInodeDebug, fi.inodeNum(), fileHandleNum)
 

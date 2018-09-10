@@ -128,7 +128,7 @@ func (lm *LowMemFile) Open(c *ctx, flags uint32, mode uint32,
 
 	out.OpenFlags = 0
 	handle := newLowMemFileHandle(c, lm.treeState())
-	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
+	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle, lm)
 	out.Fh = uint64(handle.FileHandleCommon.id)
 	return fuse.OK
 }

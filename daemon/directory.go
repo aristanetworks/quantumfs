@@ -609,7 +609,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 	}
 
 	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource))
-	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
+	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds, dir)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	c.vlog(OpenedInodeDebug, dir.inodeNum(), ds.FileHandleCommon.id)
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
@@ -805,7 +805,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	fileHandleNum := c.qfs.newFileHandleId()
 	fileDescriptor := newFileDescriptor(file.(*File), file.inodeNum(),
 		fileHandleNum, file.treeState())
-	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
+	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor, dir)
 
 	c.vlog("New file inode %d, Fh %d", file.inodeNum(), fileHandleNum)
 
