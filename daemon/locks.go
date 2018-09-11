@@ -15,6 +15,7 @@ type locker int
 // These enums are specifically in the locking order, leafs first
 const (
 	lockerMapMutexLock locker = iota
+	lockerLookupCountLock
 	lockerFlusherLock
 	lockerLinkLock
 	lockerChildRecordLock
@@ -179,6 +180,18 @@ func (m *orderedRwMutex) Unlock(c *ctx, inode InodeId, kind locker) {
 	c.lockOrder.Pop(c, inode, kind)
 }
 
+type orderedMutex struct {
+	mutex orderedRwMutex
+}
+
+func (m *orderedMutex) Lock(c *ctx) utils.NeedWriteUnlock {
+	return m.mutex.Lock(c, quantumfs.InodeIdInvalid, lockerMapMutexLock)
+}
+
+func (m *orderedMutex) Unlock(c *ctx) {
+	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerMapMutexLock)
+}
+
 // Lock types
 type orderedMapMutex struct {
 	mutex	orderedRwMutex
@@ -194,4 +207,8 @@ func (m *orderedMapMutex) Lock(c *ctx) utils.NeedWriteUnlock {
 
 func (m *orderedMapMutex) Unlock(c *ctx) {
 	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerMapMutexLock)
+}
+
+type orderedLookupCount struct {
+	orderedMutex
 }

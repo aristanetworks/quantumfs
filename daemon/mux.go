@@ -164,7 +164,7 @@ type QuantumFs struct {
 	// be instantiated. Some inode numbers will have an entry with a zero value.
 	// These are instantiated inodes waiting to be uninstantiated. Inode numbers
 	// with positive values are still referenced by the kernel.
-	lookupCountLock utils.DeferableMutex
+	lookupCountLock orderedLookupCount
 	lookupCounts    map[InodeId]uint64
 
 	// The workspaceMutability defines whether all inodes in each of the local
@@ -357,7 +357,7 @@ func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 func (qfs *QuantumFs) verifyNoLeaks(c *ctx) {
 	defer c.funcIn("QuantumFs::verifyNoLeaks").Out()
 	defer qfs.instantiationLock.Lock().Unlock()
-	defer qfs.lookupCountLock.Lock().Unlock()
+	defer qfs.lookupCountLock.Lock(c).Unlock()
 	defer qfs.mapMutex.Lock(c).Unlock()
 
 	for id, parent := range qfs.parentOfUninstantiated {
@@ -847,7 +847,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 		//
 		// See QuantumFs.inode_()
 		if instantiated {
-			defer qfs.lookupCountLock.Lock().Unlock()
+			defer qfs.lookupCountLock.Lock(c).Unlock()
 			if _, exists := qfs.lookupCounts[id]; !exists {
 				c.vlog("Removing speculative lookup reference")
 				inode.delRef(c)
@@ -1015,7 +1015,7 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 // returned.
 func (qfs *QuantumFs) incrementLookupCount(c *ctx, inodeId InodeId) {
 	defer c.FuncIn("Mux::incrementLookupCount", "inode %d", inodeId).Out()
-	defer qfs.lookupCountLock.Lock().Unlock()
+	defer qfs.lookupCountLock.Lock(c).Unlock()
 	qfs.incrementLookupCount_(c, inodeId)
 }
 
@@ -1023,7 +1023,7 @@ func (qfs *QuantumFs) incrementLookupCount(c *ctx, inodeId InodeId) {
 func (qfs *QuantumFs) incrementLookupCounts(c *ctx, children []directoryContents) {
 	defer c.FuncIn("Mux::incrementLookupCounts", "%d inodes",
 		len(children)).Out()
-	defer qfs.lookupCountLock.Lock().Unlock()
+	defer qfs.lookupCountLock.Lock(c).Unlock()
 	for _, child := range children {
 		if child.filename == "." || child.filename == ".." {
 			continue
@@ -1058,8 +1058,8 @@ func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 	}
 }
 
-func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
-	defer qfs.lookupCountLock.Lock().Unlock()
+func (qfs *QuantumFs) lookupCount(c *ctx, inodeId InodeId) (uint64, bool) {
+	defer qfs.lookupCountLock.Lock(c).Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
 		return 0, false
@@ -1081,7 +1081,7 @@ func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 
 	forgotten := false
 
-	defer qfs.lookupCountLock.Lock().Unlock()
+	defer qfs.lookupCountLock.Lock(c).Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
 		c.vlog("inode %d has not been instantiated", inodeId)
