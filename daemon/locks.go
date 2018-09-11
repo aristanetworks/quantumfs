@@ -130,7 +130,7 @@ func (order *lockOrder) alertInversion(c *ctx, inode InodeId, kind locker) {
 func (order *lockOrder) printStack(c *ctx) {
 	stackStr := ""
 	for _, info := range order.stack {
-		stackStr = fmt.Sprintf("Lock %d Inode %d", int64(info.inode),
+		stackStr = fmt.Sprintf("Lock %d Inode %d\n", int64(info.inode),
 			int64(info.kind)) + stackStr
 	}
 
