@@ -56,13 +56,27 @@ func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
 
 func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
 	c.Assert(len(order.stack) > 0, "Empty stack got a pop")
-	lastLock := order.stack[len(order.stack)-1]
-	c.Assert(lastLock.inode == inode, "Inode mismatch during pop %d %d",
-		lastLock.inode, inode)
-	c.Assert(lastLock.kind == kind, "Lock type mismatch during pop %d %d",
-		lastLock.kind, kind)
 
-	order.stack = order.stack[:len(order.stack)-1]
+	// Popping has an odd mechanism in that we don't necessarily unlock in the
+	// same order that we locked. We can't assume we're popping the last element,
+	// have to find it instead and remove it
+	removeIdx := -1
+	for i := len(order.stack)-1; i >= 0; i-- {
+		entry := order.stack[i]
+		if entry.inode == inode && entry.kind == kind {
+			removeIdx = i
+			break
+		}
+	}
+
+	if removeIdx == -1 {
+		c.elog("Unable to find lock we're popping, %d %d",
+			int64(inode), int64(kind))
+		order.printStack(c)
+		return
+	}
+
+	order.stack = append(order.stack[:removeIdx], order.stack[removeIdx+1:]...)
 }
 
 func isInodeLock(kind locker) bool {
@@ -111,10 +125,14 @@ func (order *lockOrder) checkInodeOrder(c *ctx, inode InodeId, kind locker) {
 
 func (order *lockOrder) alertInversion(c *ctx, inode InodeId, kind locker) {
 	c.elog("Lock inversion detected. New Lock %d Inode %d", kind, int64(inode))
+	order.printStack(c)
+}
+
+func (order *lockOrder) printStack(c *ctx) {
 	stackStr := ""
 	for _, info := range order.stack {
-		stackStr = fmt.Sprintf("Lock %d Inode %d", info.kind,
-			int64(info.inode)) + stackStr
+		stackStr = fmt.Sprintf("Lock %d Inode %d", int64(info.inode),
+			int64(info.kind)) + stackStr
 	}
 
 	c.elog("Stack: %s", stackStr)
@@ -184,12 +202,14 @@ type orderedMutex struct {
 	mutex orderedRwMutex
 }
 
-func (m *orderedMutex) Lock(c *ctx) utils.NeedWriteUnlock {
-	return m.mutex.Lock(c, quantumfs.InodeIdInvalid, lockerMapMutexLock)
+func (m *orderedMutex) Lock(c *ctx, inode InodeId,
+	kind locker) utils.NeedWriteUnlock {
+
+	return m.mutex.Lock(c, inode, kind)
 }
 
-func (m *orderedMutex) Unlock(c *ctx) {
-	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerMapMutexLock)
+func (m *orderedMutex) Unlock(c *ctx, inode InodeId, kind locker) {
+	m.mutex.Unlock(c, inode, kind)
 }
 
 // Lock types
@@ -210,5 +230,13 @@ func (m *orderedMapMutex) Unlock(c *ctx) {
 }
 
 type orderedLookupCount struct {
-	orderedMutex
+	mutex	orderedMutex
+}
+
+func (m *orderedLookupCount) Lock(c *ctx) utils.NeedWriteUnlock {
+	return m.mutex.Lock(c, quantumfs.InodeIdInvalid, lockerLookupCountLock)
+}
+
+func (m *orderedLookupCount) Unlock(c *ctx) {
+	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerLookupCountLock)
 }
