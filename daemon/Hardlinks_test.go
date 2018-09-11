@@ -868,7 +868,7 @@ func checkParentOfInstantiated(test *testHelper, wsrPath string, dirPath string,
 	ioutil.ReadDir(wsrPath + "/" + dirPath)
 	link := test.getInode(wsrPath + "/" + dirPath + "/" + filename)
 	defer link.getParentLock().Lock().Unlock()
-	parent, release := link.parent_(&test.qfs.c)
+	parent, release := link.parent_(test.qfs.c.NewThread())
 	defer release()
 
 	test.Assert(parent.isWorkspaceRoot(),
@@ -882,7 +882,7 @@ func checkParentOfUninstantiated(test *testHelper, wsrPath string, dirPath strin
 	link := test.getInodeNum(wsrPath + "/" + dirPath + "/" + filename)
 	wsr := test.getInodeNum(wsrPath)
 
-	defer test.qfs.mapMutex.RLock(&test.qfs.c).RUnlock()
+	defer test.qfs.mapMutex.RLock(test.qfs.c.NewThread()).RUnlock()
 	test.Assert(test.qfs.parentOfUninstantiated[link] == wsr,
 		"Hardlink parent isn't workspace root")
 }
@@ -996,7 +996,7 @@ func TestNormalizationRace(t *testing.T) {
 		test.AssertNoErr(os.Remove(dir + "/linkC"))
 
 		// Ensure it gets normalized
-		parentDir.normalizeChildren(&test.qfs.c)
+		parentDir.normalizeChildren(test.qfs.c.NewThread())
 
 		// Before that propagates, link it again
 		test.AssertNoErr(syscall.Link(dir+"/linkA", workspace+"/linkA2"))
@@ -1006,12 +1006,12 @@ func TestNormalizationRace(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		go func() {
-			defer logRequestPanic(&test.qfs.c)
+			defer logRequestPanic(test.qfs.c.NewThread())
 			test.AssertNoErr(os.Remove(workspace + "/linkA2"))
 		}()
 
 		go func() {
-			defer logRequestPanic(&test.qfs.c)
+			defer logRequestPanic(test.qfs.c.NewThread())
 			test.AssertNoErr(os.Remove(dir + "/linkA"))
 		}()
 	})

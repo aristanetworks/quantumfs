@@ -71,7 +71,7 @@ func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
 
 	if removeIdx == -1 {
 		c.elog("Unable to find lock we're popping, %d %d",
-			int64(inode), int64(kind))
+			int64(kind), int64(inode))
 		order.printStack(c)
 		return
 	}
@@ -124,15 +124,16 @@ func (order *lockOrder) checkInodeOrder(c *ctx, inode InodeId, kind locker) {
 }
 
 func (order *lockOrder) alertInversion(c *ctx, inode InodeId, kind locker) {
-	c.elog("Lock inversion detected. New Lock %d Inode %d", kind, int64(inode))
+	c.elog("Lock inversion detected. New Lock %d Inode %d", int64(kind),
+		int64(inode))
 	order.printStack(c)
 }
 
 func (order *lockOrder) printStack(c *ctx) {
 	stackStr := ""
 	for _, info := range order.stack {
-		stackStr = fmt.Sprintf("Lock %d Inode %d\n", int64(info.inode),
-			int64(info.kind)) + stackStr
+		stackStr += fmt.Sprintf("Lock %d Inode %d\n", int64(info.kind),
+			int64(info.inode))
 	}
 
 	c.elog("Stack: %s", stackStr)
@@ -171,6 +172,7 @@ func (m *orderedRwMutex) RLock(c *ctx, inode InodeId,
 	return &orderedRwMutexUnlocker {
 		mutex:	&m.mutex,
 		inode:	inode,
+		kind:	kind,
 		c:	c,
 	}
 }
@@ -184,6 +186,7 @@ func (m *orderedRwMutex) Lock(c *ctx, inode InodeId,
 	return &orderedRwMutexUnlocker {
 		mutex:	&m.mutex,
 		inode:	inode,
+		kind:	kind,
 		c:	c,
 	}
 }
