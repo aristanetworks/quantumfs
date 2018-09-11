@@ -149,7 +149,7 @@ func TestWorkspaceDeletionManualForget(t *testing.T) {
 
 		c := test.qfs.c.NewThread()
 		workspaceInodeId := test.getInodeNum(test.AbsPath(workspaceName))
-		err = test.qfs.c.workspaceDB.DeleteWorkspace(c.Ctx,
+		err = test.qfs.c.workspaceDB.DeleteWorkspace(&c.Ctx,
 			"testA", "testB", "testC")
 		test.AssertNoErr(err)
 
@@ -190,7 +190,7 @@ func TestRemoteNamespaceDeletion(t *testing.T) {
 
 		// Now simulate the namespace being remotely removed
 		c := test.qfs.c.NewThread()
-		err = test.qfs.c.workspaceDB.DeleteWorkspace(c.Ctx,
+		err = test.qfs.c.workspaceDB.DeleteWorkspace(&c.Ctx,
 			"testA", "testB", "testC")
 		test.AssertNoErr(err)
 
