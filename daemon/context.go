@@ -24,6 +24,16 @@ type ctx struct {
 	workspaceDB quantumfs.WorkspaceDB
 	dataStore   *dataStore
 	fuseCtx     *fuse.Context
+	lockOrder   lockOrder
+}
+
+func (c *ctx) NewThread() *ctx {
+	// Copy everything, but provide a separate lock order stack
+	var rtn ctx
+	rtn = *c
+	rtn.lockOrder = lockOrder{}
+
+	return &rtn
 }
 
 func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {

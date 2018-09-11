@@ -344,7 +344,7 @@ func (ht *HardlinkTableImpl) updateHardlinkInodeId(c *ctx, fileId quantumfs.File
 		// inodeId is invalid, so this is a request for a new / existing id
 		return hardlink.inodeId
 	} else if inodeId.id == quantumfs.InodeIdInvalid {
-		inodeId = c.qfs.newInodeId()
+		inodeId = c.qfs.newInodeId(c)
 		c.vlog("Allocated new inode %d for hardlink", inodeId.id)
 	}
 

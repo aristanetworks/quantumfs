@@ -122,7 +122,7 @@ func (container *ChildContainer) loadChild(c *ctx,
 			container.dir.hardlinkTable)
 		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	} else {
-		inodeId = c.qfs.newInodeId()
+		inodeId = c.qfs.newInodeId(c)
 	}
 
 	addToMap(container.publishable, inodeId.id, record)

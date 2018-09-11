@@ -155,19 +155,19 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// we need to lock to do this without racing
-		test.qfs.mapMutex.Lock()
+		test.qfs.mapMutex.Lock(&test.qfs.c)
 		numUninstantiatedOld := len(test.qfs.parentOfUninstantiated)
-		test.qfs.mapMutex.Unlock()
+		test.qfs.mapMutex.Unlock(&test.qfs.c)
 
 		// Forgetting should now forget the Directory and thus remove all the
 		// uninstantiated children from the parentOfUninstantiated list.
 		test.ForceForget(quantumfs.InodeIdInvalid)
 
-		test.qfs.mapMutex.Lock()
+		test.qfs.mapMutex.Lock(&test.qfs.c)
 		//BUG: Between remountFilesystem and here, the kernel can and does
 		// lookup these files, thereby populating the map we're checking!
 		numUninstantiatedNew := len(test.qfs.parentOfUninstantiated)
-		test.qfs.mapMutex.Unlock()
+		test.qfs.mapMutex.Unlock(&test.qfs.c)
 
 		test.Assert(numUninstantiatedOld > numUninstantiatedNew,
 			"No uninstantiated inodes were removed %d <= %d",

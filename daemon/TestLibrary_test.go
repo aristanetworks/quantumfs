@@ -236,7 +236,7 @@ type testHelper struct {
 func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
 	handles := make([]*FileDescriptor, 0)
 
-	defer th.qfs.mapMutex.Lock().Unlock()
+	defer th.qfs.mapMutex.Lock(&th.qfs.c).Unlock()
 
 	th.qfs.fileHandles.Range(func(k interface{}, file interface{}) bool {
 		fh, ok := file.(*FileDescriptor)

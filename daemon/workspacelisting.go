@@ -205,7 +205,7 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeIdInfo,
 	// First add any new entries
 	for _, name := range names {
 		if _, exists := (*inodeMap)[name]; !exists {
-			inodeId := c.qfs.newInodeId()
+			inodeId := c.qfs.newInodeId(c)
 			c.vlog("Adding new child %s inodeId %d generation %d", name,
 				inodeId.id, inodeId.generation)
 			(*inodeMap)[name] = inodeId
@@ -1012,7 +1012,7 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 	for name, nonce := range names {
 		if _, exists := wsl.workspacesByName[name]; !exists {
 			c.vlog("Adding new child %s (%s)", name, nonce.String())
-			inodeId := c.qfs.newInodeId()
+			inodeId := c.qfs.newInodeId(c)
 			wsl.workspacesByName[name] = workspaceInfo{
 				id:    inodeId,
 				nonce: nonce,

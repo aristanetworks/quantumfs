@@ -720,7 +720,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	GID := quantumfs.ObjectGid(gid, gid)
 	entry := createNewEntry(c, name, mode, umask, rdev,
 		0, UID, GID, type_, key)
-	inodeNum := c.qfs.newInodeId()
+	inodeNum := c.qfs.newInodeId(c)
 	newEntity := constructor(c, name, key, 0, inodeNum.id, dir.self,
 		mode, rdev, entry)
 
@@ -731,7 +731,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	c.qfs.setInode(c, inodeNum.id, newEntity)
 	func() {
-		defer c.qfs.mapMutex.Lock().Unlock()
+		defer c.qfs.mapMutex.Lock(c).Unlock()
 		addInodeRef_(c, inodeNum.id)
 	}()
 	c.qfs.incrementLookupCount(c, inodeNum.id)

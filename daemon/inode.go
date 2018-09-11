@@ -852,7 +852,7 @@ func addInodeRef_(c *ctx, inodeId InodeId) {
 }
 
 func (inode *InodeCommon) addRef(c *ctx) {
-	defer c.qfs.mapMutex.Lock().Unlock()
+	defer c.qfs.mapMutex.Lock(c).Unlock()
 
 	inode.addRef_(c)
 }
@@ -879,7 +879,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 	defer inode.parentLock.Lock().Unlock()
 
 	toRelease := func() bool {
-		defer c.qfs.mapMutex.Lock().Unlock()
+		defer c.qfs.mapMutex.Lock(c).Unlock()
 
 		refs := c.qfs.inodeRefcounts[inode.inodeNum()] - 1
 		c.qfs.inodeRefcounts[inode.inodeNum()] = refs

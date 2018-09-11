@@ -130,7 +130,7 @@ type QuantumFs struct {
 
 	// This is a leaf lock for protecting the instantiation maps
 	// Do not grab other locks while holding this
-	mapMutex       utils.DeferableRwMutex
+	mapMutex       orderedMapMutex
 	inodes         map[InodeId]Inode
 	inodeRefcounts map[InodeId]int32
 
@@ -211,7 +211,8 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	}
 
 	go qfs.adjustKernelKnobs()
-	go batchProcessor(qfs.toBeReleased, qfs.fileHandleReleaser)
+	go batchProcessor(qfs.c.NewThread(), qfs.toBeReleased,
+		qfs.fileHandleReleaser)
 	go qfs.fuseNotifier()
 	go qfs.waitForSignals()
 
@@ -223,15 +224,17 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 
 const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
 
-func (qfs *QuantumFs) fileHandleReleaser(ids []uint64) {
+func (qfs *QuantumFs) fileHandleReleaser(c *ctx, ids []uint64) {
 	defer qfs.c.statsFuncIn(ReleaseFileHandleLog).Out()
-	defer qfs.mapMutex.Lock().Unlock()
+	defer qfs.mapMutex.Lock(c).Unlock()
 	for _, id := range ids {
 		qfs.setFileHandle_(&qfs.c, FileHandleId(id), nil)
 	}
 }
 
-func batchProcessor(inputChan <-chan uint64, handleBatch func(ids []uint64)) {
+func batchProcessor(c *ctx, inputChan <-chan uint64, handleBatch func(c *ctx,
+	ids []uint64)) {
+
 	const maxPerCycle = 1000
 	i := 0
 	ids := make([]uint64, 0, maxPerCycle)
@@ -256,7 +259,7 @@ func batchProcessor(inputChan <-chan uint64, handleBatch func(ids []uint64)) {
 			}
 			return false
 		}()
-		handleBatch(ids)
+		handleBatch(c, ids)
 
 		if !shutdown && i < maxPerCycle {
 			// If we didn't need our full allocation, sleep to accumulate
@@ -340,7 +343,7 @@ func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 				// Release the memory
 				debug.FreeOSMemory()
 			case syscall.SIGUSR2:
-				qfs.verifyNoLeaks()
+				qfs.verifyNoLeaks(qfs.c.NewThread())
 			}
 
 		case <-qfs.stopWaitingForSignals:
@@ -351,11 +354,11 @@ func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 	}
 }
 
-func (qfs *QuantumFs) verifyNoLeaks() {
-	defer qfs.c.funcIn("QuantumFs::verifyNoLeaks").Out()
+func (qfs *QuantumFs) verifyNoLeaks(c *ctx) {
+	defer c.funcIn("QuantumFs::verifyNoLeaks").Out()
 	defer qfs.instantiationLock.Lock().Unlock()
 	defer qfs.lookupCountLock.Lock().Unlock()
-	defer qfs.mapMutex.Lock().Unlock()
+	defer qfs.mapMutex.Lock(c).Unlock()
 
 	for id, parent := range qfs.parentOfUninstantiated {
 		if parent != quantumfs.InodeIdRoot {
@@ -774,7 +777,7 @@ func (qfs *QuantumFs) LockTreeGetHandle(c *ctx, fh FileHandleId) (FileHandle,
 func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
 	release_ func()) {
 
-	release := qfs.mapMutex.Lock().Unlock
+	release := qfs.mapMutex.Lock(c).Unlock
 
 	if qfs.inodes == nil {
 		release()
@@ -814,7 +817,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 
 	// First find the Inode under a cheaper lock
 	inode := func() Inode {
-		defer qfs.mapMutex.Lock().Unlock()
+		defer qfs.mapMutex.Lock(c).Unlock()
 		inode_, _ := qfs.getInode_(c, id)
 		if inode_ != nil {
 			addInodeRef_(c, id)
@@ -831,7 +834,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	parent := InodeId(0)
 	func() {
 		defer qfs.instantiationLock.Lock().Unlock()
-		defer qfs.mapMutex.Lock().Unlock()
+		defer qfs.mapMutex.Lock(c).Unlock()
 
 		parent = qfs.parentOfUninstantiated[id]
 		inode, instantiated = qfs.inode_(c, id)
@@ -859,7 +862,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 			// rollback instantiation
 			releaserFn(c, inode)()
 			defer qfs.instantiationLock.Lock().Unlock()
-			defer qfs.mapMutex.Lock().Unlock()
+			defer qfs.mapMutex.Lock(c).Unlock()
 			qfs.parentOfUninstantiated[id] = parent
 			qfs.setInode_(c, id, nil)
 
@@ -870,7 +873,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	if instantiated {
 		uninstantiated := inode.finishInit(c)
 		if len(uninstantiated) > 0 {
-			defer qfs.mapMutex.Lock().Unlock()
+			defer qfs.mapMutex.Lock(c).Unlock()
 			qfs.addUninstantiated_(c, uninstantiated)
 		}
 	}
@@ -904,8 +907,8 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 		}
 
 		func() {
-			qfs.mapMutex.Unlock()
-			defer qfs.mapMutex.Lock()
+			qfs.mapMutex.Unlock(c)
+			defer qfs.mapMutex.Lock(c)
 			// without mapMutex the child could move underneath this
 			// parent, in such cases, find the new parent
 			inode = parent.instantiateChild_(c, id)
@@ -942,7 +945,7 @@ func (qfs *QuantumFs) inode_(c *ctx, id InodeId) (Inode, bool) {
 
 // Set an inode in a thread safe way, set to nil to delete
 func (qfs *QuantumFs) setInode(c *ctx, id InodeId, inode Inode) {
-	defer qfs.mapMutex.Lock().Unlock()
+	defer qfs.mapMutex.Lock(c).Unlock()
 
 	qfs.setInode_(c, id, inode)
 }
@@ -971,7 +974,7 @@ func newInodePair(c InodeId, p InodeId) inodePair {
 }
 
 func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []inodePair) {
-	defer qfs.mapMutex.Lock().Unlock()
+	defer qfs.mapMutex.Lock(c).Unlock()
 
 	qfs.addUninstantiated_(c, uninstantiated)
 }
@@ -993,7 +996,7 @@ func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []inodePair) {
 // Remove a list of inode numbers from the parentOfUninstantiated list
 func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 	defer c.funcIn("Mux::removeUninstantiated").Out()
-	defer qfs.mapMutex.Lock().Unlock()
+	defer qfs.mapMutex.Lock(c).Unlock()
 
 	for _, inodeNum := range uninstantiated {
 		if _, hasRefs := qfs.inodeRefcounts[inodeNum]; !hasRefs {
@@ -1039,7 +1042,7 @@ func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 			// These Inodes always exist
 			c.vlog("Skipping refcount of permanent inode")
 		} else {
-			defer qfs.mapMutex.Lock().Unlock()
+			defer qfs.mapMutex.Lock(c).Unlock()
 			inode, _ := qfs.getInode_(c, inodeId)
 			if inode != nil {
 				addInodeRef_(c, inodeId)
@@ -1175,7 +1178,7 @@ func (qfs *QuantumFs) newInodeIdInfo(id InodeId) InodeIdInfo {
 }
 
 // Retrieves a unique inode number
-func (qfs *QuantumFs) newInodeId() InodeIdInfo {
+func (qfs *QuantumFs) newInodeId(c *ctx) InodeIdInfo {
 	for {
 		// When we get a new id, it's possible that we're still using it.
 		// If it's still in use, grab another one instead
@@ -1189,7 +1192,7 @@ func (qfs *QuantumFs) newInodeId() InodeIdInfo {
 		// We expect that ids will be reused more often than not. To optimize
 		// for that case, we only lock the map mutex when we absolutely must
 		idIsFree := func() bool {
-			defer qfs.mapMutex.Lock().Unlock()
+			defer qfs.mapMutex.Lock(c).Unlock()
 
 			inode, inodeIdUsed := qfs.getInode_(&qfs.c, newId)
 			return inode == nil && !inodeIdUsed

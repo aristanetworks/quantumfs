@@ -882,7 +882,7 @@ func checkParentOfUninstantiated(test *testHelper, wsrPath string, dirPath strin
 	link := test.getInodeNum(wsrPath + "/" + dirPath + "/" + filename)
 	wsr := test.getInodeNum(wsrPath)
 
-	defer test.qfs.mapMutex.RLock().RUnlock()
+	defer test.qfs.mapMutex.RLock(&test.qfs.c).RUnlock()
 	test.Assert(test.qfs.parentOfUninstantiated[link] == wsr,
 		"Hardlink parent isn't workspace root")
 }
