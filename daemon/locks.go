@@ -54,11 +54,11 @@ func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
 }
 
 func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
-	utils.Assert(len(order.stack) > 0, "Empty stack got a pop")
+	c.Assert(len(order.stack) > 0, "Empty stack got a pop")
 	lastLock := order.stack[len(order.stack)-1]
-	utils.Assert(lastLock.inode == inode, "Inode mismatch during pop %d %d",
+	c.Assert(lastLock.inode == inode, "Inode mismatch during pop %d %d",
 		lastLock.inode, inode)
-	utils.Assert(lastLock.kind == kind, "Lock type mismatch during pop %d %d",
+	c.Assert(lastLock.kind == kind, "Lock type mismatch during pop %d %d",
 		lastLock.kind, kind)
 
 	order.stack = order.stack[:len(order.stack)-1]
@@ -86,7 +86,7 @@ func (order *lockOrder) checkInodeOrder(c *ctx, inode InodeId, kind locker) {
 
 	lockingInode, release := c.qfs.inodeNoInstantiate(c, inode)
 	defer release()
-	utils.Assert(lockingInode != nil,
+	c.Assert(lockingInode != nil,
 		"Somehow locking parentLock from uninstantiated inode")
 
 	// Since we have the parentLock we can grab the parent inode id

@@ -125,3 +125,12 @@ func (c *ctx) StatsFuncIn(funcName string, extraFmtStr string,
 
 	return c.Ctx.StatsFuncIn(qlog.LogDaemon, funcName, extraFmtStr, args...)
 }
+
+// Allow us to assert something, resulting in an error message. Error messages are
+// preferrable to panics in non-crucial asserts, or asserts in gothreads which
+// die silently.
+func (c *ctx) Assert(condition bool, format string, args ...interface{}) {
+	if !condition {
+		c.elog(format, args)
+	}
+}
