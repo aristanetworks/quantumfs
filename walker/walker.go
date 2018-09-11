@@ -40,6 +40,9 @@ type Ctx struct {
 	rootID quantumfs.ObjectKey
 
 	hlkeys map[quantumfs.FileId]*quantumfs.EncodedDirectoryRecord
+	wf     WalkFunc
+	group  *errgroup.Group
+	dsGet  walkDsGet
 }
 
 type workerData struct {
@@ -92,9 +95,27 @@ func aggregateDsGetter(dsGet walkDsGet) walkDsGet {
 	}
 }
 
+func newContext(cq *quantumfs.Ctx, dsGet walkDsGet,
+	rootID quantumfs.ObjectKey, wf WalkFunc) *Ctx {
+
+	group, groupCtx := errgroup.WithContext(context.Background())
+	return &Ctx{
+		Context: groupCtx,
+		Qctx:    cq,
+		rootID:  rootID,
+		hlkeys: make(
+			map[quantumfs.FileId]*quantumfs.EncodedDirectoryRecord),
+		wf:    wf,
+		group: group,
+		dsGet: dsGet,
+	}
+}
+
 // Walk the workspace hierarchy
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
+
+	c := newContext(cq, nil, rootID, wf)
 
 	getter := func(cq *quantumfs.Ctx, path string,
 		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
@@ -102,28 +123,28 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 
 		return ds.Get(cq, key, buf)
 	}
+	c.dsGet = getter
 	// since test routines directly call walk()
 	// ensure that Walk() doesn't add anything
 	// else here.
-	return walk(cq, getter, rootID, wf)
+	return walk(c)
 }
 
 // walk is the core walker routine which accepts a walkDsGet.
 // This enables test routines to mock datastore get errors while
 // keeping the user API simple.
-func walk(cq *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
-	wf WalkFunc) error {
-
-	adsGet := aggregateDsGetter(dsGet)
+func walk(c *Ctx) error {
+	adsGet := aggregateDsGetter(c.dsGet)
 
 	var err error
-	buf := simplebuffer.New(nil, rootID)
-	if err = adsGet(cq, "wsr", rootID,
+	buf := simplebuffer.New(nil, c.rootID)
+	if err = adsGet(c.Qctx, "wsr", c.rootID,
 		quantumfs.ObjectTypeWorkspaceRoot, buf); err != nil {
+
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
-		"WorkspaceRoot buffer %s", rootID.String())
+		"WorkspaceRoot buffer %s", c.rootID.String())
 
 	wsr := buf.AsWorkspaceRoot()
 	//===============================================
@@ -133,40 +154,31 @@ func walk(cq *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
 	// KeyTypeMetadata which refers to an ObjectType of
 	// DirectoryEntry
 
-	group, groupCtx := errgroup.WithContext(context.Background())
 	keyChan := make(chan *workerData, 100)
-
-	c := &Ctx{
-		Context: groupCtx,
-		Qctx:    cq,
-		rootID:  rootID,
-		hlkeys: make(
-			map[quantumfs.FileId]*quantumfs.EncodedDirectoryRecord),
-	}
 
 	// Start Workers
 	conc := runtime.GOMAXPROCS(-1)
 	for i := 0; i < conc; i++ {
 
-		group.Go(func() (err error) {
+		c.group.Go(func() (err error) {
 			defer panicHandler(c, &err)
-			return worker(c, keyChan, wf)
+			return worker(c, keyChan, c.wf)
 		})
 	}
 
-	group.Go(func() (err error) {
+	c.group.Go(func() (err error) {
 		defer panicHandler(c, &err)
 		defer close(keyChan)
 
 		// WSR
-		if err = writeToChan(c, keyChan, "[rootId]", rootID,
+		if err = writeToChan(c, keyChan, "[rootId]", c.rootID,
 			uint64(buf.Size()),
 			quantumfs.ObjectTypeWorkspaceRoot); err != nil {
 
 			return err
 		}
 
-		if err = handleHardLinks(c, adsGet, wsr.HardlinkEntry(), wf,
+		if err = handleHardLinks(c, adsGet, wsr.HardlinkEntry(), c.wf,
 			keyChan); err != nil {
 
 			return err
@@ -177,7 +189,7 @@ func walk(cq *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
 		// enable lookup for fileID in directoryRecord of the
 		// path which represents the hardlink
 
-		if err = handleDirectoryEntry(c, "/", adsGet, wsr.BaseLayer(), wf,
+		if err = handleDirectoryEntry(c, "/", adsGet, wsr.BaseLayer(), c.wf,
 			keyChan); err != nil {
 
 			return err
@@ -186,9 +198,9 @@ func walk(cq *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
 		return nil
 	})
 
-	err = group.Wait()
+	err = c.group.Wait()
 	if err != nil {
-		cq.Elog(qlog.LogTool, walkFailedLog, err.Error())
+		c.Qctx.Elog(qlog.LogTool, walkFailedLog, err.Error())
 	}
 	return err
 }

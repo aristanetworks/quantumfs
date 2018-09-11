@@ -183,7 +183,7 @@ func TestHLGetErr(t *testing.T) {
 		test.AssertNoErr(err)
 
 		hleGetError := fmt.Errorf("hardlinkEntry error")
-		dsHLGet := func(c *quantumfs.Ctx, path string,
+		dsGet := func(c *quantumfs.Ctx, path string,
 			key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 			buf quantumfs.Buffer) error {
 
@@ -193,7 +193,7 @@ func TestHLGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walk(c, dsHLGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == hleGetError.Error(),
 			"Walk did not get the %v, instead got %v", hleGetError,
@@ -241,7 +241,7 @@ func TestDEGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == deGetError.Error(),
 			"Walk did not get the %v, instead got %v", deGetError,
@@ -294,7 +294,7 @@ func TestEAGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
@@ -358,7 +358,7 @@ func TestEAAttrGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
@@ -411,7 +411,7 @@ func TestMultiBlockGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == mbGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", mbGetBlock0Error,
@@ -467,7 +467,7 @@ func TestVLFileGetFirstErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == vlGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock0Error,
@@ -533,7 +533,7 @@ func TestVLFileGetNextErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walk(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == vlGetBlock1Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock1Error,
