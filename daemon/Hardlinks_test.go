@@ -513,7 +513,7 @@ func TestHardlinkReparentRace(t *testing.T) {
 
 			// We want to race the parent change with getting the parent
 			go os.Remove(filename)
-			go ManualLookup(&test.qfs.c, parent, filename)
+			go ManualLookup(test.qfs.c.NewThread(), parent, filename)
 			go syscall.Stat(filename, &stat)
 			go os.Remove(linkname)
 		}
