@@ -417,7 +417,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	defer inode.getParentLock().Lock().Unlock()
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
-	defer c.qfs.flusher.lock.Lock().Unlock()
+	defer c.qfs.flusher.lock.Lock(c).Unlock()
 
 	leg := dir.children.recordByInodeId(c, inodeId)
 	if leg == nil {

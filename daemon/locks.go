@@ -243,3 +243,15 @@ func (m *orderedLookupCount) Lock(c *ctx) utils.NeedWriteUnlock {
 func (m *orderedLookupCount) Unlock(c *ctx) {
 	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerLookupCountLock)
 }
+
+type orderedFlusher struct {
+	mutex	orderedMutex
+}
+
+func (m *orderedFlusher) Lock(c *ctx) utils.NeedWriteUnlock {
+	return m.mutex.Lock(c, quantumfs.InodeIdInvalid, lockerFlusherLock)
+}
+
+func (m *orderedFlusher) Unlock(c *ctx) {
+	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerFlusherLock)
+}

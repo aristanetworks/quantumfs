@@ -119,7 +119,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 
 			doneChan := make(chan error, 1)
 			func() {
-				defer c.qfs.flusher.lock.Lock().Unlock()
+				defer c.qfs.flusher.lock.Lock(c).Unlock()
 
 				// By the time we get the flusher lock, the flush
 				// thread may be done and gone by now, so we have to
@@ -158,7 +158,7 @@ func (dq *DirtyQueue) kicker(c *ctx) {
 			// the treelock
 			err := <-doneChan
 
-			defer c.qfs.flusher.lock.Lock().Unlock()
+			defer c.qfs.flusher.lock.Lock(c).Unlock()
 			if dq.Len_() > 0 {
 				element := dq.Front_()
 				candidate := element.Value.(*dirtyInode)
@@ -202,8 +202,8 @@ func (dq *DirtyQueue) TryCommand(c *ctx, cmd FlushCmd, response chan error) erro
 
 // delRef must not be called with the flusher lock to preserve lock order
 func safelyDeref(c *ctx, inode Inode) {
-	c.qfs.flusher.lock.Unlock()
-	defer c.qfs.flusher.lock.Lock()
+	c.qfs.flusher.lock.Unlock(c)
+	defer c.qfs.flusher.lock.Lock(c)
 
 	inode.delRef(c)
 }
@@ -235,8 +235,8 @@ func (dq *DirtyQueue) flushCandidate_(c *ctx, dirtyInode *dirtyInode) bool {
 			return true
 		}
 
-		c.qfs.flusher.lock.Unlock()
-		defer c.qfs.flusher.lock.Lock()
+		c.qfs.flusher.lock.Unlock(c)
+		defer c.qfs.flusher.lock.Lock(c)
 		flushSuccess := c.qfs.flushInode_(c, inode)
 		return flushSuccess
 	}()
@@ -330,7 +330,7 @@ func (dq *DirtyQueue) flusher(c *ctx) {
 		// exclusively or not
 
 		func() {
-			defer c.qfs.flusher.lock.Lock().Unlock()
+			defer c.qfs.flusher.lock.Lock(c).Unlock()
 
 			var err error
 			done, err = dq.flushQueue_(c, trigger.flushAll)
@@ -470,11 +470,11 @@ type Flusher struct {
 	// treeState because every Inode already has the treeState of its workspace
 	// so this is an easy way to sort Inodes by workspace.
 	dqs  map[*TreeState]*DirtyQueue
-	lock utils.DeferableMutex
+	lock orderedFlusher
 }
 
 func (flusher *Flusher) nQueued(c *ctx, treeState *TreeState) int {
-	defer flusher.lock.Lock().Unlock()
+	defer flusher.lock.Lock(c).Unlock()
 	return flusher.nQueued_(c, treeState)
 }
 
@@ -502,7 +502,7 @@ func (flusher *Flusher) sync_(c *ctx, workspace string) error {
 	doneChannels := make([]chan error, 0)
 	var err error
 	func() {
-		defer flusher.lock.Lock().Unlock()
+		defer flusher.lock.Lock(c).Unlock()
 
 		c.vlog("Flusher: %d dirty queues should finish off",
 			len(flusher.dqs))
