@@ -983,7 +983,7 @@ func TestMergeOverDecrement(t *testing.T) {
 
 				// make sure link is instantiated
 				linkInodeNum := test.getInodeNum(merged + "/link")
-				test.qfs.inode(&test.qfs.c, linkInodeNum)
+				test.qfs.inode(test.qfs.c.NewThread(), linkInodeNum)
 
 				linkRecord := test.GetRecord(merged + "/link")
 				nl := wsr.hardlinkTable.nlinks(linkRecord.FileId())
@@ -992,7 +992,7 @@ func TestMergeOverDecrement(t *testing.T) {
 
 				// check the other set of hardlinks as well
 				linkInodeNum = test.getInodeNum(merged + "/link2")
-				test.qfs.inode(&test.qfs.c, linkInodeNum)
+				test.qfs.inode(test.qfs.c.NewThread(), linkInodeNum)
 
 				linkRecord = test.GetRecord(merged + "/link2")
 				nl = wsr.hardlinkTable.nlinks(linkRecord.FileId())
