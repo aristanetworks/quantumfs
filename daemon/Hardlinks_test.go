@@ -681,6 +681,7 @@ func TestHardlinkCreatedTime(t *testing.T) {
 		test.AssertNoErr(syscall.Link(fileC, fileD))
 		test.AssertNoErr(syscall.Link(fileD, fileE))
 
+		c := test.qfs.c.NewThread()
 		recordA := test.getHardlinkLeg(c, dirA, "fileA")
 		recordB := test.getHardlinkLeg(c, dirA, "fileB")
 		recordC := test.getHardlinkLeg(c, workspace, "fileC")
@@ -763,6 +764,7 @@ func TestHardlinkRenameCreation(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(fileA, "dataA"))
 		test.AssertNoErr(syscall.Link(fileA, fileB))
 
+		c := test.qfs.c.NewThread()
 		recordA := test.getHardlinkLeg(c, dirA, "fileA")
 		recordB := test.getHardlinkLeg(c, dirA, "fileB")
 
