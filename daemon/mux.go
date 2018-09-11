@@ -1782,7 +1782,24 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 		return ENAMETOOLONG
 	}
 
-	srcInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
+	if input.NodeId == input.Newdir {
+		srcInode, unlock := qfs.RLockTreeGetInode(c, InodeId(input.NodeId))
+		defer unlock()
+		logInodeWorkspace(c, srcInode)
+		if srcInode == nil {
+			c.vlog("Obsolete src inode")
+			return fuse.ENOENT
+		}
+
+		if !qfs.workspaceIsMutable(c, srcInode) {
+			return fuse.EROFS
+		}
+
+		return srcInode.RenameChild(c, oldName, newName)
+	}
+
+	// Different source and destination dirs, so use MvChild_DOWN
+	srcInode, unlock := qfs.LockTreeGetInode(c, InodeId(input.NodeId))
 	defer unlock()
 	logInodeWorkspace(c, srcInode)
 	if srcInode == nil {
@@ -1794,35 +1811,31 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 		return fuse.EROFS
 	}
 
-	if input.NodeId == input.Newdir {
-		return srcInode.RenameChild(c, oldName, newName)
-	} else {
-		dstInode, release := qfs.inode(c, InodeId(input.Newdir))
-		defer release()
+	dstInode, release := qfs.inode(c, InodeId(input.Newdir))
+	defer release()
+	if dstInode == nil {
+		c.vlog("Obsolete dst inode")
+		return fuse.ENOENT
+	}
+
+	if dstInode.treeState() != srcInode.treeState() {
+		dstInode, unlock := qfs.LockTreeGetInode(c,
+			InodeId(input.Newdir))
+		defer unlock()
+
+		// In case it was deleted prior to grabbing the other
+		// workspace treelock.
 		if dstInode == nil {
 			c.vlog("Obsolete dst inode")
 			return fuse.ENOENT
 		}
-
-		if dstInode.treeState() != srcInode.treeState() {
-			dstInode, unlock := qfs.RLockTreeGetInode(c,
-				InodeId(input.Newdir))
-			defer unlock()
-
-			// In case it was deleted prior to grabbing the other
-			// workspace treelock.
-			if dstInode == nil {
-				c.vlog("Obsolete dst inode")
-				return fuse.ENOENT
-			}
-		}
-
-		if !qfs.workspaceIsMutable(c, dstInode) {
-			return fuse.EROFS
-		}
-
-		return srcInode.MvChild(c, dstInode, oldName, newName)
 	}
+
+	if !qfs.workspaceIsMutable(c, dstInode) {
+		return fuse.EROFS
+	}
+
+	return srcInode.MvChild_DOWN(c, dstInode, oldName, newName)
 }
 
 const LinkLog = "Mux::Link"

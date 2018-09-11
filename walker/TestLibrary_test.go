@@ -259,6 +259,21 @@ func (th *testHelper) printMap(name string, m map[string]int) {
 	}
 }
 
+func (th *testHelper) expectWalkerErrors(errs []string) {
+	th.ExpectedErrors = make(map[string]struct{})
+	for _, e := range errs {
+		th.ExpectedErrors["ERROR: "+e] = struct{}{}
+	}
+}
+
+func tstNopWalkFn() WalkFunc {
+	return func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+		objType quantumfs.ObjectType) error {
+
+		return nil
+	}
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 
