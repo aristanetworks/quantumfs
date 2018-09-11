@@ -417,9 +417,10 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 
 	for name, state := range updates {
 		if state.Deleted {
-			go qfs.handleDeletedWorkspace(c, name)
+			go qfs.handleDeletedWorkspace(c.NewThread(), name)
 		} else {
-			go qfs.refreshWorkspace(c, name, state.RootId, state.Nonce)
+			go qfs.refreshWorkspace(c.NewThread(), name, state.RootId,
+				state.Nonce)
 		}
 	}
 }
@@ -791,7 +792,7 @@ func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
 		inode.addRef_(c)
 
 		return inode, func() {
-			go inode.delRef(c)
+			go inode.delRef(c.NewThread())
 		}
 	} else {
 		return nil, release
@@ -803,7 +804,7 @@ func releaserFn(c *ctx, inode Inode) func() {
 	// delRef calls a number of locks, and so calling this synchronously could
 	// cause deadlocks if the caller isn't careful about what they have locked.
 	return func() {
-		go inode.delRef(c)
+		go inode.delRef(c.NewThread())
 	}
 }
 
