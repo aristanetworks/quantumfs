@@ -236,7 +236,7 @@ type testHelper struct {
 func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
 	handles := make([]*FileDescriptor, 0)
 
-	defer th.qfs.mapMutex.Lock(&th.qfs.c).Unlock()
+	defer th.qfs.mapMutex.Lock(th.qfs.c.NewThread()).Unlock()
 
 	th.qfs.fileHandles.Range(func(k interface{}, file interface{}) bool {
 		fh, ok := file.(*FileDescriptor)
@@ -259,7 +259,7 @@ func (th *testHelper) WaitToBeUninstantiated(inode InodeId) {
 
 	msg := fmt.Sprintf("inode %d to be uninstantiated", inode)
 	th.WaitFor(msg, func() bool {
-		if !th.inodeIsInstantiated(&th.qfs.c, inode) {
+		if !th.inodeIsInstantiated(th.qfs.c.NewThread(), inode) {
 			return true
 		}
 		th.SyncAllWorkspaces()
@@ -427,7 +427,7 @@ func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 func (th *testHelper) getAccessList(workspace string) *quantumfs.PathsAccessed {
 	wsr, cleanup := th.GetWorkspaceRoot(workspace)
 	defer cleanup()
-	accessed := wsr.getList(&th.qfs.c)
+	accessed := wsr.getList(th.qfs.c.NewThread())
 	return &accessed
 }
 
