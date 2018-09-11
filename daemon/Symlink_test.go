@@ -238,7 +238,7 @@ func TestSymlinkBeforeSync(t *testing.T) {
 			record := dir.getRecordChildCall_(test.TestCtx(), linkInode)
 			test.Assert(record != nil, "Record not found")
 
-			data := test.qfs.c.dataStore.Get(&test.qfs.c.Ctx,
+			data := test.qfs.c.dataStore.Get(test.qfs.c.NewThread().Ctx,
 				record.ID())
 			test.Assert(data != nil, "No data for symlink")
 			linkPath, err := os.Readlink(symlink)

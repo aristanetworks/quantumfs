@@ -99,13 +99,14 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 		wsrId := test.getInodeNum(workspace)
 		fileId := test.getInodeNum(fileName)
 
+		c := test.qfs.c.NewThread()
 		test.ForceForget(fileId)
-		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, fileId),
+		test.Assert(!test.inodeIsInstantiated(c, fileId),
 			"Failed to forget file inode")
 
 		test.WaitFor("wsr inode to be uninstantiated", func() bool {
 			test.SyncWorkspace(test.RelPath(workspace))
-			return !test.inodeIsInstantiated(&test.qfs.c, wsrId)
+			return !test.inodeIsInstantiated(c, wsrId)
 		})
 
 		// Verify the mutability is preserved
@@ -155,19 +156,20 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// we need to lock to do this without racing
-		test.qfs.mapMutex.Lock(&test.qfs.c)
+		c := test.qfs.c.NewThread()
+		test.qfs.mapMutex.Lock(c)
 		numUninstantiatedOld := len(test.qfs.parentOfUninstantiated)
-		test.qfs.mapMutex.Unlock(&test.qfs.c)
+		test.qfs.mapMutex.Unlock(c)
 
 		// Forgetting should now forget the Directory and thus remove all the
 		// uninstantiated children from the parentOfUninstantiated list.
 		test.ForceForget(quantumfs.InodeIdInvalid)
 
-		test.qfs.mapMutex.Lock(&test.qfs.c)
+		test.qfs.mapMutex.Lock(c)
 		//BUG: Between remountFilesystem and here, the kernel can and does
 		// lookup these files, thereby populating the map we're checking!
 		numUninstantiatedNew := len(test.qfs.parentOfUninstantiated)
-		test.qfs.mapMutex.Unlock(&test.qfs.c)
+		test.qfs.mapMutex.Unlock(c)
 
 		test.Assert(numUninstantiatedOld > numUninstantiatedNew,
 			"No uninstantiated inodes were removed %d <= %d",
@@ -235,12 +237,13 @@ func TestLookupCountAfterCommand(t *testing.T) {
 		test.Assert(err == nil, "Failed call the command")
 
 		test.ForceForget(fileId)
-		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, fileId),
+		c := test.qfs.c.NewThread()
+		test.Assert(!test.inodeIsInstantiated(c, fileId),
 			"Failed to forget file inode")
 
 		test.WaitFor("wsr inode to be uninstantiated", func() bool {
 			test.SyncWorkspace(test.RelPath(workspace))
-			return !test.inodeIsInstantiated(&test.qfs.c, wsrId)
+			return !test.inodeIsInstantiated(c, wsrId)
 		})
 	})
 }
@@ -279,12 +282,13 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
-		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, fileId),
+		c := test.qfs.c.NewThread()
+		test.Assert(!test.inodeIsInstantiated(c, fileId),
 			"Failed to forget directory inode")
 
 		test.WaitFor("wsr inode to be uninstantiated", func() bool {
 			test.SyncWorkspace(test.RelPath(dstWorkspace))
-			return !test.inodeIsInstantiated(&test.qfs.c, wsrId)
+			return !test.inodeIsInstantiated(c, wsrId)
 		})
 	})
 }
@@ -342,13 +346,14 @@ func TestForgetMarking(t *testing.T) {
 
 		// We need to trigger, ourselves, the kind of Forget sequence where
 		// markings are necessary: parent, childA, then childB
-		test.Assert(test.inodeIsInstantiated(&test.qfs.c, parentId),
+		c := test.qfs.c.NewThread()
+		test.Assert(test.inodeIsInstantiated(c, parentId),
 			"Parent not loaded when expected")
 
-		test.Assert(test.inodeIsInstantiated(&test.qfs.c, childIdA),
+		test.Assert(test.inodeIsInstantiated(c, childIdA),
 			"ChildA not loaded when expected")
 
-		test.Assert(test.inodeIsInstantiated(&test.qfs.c, childIdB),
+		test.Assert(test.inodeIsInstantiated(c, childIdB),
 			"ChildB not loaded when expected")
 
 		// Now start Forgetting
@@ -356,7 +361,7 @@ func TestForgetMarking(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// Parent should still be loaded
-		test.Assert(test.inodeIsInstantiated(&test.qfs.c, parentId),
+		test.Assert(test.inodeIsInstantiated(c, parentId),
 			"Parent forgotten while children are loaded")
 
 		// Forget one child, not enough to forget the parent
@@ -364,32 +369,30 @@ func TestForgetMarking(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// Wait for uninstantiation
-		uninstMsg := fmt.Sprintf("Uninstantiating inode %d",
-			childIdA)
+		uninstMsg := fmt.Sprintf("Uninstantiating inode %d", childIdA)
 		test.WaitForLogString(uninstMsg, "childA uninstantiation")
 
-		test.Assert(test.inodeIsInstantiated(&test.qfs.c, parentId),
+		test.Assert(test.inodeIsInstantiated(c, parentId),
 			"Parent forgotten when only 1/2 children unloaded")
 
-		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, childIdA),
+		test.Assert(!test.inodeIsInstantiated(c, childIdA),
 			"ChildA not forgotten when requested")
 
 		// Now forget the last child, which should unload the parent also
 		test.qfs.Forget(uint64(childIdB), 1)
 		test.SyncAllWorkspaces()
 
-		uninstMsg = fmt.Sprintf("Uninstantiating inode %d",
-			childIdB)
+		uninstMsg = fmt.Sprintf("Uninstantiating inode %d", childIdB)
 		test.WaitForLogString(uninstMsg, "childB uninstantiation")
 
-		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, childIdA),
+		test.Assert(!test.inodeIsInstantiated(c, childIdA),
 			"ChildA not forgotten when requested")
 
-		test.Assert(!test.inodeIsInstantiated(&test.qfs.c, childIdB),
+		test.Assert(!test.inodeIsInstantiated(c, childIdB),
 			"ChildB not forgotten when requested")
 
 		test.WaitFor("parent uninstantiation", func() bool {
-			return !test.inodeIsInstantiated(&test.qfs.c, parentId)
+			return !test.inodeIsInstantiated(c, parentId)
 		})
 	})
 }
