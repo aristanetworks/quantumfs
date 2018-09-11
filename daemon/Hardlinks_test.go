@@ -1006,12 +1006,12 @@ func TestNormalizationRace(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		go func() {
-			defer logRequestPanic(&test.qfs.c)
+			defer logRequestPanic(test.qfs.c.NewThread())
 			test.AssertNoErr(os.Remove(workspace + "/linkA2"))
 		}()
 
 		go func() {
-			defer logRequestPanic(&test.qfs.c)
+			defer logRequestPanic(test.qfs.c.NewThread())
 			test.AssertNoErr(os.Remove(dir + "/linkA"))
 		}()
 	})
