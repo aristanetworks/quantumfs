@@ -801,7 +801,7 @@ func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
 
 func releaserFn(c *ctx, inode Inode) func() {
 	if inode == nil {
-		return
+		return func() {}
 	}
 
 	// We want to call delRef asynchronously to ease the locking requirements.
