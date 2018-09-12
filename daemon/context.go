@@ -36,6 +36,12 @@ func (c *ctx) NewThread() *ctx {
 	return &rtn
 }
 
+func (c *ctx) DisableLockCheck() *ctx {
+	rtn := c.NewThread()
+	rtn.lockOrder.disabled = true
+	return rtn
+}
+
 func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
 	var contextCopy *fuse.Context
 	if context != nil {

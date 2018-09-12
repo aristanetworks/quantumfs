@@ -32,10 +32,15 @@ type lockInfo struct {
 
 type lockOrder struct {
 	stack	[]lockInfo
+	disabled	bool
 }
 
 // The lock being requested must already be held so we can do checks with it
 func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
+	if order.disabled {
+		return
+	}
+
 	if len(order.stack) != 0 {
 		if isInodeLock(kind) {
 			order.checkInodeOrder(c, inode, kind)
@@ -55,6 +60,10 @@ func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
 }
 
 func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
+	if order.disabled {
+		return
+	}
+
 	c.Assert(len(order.stack) > 0, "Empty stack got a pop")
 
 	// Popping has an odd mechanism in that we don't necessarily unlock in the
