@@ -914,7 +914,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		// necessary to get the tree lock of the WorkspaceRoot exclusively
 		// here.
 		defer workspace.LockTree().Unlock()
-		return workspace.followPath_DOWN(c, dst)
+		return workspace.followPath_DOWN(c.DisableLockCheck(), dst)
 	}()
 	defer cleanup()
 	if err != nil {
