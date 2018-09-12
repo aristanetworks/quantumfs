@@ -110,8 +110,11 @@ func (order *lockOrder) checkInodeOrder(c *ctx, inode InodeId, kind locker) {
 
 	lockingInode, release := c.qfs.inodeNoInstantiate(c, inode)
 	defer release()
-	c.Assert(lockingInode != nil,
-		"Somehow locking parentLock from uninstantiated inode")
+	if lockingInode == nil {
+		// If we're locking for a new inode that isn't in the inode map yet,
+		// don't bother checking for now
+		return
+	}
 
 	// Since we have the parentLock we can grab the parent inode id
 	parent := lockingInode.parentId_()
