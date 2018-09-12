@@ -255,3 +255,15 @@ func (m *orderedFlusher) Lock(c *ctx) utils.NeedWriteUnlock {
 func (m *orderedFlusher) Unlock(c *ctx) {
 	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerFlusherLock)
 }
+
+type orderedInstantiation struct {
+	mutex	orderedMutex
+}
+
+func (m *orderedInstantiation) Lock(c *ctx) utils.NeedWriteUnlock {
+	return m.mutex.Lock(c, quantumfs.InodeIdInvalid, lockerInstantiationLock)
+}
+
+func (m *orderedInstantiation) Unlock(c *ctx) {
+	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerInstantiationLock)
+}

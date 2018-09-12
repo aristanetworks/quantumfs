@@ -413,7 +413,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	inode, release := c.qfs.inode(c, inodeId)
 	defer release()
 
-	defer c.qfs.instantiationLock.Lock().Unlock()
+	defer c.qfs.instantiationLock.Lock(c).Unlock()
 	defer inode.getParentLock().Lock().Unlock()
 	defer dir.Lock().Unlock()
 	defer dir.childRecordLock.Lock().Unlock()

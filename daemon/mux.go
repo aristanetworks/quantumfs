@@ -145,7 +145,7 @@ type QuantumFs struct {
 	//
 	// This lock must always be grabbed before the mapMutex to ensure consistent
 	// lock ordering.
-	instantiationLock utils.DeferableMutex
+	instantiationLock orderedInstantiation
 
 	// Uninstantiated Inodes are inode numbers which have been reserved for a
 	// particular inode, but the corresponding Inode has not yet been
@@ -356,7 +356,7 @@ func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 
 func (qfs *QuantumFs) verifyNoLeaks(c *ctx) {
 	defer c.funcIn("QuantumFs::verifyNoLeaks").Out()
-	defer qfs.instantiationLock.Lock().Unlock()
+	defer qfs.instantiationLock.Lock(c).Unlock()
 	defer qfs.lookupCountLock.Lock(c).Unlock()
 	defer qfs.mapMutex.Lock(c).Unlock()
 
@@ -838,7 +838,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	instantiated := false
 	parent := InodeId(0)
 	func() {
-		defer qfs.instantiationLock.Lock().Unlock()
+		defer qfs.instantiationLock.Lock(c).Unlock()
 		defer qfs.mapMutex.Lock(c).Unlock()
 
 		parent = qfs.parentOfUninstantiated[id]
@@ -866,7 +866,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 		if panicErr := recover(); panicErr != nil {
 			// rollback instantiation
 			releaserFn(c, inode)()
-			defer qfs.instantiationLock.Lock().Unlock()
+			defer qfs.instantiationLock.Lock(c).Unlock()
 			defer qfs.mapMutex.Lock(c).Unlock()
 			qfs.parentOfUninstantiated[id] = parent
 			qfs.setInode_(c, id, nil)
