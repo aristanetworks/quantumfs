@@ -214,9 +214,10 @@ func TestSymlinkBeforeSync(t *testing.T) {
 
 		inode := test.getInode(workspace)
 		dir := inode.(*WorkspaceRoot)
+		c := test.qfs.c.NewThread()
 
 		func() {
-			defer dir.RLock().RUnlock()
+			defer dir.RLock(c).RUnlock()
 			defer dir.childRecordLock.Lock().Unlock()
 
 			record := dir.getRecordChildCall_(test.TestCtx(), linkInode)
@@ -232,7 +233,7 @@ func TestSymlinkBeforeSync(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		func() {
-			defer dir.RLock().RUnlock()
+			defer dir.RLock(c).RUnlock()
 			defer dir.childRecordLock.Lock().Unlock()
 
 			record := dir.getRecordChildCall_(test.TestCtx(), linkInode)

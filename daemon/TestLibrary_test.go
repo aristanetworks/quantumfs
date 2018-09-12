@@ -799,12 +799,13 @@ func (test *testHelper) withInodeRecord(inodeId InodeId,
 	defer release()
 	test.Assert(inode != nil, "No Inode found for inode %d", inodeId)
 
+	c := test.qfs.c.NewThread()
 	defer inode.getParentLock().RLock().RUnlock()
 	parent_, release := inode.parent_(test.qfs.c.NewThread())
 	defer release()
 	parent := asDirectory(parent_)
 
-	defer parent.RLock().RUnlock()
+	defer parent.RLock(c).RUnlock()
 	defer parent.childRecordLock.Lock().Unlock()
 
 	record := parent.getRecordChildCall_(test.qfs.c.NewThread(), inodeId)
