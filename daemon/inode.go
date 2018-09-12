@@ -947,7 +947,7 @@ func reload(c *ctx, hardlinkTable HardlinkTable, rc *RefreshContext, inode Inode
 		panic("symlinks cannot be reloaded.")
 	case quantumfs.ObjectTypeDirectory:
 		subdir := inode.(*Directory)
-		subdir.refresh_DOWN(c, rc, remoteRecord.ID())
+		subdir.refresh_DOWN(c.DisableLockCheck(), rc, remoteRecord.ID())
 	case quantumfs.ObjectTypeHardlink:
 		fileId := remoteRecord.FileId()
 		hardlinkRecord := hardlinkTable.recordByFileId(fileId)
