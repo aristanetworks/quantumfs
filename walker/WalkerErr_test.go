@@ -13,6 +13,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs/qlog"
 )
 
 // This file contains tests which test walker's
@@ -45,7 +46,13 @@ func TestWalkPanicString(t *testing.T) {
 			root, err)
 
 		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			objType quantumfs.ObjectType) error {
+			objType quantumfs.ObjectType, err error) error {
+
+			if err != nil {
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog,
+					path, key.String(), err.Error())
+				return err
+			}
 
 			if strings.HasSuffix(path, "/panicFile") {
 				panic(expectedString)
@@ -54,11 +61,10 @@ func TestWalkPanicString(t *testing.T) {
 		}
 		err = Walk(c, ds, rootID, wf)
 		test.AssertErr(err)
-		test.Assert(err.Error() == expectedErr.Error(),
+		test.Assert(strings.Contains(err.Error(), expectedErr.Error()),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
-		test.expectWalkerErrors([]string{walkFailedLog,
-			panicErrLog})
+		test.expectWalkerErrors([]string{walkerErrLog})
 	})
 }
 
@@ -89,7 +95,13 @@ func TestWalkPanicErr(t *testing.T) {
 			root, err)
 
 		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			objType quantumfs.ObjectType) error {
+			objType quantumfs.ObjectType, err error) error {
+
+			if err != nil {
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog,
+					path, key.String(), err.Error())
+				return err
+			}
 
 			if strings.HasSuffix(path, "/panicFile") {
 				panic(expectedErr)
@@ -98,11 +110,11 @@ func TestWalkPanicErr(t *testing.T) {
 		}
 		err = Walk(c, ds, rootID, wf)
 		test.AssertErr(err)
-		test.Assert(err == expectedErr,
+		test.Assert(strings.Contains(err.Error(),
+			expectedErr.Error()),
 			"Walk did not get the expectedErr value, instead got %v",
 			err)
-		test.expectWalkerErrors([]string{walkFailedLog,
-			panicErrLog})
+		test.expectWalkerErrors([]string{walkerErrLog})
 	})
 }
 
@@ -132,7 +144,13 @@ func TestWalkErr(t *testing.T) {
 			root, err)
 
 		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			objType quantumfs.ObjectType) error {
+			objType quantumfs.ObjectType, err error) error {
+
+			if err != nil {
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog,
+					path, key.String(), err.Error())
+				return err
+			}
 
 			if strings.HasSuffix(path, "/errorFile") {
 				return expectedErr
@@ -144,7 +162,7 @@ func TestWalkErr(t *testing.T) {
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
-		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkerErrLog})
 	})
 }
 
@@ -198,7 +216,7 @@ func TestHLGetErr(t *testing.T) {
 		test.Assert(err.Error() == hleGetError.Error(),
 			"Walk did not get the %v, instead got %v", hleGetError,
 			err)
-		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkerErrLog})
 	})
 }
 
@@ -246,7 +264,7 @@ func TestDEGetErr(t *testing.T) {
 		test.Assert(err.Error() == deGetError.Error(),
 			"Walk did not get the %v, instead got %v", deGetError,
 			err)
-		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkerErrLog})
 	})
 }
 
@@ -299,7 +317,7 @@ func TestEAGetErr(t *testing.T) {
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
-		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkerErrLog})
 	})
 }
 
@@ -363,7 +381,7 @@ func TestEAAttrGetErr(t *testing.T) {
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
-		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkerErrLog})
 	})
 }
 
@@ -416,7 +434,7 @@ func TestMultiBlockGetErr(t *testing.T) {
 		test.Assert(err.Error() == mbGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", mbGetBlock0Error,
 			err)
-		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkerErrLog})
 	})
 }
 
@@ -472,7 +490,7 @@ func TestVLFileGetFirstErr(t *testing.T) {
 		test.Assert(err.Error() == vlGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock0Error,
 			err)
-		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkerErrLog})
 
 	})
 }
@@ -538,6 +556,6 @@ func TestVLFileGetNextErr(t *testing.T) {
 		test.Assert(err.Error() == vlGetBlock1Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock1Error,
 			err)
-		test.expectWalkerErrors([]string{walkFailedLog, walkerErrLog})
+		test.expectWalkerErrors([]string{walkerErrLog})
 	})
 }

@@ -17,6 +17,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
 )
@@ -133,8 +134,13 @@ func (th *testHelper) checkSmallFileHardlinkKey(workspace string,
 		root, err)
 
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, objType quantumfs.ObjectType) error {
+		size uint64, objType quantumfs.ObjectType, err error) error {
 
+		if err != nil {
+			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
+				path, key, err)
+			return err
+		}
 		// this check works for small files (1 block) only
 		if _, exists := hlpaths[path]; exists {
 			if !th.HardlinkKeyExists(workspace, key) {
@@ -220,8 +226,13 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 	var walkerMap = make(map[string]int)
 	var mapLock utils.DeferableMutex
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, objType quantumfs.ObjectType) error {
+		size uint64, objType quantumfs.ObjectType, err error) error {
 
+		if err != nil {
+			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
+				path, key, err)
+			return err
+		}
 		// NOTE: In the TTL walker this path comparison will be
 		// replaced by a TTL comparison.
 		if skipDirTest && objType == quantumfs.ObjectTypeDirectory &&
@@ -273,7 +284,12 @@ func walkWithCtx(c *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
 
 func tstNopWalkFn() WalkFunc {
 	return func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-		objType quantumfs.ObjectType) error {
+		objType quantumfs.ObjectType, err error) error {
+		if err != nil {
+			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
+				path, key, err)
+			return err
+		}
 
 		return nil
 	}

@@ -12,7 +12,6 @@ import (
 	"runtime/debug"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
 	"golang.org/x/sync/errgroup"
@@ -24,9 +23,24 @@ import (
 var ErrSkipDirectory = errors.New("skip this directory")
 
 // WalkFunc is the type of the function called for each data block under the
-// Workspace.
+// Workspace. Every error encountered by walker library can be filtered
+// by WalkFunc. So walker library does not log any errors, instead it forwards
+// all errors to the walkFunc. Hence the right place to harvest errors is the WalkFunc.
+// Hence even if Walk returns nil error, it could still mean that there were errors
+// during the walk. If WalkFunc returns any error, except ErrSkipDirectory,
+// then the workspace walk is stopped.
+// When err argument is non-nil, size is invalid.
+// When err argument is non-nil, path may be empty. When path is empty,
+// key, size and objType are invalid.
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
-	size uint64, objType quantumfs.ObjectType) error
+	size uint64, objType quantumfs.ObjectType,
+	err error) error
+
+func filterErrByWalkFunc(c *Ctx, path string, key quantumfs.ObjectKey,
+	objTyp quantumfs.ObjectType, err error) error {
+
+	return c.wf(c, path, key, 0, objTyp, err)
+}
 
 // walkDsGet enables mocking datastore Get in test routines.
 type walkDsGet func(cq *quantumfs.Ctx, path string,
@@ -52,7 +66,7 @@ type workerData struct {
 	objType quantumfs.ObjectType
 }
 
-const panicErrLog = "PANIC %s\n%v"
+const panicErrFmt = "PANIC %s\n%v"
 
 func panicHandler(c *Ctx, err *error) {
 	exception := recover()
@@ -64,20 +78,20 @@ func panicHandler(c *Ctx, err *error) {
 	switch exception.(type) {
 	default:
 		result = fmt.Sprintf("Unknown panic type: %v", exception)
-		*err = fmt.Errorf("%s", result)
 	case string:
 		result = exception.(string)
-		*err = fmt.Errorf(result)
 	case error:
 		result = exception.(error).Error()
-		*err = exception.(error)
 	}
 
 	trace := utils.BytesToString(debug.Stack())
-	c.Qctx.Elog(qlog.LogTool, panicErrLog, result, trace)
+	lErr := fmt.Errorf(panicErrFmt, result, trace)
+	// since objType is invalid when path is empty
+	// use ObjectTypeSmallFile as a dummy value
+	*err = filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
+		quantumfs.ObjectTypeSmallFile, lErr)
 }
 
-const walkFailedLog = "Walk failed: %s"
 const walkerErrLog = "desc: %s key: %s err: %s"
 
 // aggregateDsGetter returns a datastore getter function that
@@ -121,7 +135,10 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 		buf quantumfs.Buffer) error {
 
-		return ds.Get(cq, key, buf)
+		if derr := ds.Get(cq, key, buf); derr != nil {
+			return filterErrByWalkFunc(c, path, key, typ, derr)
+		}
+		return nil
 	}
 	c.dsGet = getter
 	// since test routines directly call walk()
@@ -202,11 +219,7 @@ func walk(c *Ctx) error {
 		return nil
 	})
 
-	err = c.group.Wait()
-	if err != nil {
-		c.Qctx.Elog(qlog.LogTool, walkFailedLog, err.Error())
-	}
-	return err
+	return c.group.Wait()
 }
 
 func handleHardLinks(c *Ctx, dsGet walkDsGet,
@@ -236,8 +249,6 @@ func handleHardLinks(c *Ctx, dsGet walkDsGet,
 		if err := dsGet(c.Qctx, "[hardlink table]",
 			key, quantumfs.ObjectTypeHardlink, buf); err != nil {
 
-			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-				"[hardlink table]", key, err)
 			return err
 		}
 
@@ -262,8 +273,6 @@ func handleMultiBlockFile(c *Ctx, path string, dsGet walkDsGet,
 
 	buf := simplebuffer.New(nil, key)
 	if err := dsGet(c.Qctx, path, key, typ, buf); err != nil {
-		c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-			path, key, err)
 		return err
 	}
 
@@ -301,8 +310,6 @@ func handleVeryLargeFile(c *Ctx, path string, dsGet walkDsGet,
 	if err := dsGet(c.Qctx, path, key,
 		quantumfs.ObjectTypeVeryLargeFile, buf); err != nil {
 
-		c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-			path, key, err)
 		return err
 	}
 
@@ -337,8 +344,6 @@ func handleDirectoryEntry(c *Ctx, path string, dsGet walkDsGet,
 		if err := dsGet(c.Qctx, path, key,
 			quantumfs.ObjectTypeDirectory, buf); err != nil {
 
-			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-				path, key, err)
 			return err
 		}
 
@@ -348,13 +353,11 @@ func handleDirectoryEntry(c *Ctx, path string, dsGet walkDsGet,
 		// When wf returns ErrSkipDirectory for a DirectoryEntry,
 		// we can skip the DirectoryRecords in that DirectoryEntry
 		if err := c.wf(c, path, key, uint64(buf.Size()),
-			quantumfs.ObjectTypeDirectory); err != nil {
+			quantumfs.ObjectTypeDirectory, nil); err != nil {
 
 			if err == ErrSkipDirectory {
 				return nil
 			}
-			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-				path, key, err)
 			return err
 		}
 
@@ -421,16 +424,16 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet walkDsGet,
 			errStr := fmt.Sprintf("Key for hardlink Path: %s "+
 				"FileId: %d missing in WSR hardlink info",
 				fpath, dr.FileId())
-			c.Qctx.Elog(qlog.LogTool, walkerErrLog, fpath, key,
-				fmt.Errorf("%s", errStr))
-			return nil
+			err := fmt.Errorf("%s", errStr)
+			return filterErrByWalkFunc(c, fpath, key,
+				quantumfs.ObjectTypeHardlink, err)
 		} else if hldr.Type() == quantumfs.ObjectTypeHardlink {
 			errStr := fmt.Sprintf("Hardlink object type found in"+
 				"WSR hardlink info for path: %s fileID: %d", fpath,
 				dr.FileId())
-			c.Qctx.Elog(qlog.LogTool, walkerErrLog, fpath, key,
-				fmt.Errorf("%s", errStr))
-			return nil
+			err := fmt.Errorf("%s", errStr)
+			return filterErrByWalkFunc(c, fpath, key,
+				quantumfs.ObjectTypeHardlink, err)
 		} else {
 			// hldr could be of any of the supported ObjectTypes so
 			// handle the directoryRecord accordingly
@@ -459,8 +462,6 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 	if err := dsGet(c.Qctx, fpath, extKey,
 		quantumfs.ObjectTypeExtendedAttribute, buf); err != nil {
 
-		c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-			"extattr "+fpath, extKey, err)
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
@@ -481,8 +482,6 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 		if err := dsGet(c.Qctx, fpath, key,
 			quantumfs.ObjectTypeExtendedAttribute, buf); err != nil {
 
-			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-				"extattr attr "+fpath, key, err)
 			return err
 		}
 		simplebuffer.AssertNonZeroBuf(buf,
@@ -513,9 +512,7 @@ func worker(c *Ctx, keyChan <-chan *workerData) error {
 			}
 		}
 		if err := c.wf(c, keyItem.path, keyItem.key, keyItem.size,
-			keyItem.objType); err != nil && err != ErrSkipDirectory {
-			c.Qctx.Elog(qlog.LogTool, walkerErrLog, keyItem.path,
-				keyItem.key, err)
+			keyItem.objType, nil); err != nil && err != ErrSkipDirectory {
 			return err
 		}
 	}
