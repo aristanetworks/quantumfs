@@ -303,7 +303,7 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (tsl *TypespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer tsl.Lock().Unlock()
+	defer tsl.Lock(c).Unlock()
 
 	for k, _ := range tsl.typespacesById {
 		iterateAgain := visitFn(k)
@@ -323,7 +323,7 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 		typespaces = []string{}
 	}
 
-	defer tsl.Lock().Unlock()
+	defer tsl.Lock(c).Unlock()
 
 	if err == nil {
 		// We only accept positive lists
@@ -372,7 +372,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 		}
 	}
 
-	defer tsl.Lock().Unlock()
+	defer tsl.Lock(c).Unlock()
 	updateChildren(c, list, &tsl.typespacesByName, &tsl.typespacesById, tsl)
 
 	if !exists {
@@ -535,7 +535,7 @@ func (tsl *TypespaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
 	defer c.funcIn("TypespaceList::instantiateChild_").Out()
-	defer tsl.Lock().Unlock()
+	defer tsl.Lock(c).Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
 	// release immediately. We can't hold the mapMutex while we instantiate,
@@ -638,7 +638,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (nsl *NamespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer nsl.Lock().Unlock()
+	defer nsl.Lock(c).Unlock()
 
 	for k, _ := range nsl.namespacesById {
 		iterateAgain := visitFn(k)
@@ -658,7 +658,7 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 		namespaces = []string{}
 	}
 
-	defer nsl.Lock().Unlock()
+	defer nsl.Lock(c).Unlock()
 
 	if err == nil {
 		// We only accept positive lists
@@ -690,7 +690,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 			break
 		}
 	}
-	defer nsl.Lock().Unlock()
+	defer nsl.Lock(c).Unlock()
 	updateChildren(c, list, &nsl.namespacesByName, &nsl.namespacesById, nsl)
 
 	if !exists {
@@ -854,7 +854,7 @@ func (nsl *NamespaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
 	defer c.funcIn("NamespaceList::instantiateChild_").Out()
-	defer nsl.Lock().Unlock()
+	defer nsl.Lock(c).Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
 	// release immediately. We can't hold the mapMutex while we instantiate,
@@ -975,7 +975,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (wsl *WorkspaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer wsl.Lock().Unlock()
+	defer wsl.Lock(c).Unlock()
 
 	for k, _ := range wsl.workspacesById {
 		iterateAgain := visitFn(k)
@@ -1037,7 +1037,7 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 		workspaces = map[string]quantumfs.WorkspaceNonce{}
 	}
 
-	defer wsl.Lock().Unlock()
+	defer wsl.Lock(c).Unlock()
 
 	if err == nil {
 		// We only accept positive lists
@@ -1073,7 +1073,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 			break
 		}
 	}
-	defer wsl.Lock().Unlock()
+	defer wsl.Lock(c).Unlock()
 	wsl.updateChildren(c, workspaces)
 
 	if !exists {
@@ -1240,7 +1240,7 @@ func (wsl *WorkspaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
 	defer c.funcIn("WorkspaceList::instantiateChild_").Out()
-	defer wsl.Lock().Unlock()
+	defer wsl.Lock(c).Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
 	// release immediately. We can't hold the mapMutex while we instantiate,

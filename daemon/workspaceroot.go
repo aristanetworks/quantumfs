@@ -74,7 +74,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 		},
 	}
 
-	defer wsr.Lock().Unlock()
+	defer wsr.Lock(c).Unlock()
 
 	wsr.self = &wsr
 	wsr.treeState_ = wsr.realTreeState
@@ -261,7 +261,7 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 
-	defer wsr.RLock().RUnlock()
+	defer wsr.RLock(c).RUnlock()
 
 	wsr.hardlinkTable.apply(c, wsr.Directory.hardlinkDelta)
 
@@ -387,7 +387,7 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 
 	if isHardlink {
 		func() {
-			defer wsr.Lock().Unlock()
+			defer wsr.Lock(c).Unlock()
 			wsr.self.dirty(c)
 			wsr.hardlinkTable.setID(c, fileId, newKey)
 		}()
@@ -410,7 +410,7 @@ func (wsr *WorkspaceRoot) Access(c *ctx, mask uint32, uid uint32,
 
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("WorkspaceRoot::GetAttr").Out()
-	defer wsr.RLock().RUnlock()
+	defer wsr.RLock(c).RUnlock()
 
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
@@ -492,7 +492,7 @@ func (wsr *WorkspaceRoot) handleFlushFailure_(c *ctx) bool {
 }
 
 func (wsr *WorkspaceRoot) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer wsr.Lock().Unlock()
+	defer wsr.Lock(c).Unlock()
 
 	// Iterate through hardlinks first to ensure we can escape early
 	for inodeNum, _ := range wsr.hardlinkTable.inodeToLink {

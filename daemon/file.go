@@ -161,7 +161,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 	if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 		result := func() fuse.Status {
-			defer fi.Lock().Unlock()
+			defer fi.Lock(c).Unlock()
 
 			c.vlog("Got file lock")
 
@@ -426,7 +426,7 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	var readCount int
 	readResult, status := func() (fuse.ReadResult, fuse.Status) {
-		defer fi.RLock().RUnlock()
+		defer fi.RLock(c).RUnlock()
 
 		// Ensure size and buf are consistent
 		buf = buf[:size]
@@ -463,7 +463,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	c.vlog("offset %d size %d flags %x", offset, size, flags)
 
 	writeCount, result := func() (uint32, fuse.Status) {
-		defer fi.Lock().Unlock()
+		defer fi.Lock(c).Unlock()
 
 		// Ensure size and buf are consistent
 		buf = buf[:size]

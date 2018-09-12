@@ -1343,7 +1343,7 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 		return nil, fmt.Errorf("bad typespacelist")
 	}
 	keepSearching := func() bool {
-		defer typespacelist.RLock().RUnlock()
+		defer typespacelist.RLock(c).RUnlock()
 		idInfo, exists := typespacelist.typespacesByName[typespace]
 		id = idInfo.id
 		if !exists {
@@ -1368,7 +1368,7 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 		return nil, fmt.Errorf("bad namespacelist")
 	}
 	keepSearching = func() bool {
-		defer namespacelist.RLock().RUnlock()
+		defer namespacelist.RLock(c).RUnlock()
 		idInfo, exists := namespacelist.namespacesByName[namespace]
 		id = idInfo.id
 		if !exists {
@@ -1393,7 +1393,7 @@ func (qfs *QuantumFs) getWsrLineageNoInstantiate(c *ctx,
 	}
 	var wsrInfo workspaceInfo
 	keepSearching = func() bool {
-		defer workspacelist.RLock().RUnlock()
+		defer workspacelist.RLock(c).RUnlock()
 		wsrInfo, exists = workspacelist.workspacesByName[workspace]
 		if !exists {
 			return false

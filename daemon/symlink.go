@@ -117,7 +117,7 @@ func (link *Symlink) Symlink(c *ctx, pointedTo string, linkName string,
 func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 	defer c.funcIn("Symlink::Readlink").Out()
 
-	defer link.Lock().Unlock()
+	defer link.Lock(c).Unlock()
 
 	link.self.markSelfAccessed(c, quantumfs.PathRead)
 
@@ -212,6 +212,6 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 func (link *Symlink) setLink(c *ctx, pointTo string) {
 	defer c.FuncIn("Symlink::setLink", "%s", pointTo).Out()
 
-	defer link.Lock().Unlock()
+	defer link.Lock(c).Unlock()
 	link.dirtyPointsTo = pointTo
 }

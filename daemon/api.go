@@ -959,7 +959,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 	}
 
 	func() {
-		defer parent.Lock().Unlock()
+		defer parent.Lock(c).Unlock()
 		parent.duplicateInode_(c, target, permissions, 0, 0, size,
 			quantumfs.UID(uid), quantumfs.GID(gid), type_, key)
 	}()
