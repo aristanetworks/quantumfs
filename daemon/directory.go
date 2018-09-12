@@ -656,7 +656,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	if !dir.self.isWorkspaceRoot() {
 		func() {
-			defer dir.parentLock.RLock().RUnlock()
+			defer dir.ParentRLock(c).RUnlock()
 			parent, release := dir.parent_(c)
 			defer release()
 
@@ -1810,7 +1810,7 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 
 	path = dir.name() + "/" + path
 
-	defer dir.InodeCommon.parentLock.RLock().RUnlock()
+	defer dir.InodeCommon.ParentRLock(c).RUnlock()
 	parent, release := dir.InodeCommon.parent_(c)
 	defer release()
 
