@@ -132,12 +132,13 @@ type Inode interface {
 	parent_(c *ctx) (parent Inode, release func())
 	setParent(c *ctx, newParent Inode)
 	setParent_(c *ctx, newParent Inode)
-	getParentLock() *utils.DeferableRwMutex
+	ParentLock(c *ctx) utils.NeedWriteUnlock
+	ParentRLock(c *ctx) utils.NeedReadUnlock
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
 	// orphaned from the directory tree and cannot be accessed except directly by
 	// the inodeNum or by an already open file handle.
-	isOrphaned() bool
+	isOrphaned(c *ctx) bool
 	isOrphaned_() bool
 	orphan(c *ctx, record quantumfs.DirectoryRecord)
 	orphan_(c *ctx, record quantumfs.DirectoryRecord)
@@ -545,7 +546,7 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	toCheck, release := inode.parent_(c)
 	defer release()
 	for {
-		defer toCheck.getParentLock().RLock().RUnlock()
+		defer toCheck.ParentRLock(c).RUnlock()
 
 		if ancestor.inodeNum() == toCheck.parentId_() {
 			return true
@@ -580,11 +581,7 @@ func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
 	utils.Assert(inode.id != inode.parentId, "Orphaned via setParent_()")
 }
 
-func (inode *InodeCommon) getParentLock() *orderedRwMutex {
-	return &inode.parentLock
-}
-
-func (inode *InodeCommon) isOrphaned() bool {
+func (inode *InodeCommon) isOrphaned(c *ctx) bool {
 	defer inode.ParentRLock(c).RUnlock()
 
 	return inode.isOrphaned_()
@@ -665,7 +662,7 @@ func (inode *InodeCommon) markUnclean_(dirtyElement *list.Element) (already bool
 }
 
 func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) {
-	defer inode.getParentLock().RLock().RUnlock()
+	defer inode.ParentRLock(c).RUnlock()
 
 	var record quantumfs.ImmutableDirectoryRecord
 	if inode.isOrphaned_() {
@@ -775,7 +772,7 @@ func (inode *InodeCommon) absPath(c *ctx, path string) string {
 	if inode.isWorkspaceRoot() {
 		return "/" + path
 	}
-	if inode.isOrphaned() {
+	if inode.isOrphaned(c) {
 		panic("Orphaned file")
 	}
 
@@ -800,7 +797,7 @@ func (inode *InodeCommon) markAccessed(c *ctx, path string, op quantumfs.PathFla
 
 func (inode *InodeCommon) markSelfAccessed(c *ctx, op quantumfs.PathFlags) {
 	defer c.FuncIn("InodeCommon::markSelfAccessed", "CRUD %x", op).Out()
-	if inode.isOrphaned() {
+	if inode.isOrphaned(c) {
 		c.vlog("Orphaned, not marking")
 		return
 	}

@@ -414,7 +414,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	defer release()
 
 	defer c.qfs.instantiationLock.Lock(c).Unlock()
-	defer inode.getParentLock().Lock().Unlock()
+	defer inode.ParentLock(c).Unlock()
 	defer dir.Lock(c).Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 	defer c.qfs.flusher.lock.Lock(c).Unlock()
@@ -1165,7 +1165,7 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 	defer release()
 
 	if overwrittenInode != nil {
-		defer overwrittenInode.getParentLock().Lock().Unlock()
+		defer overwrittenInode.ParentLock(c).Unlock()
 	}
 	defer dir.Lock(c).Unlock()
 
