@@ -49,8 +49,9 @@ func TestWalkPanicString(t *testing.T) {
 			objType quantumfs.ObjectType, err error) error {
 
 			if err != nil {
-				c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-					path, key.String(), err.Error())
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
+					err.Error())
+				test.appendWalkFuncInErr(err)
 				return err
 			}
 
@@ -64,7 +65,8 @@ func TestWalkPanicString(t *testing.T) {
 		test.Assert(strings.Contains(err.Error(), expectedErr.Error()),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
-		test.expectWalkerErrors([]string{walkerErrLog})
+		test.assertWalkFuncInErrs([]string{expectedString})
+		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -98,8 +100,9 @@ func TestWalkPanicErr(t *testing.T) {
 			objType quantumfs.ObjectType, err error) error {
 
 			if err != nil {
-				c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-					path, key.String(), err.Error())
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
+					err.Error())
+				test.appendWalkFuncInErr(err)
 				return err
 			}
 
@@ -114,7 +117,8 @@ func TestWalkPanicErr(t *testing.T) {
 			expectedErr.Error()),
 			"Walk did not get the expectedErr value, instead got %v",
 			err)
-		test.expectWalkerErrors([]string{walkerErrLog})
+		test.assertWalkFuncInErrs([]string{expectedErr.Error()})
+		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -147,8 +151,9 @@ func TestWalkErr(t *testing.T) {
 			objType quantumfs.ObjectType, err error) error {
 
 			if err != nil {
-				c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-					path, key.String(), err.Error())
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
+					err.Error())
+				test.appendWalkFuncInErr(err)
 				return err
 			}
 
@@ -162,7 +167,10 @@ func TestWalkErr(t *testing.T) {
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
-		test.expectWalkerErrors([]string{walkerErrLog})
+		// since errors generated in walkFunc aren't reflected back into
+		// walkFunc.
+		test.assertWalkFuncInErrs(nil)
+		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -211,12 +219,13 @@ func TestHLGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == hleGetError.Error(),
 			"Walk did not get the %v, instead got %v", hleGetError,
 			err)
-		test.expectWalkerErrors([]string{walkerErrLog})
+		test.assertWalkFuncInErrs([]string{hleGetError.Error()})
+		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -259,12 +268,13 @@ func TestDEGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == deGetError.Error(),
 			"Walk did not get the %v, instead got %v", deGetError,
 			err)
-		test.expectWalkerErrors([]string{walkerErrLog})
+		test.assertWalkFuncInErrs([]string{deGetError.Error()})
+		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -312,12 +322,13 @@ func TestEAGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
-		test.expectWalkerErrors([]string{walkerErrLog})
+		test.assertWalkFuncInErrs([]string{eaGetError.Error()})
+		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -376,12 +387,13 @@ func TestEAAttrGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == eaGetError.Error(),
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
-		test.expectWalkerErrors([]string{walkerErrLog})
+		test.assertWalkFuncInErrs([]string{eaGetError.Error()})
+		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -429,12 +441,13 @@ func TestMultiBlockGetErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == mbGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", mbGetBlock0Error,
 			err)
-		test.expectWalkerErrors([]string{walkerErrLog})
+		test.assertWalkFuncInErrs([]string{mbGetBlock0Error.Error()})
+		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -485,12 +498,13 @@ func TestVLFileGetFirstErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == vlGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock0Error,
 			err)
-		test.expectWalkerErrors([]string{walkerErrLog})
+		test.assertWalkFuncInErrs([]string{vlGetBlock0Error.Error()})
+		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
 
 	})
 }
@@ -551,11 +565,12 @@ func TestVLFileGetNextErr(t *testing.T) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, tstNopWalkFn())
+		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
 		test.AssertErr(err)
 		test.Assert(err.Error() == vlGetBlock1Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock1Error,
 			err)
-		test.expectWalkerErrors([]string{walkerErrLog})
+		test.assertWalkFuncInErrs([]string{vlGetBlock1Error.Error()})
+		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
 	})
 }

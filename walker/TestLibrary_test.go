@@ -46,6 +46,7 @@ func runTestCommon(t *testing.T, test walkerTest) {
 		},
 	}
 
+	th.walkInErrors = make([]error, 0)
 	th.Timeout = 7000 * time.Millisecond
 	th.CreateTestDirs()
 	defer th.EndTest()
@@ -59,6 +60,9 @@ func runTestCommon(t *testing.T, test walkerTest) {
 type testHelper struct {
 	daemon.TestHelper
 	config daemon.QuantumFsConfig
+
+	mutex        utils.DeferableMutex
+	walkInErrors []error
 }
 
 type walkerTest func(test *testHelper)
@@ -270,29 +274,51 @@ func (th *testHelper) printMap(name string, m map[string]int) {
 	}
 }
 
-func (th *testHelper) expectWalkerErrors(errs []string) {
+func (th *testHelper) appendWalkFuncInErr(err error) {
+	defer th.mutex.Lock().Unlock()
+	th.walkInErrors = append(th.walkInErrors, err)
+}
+
+// assertWalkFuncInErrs asserts the input error strings to walkFunc.
+func (th *testHelper) assertWalkFuncInErrs(errs []string) {
+	th.Assert(len(th.walkInErrors) == len(errs), "want %d errors, got %d errors",
+		len(errs), len(th.walkInErrors))
+	for _, e := range errs {
+		found := false
+		for _, w := range th.walkInErrors {
+			if strings.Contains(w.Error(), e) {
+				found = true
+				break
+			}
+		}
+		th.Assert(found, "substring \"%s\" not found in any errors", e)
+	}
+}
+
+// assertWalkFuncQlogErrs asserts the error format strings
+// expected in qlog.
+func (th *testHelper) assertWalkFuncQlogErrs(errs []string) {
 	th.ExpectedErrors = make(map[string]struct{})
 	for _, e := range errs {
 		th.ExpectedErrors["ERROR: "+e] = struct{}{}
 	}
 }
 
-func walkWithCtx(c *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
-	wf WalkFunc) error {
-	return walk(newContext(c, dsGet, rootID, wf))
-}
-
-func tstNopWalkFn() WalkFunc {
+func (th *testHelper) nopWalkFn() WalkFunc {
 	return func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
 		objType quantumfs.ObjectType, err error) error {
 		if err != nil {
-			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-				path, key, err)
+			c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key, err)
+			th.appendWalkFuncInErr(err)
 			return err
 		}
-
 		return nil
 	}
+}
+
+func walkWithCtx(c *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
+	wf WalkFunc) error {
+	return walk(newContext(c, dsGet, rootID, wf))
 }
 
 func TestMain(m *testing.M) {

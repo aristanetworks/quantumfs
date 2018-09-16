@@ -109,6 +109,19 @@ func aggregateDsGetter(dsGet walkDsGet) walkDsGet {
 	}
 }
 
+func dsErrFilter(c *Ctx, dsGet walkDsGet) walkDsGet {
+	return func(cq *quantumfs.Ctx, path string,
+		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
+		buf quantumfs.Buffer) error {
+
+		err := dsGet(cq, path, key, typ, buf)
+		if err != nil {
+			err = filterErrByWalkFunc(c, path, key, typ, err)
+		}
+		return err
+	}
+}
+
 func newContext(cq *quantumfs.Ctx, dsGet walkDsGet,
 	rootID quantumfs.ObjectKey, wf WalkFunc) *Ctx {
 
@@ -156,10 +169,11 @@ func walk(c *Ctx) error {
 	// but we don't overwrite the c.dsGet since thats the
 	// caller provided dsGet
 	adsGet := aggregateDsGetter(c.dsGet)
+	adsGetEF := dsErrFilter(c, adsGet)
 
 	var err error
 	buf := simplebuffer.New(nil, c.rootID)
-	if err = adsGet(c.Qctx, "wsr", c.rootID,
+	if err = adsGetEF(c.Qctx, "wsr", c.rootID,
 		quantumfs.ObjectTypeWorkspaceRoot, buf); err != nil {
 
 		return err
@@ -199,7 +213,7 @@ func walk(c *Ctx) error {
 			return err
 		}
 
-		if err = handleHardLinks(c, adsGet, wsr.HardlinkEntry(),
+		if err = handleHardLinks(c, adsGetEF, wsr.HardlinkEntry(),
 			keyChan); err != nil {
 
 			return err
@@ -210,7 +224,7 @@ func walk(c *Ctx) error {
 		// enable lookup for fileID in directoryRecord of the
 		// path which represents the hardlink
 
-		if err = handleDirectoryEntry(c, "/", adsGet, wsr.BaseLayer(),
+		if err = handleDirectoryEntry(c, "/", adsGetEF, wsr.BaseLayer(),
 			keyChan); err != nil {
 
 			return err
