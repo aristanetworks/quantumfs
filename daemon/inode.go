@@ -163,6 +163,8 @@ type Inode interface {
 	parentRemoveChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 	parentGetChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 		owner fuse.Owner)
+	parentGetChildAttr_(c *ctx, inodeNum InodeId, out *fuse.Attr,
+		owner fuse.Owner)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
 
 	getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status)
@@ -502,9 +504,14 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) parentGetChildAttr(c *ctx, inodeNum InodeId,
 	out *fuse.Attr, owner fuse.Owner) {
 
-	defer c.funcIn("InodeCommon::parentGetChildAttr").Out()
-
 	defer inode.parentLock.RLock().RUnlock()
+	inode.parentGetChildAttr_(c, inodeNum, out, owner)
+}
+
+func (inode *InodeCommon) parentGetChildAttr_(c *ctx, inodeNum InodeId,
+	out *fuse.Attr, owner fuse.Owner) {
+
+	defer c.funcIn("InodeCommon::parentGetChildAttr_").Out()
 
 	if !inode.isOrphaned_() {
 		parent, release := inode.parent_(c)
