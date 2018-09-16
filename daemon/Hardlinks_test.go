@@ -869,7 +869,7 @@ func checkParentOfInstantiated(test *testHelper, wsrPath string, dirPath string,
 
 	ioutil.ReadDir(wsrPath + "/" + dirPath)
 	link := test.getInode(wsrPath + "/" + dirPath + "/" + filename)
-	defer link.getParentLock().Lock().Unlock()
+	defer link.ParentLock(test.qfs.c.NewThread()).Unlock()
 	parent, release := link.parent_(test.qfs.c.NewThread())
 	defer release()
 

@@ -414,7 +414,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	defer release()
 
 	defer c.qfs.instantiationLock.Lock(c).Unlock()
-	defer inode.getParentLock().Lock().Unlock()
+	defer inode.ParentLock(c).Unlock()
 	defer dir.Lock(c).Unlock()
 	defer dir.childRecordLock.Lock().Unlock()
 	defer c.qfs.flusher.lock.Lock(c).Unlock()
@@ -656,7 +656,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	if !dir.self.isWorkspaceRoot() {
 		func() {
-			defer dir.parentLock.RLock().RUnlock()
+			defer dir.ParentRLock(c).RUnlock()
 			parent, release := dir.parent_(c)
 			defer release()
 
@@ -773,6 +773,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 
 	var file Inode
 	result := func() fuse.Status {
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -780,7 +781,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 			return recordErr
 		}
 
-		err := hasDirectoryWritePerm(c, dir)
+		err := hasDirectoryWritePerm_(c, dir)
 		if err != fuse.OK {
 			return err
 		}
@@ -830,6 +831,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 	var newDir Inode
 	result := func() fuse.Status {
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -837,7 +839,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 			return recordErr
 		}
 
-		err := hasDirectoryWritePerm(c, dir)
+		err := hasDirectoryWritePerm_(c, dir)
 		if err != fuse.OK {
 			return err
 		}
@@ -925,6 +927,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	result := child.deleteSelf(c, func() (quantumfs.DirectoryRecord,
 		fuse.Status) {
 
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		record, err := func() (quantumfs.ImmutableDirectoryRecord,
@@ -950,7 +953,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 			return nil, fuse.Status(syscall.EISDIR)
 		}
 
-		err = hasDirectoryWritePermSticky(c, dir, record.Owner())
+		err = hasDirectoryWritePermSticky_(c, dir, record.Owner())
 		if err != fuse.OK {
 			return nil, err
 		}
@@ -979,6 +982,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	result := child.deleteSelf(c, func() (quantumfs.DirectoryRecord,
 		fuse.Status) {
 
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		result := func() fuse.Status {
@@ -988,7 +992,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 				return fuse.ENOENT
 			}
 
-			err := hasDirectoryWritePermSticky(c, dir, record.Owner())
+			err := hasDirectoryWritePermSticky_(c, dir, record.Owner())
 			if err != fuse.OK {
 				return err
 			}
@@ -1027,6 +1031,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	var inode Inode
 	result := func() fuse.Status {
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -1034,7 +1039,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return recordErr
 		}
 
-		result := hasDirectoryWritePerm(c, dir)
+		result := hasDirectoryWritePerm_(c, dir)
 		if result != fuse.OK {
 			return result
 		}
@@ -1089,6 +1094,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 
 	var inode Inode
 	result := func() fuse.Status {
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -1096,7 +1102,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 			return recordErr
 		}
 
-		err := hasDirectoryWritePerm(c, dir)
+		err := hasDirectoryWritePerm_(c, dir)
 		if err != fuse.OK {
 			return err
 		}
@@ -1165,8 +1171,14 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 	defer release()
 
 	if overwrittenInode != nil {
-		defer overwrittenInode.getParentLock().Lock().Unlock()
+		defer overwrittenInode.ParentLock(c).Unlock()
 	}
+	unlockParent := dir.ParentRLock(c).RUnlock
+	defer func () {
+		if unlockParent != nil {
+			unlockParent()
+		}
+	}()
 	defer dir.Lock(c).Unlock()
 
 	oldInodeId, record, result := func() (InodeId,
@@ -1189,10 +1201,12 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 			return quantumfs.InodeIdInvalid, nil, fuse.ENOENT
 		}
 
-		err := hasDirectoryWritePermSticky(c, dir, record.Owner())
+		err := hasDirectoryWritePermSticky_(c, dir, record.Owner())
 		if err != fuse.OK {
 			return quantumfs.InodeIdInvalid, nil, err
 		}
+		unlockParent()
+		unlockParent = nil
 
 		if oldName == newName {
 			return quantumfs.InodeIdInvalid, nil, fuse.OK
@@ -1810,7 +1824,7 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 
 	path = dir.name() + "/" + path
 
-	defer dir.InodeCommon.parentLock.RLock().RUnlock()
+	defer dir.InodeCommon.ParentRLock(c).RUnlock()
 	parent, release := dir.InodeCommon.parent_(c)
 	defer release()
 

@@ -257,7 +257,7 @@ func snapshotChildren(c *ctx, inode Inode, children *map[string]InodeIdInfo,
 	}
 
 	func() {
-		defer inode.getParentLock().RLock().RUnlock()
+		defer inode.ParentRLock(c).RUnlock()
 		parentId := inode.parentId_()
 		fillParent(c, &child.attr, parentId, typespace, namespace)
 		out = append(out, child)
