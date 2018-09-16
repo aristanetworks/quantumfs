@@ -773,7 +773,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 
 	var file Inode
 	result := func() fuse.Status {
-		defer dir.parentLock.RLock().RUnlock()
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -831,7 +831,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 	var newDir Inode
 	result := func() fuse.Status {
-		defer dir.parentLock.RLock().RUnlock()
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -927,7 +927,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	result := child.deleteSelf(c, func() (quantumfs.DirectoryRecord,
 		fuse.Status) {
 
-		defer dir.parentLock.RLock().RUnlock()
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		record, err := func() (quantumfs.ImmutableDirectoryRecord,
@@ -982,7 +982,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	result := child.deleteSelf(c, func() (quantumfs.DirectoryRecord,
 		fuse.Status) {
 
-		defer dir.parentLock.RLock().RUnlock()
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		result := func() fuse.Status {
@@ -1031,7 +1031,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	var inode Inode
 	result := func() fuse.Status {
-		defer dir.parentLock.RLock().RUnlock()
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -1094,7 +1094,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 
 	var inode Inode
 	result := func() fuse.Status {
-		defer dir.parentLock.RLock().RUnlock()
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -1173,7 +1173,7 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 	if overwrittenInode != nil {
 		defer overwrittenInode.ParentLock(c).Unlock()
 	}
-	unlockParent := dir.parentLock.RLock().RUnlock
+	unlockParent := dir.ParentRLock(c).RUnlock
 	defer func () {
 		if unlockParent != nil {
 			unlockParent()

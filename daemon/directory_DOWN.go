@@ -559,7 +559,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	// check write permission for both directories
 	
 	result = func() fuse.Status {
-		defer dstInode.getParentLock().RLock().RUnlock()
+		defer dstInode.ParentRLock(c).RUnlock()
 		return hasDirectoryWritePerm_(c, dstInode)
 	} ()
 	if result != fuse.OK {
@@ -567,7 +567,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	}
 
 	result = func() fuse.Status {
-		defer dir.parentLock.RLock().RUnlock()
+		defer dir.ParentRLock(c).RUnlock()
 		defer dir.childRecordLock.Lock().Unlock()
 
 		record := dir.children.recordByName(c, oldName)

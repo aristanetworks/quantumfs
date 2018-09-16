@@ -158,7 +158,7 @@ func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
 
 	pid := c.fuseCtx.Pid
 	
-	defer inode.getParentLock().RLock().RUnlock()
+	defer inode.ParentRLock(c).RUnlock()
 	return hasPermissionIds_(c, inode, uid, gid, pid, checkFlags, -1)
 }
 
@@ -211,7 +211,7 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 	owner := c.fuseCtx.Owner
 	pid := c.fuseCtx.Pid
 
-	defer inode.getParentLock().RLock().RUnlock()
+	defer inode.ParentRLock(c).RUnlock()
 	return hasPermissionIds_(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
 }
 
