@@ -17,17 +17,18 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// ErrSkipDirectory is a special error from WalkFunc to indicate that
-// the directory named in the call is to be skipped.
+// ErrSkipHierarchy is a special error from WalkFunc to indicate that
+// the walker should skip the current workspace hiearchy and
+// continue with rest of the workspace walk.
 // This error will not be treated as an error during workspace walk.
-var ErrSkipDirectory = errors.New("skip this directory")
+var ErrSkipHierarchy = errors.New("skip this hiearchy")
 
 // WalkFunc is the type of the function called for each data block under the
 // Workspace. Every error encountered by walker library can be filtered
 // by WalkFunc. So walker library does not log any errors, instead it forwards
 // all errors to the walkFunc. Hence the right place to harvest errors is the WalkFunc.
 // Hence even if Walk returns nil error, it could still mean that there were errors
-// during the walk. If WalkFunc returns any error, except ErrSkipDirectory,
+// during the walk. If WalkFunc returns any error, except ErrSkipHierarchy,
 // then the workspace walk is stopped.
 // When err argument is non-nil, size is invalid.
 // When err argument is non-nil, path may be empty. When path is empty,
@@ -361,7 +362,7 @@ func handleVeryLargeFile(c *Ctx, path string, dsGet walkDsGet,
 		// ObjectTypeLargeFile objects
 		if err := handleMultiBlockFile(c, path, dsGet,
 			vlf.LargeFileKey(part), quantumfs.ObjectTypeLargeFile,
-			keyChan); err != nil && err != ErrSkipDirectory {
+			keyChan); err != nil && err != ErrSkipHierarchy {
 
 			return err
 		}
@@ -384,12 +385,12 @@ func handleDirectoryEntry(c *Ctx, path string, dsGet walkDsGet,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"DirectoryEntry buffer %s", key.String())
 
-		// When wf returns ErrSkipDirectory for a DirectoryEntry,
+		// When wf returns ErrSkipHierarchy for a DirectoryEntry,
 		// we can skip the DirectoryRecords in that DirectoryEntry
 		if err := c.wf(c, path, key, uint64(buf.Size()),
 			quantumfs.ObjectTypeDirectory, nil); err != nil {
 
-			if err == ErrSkipDirectory {
+			if err == ErrSkipHierarchy {
 				return nil
 			}
 			return err
@@ -550,7 +551,7 @@ func worker(c *Ctx,
 			}
 		}
 		if wfErr := c.wf(c, keyItem.path, keyItem.key, keyItem.size,
-			keyItem.objType, nil); wfErr != nil && wfErr != ErrSkipDirectory {
+			keyItem.objType, nil); wfErr != nil && wfErr != ErrSkipHierarchy {
 			err = wfErr
 			return
 		}
