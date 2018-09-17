@@ -49,8 +49,8 @@ func TestWalkPanicString(t *testing.T) {
 			objType quantumfs.ObjectType, err error) error {
 
 			if err != nil {
-				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
-					err.Error())
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
+					key.String(), err.Error())
 				test.appendWalkFuncInErr(err)
 				return err
 			}
@@ -100,8 +100,8 @@ func TestWalkPanicErr(t *testing.T) {
 			objType quantumfs.ObjectType, err error) error {
 
 			if err != nil {
-				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
-					err.Error())
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
+					key.String(), err.Error())
 				test.appendWalkFuncInErr(err)
 				return err
 			}
@@ -151,8 +151,8 @@ func TestWalkErr(t *testing.T) {
 			objType quantumfs.ObjectType, err error) error {
 
 			if err != nil {
-				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
-					err.Error())
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
+					key.String(), err.Error())
 				test.appendWalkFuncInErr(err)
 				return err
 			}

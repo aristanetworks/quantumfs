@@ -142,7 +142,8 @@ func (th *testHelper) checkSmallFileHardlinkKey(workspace string,
 
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-				path, key, err)
+				path, key.String(), err.Error())
+			th.appendWalkFuncInErr(err)
 			return err
 		}
 		// this check works for small files (1 block) only
@@ -234,7 +235,8 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
-				path, key, err)
+				path, key.String(), err.Error())
+			th.appendWalkFuncInErr(err)
 			return err
 		}
 		// NOTE: In the TTL walker this path comparison will be
@@ -308,7 +310,8 @@ func (th *testHelper) nopWalkFn() WalkFunc {
 	return func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
 		objType quantumfs.ObjectType, err error) error {
 		if err != nil {
-			c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key, err)
+			c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
+				err.Error())
 			th.appendWalkFuncInErr(err)
 			return err
 		}
