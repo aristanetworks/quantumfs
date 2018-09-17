@@ -111,8 +111,8 @@ type MetaInodeDeletionRecord struct {
 }
 
 type fileHandleReferenced struct {
-	fh	FileHandle
-	source	Inode
+	fh     FileHandle
+	source Inode
 }
 
 type QuantumFs struct {
@@ -1164,10 +1164,10 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 		}
 
 		qfs.fileHandles.Store(id,
-			fileHandleReferenced {
-				fh:	fileHandle,
-				source:	source,
-		})
+			fileHandleReferenced{
+				fh:     fileHandle,
+				source: source,
+			})
 	} else {
 		if exists {
 			// clean remaining response queue size from the apiFileSize
