@@ -64,7 +64,7 @@ func (th *testHelper) testHelperUpcast(
 
 // Use the context of the actual test case.
 // th.testCtx() creates a new context.
-func (th *testHelper) setupPrefixMatchTest(c *Ctx,
+func (th *testHelper) setupWsFilesTTLs(c *Ctx,
 	count int) (workspaces []string, files []string, oldTTLs []int64) {
 
 	workspaces = make([]string, count)

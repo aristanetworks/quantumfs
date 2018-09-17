@@ -257,7 +257,7 @@ func TestWsNameMatcher(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
 		c := test.testCtx()
-		workspaces, files, oldTTLs := test.setupPrefixMatchTest(c, 2)
+		workspaces, files, oldTTLs := test.setupWsFilesTTLs(c, 2)
 		c.wsNameMatcher = getPrefixMatcher(workspaces[0], false)
 
 		walkFullWSDBSetup(c)
@@ -282,7 +282,7 @@ func TestWsNameNegMatcher(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
 		c := test.testCtx()
-		workspaces, files, oldTTLs := test.setupPrefixMatchTest(c, 2)
+		workspaces, files, oldTTLs := test.setupWsFilesTTLs(c, 2)
 		c.wsNameMatcher = getPrefixMatcher(workspaces[0], true)
 
 		walkFullWSDBSetup(c)
@@ -336,4 +336,52 @@ func TestWriteStatPoints_Optimal(t *testing.T) {
 		AddPointWalkerWorkspace(c, w, true, 1*time.Second, "no errors")
 		AddPointWalkerIteration(c, 1*time.Second)
 	})
+}
+
+// TestSkipWsWrittenSince checks if workspaces are skipped
+// from walk based on provided duration.
+func TestSkipWsWrittenSince(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		c := test.testCtx()
+		workspaces, files, oldTTLs := test.setupWsFilesTTLs(c, 3)
+		dummyErrFmt := "dummy error: %s"
+		c.wsLastWriteTime = func(c *Ctx, ts, ns, ws string) (time.Time, error) {
+			wsFullPath := fmt.Sprintf("%s/%s/%s", ts, ns, ws)
+			switch wsFullPath {
+			case workspaces[1]:
+				return time.Now(), nil
+			case workspaces[2]:
+				return time.Now(), fmt.Errorf(dummyErrFmt,
+					"error in getting last write time")
+			default:
+				return time.Unix(0, 0), nil
+			}
+		}
+		c.lwDuration = time.Hour
+
+		walkFullWSDBSetup(c)
+
+		newTTL0 := test.getTTL(c, files[0])
+		newTTL1 := test.getTTL(c, files[1])
+		newTTL2 := test.getTTL(c, files[2])
+
+		// refresh should happen for workspaces[0]
+		// refresh should not happen for workspaces[1]
+		//   due to the last write time being very recent
+		// refresh should happen for workspaces[2]
+		//   due to error in finding last write time
+		test.Assert(newTTL0 > oldTTLs[0],
+			"TTL for file-0 did not refresh, old: %d new: %d",
+			oldTTLs[0], newTTL0)
+		test.Assert(newTTL1 <= oldTTLs[1],
+			"TTL for file-1 refreshed, old: %d new: %d",
+			oldTTLs[1], newTTL1)
+		test.Assert(newTTL2 > oldTTLs[2],
+			"TTL for file-2 did not refresh, old: %d new: %d",
+			oldTTLs[2], newTTL2)
+
+		test.ShouldFailLogscan = true
+	})
+
 }

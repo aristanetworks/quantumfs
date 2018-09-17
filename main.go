@@ -87,13 +87,19 @@ func main() {
 		" are skipped. The negWsPrefixMatch option reverses the check")
 	negPrefixMatch := walkFlags.Bool("negWsPrefixMatch", false, "negate the prefix match checking. All workspaces"+
 		" with names not matching the prefix are handled.")
+	lastWriteDuration := walkFlags.String("skipWsWrittenWithin", "", "CAUTION: Since this option causes certain"+
+		" workspaces to be skipped, use this option carefully. For example, using it with transient workspaces"+
+		" is ok. This option causes walker daemon to skip walking workspaces which were written"+
+		" within the given duration. The duration string is in Golang duration format. If the duration is empty"+
+		" then the duration check is not used.")
 
 	walkFlags.Usage = func() {
 		fmt.Println("qubit-walkerd version", version)
 		fmt.Println("usage: qubit-walkerd -name <name> -etherCfg <etherCfg> [-wsdbCfg <wsdb service name>] [-logdir dir]")
 		fmt.Println("                [-influxServer serverIP -influxPort port" +
 			" -influxDBName dbname] [-numWalkers num] [-skipSeenKeys]" +
-			" [-wsPrefixMatch prefix] [-negWsPrefixMatch]")
+			" [-wsPrefixMatch prefix] [-negWsPrefixMatch]" +
+			" [-skipWsWrittenWithin duration]")
 		fmt.Println()
 		fmt.Println("This daemon periodically walks all the workspaces,")
 		fmt.Println("updates the TTL of each block as per the config file and")
@@ -130,7 +136,7 @@ func main() {
 	}
 
 	c := getWalkerDaemonContext(*name, *influxServer, uint16(*influxPort), *influxDBName,
-		*etherCfg, *wsdbCfg, *logdir, *numWalkers, matcher)
+		*etherCfg, *wsdbCfg, *logdir, *numWalkers, matcher, *lastWriteDuration)
 
 	// Start heart beat messaging.
 	timer := time.Tick(heartBeatInterval)
@@ -242,6 +248,25 @@ func exitNoRestart(c *Ctx, exitMsg string, trueCond bool) {
 	}
 }
 
+// skipWsWrittenWithin returns true if the workspace was written
+// recently and so it should be skipped from walk.
+func skipWsWrittenWithin(c *Ctx, ts, ns, ws string) bool {
+	if c.lwDuration == 0 {
+		return false
+	}
+
+	lastWriteTime, err := c.wsLastWriteTime(c, ts, ns, ws)
+	if err != nil {
+		c.elog("Error from WorkspaceLastWriteTime(%s/%s/%s): %v",
+			ts, ns, ws, err.Error())
+		return false
+	}
+	if time.Now().Sub(lastWriteTime) < c.lwDuration {
+		return true
+	}
+	return false
+}
+
 // walkFullWSDB will iterate through all the TS/NS/WS once.
 // It is possible for NamespaceList and WorkspaceList to be empty
 // due to concurrent deletes from pruner. The TypespaceList will
@@ -276,6 +301,13 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 						wsFullPath)
 					continue
 				}
+
+				if skipWsWrittenWithin(c, ts, ns, ws) {
+					c.vlog("skipped walk of ws %s since ws was written within last %s",
+						wsFullPath, c.lwDuration)
+					continue
+				}
+
 				if err := queueWorkspace(c, workChan, ts, ns, ws); err != nil {
 					c.elog("Error from queueWorkspace (%s/%s/%s): %s",
 						ts, ns, ws, err.Error())
