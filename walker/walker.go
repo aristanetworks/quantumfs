@@ -42,6 +42,7 @@ type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 func filterErrByWalkFunc(c *Ctx, path string, key quantumfs.ObjectKey,
 	objTyp quantumfs.ObjectType, err error) error {
 
+	// size is invalid, see note above.
 	return c.wf(c, path, key, 0, objTyp, err)
 }
 
@@ -151,10 +152,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 		buf quantumfs.Buffer) error {
 
-		if derr := ds.Get(cq, key, buf); derr != nil {
-			return filterErrByWalkFunc(c, path, key, typ, derr)
-		}
-		return nil
+		return ds.Get(cq, key, buf)
 	}
 	c.dsGet = getter
 	// since test routines directly call walk()
@@ -442,15 +440,19 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet walkDsGet,
 				"FileId: %d missing in WSR hardlink info",
 				fpath, dr.FileId())
 			err := fmt.Errorf("%s", errStr)
-			return filterErrByWalkFunc(c, fpath, key,
+			filterErrByWalkFunc(c, fpath, key,
 				quantumfs.ObjectTypeHardlink, err)
+			// ignore walkFunc return error for this use case
+			return nil
 		} else if hldr.Type() == quantumfs.ObjectTypeHardlink {
 			errStr := fmt.Sprintf("Hardlink object type found in"+
 				"WSR hardlink info for path: %s fileID: %d", fpath,
 				dr.FileId())
 			err := fmt.Errorf("%s", errStr)
-			return filterErrByWalkFunc(c, fpath, key,
+			filterErrByWalkFunc(c, fpath, key,
 				quantumfs.ObjectTypeHardlink, err)
+			// ignore walkFunc return error for this use case
+			return nil
 		} else {
 			// hldr could be of any of the supported ObjectTypes so
 			// handle the directoryRecord accordingly
