@@ -26,10 +26,10 @@ var ErrSkipHierarchy = errors.New("skip this hiearchy")
 // WalkFunc is the type of the function called for each data block under the
 // Workspace. Every error encountered by walker library can be filtered
 // by WalkFunc. So walker library does not log any errors, instead it forwards
-// all errors to the walkFunc. Hence the right place to harvest errors is the WalkFunc.
-// Hence even if Walk returns nil error, it could still mean that there were errors
-// during the walk. If WalkFunc returns any error, except ErrSkipHierarchy,
-// then the workspace walk is stopped.
+// all errors to the walkFunc. Hence the right place to harvest errors is the
+// WalkFunc. Hence even if Walk returns nil error, it could still mean that
+// there were errors during the walk. If WalkFunc returns any error, except
+// ErrSkipHierarchy, then the workspace walk is stopped.
 // So depending on the error handling behaviour of WalkFunc, Walk API
 // can be used to do a fail-fast (abort walk on first error) or a
 // best-effort walk (continue walk amidst errors).
@@ -43,6 +43,7 @@ type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 func filterErrByWalkFunc(c *Ctx, path string, key quantumfs.ObjectKey,
 	objTyp quantumfs.ObjectType, err error) error {
 
+	// size is invalid, see note above.
 	return c.wf(c, path, key, 0, objTyp, err)
 }
 
@@ -163,10 +164,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 		buf quantumfs.Buffer) error {
 
-		if derr := ds.Get(cq, key, buf); derr != nil {
-			return filterErrByWalkFunc(c, path, key, typ, derr)
-		}
-		return nil
+		return ds.Get(cq, key, buf)
 	}
 	c.dsGet = getter
 	// since test routines directly call walk()
@@ -212,8 +210,8 @@ func walk(c *Ctx) error {
 
 		c.group.Go(func() (err error) {
 			var wErr, panicWfErr error
-			// ignore panicErr since fail-fast walkFunc expected
-			// to echo back the panicErr.
+			// ignore panicErr since fail-fast walkFunc is expected
+			// to reflect panicErr in panicWfErr.
 			wErr, _, panicWfErr = worker(c, keyChan)
 			if panicWfErr != nil {
 				return panicWfErr
@@ -463,15 +461,19 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet walkDsGet,
 				"FileId: %d missing in WSR hardlink info",
 				fpath, dr.FileId())
 			err := fmt.Errorf("%s", errStr)
-			return filterErrByWalkFunc(c, fpath, key,
+			filterErrByWalkFunc(c, fpath, key,
 				quantumfs.ObjectTypeHardlink, err)
+			// ignore walkFunc return error for this use case
+			return nil
 		} else if hldr.Type() == quantumfs.ObjectTypeHardlink {
 			errStr := fmt.Sprintf("Hardlink object type found in"+
 				"WSR hardlink info for path: %s fileID: %d", fpath,
 				dr.FileId())
 			err := fmt.Errorf("%s", errStr)
-			return filterErrByWalkFunc(c, fpath, key,
+			filterErrByWalkFunc(c, fpath, key,
 				quantumfs.ObjectTypeHardlink, err)
+			// ignore walkFunc return error for this use case
+			return nil
 		} else {
 			// hldr could be of any of the supported ObjectTypes so
 			// handle the directoryRecord accordingly
@@ -554,7 +556,9 @@ func worker(c *Ctx,
 			}
 		}
 		if wfErr := c.wf(c, keyItem.path, keyItem.key, keyItem.size,
-			keyItem.objType, nil); wfErr != nil && wfErr != ErrSkipHierarchy {
+			keyItem.objType, nil); wfErr != nil &&
+			wfErr != ErrSkipHierachy {
+
 			err = wfErr
 			return
 		}
