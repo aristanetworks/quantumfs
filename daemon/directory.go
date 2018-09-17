@@ -657,7 +657,6 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	if !dir.self.isWorkspaceRoot() {
 		func() {
-			defer dir.ParentRLock(c).RUnlock()
 			parent, release := dir.parent_(c)
 			defer release()
 
