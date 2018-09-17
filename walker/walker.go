@@ -30,9 +30,9 @@ var ErrSkipHierarchy = errors.New("skip this hiearchy")
 // Hence even if Walk returns nil error, it could still mean that there were errors
 // during the walk. If WalkFunc returns any error, except ErrSkipHierarchy,
 // then the workspace walk is stopped.
-// Depending on WalkFunc, Walk API can do a fail-fast walk (ie abort the
-// walk on first error) or a best-effort walk (ie continue walking as
-// much as possible, even amidst errors).
+// So depending on the error handling behaviour of WalkFunc, Walk API
+// can be used to do a fail-fast (abort walk on first error) or a
+// best-effort walk (continue walk amidst errors).
 // When err argument is non-nil, size is invalid.
 // When err argument is non-nil, path may be empty. When path is empty,
 // key, size and objType are invalid.
