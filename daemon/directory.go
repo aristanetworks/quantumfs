@@ -628,7 +628,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	dir.self.markSelfAccessed(c, quantumfs.PathRead|quantumfs.PathIsDir)
 
-	defer dir.getParentLock().RLock().RUnlock()
+	defer dir.ParentRLock(c).RUnlock()
 	defer dir.RLock(c).RUnlock()
 
 	if dir.childSnapshot != nil && dir.snapshotGeneration == dir.generation() {
