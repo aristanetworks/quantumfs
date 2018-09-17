@@ -555,7 +555,9 @@ func worker(c *Ctx,
 			}
 		}
 		if wfErr := c.wf(c, keyItem.path, keyItem.key, keyItem.size,
-			keyItem.objType, nil); wfErr != nil && wfErr != ErrSkipDirectory {
+			keyItem.objType, nil); wfErr != nil &&
+			wfErr != ErrSkipDirectory {
+
 			err = wfErr
 			return
 		}
