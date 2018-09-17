@@ -209,8 +209,8 @@ func walk(c *Ctx) error {
 
 		c.group.Go(func() (err error) {
 			var wErr, panicWfErr error
-			// ignore panicErr since fail-fast walkFunc expected
-			// to echo back the panicErr.
+			// ignore panicErr since fail-fast walkFunc is expected
+			// to reflect panicErr in panicWfErr.
 			wErr, _, panicWfErr = worker(c, keyChan)
 			if panicWfErr != nil {
 				return panicWfErr
