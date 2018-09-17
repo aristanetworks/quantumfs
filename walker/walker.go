@@ -19,7 +19,9 @@ import (
 
 // ErrSkipHierarchy is a special error from WalkFunc to indicate that
 // the walker should skip the current workspace hiearchy and
-// continue with rest of the workspace walk.
+// continue with rest of the workspace walk. This error also
+// leaves it upto the walker library to decide whether it wishes
+// to exit or continue walking.
 // This error will not be treated as an error during workspace walk.
 var ErrSkipHierarchy = errors.New("skip this hiearchy")
 
