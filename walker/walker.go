@@ -25,10 +25,10 @@ var ErrSkipDirectory = errors.New("skip this directory")
 // WalkFunc is the type of the function called for each data block under the
 // Workspace. Every error encountered by walker library can be filtered
 // by WalkFunc. So walker library does not log any errors, instead it forwards
-// all errors to the walkFunc. Hence the right place to harvest errors is the WalkFunc.
-// Hence even if Walk returns nil error, it could still mean that there were errors
-// during the walk. If WalkFunc returns any error, except ErrSkipDirectory,
-// then the workspace walk is stopped.
+// all errors to the walkFunc. Hence the right place to harvest errors is the
+// WalkFunc. Hence even if Walk returns nil error, it could still mean that
+// there were errors during the walk. If WalkFunc returns any error, except
+// ErrSkipDirectory, then the workspace walk is stopped.
 // So depending on the error handling behaviour of WalkFunc, Walk API
 // can be used to do a fail-fast (abort walk on first error) or a
 // best-effort walk (continue walk amidst errors).
@@ -531,7 +531,9 @@ func worker(c *Ctx, keyChan <-chan *workerData) error {
 			}
 		}
 		if err := c.wf(c, keyItem.path, keyItem.key, keyItem.size,
-			keyItem.objType, nil); err != nil && err != ErrSkipDirectory {
+			keyItem.objType, nil); err != nil &&
+			err != ErrSkipDirectory {
+
 			return err
 		}
 	}
