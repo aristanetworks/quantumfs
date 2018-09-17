@@ -19,17 +19,19 @@ import (
 
 // ErrSkipHierarchy is a special error from WalkFunc to indicate that
 // the walker should skip the current workspace hiearchy and
-// continue with rest of the workspace walk.
+// continue with rest of the workspace walk. This error also
+// leaves it upto the walker library to decide whether it wishes
+// to exit or continue walking.
 // This error will not be treated as an error during workspace walk.
 var ErrSkipHierarchy = errors.New("skip this hiearchy")
 
 // WalkFunc is the type of the function called for each data block under the
 // Workspace. Every error encountered by walker library can be filtered
 // by WalkFunc. So walker library does not log any errors, instead it forwards
-// all errors to the walkFunc. Hence the right place to harvest errors is the WalkFunc.
-// Hence even if Walk returns nil error, it could still mean that there were errors
-// during the walk. If WalkFunc returns any error, except ErrSkipHierarchy,
-// then the workspace walk is stopped.
+// all errors to the walkFunc. Hence the right place to harvest errors is the
+// WalkFunc. Hence even if Walk returns nil error, it could still mean that
+// there were errors during the walk. If WalkFunc returns any error, except
+// ErrSkipHierarchy, then the workspace walk is stopped.
 // So depending on the error handling behaviour of WalkFunc, Walk API
 // can be used to do a fail-fast (abort walk on first error) or a
 // best-effort walk (continue walk amidst errors).
@@ -43,6 +45,7 @@ type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 func filterErrByWalkFunc(c *Ctx, path string, key quantumfs.ObjectKey,
 	objTyp quantumfs.ObjectType, err error) error {
 
+	// size is invalid, see note above.
 	return c.wf(c, path, key, 0, objTyp, err)
 }
 
@@ -163,10 +166,7 @@ func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 		buf quantumfs.Buffer) error {
 
-		if derr := ds.Get(cq, key, buf); derr != nil {
-			return filterErrByWalkFunc(c, path, key, typ, derr)
-		}
-		return nil
+		return ds.Get(cq, key, buf)
 	}
 	c.dsGet = getter
 	// since test routines directly call walk()
@@ -588,7 +588,9 @@ func worker(c *Ctx,
 			}
 		}
 		if wfErr := c.wf(c, keyItem.path, keyItem.key, keyItem.size,
-			keyItem.objType, nil); wfErr != nil && wfErr != ErrSkipHierarchy {
+			keyItem.objType, nil); wfErr != nil &&
+			wfErr != ErrSkipHierarchy {
+
 			err = wfErr
 			return
 		}
