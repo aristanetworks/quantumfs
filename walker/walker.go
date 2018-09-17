@@ -208,14 +208,22 @@ func walk(c *Ctx) error {
 	for i := 0; i < conc; i++ {
 
 		c.group.Go(func() (err error) {
-			var wErr, panicWfErr error
-			// ignore panicErr since fail-fast walkFunc expected
-			// to echo back the panicErr.
-			wErr, _, panicWfErr = worker(c, keyChan)
-			if panicWfErr != nil {
-				return panicWfErr
+			var wErr, panicErr, panicWfErr error
+			for {
+				// When worker panics and walkFunc filters
+				// the error, then call worker again so
+				// that other keys in keyChan can be processed.
+				// In all other cases, finish the worker
+				// goroutine.
+				wErr, panicErr, panicWfErr = worker(c, keyChan)
+				if panicErr != nil {
+					if panicWfErr == ErrSkipHierarchy {
+						continue
+					}
+					return panicWfErr
+				}
+				return wErr
 			}
-			return wErr
 		})
 	}
 
@@ -284,6 +292,9 @@ func handleHardLinks(c *Ctx, dsGet walkDsGet,
 		if err := dsGet(c.Qctx, "[hardlink table]",
 			key, quantumfs.ObjectTypeHardlink, buf); err != nil {
 
+			if err == ErrSkipHierarchy {
+				return nil
+			}
 			return err
 		}
 
@@ -308,6 +319,9 @@ func handleMultiBlockFile(c *Ctx, path string, dsGet walkDsGet,
 
 	buf := simplebuffer.New(nil, key)
 	if err := dsGet(c.Qctx, path, key, typ, buf); err != nil {
+		if err == ErrSkipHierarchy {
+			return nil
+		}
 		return err
 	}
 
@@ -345,6 +359,9 @@ func handleVeryLargeFile(c *Ctx, path string, dsGet walkDsGet,
 	if err := dsGet(c.Qctx, path, key,
 		quantumfs.ObjectTypeVeryLargeFile, buf); err != nil {
 
+		if err == ErrSkipHierarchy {
+			return nil
+		}
 		return err
 	}
 
@@ -379,6 +396,9 @@ func handleDirectoryEntry(c *Ctx, path string, dsGet walkDsGet,
 		if err := dsGet(c.Qctx, path, key,
 			quantumfs.ObjectTypeDirectory, buf); err != nil {
 
+			if err == ErrSkipHierarchy {
+				return nil
+			}
 			return err
 		}
 
@@ -460,15 +480,23 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet walkDsGet,
 				"FileId: %d missing in WSR hardlink info",
 				fpath, dr.FileId())
 			err := fmt.Errorf("%s", errStr)
-			return filterErrByWalkFunc(c, fpath, key,
+			err = filterErrByWalkFunc(c, fpath, key,
 				quantumfs.ObjectTypeHardlink, err)
+			if err == ErrSkipHierarchy {
+				return nil
+			}
+			return err
 		} else if hldr.Type() == quantumfs.ObjectTypeHardlink {
 			errStr := fmt.Sprintf("Hardlink object type found in"+
 				"WSR hardlink info for path: %s fileID: %d", fpath,
 				dr.FileId())
 			err := fmt.Errorf("%s", errStr)
-			return filterErrByWalkFunc(c, fpath, key,
+			err = filterErrByWalkFunc(c, fpath, key,
 				quantumfs.ObjectTypeHardlink, err)
+			if err == ErrSkipHierarchy {
+				return nil
+			}
+			return err
 		} else {
 			// hldr could be of any of the supported ObjectTypes so
 			// handle the directoryRecord accordingly
@@ -497,6 +525,9 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 	if err := dsGet(c.Qctx, fpath, extKey,
 		quantumfs.ObjectTypeExtendedAttribute, buf); err != nil {
 
+		if err == ErrSkipHierarchy {
+			return nil
+		}
 		return err
 	}
 	simplebuffer.AssertNonZeroBuf(buf,
@@ -517,6 +548,9 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 		if err := dsGet(c.Qctx, fpath, key,
 			quantumfs.ObjectTypeExtendedAttribute, buf); err != nil {
 
+			if err == ErrSkipHierarchy {
+				return nil
+			}
 			return err
 		}
 		simplebuffer.AssertNonZeroBuf(buf,
