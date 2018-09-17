@@ -628,6 +628,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	dir.self.markSelfAccessed(c, quantumfs.PathRead|quantumfs.PathIsDir)
 
+	defer dir.ParentRLock().RUnlock()
 	defer dir.RLock().RUnlock()
 
 	if dir.childSnapshot != nil && dir.snapshotGeneration == dir.generation() {
@@ -644,7 +645,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 	// WorkspaceRoot.getChildSnapShot() will overwrite the first two entries with
 	// the correct data.
 	if !dir.self.isWorkspaceRoot() {
-		dir.parentGetChildAttr(c, dir.inodeNum(), &selfInfo.attr,
+		dir.parentGetChildAttr_(c, dir.inodeNum(), &selfInfo.attr,
 			c.fuseCtx.Owner)
 		selfInfo.fuseType = selfInfo.attr.Mode
 	}
@@ -665,7 +666,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 				wsr.fillWorkspaceAttrReal(c, &parentInfo.attr)
 			} else {
 				c.vlog("Got record from grandparent")
-				parent.parentGetChildAttr(c, parent.inodeNum(),
+				parent.parentGetChildAttr_(c, parent.inodeNum(),
 					&parentInfo.attr, c.fuseCtx.Owner)
 			}
 			parentInfo.fuseType = parentInfo.attr.Mode
