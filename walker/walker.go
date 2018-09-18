@@ -39,6 +39,10 @@ type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 	size uint64, objType quantumfs.ObjectType,
 	err error) error
 
+// filterErrByWalkFunc is used to forward the walker library
+// encountered errors to walkFunc. Use of this function
+// makes the error forwarding more clearer than using the
+// walkFunc directly.
 func filterErrByWalkFunc(c *Ctx, path string, key quantumfs.ObjectKey,
 	objTyp quantumfs.ObjectType, err error) error {
 
@@ -72,6 +76,8 @@ type workerData struct {
 
 const panicErrFmt = "PANIC %s\n%v"
 
+// panicHandler converts panics to error. Such
+// error is also forwarded to walkFunc.
 func panicHandler(c *Ctx, pErr *error, wfErr *error) {
 	var pErrTmp, wfErrTmp error
 
@@ -124,6 +130,8 @@ func aggregateDsGetter(dsGet walkDsGet) walkDsGet {
 	}
 }
 
+// dsErrFilter forwards errors from dsGet invocations to
+// walkFunc.
 func dsErrFilter(c *Ctx, dsGet walkDsGet) walkDsGet {
 	return func(cq *quantumfs.Ctx, path string,
 		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
