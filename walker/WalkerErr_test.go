@@ -4,7 +4,15 @@
 package walker
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
 	"testing"
+
+	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs/qlog"
 )
 
 // This file contains tests which verify walker's
@@ -20,6 +28,75 @@ func TestFailFastWalkPanicString(t *testing.T) {
 // panic(err) is generated from walkFunc .
 func TestFailFastWalkPanicErr(t *testing.T) {
 	runTest(t, doPanicErrTest(false))
+}
+
+// TestWalkLibraryPanicErr verifies that panic in walker
+// goroutine aborts the walk.
+func TestWalkLibraryPanicErr(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+
+		// create files in the workspace
+		for i := 0; i < quantumfs.MaxDirectoryRecords()+1; i++ {
+			filename := fmt.Sprintf("%s/file-%d", workspace, i)
+			data := daemon.GenData(1)
+			err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+			test.Assert(err == nil, "Write failed (%s): %s",
+				filename, err)
+		}
+
+		// setup hardlinks so that more than one HLE blocks
+		// are used.
+		for i := 0; i < quantumfs.MaxDirectoryRecords()+1; i++ {
+			link := fmt.Sprintf("%s/link-%d", workspace, i)
+			fname := fmt.Sprintf("%s/file-%d", workspace, i)
+			err := os.Link(fname, link)
+			test.Assert(err == nil, "Link failed (%s): %s",
+				link, err)
+		}
+
+		test.SyncAllWorkspaces()
+		c := &test.TestCtx().Ctx
+		db := test.GetWorkspaceDB()
+		ds := test.GetDataStore()
+		root := strings.Split(test.RelPath(workspace), "/")
+		rootID, _, err := db.Workspace(c, root[0], root[1], root[2])
+		test.AssertNoErr(err)
+
+		hleGetError := fmt.Errorf("hardlinkEntry error")
+		dsGet := func(c *quantumfs.Ctx, path string,
+			key quantumfs.ObjectKey, typ quantumfs.ObjectType,
+			buf quantumfs.Buffer) error {
+
+			if typ == quantumfs.ObjectTypeHardlink {
+				return hleGetError
+			}
+			return ds.Get(c, key, buf)
+		}
+
+		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+			objType quantumfs.ObjectType, err error) error {
+
+			if err == hleGetError {
+				panic("walker library panic")
+			}
+			if err != nil {
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
+					key.String(), err.Error())
+				test.appendWalkFuncInErr(err)
+				return err
+			}
+			return nil
+		}
+
+		err = walkWithCtx(c, dsGet, rootID, wf)
+		test.AssertErr(err)
+		test.Assert(strings.Contains(err.Error(), "PANIC"),
+			"Walk error did not contain PANIC, got %v", err)
+		test.assertWalkFuncInErrs([]string{"PANIC"})
+		test.expectQlogErrs([]string{walkerErrLog})
+	})
 }
 
 // TestFailFastWalkErr tests that Walk aborts when

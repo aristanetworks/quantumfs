@@ -46,7 +46,7 @@ func runTestCommon(t *testing.T, test walkerTest) {
 		},
 	}
 
-	th.walkInErrors = make([]error, 0)
+	th.walkFuncInputErrs = make([]error, 0)
 	th.Timeout = 7000 * time.Millisecond
 	th.CreateTestDirs()
 	defer th.EndTest()
@@ -61,8 +61,8 @@ type testHelper struct {
 	daemon.TestHelper
 	config daemon.QuantumFsConfig
 
-	mutex        utils.DeferableMutex
-	walkInErrors []error
+	walkFuncInputErrsMutex utils.DeferableMutex
+	walkFuncInputErrs      []error
 }
 
 type walkerTest func(test *testHelper)
@@ -277,17 +277,18 @@ func (th *testHelper) printMap(name string, m map[string]int) {
 }
 
 func (th *testHelper) appendWalkFuncInErr(err error) {
-	defer th.mutex.Lock().Unlock()
-	th.walkInErrors = append(th.walkInErrors, err)
+	defer th.walkFuncInputErrsMutex.Lock().Unlock()
+	th.walkFuncInputErrs = append(th.walkFuncInputErrs, err)
 }
 
 // assertWalkFuncInErrs asserts the input error strings to walkFunc.
 func (th *testHelper) assertWalkFuncInErrs(errs []string) {
-	th.Assert(len(th.walkInErrors) == len(errs), "want %d errors, got %d errors",
-		len(errs), len(th.walkInErrors))
+	th.Assert(len(th.walkFuncInputErrs) == len(errs),
+		"want %d errors, got %d errors",
+		len(errs), len(th.walkFuncInputErrs))
 	for _, e := range errs {
 		found := false
-		for _, w := range th.walkInErrors {
+		for _, w := range th.walkFuncInputErrs {
 			if strings.Contains(w.Error(), e) {
 				found = true
 				break
@@ -297,9 +298,9 @@ func (th *testHelper) assertWalkFuncInErrs(errs []string) {
 	}
 }
 
-// assertWalkFuncQlogErrs asserts the error format strings
+// expectQlogErrs asserts the error format strings
 // expected in qlog.
-func (th *testHelper) assertWalkFuncQlogErrs(errs []string) {
+func (th *testHelper) expectQlogErrs(errs []string) {
 	th.ExpectedErrors = make(map[string]struct{})
 	for _, e := range errs {
 		th.ExpectedErrors["ERROR: "+e] = struct{}{}
