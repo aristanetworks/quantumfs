@@ -92,7 +92,7 @@ func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
 		// match the new incarnation
 		fileId = remoteRecord.FileId()
 		loadRecord, found = rc.fileMap[remoteRecord.FileId()]
-		utils.Assert(found, "Dir moved, but not found in buildmap %d",
+		utils.Assert(found, "Dir moved, but not found in buildmap %s",
 			localRecord.Filename())
 
 		moved = false
