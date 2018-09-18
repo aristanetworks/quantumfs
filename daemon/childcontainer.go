@@ -30,7 +30,7 @@ type ChildContainer struct {
 }
 
 func newChildContainer(c *ctx, dir *Directory, baseLayerId quantumfs.ObjectKey,
-	wsr InodeId) (*ChildContainer, []inodePair) {
+	wsr InodeId) (*ChildContainer, []loadedInfo) {
 
 	defer c.funcIn("newChildContainer").Out()
 
@@ -75,11 +75,11 @@ func addToMap(m map[InodeId]map[string]quantumfs.DirectoryRecord,
 }
 
 func (container *ChildContainer) loadAllChildren(c *ctx,
-	baseLayerId quantumfs.ObjectKey, wsr InodeId) []inodePair {
+	baseLayerId quantumfs.ObjectKey, wsr InodeId) []loadedInfo {
 
 	defer c.funcIn("ChildContainer::loadAllChildren").Out()
 
-	uninstantiated := make([]inodePair, 0, 200) // 200 arbitrarily chosen
+	uninstantiated := make([]loadedInfo, 0, 200) // 200 arbitrarily chosen
 
 	foreachDentry(c, baseLayerId,
 		func(record quantumfs.ImmutableDirectoryRecord) {
@@ -93,7 +93,9 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 			}
 
 			uninstantiated = append(uninstantiated,
-				newInodePair(childInodeNum, parent))
+				newLoadedInfo(childInodeNum, parent,
+					record.Filename(), record.Type(),
+					record.FileId()))
 		})
 
 	return uninstantiated
@@ -120,7 +122,6 @@ func (container *ChildContainer) loadChild(c *ctx,
 			"hardlink not known by hardlink table")
 		record = newHardlinkLegFromRecord(record,
 			container.dir.hardlinkTable)
-		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	} else {
 		inodeId = c.qfs.newInodeId()
 	}
@@ -290,7 +291,6 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 	// path
 	if hardlink, isHardlink := record.(*HardlinkLeg); isHardlink {
 		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
-		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
 	container.setRecord(c, inodeId, record)
 }
