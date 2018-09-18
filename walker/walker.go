@@ -76,20 +76,15 @@ type workerData struct {
 
 const panicErrFmt = "PANIC %s\n%v"
 
-// panicHandler converts panics to error. Such
-// error is also forwarded to walkFunc.
+// panicHandler converts panic to error which is then
+// forwarded to walkFunc.
+// pErr is the error created out of panic and
+// wfErr is the error that walkFunc returns when
+// pErr is forwarded to it.
+// Both pErr and wfErr are passed by to the caller so that
+// caller can use them to decide if walk should be continued
+// or not.
 func panicHandler(c *Ctx, pErr *error, wfErr *error) {
-	var pErrTmp, wfErrTmp error
-
-	defer func() {
-		if pErr != nil {
-			*pErr = pErrTmp
-		}
-		if wfErr != nil {
-			*wfErr = wfErrTmp
-		}
-	}()
-
 	exception := recover()
 	if exception == nil {
 		return
@@ -106,11 +101,17 @@ func panicHandler(c *Ctx, pErr *error, wfErr *error) {
 	}
 
 	trace := utils.BytesToString(debug.Stack())
-	pErrTmp = fmt.Errorf(panicErrFmt, result, trace)
+	pErrTmp := fmt.Errorf(panicErrFmt, result, trace)
+	if pErr != nil {
+		*pErr = pErrTmp
+	}
 	// since objType is invalid when path is empty
 	// use ObjectTypeSmallFile as a dummy value
-	wfErrTmp = filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
+	wfErrTmp := filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
 		quantumfs.ObjectTypeSmallFile, pErrTmp)
+	if wfErr != nil {
+		*wfErr = wfErrTmp
+	}
 }
 
 const walkerErrLog = "desc: %s key: %s err: %s"
@@ -232,7 +233,7 @@ func walk(c *Ctx) error {
 		// If walker goroutine panics then irrespective
 		// of walkFunc error filtering, we'll end the
 		// workspace walk.
-		defer panicHandler(c, nil, nil)
+		defer panicHandler(c, &err, nil)
 
 		// WSR
 		if err = writeToChan(c, keyChan, "[rootId]", c.rootID,
@@ -546,6 +547,15 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 	return nil
 }
 
+// worker returns 3 errors
+// err is the error returned by walkFunc or caller detecting that
+//     errorgroup is terminating.
+// panicErr is the error created out of panic by panicHandler.
+// panicWfErr is the error returned by walkFunc when panicErr was
+//   forwarded to it.
+//
+// These 3 errors enable caller to determine if worker should be
+// re-spawned or not.
 func worker(c *Ctx,
 	keyChan <-chan *workerData) (err error, panicErr error, panicWfErr error) {
 
