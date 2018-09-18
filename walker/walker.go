@@ -154,15 +154,15 @@ func newContext(cq *quantumfs.Ctx, dsGet walkDsGet,
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
 
-	c := newContext(cq, nil, rootID, wf)
-
 	getter := func(cq *quantumfs.Ctx, path string,
 		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 		buf quantumfs.Buffer) error {
 
 		return ds.Get(cq, key, buf)
 	}
-	c.dsGet = getter
+
+	c := newContext(cq, getter, rootID, wf)
+
 	// since test routines directly call walk()
 	// ensure that Walk() doesn't add anything
 	// else here.
