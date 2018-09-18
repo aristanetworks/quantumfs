@@ -1142,8 +1142,12 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 
 	defer c.FuncIn("Directory::RenameChild", "%s -> %s", oldName, newName).Out()
 
-	fileType, overwritten, result := dir.renameChild(c, oldName, newName)
+	fileType, moved, overwritten, result := dir.renameChild(c, oldName, newName)
 	if result == fuse.OK {
+		if moved != nil && moved.Type() == quantumfs.ObjectTypeHardlink {
+			dir.markHardlinkPath(c, moved.Filename(), moved.FileId())
+		}
+
 		if overwritten != nil {
 			dir.self.markAccessed(c, overwritten.Filename(),
 				markType(overwritten.Type(),
@@ -1165,6 +1169,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 
 func (dir *Directory) renameChild(c *ctx, oldName string,
 	newName string) (fileType quantumfs.ObjectType,
+	movedRecord quantumfs.ImmutableDirectoryRecord,
 	overwrittenRecord quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
 
 	defer dir.updateSize(c, result)
@@ -1183,7 +1188,8 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 	}()
 	defer dir.Lock().Unlock()
 
-	oldInodeId, record, result := func() (InodeId,
+	var oldInodeId InodeId
+	oldInodeId, movedRecord, result = func() (InodeId,
 		quantumfs.ImmutableDirectoryRecord, fuse.Status) {
 
 		defer dir.childRecordLock.Lock().Unlock()
@@ -1252,8 +1258,8 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 		child.dirty(c)
 	} else {
 		release()
-		if _, isHardlink := record.(*HardlinkLeg); isHardlink {
-			dir.hardlinkTable.makePublishable(c, record.FileId())
+		if _, isHardlink := movedRecord.(*HardlinkLeg); isHardlink {
+			dir.hardlinkTable.makePublishable(c, movedRecord.FileId())
 		} else {
 			func() {
 				defer dir.childRecordLock.Lock().Unlock()

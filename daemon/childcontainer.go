@@ -291,7 +291,6 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 	// path
 	if hardlink, isHardlink := record.(*HardlinkLeg); isHardlink {
 		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
-		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
 	container.setRecord(c, inodeId, record)
 }
