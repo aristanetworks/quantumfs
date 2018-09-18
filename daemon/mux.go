@@ -833,12 +833,15 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	// will instantiate the Inode if necessary and possible.
 	instantiated := false
 	parent := InodeId(0)
+	var parentInode Inode
 	func() {
 		defer qfs.instantiationLock.Lock().Unlock()
 		defer qfs.mapMutex.Lock().Unlock()
 
 		parent = qfs.parentOfUninstantiated[id]
 		inode, instantiated = qfs.inode_(c, id)
+		// It's safe to hold the parent without a ref, since we hold a child
+		parentInode, _ = qfs.getInode_(c, parent)
 		// Add an inode reference for what will be using this inode
 		addInodeRef_(c, id)
 	}()
@@ -875,9 +878,10 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 		uninstantiated := inode.finishInit(c)
 		if len(uninstantiated) > 0 {
 			// check each new child for hardlinks we need to track
-			parentInode, _ := qfs.getInode_(c, parent)
-			dir := asDirectory(parentInode)
-			dir.traceHardlinks(c, uninstantiated)
+			dir := asDirectoryQuiet(parentInode)
+			if dir != nil {
+				dir.traceHardlinks(c, uninstantiated)
+			}
 
 			newInodes := make([]inodePair, 0, len(uninstantiated))
 			for _, newInode := range uninstantiated {
@@ -990,14 +994,18 @@ type loadedInfo struct {
 	child  InodeId
 	parent InodeId
 	name   string
+	filetype quantumfs.ObjectType
 	fileId quantumfs.FileId
 }
 
-func newLoadedInfo(c InodeId, p InodeId, n string, f quantumfs.FileId) loadedInfo {
+func newLoadedInfo(c InodeId, p InodeId, n string, t quantumfs.ObjectType,
+	f quantumfs.FileId) loadedInfo {
+
 	return loadedInfo{
 		child:  c,
 		parent: p,
 		name:   n,
+		filetype: t,
 		fileId: f,
 	}
 }

@@ -94,7 +94,8 @@ func (container *ChildContainer) loadAllChildren(c *ctx,
 
 			uninstantiated = append(uninstantiated,
 				newLoadedInfo(childInodeNum, parent,
-					record.Filename(), record.FileId()))
+					record.Filename(), record.Type(),
+					record.FileId()))
 		})
 
 	return uninstantiated

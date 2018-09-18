@@ -1819,8 +1819,10 @@ func (dir *Directory) traceHardlinks(c *ctx, newChildren []loadedInfo) {
 	defer dir.parentLock.RLock().RUnlock()
 
 	for _, child := range newChildren {
-		// discard file ids that aren't real
-		if child.fileId == quantumfs.InvalidFileId {
+		// discard file ids that aren't real or non-hardlinks
+		if child.fileId == quantumfs.InvalidFileId ||
+			child.filetype != quantumfs.ObjectTypeHardlink {
+
 			continue
 		}
 
