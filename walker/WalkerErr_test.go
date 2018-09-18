@@ -15,9 +15,9 @@ func TestFailFastWalkPanicErr(t *testing.T) {
 	runTest(t, doPanicErrTest(false))
 }
 
-// TestWalkLibraryPanicErr verifies that panic in walker
+// TestFailFastWalkLibraryPanicErr verifies that panic in walker
 // goroutine aborts the walk.
-func TestWalkLibraryPanicErr(t *testing.T) {
+func TestFailFastWalkLibraryPanicErr(t *testing.T) {
 	runTest(t, doWalkLibraryPanicErrTest(false))
 }
 

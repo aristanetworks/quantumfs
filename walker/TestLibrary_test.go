@@ -62,7 +62,7 @@ type testHelper struct {
 	config daemon.QuantumFsConfig
 
 	walkFuncInputErrsMutex utils.DeferableMutex
-	walkFuncInputErrs      []error
+	walkFuncInputErrs      []error // errors input into WalkFunc
 }
 
 type walkerTest func(test *testHelper)
@@ -143,7 +143,7 @@ func (th *testHelper) checkSmallFileHardlinkKey(workspace string,
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
 				path, key.String(), err.Error())
-			th.appendWalkFuncInErr(err)
+			th.appendWalkFuncInputErr(err)
 			return err
 		}
 		// this check works for small files (1 block) only
@@ -236,7 +236,7 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
 				path, key.String(), err.Error())
-			th.appendWalkFuncInErr(err)
+			th.appendWalkFuncInputErr(err)
 			return err
 		}
 		// NOTE: In the TTL walker this path comparison will be
@@ -276,13 +276,13 @@ func (th *testHelper) printMap(name string, m map[string]int) {
 	}
 }
 
-func (th *testHelper) appendWalkFuncInErr(err error) {
+func (th *testHelper) appendWalkFuncInputErr(err error) {
 	defer th.walkFuncInputErrsMutex.Lock().Unlock()
 	th.walkFuncInputErrs = append(th.walkFuncInputErrs, err)
 }
 
-// assertWalkFuncInErrs asserts the input error strings to walkFunc.
-func (th *testHelper) assertWalkFuncInErrs(errs []string) {
+// assertWalkFuncInputErrs asserts the input error strings to walkFunc.
+func (th *testHelper) assertWalkFuncInputErrs(errs []string) {
 	th.Assert(len(th.walkFuncInputErrs) == len(errs),
 		"want %d errors, got %d errors",
 		len(errs), len(th.walkFuncInputErrs))
@@ -317,7 +317,7 @@ func (th *testHelper) nopWalkFn(bestEffort bool) (map[string]struct{},
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
 				err.Error())
-			th.appendWalkFuncInErr(err)
+			th.appendWalkFuncInputErr(err)
 			if bestEffort {
 				return ErrSkipHierarchy
 			}
@@ -369,7 +369,7 @@ func doPanicStringTest(bestEffort bool) func(*testHelper) {
 			if err != nil {
 				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
 					key.String(), err.Error())
-				test.appendWalkFuncInErr(err)
+				test.appendWalkFuncInputErr(err)
 				if bestEffort {
 					return ErrSkipHierarchy
 				}
@@ -425,7 +425,7 @@ func doPanicErrTest(bestEffort bool) func(*testHelper) {
 			if err != nil {
 				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
 					key.String(), err.Error())
-				test.appendWalkFuncInErr(err)
+				test.appendWalkFuncInputErr(err)
 				if bestEffort {
 					return ErrSkipHierarchy
 				}
@@ -515,7 +515,7 @@ func doWalkLibraryPanicErrTest(bestEffort bool) func(*testHelper) {
 		test.Assert(strings.Contains(err.Error(), "PANIC"),
 			"Walk error does not contain PANIC, got %v",
 			err)
-		test.assertWalkFuncInErrs([]string{"PANIC"})
+		test.assertWalkFuncInputErrs([]string{"PANIC"})
 		// root dir should not be walked since HLE DS get failed
 		_, exists := paths["/"]
 		test.Assert(!exists, "root dir walked, walk did not abort")
@@ -565,7 +565,9 @@ func doWalkErrTest(bestEffort bool) func(*testHelper) {
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
-		test.assertWalkFuncInErrs(nil)
+		// since errors generated in walkFunc aren't reflected back into
+		// walkFunc.
+		test.assertWalkFuncInputErrs(nil)
 		test.expectQlogErrs([]string{walkerErrLog})
 	}
 }
@@ -644,7 +646,7 @@ func doHLGetErrTest(bestEffort bool) func(*testHelper) {
 		test.Assert(err.Error() == hleGetError.Error(),
 			"Walk did not get the %v, instead got %v", hleGetError,
 			err)
-		test.assertWalkFuncInErrs([]string{hleGetError.Error()})
+		test.assertWalkFuncInputErrs([]string{hleGetError.Error()})
 		// root dir should not be walked since HLE DS get failed
 		_, exists := paths["/"]
 		test.Assert(!exists, "root dir walked, walk did not abort")
