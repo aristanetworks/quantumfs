@@ -830,6 +830,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	defer c.funcIn("Directory::Mkdir").Out()
 
 	var newDir Inode
+	var uninstantiated []loadedInfo
 	result := func() fuse.Status {
 		defer dir.parentLock.RLock().RUnlock()
 		defer dir.Lock().Unlock()
@@ -848,12 +849,13 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 			newDirectory, quantumfs.ObjectTypeDirectory,
 			quantumfs.EmptyDirKey, out)
 		if newDir != nil {
-			newDir.finishInit(c)
+			uninstantiated = newDir.finishInit(c)
 		}
 		return fuse.OK
 	}()
 
 	if result == fuse.OK {
+		dir.traceHardlinks(c, uninstantiated)
 		newDir.markSelfAccessed(c, quantumfs.PathCreated|
 			quantumfs.PathIsDir)
 	}
