@@ -211,8 +211,9 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeIdInfo,
 			(*inodeMap)[name] = inodeId
 			(*nameMap)[inodeId.id] = name
 
-			c.qfs.addUninstantiated(c, []inodePair{
-				newInodePair(inodeId.id, parent.inodeNum())})
+			c.qfs.addUninstantiated(c, []loadedInfo{
+				newLoadedInfo(inodeId.id, parent.inodeNum(),
+					name, quantumfs.InvalidFileId)})
 		}
 		touched[name] = true
 	}
@@ -1019,8 +1020,9 @@ func (wsl *WorkspaceList) updateChildren(c *ctx,
 			}
 			wsl.workspacesById[inodeId.id] = name
 
-			c.qfs.addUninstantiated(c, []inodePair{
-				newInodePair(inodeId.id, wsl.inodeNum())})
+			c.qfs.addUninstantiated(c, []loadedInfo{
+				newLoadedInfo(inodeId.id, wsl.inodeNum(),
+					name, quantumfs.InvalidFileId)})
 		}
 	}
 

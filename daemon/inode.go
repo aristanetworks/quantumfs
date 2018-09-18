@@ -106,7 +106,7 @@ type Inode interface {
 	// Must be called with the instantiation lock
 	// Instantiate the Inode for the given child on demand.
 	instantiateChild_(c *ctx, inodeNum InodeId) Inode
-	finishInit(c *ctx) []inodePair
+	finishInit(c *ctx) []loadedInfo
 
 	name() string
 	setName(name string)
@@ -688,7 +688,7 @@ func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 	panic(msg)
 }
 
-func (inode *InodeCommon) finishInit(c *ctx) []inodePair {
+func (inode *InodeCommon) finishInit(c *ctx) []loadedInfo {
 	return nil
 }
 
@@ -885,6 +885,23 @@ func (inode *InodeCommon) delRef(c *ctx) {
 
 	defer inode.parentLock.Lock().Unlock()
 
+	parent, release := inode.parent_(c)
+	defer release()
+
+	var record quantumfs.ImmutableDirectoryRecord
+	if inode.isOrphaned_() {
+		record = inode.unlinkRecord
+	} else {
+		record = func () quantumfs.ImmutableDirectoryRecord {
+			dir := asDirectory(parent)
+
+			defer dir.RLock().RUnlock()
+			defer dir.childRecordLock.Lock().Unlock()
+
+			return dir.getRecordChildCall_(c, inode.inodeNum())
+		} ()
+	}
+
 	toRelease := func() bool {
 		defer c.qfs.mapMutex.Lock().Unlock()
 
@@ -901,8 +918,9 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		c.qfs.setInode_(c, inode.inodeNum(), nil)
 		delete(c.qfs.inodeRefcounts, inode.inodeNum())
 
-		c.qfs.addUninstantiated_(c, []inodePair{
-			newInodePair(inode.inodeNum(), inode.parentId_())})
+		c.qfs.addUninstantiated_(c, []loadedInfo{
+			newLoadedInfo(inode.inodeNum(), inode.parentId_(),
+				record.Filename(), record.FileId())})
 		return true
 	}()
 	if !toRelease {
@@ -912,9 +930,6 @@ func (inode *InodeCommon) delRef(c *ctx) {
 	// This Inode is now unlisted and unreachable
 
 	if !inode.isOrphaned_() {
-		parent, release := inode.parent_(c)
-		defer release()
-
 		parent.delRef(c)
 	}
 

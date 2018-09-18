@@ -874,6 +874,11 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	if instantiated {
 		uninstantiated := inode.finishInit(c)
 		if len(uninstantiated) > 0 {
+			// check each new child for hardlinks we need to track
+			parentInode, _ := qfs.getInode_(c, parent)
+			dir := asDirectory(parentInode)
+			dir.traceHardlinks(c, uninstantiated)
+
 			defer qfs.mapMutex.Lock().Unlock()
 			qfs.addUninstantiated_(c, uninstantiated)
 		}
@@ -962,26 +967,30 @@ func (qfs *QuantumFs) setInode_(c *ctx, id InodeId, inode Inode) {
 }
 
 // Set a list of inode numbers to be uninstantiated with the given parent
-type inodePair struct {
+type loadedInfo struct {
 	child  InodeId
 	parent InodeId
+	name   string
+	fileId quantumfs.FileId
 }
 
-func newInodePair(c InodeId, p InodeId) inodePair {
-	return inodePair{
+func newLoadedInfo(c InodeId, p InodeId, n string, f quantumfs.FileId) loadedInfo {
+	return loadedInfo{
 		child:  c,
 		parent: p,
+		name:   n,
+		fileId: f,
 	}
 }
 
-func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []inodePair) {
+func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []loadedInfo) {
 	defer qfs.mapMutex.Lock().Unlock()
 
 	qfs.addUninstantiated_(c, uninstantiated)
 }
 
 // Requires the mapMutex for writing
-func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []inodePair) {
+func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []loadedInfo) {
 	defer c.funcIn("Mux::addUninstantiated_").Out()
 
 	for _, pair := range uninstantiated {

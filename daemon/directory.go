@@ -101,7 +101,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	utils.Assert(dir.treeState() != nil, "Directory treeState nil at init")
 }
 
-func (dir *Directory) finishInit(c *ctx) (uninstantiated []inodePair) {
+func (dir *Directory) finishInit(c *ctx) (uninstantiated []loadedInfo) {
 	defer c.funcIn("Directory::finishInit").Out()
 	defer dir.childRecordLock.Unlock()
 
@@ -1791,7 +1791,7 @@ func createNewEntry(c *ctx, name string, mode uint32,
 // Needs exclusive Inode lock
 func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask uint32,
 	rdev uint32, size uint64, uid quantumfs.UID, gid quantumfs.GID,
-	type_ quantumfs.ObjectType, key quantumfs.ObjectKey) {
+	type_ quantumfs.ObjectType, key quantumfs.ObjectKey) quantumfs.FileId {
 
 	defer c.FuncIn("Directory::duplicateInode_", "name %s", name).Out()
 
@@ -1807,9 +1807,26 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	if type_ == quantumfs.ObjectTypeHardlink {
 		parent = dir.hardlinkTable.getWorkspaceRoot().inodeNum()
 	}
-	c.qfs.addUninstantiated(c, []inodePair{newInodePair(inodeNum, parent)})
+	c.qfs.addUninstantiated(c, []loadedInfo{newLoadedInfo(inodeNum, parent,
+		name, entry.FileId())})
 
 	c.qfs.noteChildCreated(c, dir.inodeNum(), name)
+	return entry.FileId()
+}
+
+func (dir *Directory) traceHardlinks(c *ctx, newChildren []loadedInfo) {
+	defer c.funcIn("Directory::traceHardlinks").Out()
+
+	defer dir.parentLock.RLock().RUnlock()
+
+	for _, child := range newChildren {
+		if dir.InodeCommon.isWorkspaceRoot() {
+			dir.hardlinkTable.markHardlinkPath(c, child.name,
+				child.fileId)
+		} else {
+			dir.markLink_(c, child.name, child.fileId)
+		}
+	}
 }
 
 func (dir *Directory) markHardlinkPath(c *ctx, path string,
@@ -1822,9 +1839,13 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 		return
 	}
 
-	path = dir.name() + "/" + path
-
 	defer dir.InodeCommon.parentLock.RLock().RUnlock()
+	dir.markLink_(c, path, fileId)
+}
+
+// Must be called with the parentLock held
+func (dir *Directory) markLink_(c *ctx, path string, fileId quantumfs.FileId) {
+	path = dir.name() + "/" + path
 	parent, release := dir.InodeCommon.parent_(c)
 	defer release()
 
