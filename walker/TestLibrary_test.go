@@ -382,7 +382,7 @@ func doPanicStringTest(bestEffort bool) func(*testHelper) {
 			return nil
 		}
 		err = Walk(c, ds, rootID, wf)
-		test.assertWalkFuncInErrs([]string{expectedString})
+		test.assertWalkFuncInputErrs([]string{expectedString})
 		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
@@ -438,7 +438,7 @@ func doPanicErrTest(bestEffort bool) func(*testHelper) {
 			return nil
 		}
 		err = Walk(c, ds, rootID, wf)
-		test.assertWalkFuncInErrs([]string{expectedErr.Error()})
+		test.assertWalkFuncInputErrs([]string{expectedErr.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
@@ -631,7 +631,7 @@ func doHLGetErrTest(bestEffort bool) func(*testHelper) {
 				errs[i] = test.walkFuncInputErrs[1].Error()
 			}
 			test.AssertNoErr(err)
-			test.assertWalkFuncInErrs(errs)
+			test.assertWalkFuncInputErrs(errs)
 
 			// since root dir is walked AFTER handling hardlinks,
 			// check that root dir was in the captured path even
@@ -692,7 +692,7 @@ func doDEGetErrTest(bestEffort bool) func(*testHelper) {
 
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
-		test.assertWalkFuncInErrs([]string{deGetError.Error()})
+		test.assertWalkFuncInputErrs([]string{deGetError.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
@@ -752,7 +752,7 @@ func doEAGetErrTest(bestEffort bool) func(*testHelper) {
 
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
-		test.assertWalkFuncInErrs([]string{eaGetError.Error()})
+		test.assertWalkFuncInputErrs([]string{eaGetError.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
@@ -823,7 +823,7 @@ func doEAAttrGetErrTest(bestEffort bool) func(*testHelper) {
 
 		paths, types, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
-		test.assertWalkFuncInErrs([]string{eaGetError.Error()})
+		test.assertWalkFuncInputErrs([]string{eaGetError.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
@@ -887,7 +887,7 @@ func doMultiBlockGetErrTest(bestEffort bool) func(*testHelper) {
 
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
-		test.assertWalkFuncInErrs([]string{mbGetBlock0Error.Error()})
+		test.assertWalkFuncInputErrs([]string{mbGetBlock0Error.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
@@ -953,7 +953,7 @@ func doVLFileGetFirstErrTest(bestEffort bool) func(*testHelper) {
 
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
-		test.assertWalkFuncInErrs([]string{vlGetBlock0Error.Error()})
+		test.assertWalkFuncInputErrs([]string{vlGetBlock0Error.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
@@ -1027,7 +1027,7 @@ func doVLFileGetNextErrTest(bestEffort bool) func(*testHelper) {
 
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
-		test.assertWalkFuncInErrs([]string{vlGetBlock1Error.Error()})
+		test.assertWalkFuncInputErrs([]string{vlGetBlock1Error.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
