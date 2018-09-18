@@ -486,7 +486,7 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	baseLayerId quantumfs.ObjectKey) {
 
 	defer c.funcIn("Directory::refresh_DOWN").Out()
-	uninstantiated := make([]loadedInfo, 0)
+	uninstantiated := make([]inodePair, 0)
 
 	localEntries := make(map[string]InodeIdInfo, 0)
 	defer dir.childRecordLock.Lock().Unlock()
@@ -508,8 +508,7 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 			childId := dir.loadNewChild_DOWN_(c, record, inodeId)
 
 			uninstantiated = append(uninstantiated,
-				newLoadedInfo(childId, parent, record.Filename(),
-					record.FileId()))
+				newInodePair(childId, parent))
 			return
 		}
 		if missingDentry {
@@ -703,9 +702,8 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	// uninstantiated, we swizzle the parent here. If it's a hardlink, it's
 	// already matched to the workspaceroot so don't corrupt that
 	if childInode == nil && !isHardlink {
-		c.qfs.addUninstantiated(c, []loadedInfo{
-			newLoadedInfo(childInodeId.id, dir.inodeNum(),
-				newEntry.Filename(), newEntry.FileId())})
+		c.qfs.addUninstantiated(c, []inodePair{
+			newInodePair(childInodeId.id, dir.inodeNum())})
 	}
 
 	result = fuse.OK

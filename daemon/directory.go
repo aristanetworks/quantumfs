@@ -1807,8 +1807,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	if type_ == quantumfs.ObjectTypeHardlink {
 		parent = dir.hardlinkTable.getWorkspaceRoot().inodeNum()
 	}
-	c.qfs.addUninstantiated(c, []loadedInfo{newLoadedInfo(inodeNum, parent,
-		name, entry.FileId())})
+	c.qfs.addUninstantiated(c, []inodePair{newInodePair(inodeNum, parent)})
 
 	c.qfs.noteChildCreated(c, dir.inodeNum(), name)
 	return entry.FileId()
@@ -1820,6 +1819,11 @@ func (dir *Directory) traceHardlinks(c *ctx, newChildren []loadedInfo) {
 	defer dir.parentLock.RLock().RUnlock()
 
 	for _, child := range newChildren {
+		// discard file ids that aren't real
+		if child.fileId == quantumfs.InvalidFileId {
+			continue
+		}
+
 		if dir.InodeCommon.isWorkspaceRoot() {
 			dir.hardlinkTable.markHardlinkPath(c, child.name,
 				child.fileId)
