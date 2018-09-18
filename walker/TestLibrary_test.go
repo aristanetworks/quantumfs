@@ -62,7 +62,7 @@ type testHelper struct {
 	config daemon.QuantumFsConfig
 
 	walkFuncInputErrsMutex utils.DeferableMutex
-	walkFuncInputErrs      []error
+	walkFuncInputErrs      []error // errors input into WalkFunc
 }
 
 type walkerTest func(test *testHelper)
@@ -143,7 +143,7 @@ func (th *testHelper) checkSmallFileHardlinkKey(workspace string,
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
 				path, key.String(), err.Error())
-			th.appendWalkFuncInErr(err)
+			th.appendWalkFuncInputErr(err)
 			return err
 		}
 		// this check works for small files (1 block) only
@@ -236,7 +236,7 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
 				path, key.String(), err.Error())
-			th.appendWalkFuncInErr(err)
+			th.appendWalkFuncInputErr(err)
 			return err
 		}
 		// NOTE: In the TTL walker this path comparison will be
@@ -276,13 +276,13 @@ func (th *testHelper) printMap(name string, m map[string]int) {
 	}
 }
 
-func (th *testHelper) appendWalkFuncInErr(err error) {
+func (th *testHelper) appendWalkFuncInputErr(err error) {
 	defer th.walkFuncInputErrsMutex.Lock().Unlock()
 	th.walkFuncInputErrs = append(th.walkFuncInputErrs, err)
 }
 
 // assertWalkFuncInErrs asserts the input error strings to walkFunc.
-func (th *testHelper) assertWalkFuncInErrs(errs []string) {
+func (th *testHelper) assertWalkFuncInputErrs(errs []string) {
 	th.Assert(len(th.walkFuncInputErrs) == len(errs),
 		"want %d errors, got %d errors",
 		len(errs), len(th.walkFuncInputErrs))
@@ -313,7 +313,7 @@ func (th *testHelper) nopWalkFn() WalkFunc {
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
 				err.Error())
-			th.appendWalkFuncInErr(err)
+			th.appendWalkFuncInputErr(err)
 			return err
 		}
 		return nil
