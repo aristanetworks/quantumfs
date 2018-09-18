@@ -497,8 +497,9 @@ func doWalkLibraryPanicErrTest(bestEffort bool) func(*testHelper) {
 
 		paths, _, wf := test.nopWalkFn(bestEffort)
 
-		panicWf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			objType quantumfs.ObjectType, err error) error {
+		panicWf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+			size uint64, objType quantumfs.ObjectType,
+			err error) error {
 
 			if err == hleGetError {
 				panic("walker library panic")
