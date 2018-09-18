@@ -46,7 +46,7 @@ func runTestCommon(t *testing.T, test walkerTest) {
 		},
 	}
 
-	th.walkInErrors = make([]error, 0)
+	th.walkFuncInputErrs = make([]error, 0)
 	th.Timeout = 7000 * time.Millisecond
 	th.CreateTestDirs()
 	defer th.EndTest()
@@ -61,8 +61,8 @@ type testHelper struct {
 	daemon.TestHelper
 	config daemon.QuantumFsConfig
 
-	mutex        utils.DeferableMutex
-	walkInErrors []error
+	walkFuncInputErrsMutex utils.DeferableMutex
+	walkFuncInputErrs      []error
 }
 
 type walkerTest func(test *testHelper)
@@ -277,17 +277,18 @@ func (th *testHelper) printMap(name string, m map[string]int) {
 }
 
 func (th *testHelper) appendWalkFuncInErr(err error) {
-	defer th.mutex.Lock().Unlock()
-	th.walkInErrors = append(th.walkInErrors, err)
+	defer th.walkFuncInputErrsMutex.Lock().Unlock()
+	th.walkFuncInputErrs = append(th.walkFuncInputErrs, err)
 }
 
 // assertWalkFuncInErrs asserts the input error strings to walkFunc.
 func (th *testHelper) assertWalkFuncInErrs(errs []string) {
-	th.Assert(len(th.walkInErrors) == len(errs), "want %d errors, got %d errors",
-		len(errs), len(th.walkInErrors))
+	th.Assert(len(th.walkFuncInputErrs) == len(errs),
+		"want %d errors, got %d errors",
+		len(errs), len(th.walkFuncInputErrs))
 	for _, e := range errs {
 		found := false
-		for _, w := range th.walkInErrors {
+		for _, w := range th.walkFuncInputErrs {
 			if strings.Contains(w.Error(), e) {
 				found = true
 				break
@@ -297,9 +298,9 @@ func (th *testHelper) assertWalkFuncInErrs(errs []string) {
 	}
 }
 
-// assertWalkFuncQlogErrs asserts the error format strings
+// expectQlogErrs asserts the error format strings
 // expected in qlog.
-func (th *testHelper) assertWalkFuncQlogErrs(errs []string) {
+func (th *testHelper) expectQlogErrs(errs []string) {
 	th.ExpectedErrors = make(map[string]struct{})
 	for _, e := range errs {
 		th.ExpectedErrors["ERROR: "+e] = struct{}{}
@@ -382,7 +383,7 @@ func doPanicStringTest(bestEffort bool) func(*testHelper) {
 		}
 		err = Walk(c, ds, rootID, wf)
 		test.assertWalkFuncInErrs([]string{expectedString})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
 			return
@@ -438,7 +439,7 @@ func doPanicErrTest(bestEffort bool) func(*testHelper) {
 		}
 		err = Walk(c, ds, rootID, wf)
 		test.assertWalkFuncInErrs([]string{expectedErr.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
 			return
@@ -448,6 +449,73 @@ func doPanicErrTest(bestEffort bool) func(*testHelper) {
 			expectedErr.Error()),
 			"Walk did not get the expectedErr value, instead got %v",
 			err)
+	}
+}
+
+func doWalkLibraryPanicErrTest(bestEffort bool) func(*testHelper) {
+	return func(test *testHelper) {
+
+		workspace := test.NewWorkspace()
+
+		// create files in the workspace
+		for i := 0; i < quantumfs.MaxDirectoryRecords()+1; i++ {
+			filename := fmt.Sprintf("%s/file-%d", workspace, i)
+			data := daemon.GenData(1)
+			err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
+			test.Assert(err == nil, "Write failed (%s): %s",
+				filename, err)
+		}
+
+		// setup hardlinks so that more than one HLE blocks
+		// are used.
+		for i := 0; i < quantumfs.MaxDirectoryRecords()+1; i++ {
+			link := fmt.Sprintf("%s/link-%d", workspace, i)
+			fname := fmt.Sprintf("%s/file-%d", workspace, i)
+			err := os.Link(fname, link)
+			test.Assert(err == nil, "Link failed (%s): %s",
+				link, err)
+		}
+
+		test.SyncAllWorkspaces()
+		c := &test.TestCtx().Ctx
+		db := test.GetWorkspaceDB()
+		ds := test.GetDataStore()
+		root := strings.Split(test.RelPath(workspace), "/")
+		rootID, _, err := db.Workspace(c, root[0], root[1], root[2])
+		test.AssertNoErr(err)
+
+		hleGetError := fmt.Errorf("hardlinkEntry error")
+		dsGet := func(c *quantumfs.Ctx, path string,
+			key quantumfs.ObjectKey, typ quantumfs.ObjectType,
+			buf quantumfs.Buffer) error {
+
+			if typ == quantumfs.ObjectTypeHardlink {
+				return hleGetError
+			}
+			return ds.Get(c, key, buf)
+		}
+
+		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+			objType quantumfs.ObjectType, err error) error {
+
+			if err == hleGetError {
+				panic("walker library panic")
+			}
+			if err != nil {
+				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
+					key.String(), err.Error())
+				test.appendWalkFuncInErr(err)
+				return err
+			}
+			return nil
+		}
+
+		err = walkWithCtx(c, dsGet, rootID, wf)
+		test.AssertErr(err)
+		test.Assert(strings.Contains(err.Error(), "PANIC"),
+			"Walk error did not contain PANIC, got %v", err)
+		test.assertWalkFuncInErrs([]string{"PANIC"})
+		test.expectQlogErrs([]string{walkerErrLog})
 	}
 }
 
@@ -495,7 +563,7 @@ func doWalkErrTest(bestEffort bool) func(*testHelper) {
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
 		test.assertWalkFuncInErrs(nil)
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 	}
 }
 
@@ -544,7 +612,7 @@ func doHLGetErrTest(bestEffort bool) func(*testHelper) {
 
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			// both link- and file- walks will result in
 			// "missing in WSR hardlink info" error, plus one
@@ -577,6 +645,7 @@ func doHLGetErrTest(bestEffort bool) func(*testHelper) {
 		// root dir should not be walked since HLE DS get failed
 		_, exists := paths["/"]
 		test.Assert(!exists, "root dir walked, walk did not abort")
+		test.expectQlogErrs([]string{walkerErrLog})
 	}
 }
 
@@ -620,7 +689,7 @@ func doDEGetErrTest(bestEffort bool) func(*testHelper) {
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInErrs([]string{deGetError.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
 			_, exists := paths["/dir-2"]
@@ -680,7 +749,7 @@ func doEAGetErrTest(bestEffort bool) func(*testHelper) {
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInErrs([]string{eaGetError.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
 			_, exists := paths["/file-1"]
@@ -751,7 +820,7 @@ func doEAAttrGetErrTest(bestEffort bool) func(*testHelper) {
 		paths, types, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInErrs([]string{eaGetError.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
 			_, exists := paths["/file-1"]
@@ -815,7 +884,7 @@ func doMultiBlockGetErrTest(bestEffort bool) func(*testHelper) {
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInErrs([]string{mbGetBlock0Error.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
 			_, exists := paths["/file-0"]
@@ -881,7 +950,7 @@ func doVLFileGetFirstErrTest(bestEffort bool) func(*testHelper) {
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInErrs([]string{vlGetBlock0Error.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
 			_, exists := paths["/file-0"]
@@ -896,7 +965,6 @@ func doVLFileGetFirstErrTest(bestEffort bool) func(*testHelper) {
 		test.Assert(err.Error() == vlGetBlock0Error.Error(),
 			"Walk did not get the %v, instead got %v", vlGetBlock0Error,
 			err)
-
 	}
 }
 
@@ -956,7 +1024,7 @@ func doVLFileGetNextErrTest(bestEffort bool) func(*testHelper) {
 		paths, _, wf := test.nopWalkFn(bestEffort)
 		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInErrs([]string{vlGetBlock1Error.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
 			_, exists := paths["/file-0"]
