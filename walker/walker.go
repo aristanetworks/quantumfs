@@ -218,14 +218,7 @@ func walk(c *Ctx) error {
 	for i := 0; i < conc; i++ {
 
 		c.group.Go(func() (err error) {
-			var wErr, panicWfErr error
-			// ignore panicErr since fail-fast walkFunc is expected
-			// to reflect panicErr in panicWfErr.
-			wErr, _, panicWfErr = worker(c, keyChan)
-			if panicWfErr != nil {
-				return panicWfErr
-			}
-			return wErr
+			return worker(c, keyChan)
 		})
 	}
 
@@ -558,9 +551,22 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 // These 3 errors enable caller to determine if worker should be
 // re-spawned or not.
 func worker(c *Ctx,
-	keyChan <-chan *workerData) (err error, panicErr error, panicWfErr error) {
+	keyChan <-chan *workerData) (err error) {
 
-	defer panicHandler(c, &panicErr, &panicWfErr)
+	var filteredPanicErr error
+
+	// now that panicHandler has run, figure out what
+	// single error to bubble up.
+	defer func() {
+		if filteredPanicErr != nil {
+			err = filteredPanicErr
+		}
+	}()
+
+	// since we are in fail-fast mode, ignore the panicErr
+	// relying only on the walkFunc returned filteredPanicErr.
+	defer panicHandler(c, nil, &filteredPanicErr)
+
 	var keyItem *workerData
 	for {
 		select {
@@ -570,6 +576,7 @@ func worker(c *Ctx,
 			return
 		case keyItem = <-keyChan:
 			if keyItem == nil {
+				err = nil
 				return
 			}
 		}

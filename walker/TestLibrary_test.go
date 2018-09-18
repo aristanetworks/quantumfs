@@ -281,7 +281,7 @@ func (th *testHelper) appendWalkFuncInputErr(err error) {
 	th.walkFuncInputErrs = append(th.walkFuncInputErrs, err)
 }
 
-// assertWalkFuncInErrs asserts the input error strings to walkFunc.
+// assertWalkFuncInputErrs asserts the input error strings to walkFunc.
 func (th *testHelper) assertWalkFuncInputErrs(errs []string) {
 	th.Assert(len(th.walkFuncInputErrs) == len(errs),
 		"want %d errors, got %d errors",

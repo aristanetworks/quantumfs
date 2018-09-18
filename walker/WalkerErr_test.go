@@ -176,7 +176,7 @@ func TestWalkLibraryPanicErr(t *testing.T) {
 			if err != nil {
 				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
 					key.String(), err.Error())
-				test.appendWalkFuncInErr(err)
+				test.appendWalkFuncInputErr(err)
 				return err
 			}
 			return nil
@@ -186,7 +186,7 @@ func TestWalkLibraryPanicErr(t *testing.T) {
 		test.AssertErr(err)
 		test.Assert(strings.Contains(err.Error(), "PANIC"),
 			"Walk error did not contain PANIC, got %v", err)
-		test.assertWalkFuncInErrs([]string{"PANIC"})
+		test.assertWalkFuncInputErrs([]string{"PANIC"})
 		test.expectQlogErrs([]string{walkerErrLog})
 	})
 }
