@@ -66,7 +66,7 @@ func TestWalkPanicString(t *testing.T) {
 			"Walk did not get the %v, instead got %v", expectedErr,
 			err)
 		test.assertWalkFuncInErrs([]string{expectedString})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -118,7 +118,7 @@ func TestWalkPanicErr(t *testing.T) {
 			"Walk did not get the expectedErr value, instead got %v",
 			err)
 		test.assertWalkFuncInErrs([]string{expectedErr.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -170,7 +170,7 @@ func TestWalkErr(t *testing.T) {
 		// since errors generated in walkFunc aren't reflected back into
 		// walkFunc.
 		test.assertWalkFuncInErrs(nil)
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -225,7 +225,7 @@ func TestHLGetErr(t *testing.T) {
 			"Walk did not get the %v, instead got %v", hleGetError,
 			err)
 		test.assertWalkFuncInErrs([]string{hleGetError.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -274,7 +274,7 @@ func TestDEGetErr(t *testing.T) {
 			"Walk did not get the %v, instead got %v", deGetError,
 			err)
 		test.assertWalkFuncInErrs([]string{deGetError.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -328,7 +328,7 @@ func TestEAGetErr(t *testing.T) {
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
 		test.assertWalkFuncInErrs([]string{eaGetError.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -393,7 +393,7 @@ func TestEAAttrGetErr(t *testing.T) {
 			"Walk did not get the %v, instead got %v", eaGetError,
 			err)
 		test.assertWalkFuncInErrs([]string{eaGetError.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -447,7 +447,7 @@ func TestMultiBlockGetErr(t *testing.T) {
 			"Walk did not get the %v, instead got %v", mbGetBlock0Error,
 			err)
 		test.assertWalkFuncInErrs([]string{mbGetBlock0Error.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 	})
 }
 
@@ -504,7 +504,7 @@ func TestVLFileGetFirstErr(t *testing.T) {
 			"Walk did not get the %v, instead got %v", vlGetBlock0Error,
 			err)
 		test.assertWalkFuncInErrs([]string{vlGetBlock0Error.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 
 	})
 }
@@ -571,6 +571,6 @@ func TestVLFileGetNextErr(t *testing.T) {
 			"Walk did not get the %v, instead got %v", vlGetBlock1Error,
 			err)
 		test.assertWalkFuncInErrs([]string{vlGetBlock1Error.Error()})
-		test.assertWalkFuncQlogErrs([]string{walkerErrLog})
+		test.expectQlogErrs([]string{walkerErrLog})
 	})
 }
