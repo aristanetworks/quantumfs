@@ -32,6 +32,7 @@ var ErrSkipDirectory = errors.New("skip this directory")
 // So depending on the error handling behaviour of WalkFunc, Walk API
 // can be used to do a fail-fast (abort walk on first error) or a
 // best-effort walk (continue walk amidst errors).
+//
 // When err argument is non-nil, size is invalid.
 // When err argument is non-nil, path may be empty. When path is empty,
 // key, size and objType are invalid.
@@ -41,7 +42,7 @@ type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 
 // filterErrByWalkFunc is used to forward the walker library
 // encountered errors to walkFunc. Use of this function
-// makes the error forwarding more clearer than using the
+// makes the error forwarding more clear than using the
 // walkFunc directly.
 func filterErrByWalkFunc(c *Ctx, path string, key quantumfs.ObjectKey,
 	objTyp quantumfs.ObjectType, err error) error {

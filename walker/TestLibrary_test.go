@@ -310,6 +310,7 @@ func (th *testHelper) expectQlogErrs(errs []string) {
 func (th *testHelper) nopWalkFn() WalkFunc {
 	return func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
 		objType quantumfs.ObjectType, err error) error {
+
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
 				err.Error())
@@ -322,6 +323,7 @@ func (th *testHelper) nopWalkFn() WalkFunc {
 
 func walkWithCtx(c *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
+
 	return walk(newContext(c, dsGet, rootID, wf))
 }
 
