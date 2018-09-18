@@ -3,15 +3,8 @@
 
 package walker
 
-import (
-	"testing"
-)
+import "testing"
 
-// This file contains tests which verify walker's
-// fail-fast behaviour.
-
-// TestFailFastWalkPanicString verifies that walk aborts when
-// panic(string) is generated from walkFunc.
 func TestFailFastWalkPanicString(t *testing.T) {
 	runTest(t, doPanicStringTest(false))
 }
@@ -20,6 +13,12 @@ func TestFailFastWalkPanicString(t *testing.T) {
 // panic(err) is generated from walkFunc .
 func TestFailFastWalkPanicErr(t *testing.T) {
 	runTest(t, doPanicErrTest(false))
+}
+
+// TestWalkLibraryPanicErr verifies that panic in walker
+// goroutine aborts the walk.
+func TestWalkLibraryPanicErr(t *testing.T) {
+	runTest(t, doWalkLibraryPanicErrTest(false))
 }
 
 // TestFailFastWalkErr tests that Walk aborts when
