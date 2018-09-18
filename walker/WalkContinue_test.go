@@ -22,6 +22,12 @@ func TestBestEffortWalkPanicErr(t *testing.T) {
 	runTest(t, doPanicErrTest(true))
 }
 
+// TestBestEffortWalkLibraryPanicErr verifies that panic in walker
+// goroutine aborts the walk.
+func TestBestEffortWalkLibraryPanicErr(t *testing.T) {
+	runTest(t, doWalkLibraryPanicErrTest(true))
+}
+
 // TestBestEffortWalkErr tests that Walk continues when
 // walkFunc returns an error.
 func TestBestEffortWalkErr(t *testing.T) {

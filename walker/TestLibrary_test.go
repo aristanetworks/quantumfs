@@ -495,27 +495,30 @@ func doWalkLibraryPanicErrTest(bestEffort bool) func(*testHelper) {
 			return ds.Get(c, key, buf)
 		}
 
-		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+		paths, _, wf := test.nopWalkFn(bestEffort)
+
+		panicWf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
 			objType quantumfs.ObjectType, err error) error {
 
 			if err == hleGetError {
 				panic("walker library panic")
 			}
-			if err != nil {
-				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
-					key.String(), err.Error())
-				test.appendWalkFuncInErr(err)
-				return err
-			}
-			return nil
+			return wf(c, path, key, size, objType, err)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, wf)
+		err = walkWithCtx(c, dsGet, rootID, panicWf)
+		test.expectQlogErrs([]string{walkerErrLog})
+
+		// walker library panic will abort the walk
+		// irrespective of fail-fast or best-effort mode.
 		test.AssertErr(err)
 		test.Assert(strings.Contains(err.Error(), "PANIC"),
-			"Walk error did not contain PANIC, got %v", err)
+			"Walk error does not contain PANIC, got %v",
+			err)
 		test.assertWalkFuncInErrs([]string{"PANIC"})
-		test.expectQlogErrs([]string{walkerErrLog})
+		// root dir should not be walked since HLE DS get failed
+		_, exists := paths["/"]
+		test.Assert(!exists, "root dir walked, walk did not abort")
 	}
 }
 
@@ -623,7 +626,7 @@ func doHLGetErrTest(bestEffort bool) func(*testHelper) {
 			for i := 1; i < errCount; i++ {
 				// walkInErrors[0] == hleGetError
 				// rest should be sasame as test.walkInErrors[1]
-				errs[i] = test.walkInErrors[1].Error()
+				errs[i] = test.walkFuncInputErrs[1].Error()
 			}
 			test.AssertNoErr(err)
 			test.assertWalkFuncInErrs(errs)
@@ -645,7 +648,6 @@ func doHLGetErrTest(bestEffort bool) func(*testHelper) {
 		// root dir should not be walked since HLE DS get failed
 		_, exists := paths["/"]
 		test.Assert(!exists, "root dir walked, walk did not abort")
-		test.expectQlogErrs([]string{walkerErrLog})
 	}
 }
 
