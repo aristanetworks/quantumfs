@@ -553,7 +553,7 @@ func (th *TestHelper) SetUidGid(uid int, gid int,
 
 	return SetDefaultUidGids{
 		originalSupplementaryGroups: oldGroups,
-		test: th,
+		test:                        th,
 	}
 }
 
