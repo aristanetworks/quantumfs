@@ -576,9 +576,9 @@ func worker(c *Ctx, keyChan <-chan *workerData) (err error) {
 				return
 			}
 		}
-		if err := c.wf(c, keyItem.path, keyItem.key, keyItem.size,
+		if err = c.wf(c, keyItem.path, keyItem.key, keyItem.size,
 			keyItem.objType, nil); err != nil &&
-			err != ErrSkipDirectory {
+			err != ErrSkipHierarchy {
 
 			return
 		}
