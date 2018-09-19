@@ -878,8 +878,21 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	if instantiated {
 		uninstantiated := inode.finishInit(c)
 		if len(uninstantiated) > 0 {
+			// check each new child for hardlinks we need to track
+			dir := asDirectoryQuiet(inode)
+			if dir != nil {
+				dir.traceHardlinks(c, uninstantiated)
+			}
+
+			newInodes := make([]inodePair, 0, len(uninstantiated))
+			for _, newInode := range uninstantiated {
+				newInodes = append(newInodes,
+					newInodePair(newInode.child,
+						newInode.parent))
+			}
+
 			defer qfs.mapMutex.Lock(c).Unlock()
-			qfs.addUninstantiated_(c, uninstantiated)
+			qfs.addUninstantiated_(c, newInodes)
 		}
 	}
 
@@ -975,6 +988,26 @@ func newInodePair(c InodeId, p InodeId) inodePair {
 	return inodePair{
 		child:  c,
 		parent: p,
+	}
+}
+
+type loadedInfo struct {
+	child  InodeId
+	parent InodeId
+	name   string
+	filetype quantumfs.ObjectType
+	fileId quantumfs.FileId
+}
+
+func newLoadedInfo(c InodeId, p InodeId, n string, t quantumfs.ObjectType,
+	f quantumfs.FileId) loadedInfo {
+
+	return loadedInfo{
+		child:  c,
+		parent: p,
+		name:   n,
+		filetype: t,
+		fileId: f,
 	}
 }
 

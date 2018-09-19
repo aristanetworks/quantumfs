@@ -78,29 +78,33 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		srcParent.Sync_DOWN(c)
 	}
 
-	// We cannot lock earlier because the parent of srcInode may be us
-	defer dir.Lock(c).Unlock()
+	maintenance := func(){}
+	func () {
+		// We cannot lock earlier because the parent of srcInode may be us
+		defer dir.Lock(c).Unlock()
 
-	func() {
-		defer dir.childRecordLock.Lock().Unlock()
-		dir.children.setRecord(c, inodeInfo, newRecord)
+		func() {
+			defer dir.childRecordLock.Lock().Unlock()
+			maintenance = dir.children.setRecord(c, inodeInfo, newRecord)
+		}()
+
+		dir.self.markAccessed(c, newName,
+			markType(newRecord.Type(), quantumfs.PathCreated))
+
+		c.vlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
+
+		out.NodeId = uint64(inodeInfo.id)
+		out.Generation = inodeInfo.generation
+		c.qfs.incrementLookupCount(c, inodeInfo.id)
+		fillEntryOutCacheData(c, out)
+		fillAttrWithDirectoryRecord(c, &out.Attr, inodeInfo.id,
+			c.fuseCtx.Owner, newRecord)
+
+		dir.self.dirty(c)
+		// Hardlinks aren't tracked by the uninstantiated list, they need a
+		// more complicated ref counting system handled by workspaceroot
 	}()
-
-	dir.self.markAccessed(c, newName,
-		markType(newRecord.Type(), quantumfs.PathCreated))
-
-	c.vlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
-
-	out.NodeId = uint64(inodeInfo.id)
-	out.Generation = inodeInfo.generation
-	c.qfs.incrementLookupCount(c, inodeInfo.id)
-	fillEntryOutCacheData(c, out)
-	fillAttrWithDirectoryRecord(c, &out.Attr, inodeInfo.id, c.fuseCtx.Owner,
-		newRecord)
-
-	dir.self.dirty(c)
-	// Hardlinks aren't tracked by the uninstantiated list, they need a more
-	// complicated reference counting system handled by workspaceroot
+	maintenance()
 
 	return fuse.OK
 }
@@ -166,11 +170,12 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
 
 func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 	childname string) (copy quantumfs.DirectoryRecord, needsSync bool,
-	inodeIdInfo InodeIdInfo, err fuse.Status) {
+	inodeIdInfo InodeIdInfo, maintenance func(), err fuse.Status) {
 
 	defer c.FuncIn("Directory::convertToHardlinkLeg_DOWN",
 		"name %s", childname).Out()
 
+	maintenance = func(){}
 	childId := dir.children.inodeNum(childname)
 
 	c.vlog("Converting inode %d to hardlink", childId.id)
@@ -178,14 +183,14 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 	child := dir.children.recordByName(c, childname)
 	if child == nil {
 		c.elog("No child record for name %s", childname)
-		return nil, false, invalidIdInfo(), fuse.ENOENT
+		return nil, false, invalidIdInfo(), maintenance, fuse.ENOENT
 	}
 
 	// If it's already a hardlink, great no more work is needed
 	if link, isLink := child.(*HardlinkLeg); isLink {
 		c.vlog("Already a hardlink")
 		recordCopy := *link
-		return &recordCopy, false, invalidIdInfo(), fuse.OK
+		return &recordCopy, false, invalidIdInfo(), maintenance, fuse.OK
 	}
 
 	// record must be a file type to be hardlinked
@@ -194,7 +199,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 		child.Type() != quantumfs.ObjectTypeSpecial {
 
 		c.vlog("Cannot hardlink %s - not a file", child.Filename())
-		return nil, false, invalidIdInfo(), fuse.EINVAL
+		return nil, false, invalidIdInfo(), maintenance, fuse.EINVAL
 	}
 
 	// remove the record from the childmap before donating it to be a hardlink
@@ -205,10 +210,10 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 
 	linkSrcCopy := newLink.Clone()
 	linkSrcCopy.SetFilename(childname)
-	dir.children.setRecord(c, childId, linkSrcCopy)
+	maintenance = dir.children.setRecord(c, childId, linkSrcCopy)
 
 	newLink.setCreationTime(quantumfs.NewTime(time.Now()))
-	return newLink, true, childId, fuse.OK
+	return newLink, true, childId, maintenance, fuse.OK
 }
 
 // the toLink parentLock must be locked
@@ -227,10 +232,17 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 			fuse.OK
 	}
 
-	defer dir.Lock(c).Unlock()
-	defer dir.childRecordLock.Lock().Unlock()
+	maintenance := func(){}
+	func () {
+		defer dir.Lock(c).Unlock()
+		defer dir.childRecordLock.Lock().Unlock()
 
-	return dir.convertToHardlinkLeg_DOWN(c, toLink.name())
+		copy, needsSync, inodeIdInfo, maintenance,
+			err = dir.convertToHardlinkLeg_DOWN(c, toLink.name())
+	} ()
+	maintenance()
+
+	return copy, needsSync, inodeIdInfo, err
 }
 
 // The caller must hold the childRecordLock

@@ -106,7 +106,7 @@ type Inode interface {
 	// Must be called with the instantiation lock
 	// Instantiate the Inode for the given child on demand.
 	instantiateChild_(c *ctx, inodeNum InodeId) Inode
-	finishInit(c *ctx) []inodePair
+	finishInit(c *ctx) []loadedInfo
 
 	name() string
 	setName(name string)
@@ -696,7 +696,7 @@ func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 	panic(msg)
 }
 
-func (inode *InodeCommon) finishInit(c *ctx) []inodePair {
+func (inode *InodeCommon) finishInit(c *ctx) []loadedInfo {
 	return nil
 }
 
