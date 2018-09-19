@@ -387,9 +387,18 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
-	defer c.funcIn("InodeCommon::parentSetChildAttr").Out()
-
 	defer inode.parentLock.RLock().RUnlock()
+
+	return inode.parentSetChildAttr_(c, inodeNum, newType, attr, out,
+		updateMtime)
+}
+
+// Must be called with the parentlock held for reads
+func (inode *InodeCommon) parentSetChildAttr_(c *ctx, inodeNum InodeId,
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+
+	defer c.funcIn("InodeCommon::parentSetChildAttr_").Out()
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
