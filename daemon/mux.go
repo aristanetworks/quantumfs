@@ -533,6 +533,9 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	}
 
 	defer wsr.LockTree().Unlock()
+	// from this point on we have exclusive access to the tree, so ignore
+	// locking order since we need to do some wild stuff
+	c = c.DisableLockCheck()
 
 	err := qfs.flusher.syncWorkspace_(c, name)
 	if err != nil {
