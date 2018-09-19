@@ -23,7 +23,7 @@ import (
 // leaves it upto the walker library to decide whether it wishes
 // to exit or continue walking.
 // This error will not be treated as an error during workspace walk.
-var ErrSkipHierarchy = errors.New("skip this hiearchy")
+var ErrSkipHierarchy = errors.New("skip this hierarchy")
 
 // WalkFunc is the type of the function called for each data block under the
 // Workspace. Every error encountered by walker library can be filtered
