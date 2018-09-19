@@ -28,14 +28,14 @@ var ErrSkipDirectory = errors.New("skip this directory")
 // all errors to the walkFunc. Hence the right place to harvest errors is the
 // WalkFunc. Hence even if Walk returns nil error, it could still mean that
 // there were errors during the walk. If WalkFunc returns any error, except
-// ErrSkipDirectory, then the workspace walk is stopped.
-// So depending on the error handling behaviour of WalkFunc, Walk API
-// can be used to do a fail-fast (abort walk on first error) or a
-// best-effort walk (continue walk amidst errors).
+// ErrSkipDirectory, then the workspace walk is stopped. So depending on the
+// error handling behaviour of WalkFunc, Walk API can be used to do a fail-fast
+// (abort walk on first error) or a best-effort walk (continue walk amidst errors).
 //
 // When err argument is non-nil, size is invalid.
-// When err argument is non-nil, path may be empty. When path is empty,
-// key, size and objType are invalid.
+//
+// When err argument is non-nil, path may be empty. When path is empty, key, size
+// and objType are invalid.
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 	size uint64, objType quantumfs.ObjectType,
 	err error) error
