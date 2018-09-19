@@ -933,7 +933,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 	}
 
 	// This Inode is now unlisted and unreachable
-	defer inode.parentLock.Lock().Unlock()
+	defer inode.ParentLock(c).Unlock()
 
 	if !inode.isOrphaned_() {
 		parent, release := inode.parent_(c)
