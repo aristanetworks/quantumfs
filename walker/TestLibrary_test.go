@@ -268,6 +268,7 @@ func (th *testHelper) expectWalkerErrors(errs []string) {
 
 func walkWithCtx(c *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
+
 	return walk(newContext(c, dsGet, rootID, wf))
 }
 
