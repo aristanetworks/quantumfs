@@ -557,11 +557,11 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	overwritten quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
 
 	// check write permission for both directories
-	
+
 	result = func() fuse.Status {
 		defer dstInode.getParentLock().RLock().RUnlock()
 		return hasDirectoryWritePerm_(c, dstInode)
-	} ()
+	}()
 	if result != fuse.OK {
 		return
 	}
