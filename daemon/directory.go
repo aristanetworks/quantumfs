@@ -1168,8 +1168,7 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 }
 
 func (dir *Directory) renameChild(c *ctx, oldName string,
-	newName string) (fileType quantumfs.ObjectType,
-	movedRecord quantumfs.ImmutableDirectoryRecord,
+	newName string) (fileType quantumfs.ObjectType, maintenance func(),
 	overwrittenRecord quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
 
 	defer dir.updateSize(c, result)
@@ -1841,6 +1840,17 @@ func (dir *Directory) traceHardlinks(c *ctx, newChildren []loadedInfo) {
 			dir.markLink_(c, child.name, child.fileId)
 		}
 	}
+}
+
+// No locks in dir should be locked when calling this
+func (dir *Directory) checkHardlinkPath(c *ctx,
+	record quantumfs.ImmutableDirectoryRecord) {
+
+	if record.Type() != quantumfs.ObjectTypeHardlink {
+		return
+	}
+
+	dir.markHardlinkPath(c, record.Filename(), record.FileId())
 }
 
 func (dir *Directory) markHardlinkPath(c *ctx, path string,

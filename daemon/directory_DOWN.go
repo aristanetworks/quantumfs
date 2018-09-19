@@ -86,6 +86,8 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		dir.children.setRecord(c, inodeInfo, newRecord)
 	}()
 
+	dir.checkHardlinkPath(c, newRecord)
+
 	dir.self.markAccessed(c, newName,
 		markType(newRecord.Type(), quantumfs.PathCreated))
 
@@ -226,11 +228,16 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 		return linkCopy, false, dir.hardlinkTable.findHardlinkInodeId(c, id),
 			fuse.OK
 	}
+	
+	func () {
+		defer dir.Lock().Unlock()
+		defer dir.childRecordLock.Lock().Unlock()
 
-	defer dir.Lock().Unlock()
-	defer dir.childRecordLock.Lock().Unlock()
+		copy, needsSync, inodeIdInfo, err = dir.convertToHardlinkLeg_DOWN(c,
+			toLink.name())
+	} ()
 
-	return dir.convertToHardlinkLeg_DOWN(c, toLink.name())
+	dir.checkHardlinkPath(c, copy)
 }
 
 // The caller must hold the childRecordLock
