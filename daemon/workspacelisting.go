@@ -327,7 +327,7 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 		typespaces = []string{}
 	}
 
-	parentUnlock := callOnce(tsl.getParentLock().RLock().RUnlock)
+	parentUnlock := callOnce(tsl.ParentRLock(c).RUnlock)
 	defer parentUnlock.invoke()
 	defer tsl.Lock(c).Unlock()
 
@@ -668,7 +668,7 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 		namespaces = []string{}
 	}
 
-	parentUnlock := callOnce(nsl.getParentLock().RLock().RUnlock)
+	parentUnlock := callOnce(nsl.ParentRLock(c).RUnlock)
 	defer parentUnlock.invoke()
 	defer nsl.Lock(c).Unlock()
 
@@ -1054,7 +1054,7 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 		workspaces = map[string]quantumfs.WorkspaceNonce{}
 	}
 
-	parentUnlock := callOnce(wsl.getParentLock().RLock().RUnlock)
+	parentUnlock := callOnce(wsl.ParentRLock(c).RUnlock)
 	defer parentUnlock.invoke()
 	defer wsl.Lock(c).Unlock()
 
