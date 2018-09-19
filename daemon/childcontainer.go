@@ -146,6 +146,7 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeIdInfo,
 	// Since we have an inodeId this child is or will be instantiated and so is
 	// placed in the effective set.
 
+	maintenance = func(){}
 	utils.Assert(inodeId.id != quantumfs.InodeIdInvalid,
 		"setRecord without inodeId")
 
@@ -276,7 +277,7 @@ func (container *ChildContainer) deleteChild(c *ctx,
 }
 
 func (container *ChildContainer) renameChild(c *ctx, oldName string,
-	newName string) (maintenance func()) {
+	newName string) func() {
 
 	defer c.FuncIn("ChildContainer::renameChild", "%s -> %s",
 		oldName, newName).Out()
@@ -311,6 +312,7 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 
 	defer c.funcIn("ChildContainer::modifyChildWithFunc").Out()
 
+	maintenance = func(){}
 	record := container._recordByInodeId(c, inodeId)
 	if record == nil {
 		return func(){}
@@ -323,10 +325,8 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 		// have an effective entry we must create one. Hardlinks are always
 		// publishable, so do not create an effective entry for those types.
 		record = quantumfs.ToThinRecord(record)
-		maintenance = func() {
-			container.setRecord(c,
-				container.inodeNum(record.Filename()), record)
-		}
+		maintenance = container.setRecord(c,
+			container.inodeNum(record.Filename()), record)
 	}
 
 	modify(record)
