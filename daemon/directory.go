@@ -1877,7 +1877,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 func (dir *Directory) traceHardlinks(c *ctx, newChildren []loadedInfo) {
 	defer c.funcIn("Directory::traceHardlinks").Out()
 
-	defer dir.parentLock.RLock().RUnlock()
+	defer dir.ParentRLock(c).RUnlock()
 
 	for _, child := range newChildren {
 		// discard file ids that aren't real or non-hardlinks
