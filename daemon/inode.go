@@ -905,8 +905,6 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		return
 	}
 
-	defer inode.ParentLock(c).Unlock()
-
 	toRelease := func() bool {
 		defer c.qfs.mapMutex.Lock(c).Unlock()
 
@@ -923,6 +921,9 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		c.qfs.setInode_(c, inode.inodeNum(), nil)
 		delete(c.qfs.inodeRefcounts, inode.inodeNum())
 
+		// Note: it is a little dangerous to grab parentId_() without the
+		// parent lock, but *in theory* nobody else should have a reference
+		// to this inode anymore so there shouldn't be any races possible.
 		c.qfs.addUninstantiated_(c, []inodePair{
 			newInodePair(inode.inodeNum(), inode.parentId_())})
 		return true
@@ -932,6 +933,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 	}
 
 	// This Inode is now unlisted and unreachable
+	defer inode.parentLock.Lock().Unlock()
 
 	if !inode.isOrphaned_() {
 		parent, release := inode.parent_(c)
