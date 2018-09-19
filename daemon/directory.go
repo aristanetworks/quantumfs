@@ -1176,7 +1176,7 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 		defer overwrittenInode.getParentLock().Lock().Unlock()
 	}
 	unlockParent := dir.parentLock.RLock().RUnlock
-	defer func () {
+	defer func() {
 		if unlockParent != nil {
 			unlockParent()
 		}
