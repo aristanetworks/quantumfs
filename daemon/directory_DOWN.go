@@ -88,9 +88,6 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 			maintenance = dir.children.setRecord(c, inodeInfo, newRecord)
 		}()
 
-		dir.self.markAccessed(c, newName,
-			markType(newRecord.Type(), quantumfs.PathCreated))
-
 		c.vlog("Hardlinked %d to %s", srcInode.inodeNum(), newName)
 
 		out.NodeId = uint64(inodeInfo.id)
@@ -105,6 +102,9 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		// more complicated ref counting system handled by workspaceroot
 	}()
 	maintenance()
+
+	dir.self.markAccessed(c, newName,
+		markType(newRecord.Type(), quantumfs.PathCreated))
 
 	return fuse.OK
 }
