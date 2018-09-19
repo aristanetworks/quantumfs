@@ -161,7 +161,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 	if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 		result := func() fuse.Status {
-			parentUnlock := callOnce(fi.parentLock.RLock().RUnlock)
+			parentUnlock := callOnce(fi.ParentRLock(c).RUnlock)
 			defer parentUnlock.invoke()
 			defer fi.Lock(c).Unlock()
 
@@ -469,7 +469,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	c.vlog("offset %d size %d flags %x", offset, size, flags)
 
 	writeCount, result := func() (uint32, fuse.Status) {
-		parentUnlock := callOnce(fi.parentLock.RLock().RUnlock)
+		parentUnlock := callOnce(fi.ParentRLock(c).RUnlock)
 		defer parentUnlock.invoke()
 		defer fi.Lock(c).Unlock()
 
