@@ -958,12 +958,16 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 			"Unable to freshen all blocks for key: %s", err)
 	}
 
+	var fileId quantumfs.FileId
 	func() {
 		defer parent.Lock().Unlock()
-		parent.duplicateInode_(c, target, permissions, 0, 0, size,
+		fileId = parent.duplicateInode_(c, target, permissions, 0, 0, size,
 			quantumfs.UID(uid), quantumfs.GID(gid), type_, key)
 	}()
 
+	if type_ == quantumfs.ObjectTypeHardlink {
+		parent.markHardlinkPath(c, target, fileId)
+	}
 	parent.self.markAccessed(c, target, markType(type_, quantumfs.PathCreated))
 
 	parent.updateSize(c, fuse.OK)
