@@ -235,7 +235,7 @@ func updateChildren(c *ctx, names []string, inodeMap *map[string]InodeIdInfo,
 
 func snapshotChildren(c *ctx, inode Inode, children *map[string]InodeIdInfo,
 	typespace string, namespace string, fillChildren listingAttrFill,
-	fillMe listingAttrFill, fillParent listingAttrFill) []directoryContents {
+	fillMe listingAttrFill, parentInfo directoryContents) []directoryContents {
 
 	defer c.FuncIn("snapshotChildren", "typespace %s namespace %s", typespace,
 		namespace).Out()
@@ -251,17 +251,7 @@ func snapshotChildren(c *ctx, inode Inode, children *map[string]InodeIdInfo,
 	out = append(out, child)
 
 	c.vlog("Adding ..")
-	child = directoryContents{
-		filename: "..",
-		fuseType: fuse.S_IFDIR,
-	}
-
-	func() {
-		defer inode.getParentLock().RLock().RUnlock()
-		parentId := inode.parentId_()
-		fillParent(c, &child.attr, parentId, typespace, namespace)
-		out = append(out, child)
-	}()
+	out = append(out, parentInfo)
 
 	c.vlog("Adding the rest of the %d children", len(*children))
 	for name, inode := range *children {
@@ -313,6 +303,20 @@ func (tsl *TypespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 	}
 }
 
+// Must be called with the inode's parent lock held for reads
+func getParentInfo_(c *ctx, inode Inode, fillParent listingAttrFill,
+	typespace string, namespace string) directoryContents {
+
+	rtn := directoryContents{
+		filename:	"..",
+		fuseType:	fuse.S_IFDIR,
+	}
+
+	parentId := inode.parentId_()
+	fillParent(c, &rtn.attr, parentId, typespace, namespace)
+	return rtn
+}
+
 func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	defer c.funcIn("TypespaceList::getChildSnapshot").Out()
 
@@ -323,7 +327,13 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 		typespaces = []string{}
 	}
 
+	parentUnlock := callOnce(tsl.getParentLock().RLock().RUnlock)
+	defer parentUnlock.invoke()
 	defer tsl.Lock(c).Unlock()
+
+	parentInfo := getParentInfo_(c, tsl, fillRootAttrWrapper, "", "")
+	// unlock the parent early
+	parentUnlock.invoke()
 
 	if err == nil {
 		// We only accept positive lists
@@ -334,7 +344,7 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	// The kernel will override our parent's attributes so it doesn't matter what
 	// we put into there.
 	children := snapshotChildren(c, tsl, &tsl.typespacesByName, "", "",
-		fillTypespaceAttr, fillRootAttrWrapper, fillRootAttrWrapper)
+		fillTypespaceAttr, fillRootAttrWrapper, parentInfo)
 
 	api := directoryContents{
 		filename: quantumfs.ApiPath,
@@ -658,7 +668,14 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 		namespaces = []string{}
 	}
 
+	parentUnlock := callOnce(nsl.getParentLock().RLock().RUnlock)
+	defer parentUnlock.invoke()
 	defer nsl.Lock(c).Unlock()
+
+	parentInfo := getParentInfo_(c, nsl, fillRootAttrWrapper, nsl.typespaceName,
+		"")
+	// unlock the parent early
+	parentUnlock.invoke()
 
 	if err == nil {
 		// We only accept positive lists
@@ -668,7 +685,7 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 
 	children := snapshotChildren(c, nsl, &nsl.namespacesByName,
 		nsl.typespaceName, "", fillNamespaceAttr, fillTypespaceAttr,
-		fillRootAttrWrapper)
+		parentInfo)
 
 	return children
 }
@@ -1037,7 +1054,14 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 		workspaces = map[string]quantumfs.WorkspaceNonce{}
 	}
 
+	parentUnlock := callOnce(wsl.getParentLock().RLock().RUnlock)
+	defer parentUnlock.invoke()
 	defer wsl.Lock(c).Unlock()
+
+	parentInfo := getParentInfo_(c, wsl, fillTypespaceAttr, wsl.typespaceName,
+		wsl.namespaceName)
+	// unlock the parent early
+	parentUnlock.invoke()
 
 	if err == nil {
 		// We only accept positive lists
@@ -1050,7 +1074,7 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	}
 	children := snapshotChildren(c, wsl, &namesAndIds, wsl.typespaceName,
 		wsl.namespaceName, fillWorkspaceAttrFake, fillNamespaceAttr,
-		fillTypespaceAttr)
+		parentInfo)
 
 	return children
 }
