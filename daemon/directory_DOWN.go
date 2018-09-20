@@ -78,8 +78,8 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		srcParent.Sync_DOWN(c)
 	}
 
-	maintenance := func(){}
-	func () {
+	maintenance := func() {}
+	func() {
 		// We cannot lock earlier because the parent of srcInode may be us
 		defer dir.Lock(c).Unlock()
 
@@ -175,7 +175,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 	defer c.FuncIn("Directory::convertToHardlinkLeg_DOWN",
 		"name %s", childname).Out()
 
-	maintenance = func(){}
+	maintenance = func() {}
 	childId := dir.children.inodeNum(childname)
 
 	c.vlog("Converting inode %d to hardlink", childId.id)
@@ -232,14 +232,14 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 			fuse.OK
 	}
 
-	maintenance := func(){}
-	func () {
+	maintenance := func() {}
+	func() {
 		defer dir.Lock(c).Unlock()
 		defer dir.ChildRecordLock(c).Unlock()
 
 		copy, needsSync, inodeIdInfo, maintenance,
 			err = dir.convertToHardlinkLeg_DOWN(c, toLink.name())
-	} ()
+	}()
 	maintenance()
 
 	return copy, needsSync, inodeIdInfo, err
@@ -569,11 +569,11 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	overwritten quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
 
 	// check write permission for both directories
-	
+
 	result = func() fuse.Status {
 		defer dstInode.ParentRLock(c).RUnlock()
 		return hasDirectoryWritePerm_(c, dstInode)
-	} ()
+	}()
 	if result != fuse.OK {
 		return
 	}
