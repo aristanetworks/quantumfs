@@ -218,7 +218,7 @@ func TestSymlinkBeforeSync(t *testing.T) {
 
 		func() {
 			defer dir.RLock(c).RUnlock()
-			defer dir.childRecordLock.Lock().Unlock()
+			defer dir.ChildRecordLock(test.qfs.c.NewThread()).Unlock()
 
 			record := dir.getRecordChildCall_(test.TestCtx(), linkInode)
 			test.Assert(record != nil, "Record not found")
@@ -234,7 +234,7 @@ func TestSymlinkBeforeSync(t *testing.T) {
 
 		func() {
 			defer dir.RLock(c).RUnlock()
-			defer dir.childRecordLock.Lock().Unlock()
+			defer dir.ChildRecordLock(test.qfs.c.NewThread()).Unlock()
 
 			record := dir.getRecordChildCall_(test.TestCtx(), linkInode)
 			test.Assert(record != nil, "Record not found")

@@ -56,7 +56,7 @@ func TestHardlink(t *testing.T) {
 		parentInode := test.getInode(workspace)
 		parentDir := &parentInode.(*WorkspaceRoot).Directory
 
-		defer parentDir.childRecordLock.Lock().Unlock()
+		defer parentDir.ChildRecordLock(test.qfs.c.NewThread()).Unlock()
 		c := test.TestCtx()
 		type_ := parentDir.children.recordByInodeId(c, file1InodeNum).Type()
 		test.Assert(type_ == quantumfs.ObjectTypeHardlink,
