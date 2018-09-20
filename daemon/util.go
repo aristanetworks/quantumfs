@@ -157,7 +157,7 @@ func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
 	}
 
 	pid := c.fuseCtx.Pid
-	
+
 	defer inode.ParentRLock(c).RUnlock()
 	return hasPermissionIds_(c, inode, uid, gid, pid, checkFlags, -1)
 }

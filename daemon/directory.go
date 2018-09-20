@@ -1200,7 +1200,7 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 		defer overwrittenInode.ParentLock(c).Unlock()
 	}
 	unlockParent := dir.ParentRLock(c).RUnlock
-	defer func () {
+	defer func() {
 		if unlockParent != nil {
 			unlockParent()
 		}
@@ -1908,7 +1908,6 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 		dir.hardlinkTable.markHardlinkPath(c, path, fileId)
 		return
 	}
-
 
 	defer dir.InodeCommon.ParentRLock(c).RUnlock()
 	dir.markLink_(c, path, fileId)
