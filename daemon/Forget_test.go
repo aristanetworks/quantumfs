@@ -459,7 +459,7 @@ func TestForgetUnlinkedUninstantiated(t *testing.T) {
 
 		test.WaitFor("dropping fileA's inode", func() bool {
 			_, exists := test.qfs.lookupCount(test.qfs.c.NewThread(),
-			inodeId)
+				inodeId)
 			return !exists
 		})
 	})

@@ -245,7 +245,7 @@ func (m *orderedMapMutex) Unlock(c *ctx) {
 }
 
 type orderedLookupCount struct {
-	mutex	orderedMutex
+	mutex orderedMutex
 }
 
 func (m *orderedLookupCount) Lock(c *ctx) utils.NeedWriteUnlock {
@@ -257,7 +257,7 @@ func (m *orderedLookupCount) Unlock(c *ctx) {
 }
 
 type orderedFlusher struct {
-	mutex	orderedMutex
+	mutex orderedMutex
 }
 
 func (m *orderedFlusher) Lock(c *ctx) utils.NeedWriteUnlock {
@@ -269,7 +269,7 @@ func (m *orderedFlusher) Unlock(c *ctx) {
 }
 
 type orderedInstantiation struct {
-	mutex	orderedMutex
+	mutex orderedMutex
 }
 
 func (m *orderedInstantiation) Lock(c *ctx) utils.NeedWriteUnlock {
