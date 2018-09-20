@@ -30,6 +30,13 @@ type lockInfo struct {
 	inode		InodeId
 }
 
+func newLockInfo(k locker, i InodeId) lockInfo {
+	return lockInfo{
+		kind:	k,
+		inode:	i,
+	}
+}
+
 type lockOrder struct {
 	stack	[]lockInfo
 	disabled	bool
