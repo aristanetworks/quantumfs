@@ -410,7 +410,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 
 	defer c.FuncIn("Directory::normalizeChild", "%d", inodeId).Out()
 
-	maintenance = func(){}
+	maintenance = func() {}
 	inode, release := c.qfs.inode(c, inodeId)
 	defer release()
 
@@ -513,7 +513,7 @@ func (dir *Directory) setChildAttr(c *ctx, inodeNum InodeId,
 		}
 	}
 
-	maintenance := func(){}
+	maintenance := func() {}
 	result := func() fuse.Status {
 		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
@@ -720,7 +720,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	defer c.funcIn("Directory::create_").Out()
 
-	maintenance = func(){}
+	maintenance = func() {}
 	uid := c.fuseCtx.Owner.Uid
 	gid := c.fuseCtx.Owner.Gid
 	UID := quantumfs.ObjectUid(uid, uid)
@@ -778,7 +778,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 
 	defer c.funcIn("Directory::Create").Out()
 
-	maintenance := func(){}
+	maintenance := func() {}
 	var file Inode
 	result := func() fuse.Status {
 		defer dir.parentLock.RLock().RUnlock()
@@ -838,7 +838,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 	defer c.funcIn("Directory::Mkdir").Out()
 
-	maintenance := func(){}
+	maintenance := func() {}
 	var newDir Inode
 	var uninstantiated []loadedInfo
 	result := func() fuse.Status {
@@ -1042,8 +1042,8 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	defer c.funcIn("Directory::Symlink").Out()
 
-	maintCreate := func(){}
-	maintModify := func(){}
+	maintCreate := func() {}
+	maintModify := func() {}
 	var inode Inode
 	result := func() fuse.Status {
 		defer dir.parentLock.RLock().RUnlock()
@@ -1110,7 +1110,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 
 	defer c.funcIn("Directory::Mknod").Out()
 
-	maintenance := func(){}
+	maintenance := func() {}
 	var inode Inode
 	result := func() fuse.Status {
 		defer dir.parentLock.RLock().RUnlock()
@@ -1190,7 +1190,7 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 	newName string) (fileType quantumfs.ObjectType, maintenance func(),
 	overwrittenRecord quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
 
-	maintenance = func(){}
+	maintenance = func() {}
 	defer dir.updateSize(c, result)
 	overwrittenInodeId := dir.childInodeNum(newName).id
 	overwrittenInode, release := c.qfs.inode(c, overwrittenInodeId)
@@ -1200,7 +1200,7 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 		defer overwrittenInode.getParentLock().Lock().Unlock()
 	}
 	unlockParent := dir.parentLock.RLock().RUnlock
-	defer func () {
+	defer func() {
 		if unlockParent != nil {
 			unlockParent()
 		}
@@ -1517,9 +1517,9 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 	defer c.FuncIn("Directory::setChildXAttr", "%d, %s len %d", inodeNum, attr,
 		len(data)).Out()
 
-	maintenance := func(){}
+	maintenance := func() {}
 	rtn := fuse.OK
-	func () {
+	func() {
 		defer dir.Lock().Unlock()
 		maintenance, rtn = dir.setChildXAttr_(c, inodeNum, attr, data)
 	}()
@@ -1532,7 +1532,7 @@ func (dir *Directory) setChildXAttr(c *ctx, inodeNum InodeId, attr string,
 func (dir *Directory) setChildXAttr_(c *ctx, inodeNum InodeId, attr string,
 	data []byte) (maintenance func(), rtn fuse.Status) {
 
-	maintenance = func(){}
+	maintenance = func() {}
 	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
 	if ok == fuse.EIO {
 		return maintenance, fuse.EIO
@@ -1623,9 +1623,9 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 
 	defer c.FuncIn("Directory::removeChildXAttr", "%d, %s", inodeNum, attr).Out()
 
-	maintenance := func(){}
+	maintenance := func() {}
 	rtn := fuse.OK
-	func () {
+	func() {
 		defer dir.Lock().Unlock()
 		maintenance, rtn = dir.removeChildXAttr_(c, inodeNum, attr)
 	}()
@@ -1638,7 +1638,7 @@ func (dir *Directory) removeChildXAttr(c *ctx, inodeNum InodeId,
 func (dir *Directory) removeChildXAttr_(c *ctx, inodeNum InodeId,
 	attr string) (maintenance func(), rtn fuse.Status) {
 
-	maintenance = func(){}
+	maintenance = func() {}
 	attributeList, ok := dir.getExtendedAttributes_(c, inodeNum)
 	if ok == fuse.EIO {
 		return maintenance, fuse.EIO
