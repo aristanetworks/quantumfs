@@ -327,8 +327,8 @@ func getParentInfo_(c *ctx, inode Inode, fillParent listingAttrFill,
 	typespace string, namespace string) directoryContents {
 
 	rtn := directoryContents{
-		filename:	"..",
-		fuseType:	fuse.S_IFDIR,
+		filename: "..",
+		fuseType: fuse.S_IFDIR,
 	}
 
 	parentId := inode.parentId_()
