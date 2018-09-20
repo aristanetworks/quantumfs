@@ -84,7 +84,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		defer dir.Lock(c).Unlock()
 
 		func() {
-			defer dir.childRecordLock.Lock().Unlock()
+			defer dir.ChildRecordLock(c).Unlock()
 			maintenance = dir.children.setRecord(c, inodeInfo, newRecord)
 		}()
 
@@ -235,7 +235,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	maintenance := func(){}
 	func () {
 		defer dir.Lock(c).Unlock()
-		defer dir.childRecordLock.Lock().Unlock()
+		defer dir.ChildRecordLock(c).Unlock()
 
 		copy, needsSync, inodeIdInfo, maintenance,
 			err = dir.convertToHardlinkLeg_DOWN(c, toLink.name())
@@ -321,12 +321,12 @@ func (dir *Directory) moveHardlinkLeg_DOWN(c *ctx, newParent Inode, oldName stri
 	// Unlike regular rename, we throw away the result of deleteChild and
 	// just use the new remote record for creating the move destination
 	func() {
-		defer dir.childRecordLock.Lock().Unlock()
+		defer dir.ChildRecordLock(c).Unlock()
 		dir.children.deleteChild(c, oldName)
 	}()
 
 	dst := asDirectory(newParent)
-	defer dst.childRecordLock.Lock().Unlock()
+	defer dst.ChildRecordLock(c).Unlock()
 	dst.children.setRecord(c, inodeId, remoteRecord)
 }
 
@@ -426,7 +426,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 	defer c.funcIn("Directory::updateRefreshMap_DOWN").Out()
 
-	defer dir.childRecordLock.Lock().Unlock()
+	defer dir.ChildRecordLock(c).Unlock()
 
 	remoteEntries := make(map[string]quantumfs.DirectoryRecord, 0)
 	if baseLayerId != nil {
@@ -501,7 +501,7 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	uninstantiated := make([]inodePair, 0)
 
 	localEntries := make(map[string]InodeIdInfo, 0)
-	defer dir.childRecordLock.Lock().Unlock()
+	defer dir.ChildRecordLock(c).Unlock()
 	dir.children.foreachChild(c, func(childname string, childId InodeIdInfo) {
 		localEntries[childname] = childId
 	})
@@ -580,7 +580,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 
 	result = func() fuse.Status {
 		defer dir.ParentRLock(c).RUnlock()
-		defer dir.childRecordLock.Lock().Unlock()
+		defer dir.ChildRecordLock(c).Unlock()
 
 		record := dir.children.recordByName(c, oldName)
 		return hasDirectoryWritePermSticky_(c, dir, record.Owner())
@@ -630,7 +630,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 
 	result = func() fuse.Status {
 		c.vlog("Checking if destination is an empty directory")
-		defer dst.childRecordLock.Lock().Unlock()
+		defer dst.ChildRecordLock(c).Unlock()
 
 		dstRecord := dst.children.recordByName(c, newName)
 		if dstRecord != nil &&
@@ -650,7 +650,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	// directories are locked.
 	c.vlog("Removing source")
 	newEntry := func() quantumfs.DirectoryRecord {
-		defer dir.childRecordLock.Lock().Unlock()
+		defer dir.ChildRecordLock(c).Unlock()
 		return dir.children.deleteChild(c, oldName)
 	}()
 	if newEntry == nil {
@@ -688,7 +688,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	// Add to destination, possibly removing the overwritten inode
 	c.vlog("Adding to destination directory")
 	func() {
-		defer dst.childRecordLock.Lock().Unlock()
+		defer dst.ChildRecordLock(c).Unlock()
 		overwritten = dst.orphanChild_(c, newName, overwrittenInode)
 		dst.children.setRecord(c, childInodeId, newEntry)
 

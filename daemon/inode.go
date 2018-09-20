@@ -691,7 +691,7 @@ func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) 
 		dir = asDirectory(parent)
 
 		defer dir.RLock(c).RUnlock()
-		defer dir.childRecordLock.Lock().Unlock()
+		defer dir.ChildRecordLock(c).Unlock()
 		record = dir.getRecordChildCall_(c, inode.inodeNum())
 	}
 
