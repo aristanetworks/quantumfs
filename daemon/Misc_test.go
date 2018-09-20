@@ -421,3 +421,39 @@ func TestLockCheckStack(t *testing.T) {
 			stack, compare)
 	})
 }
+
+func TestLockCheckInvertedStack(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.ExpectedErrors = make(map[string]struct{})
+		test.ExpectedErrors["ERROR: "+lockInversionLog] = struct{}{}
+		test.ExpectedErrors["ERROR: Stack: %s"] = struct{}{}
+
+		workspace := test.NewWorkspace()
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/file",
+			"some data"))
+
+		test.SyncAllWorkspaces()
+
+		fileParent := test.getInode(workspace)
+
+		c := test.qfs.c.NewThread()
+		c.fuseCtx = &fuse.Context{}
+
+		inodeUnlock := callOnce(fileParent.Lock(c).Unlock)
+		defer inodeUnlock.invoke()
+
+		go func () {
+			inode, unlock := test.qfs.RLockTreeGetInode(c,
+				fileParent.inodeNum())
+			defer unlock()
+
+			var input fuse.CreateIn
+			var out fuse.CreateOut
+			inode.Create(c, &input, "newFile", &out)
+		} ()
+
+		test.WaitForLogString("Lock inversion detected", "Locks to invert")
+
+		inodeUnlock.invoke()
+	})
+}

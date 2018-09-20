@@ -142,9 +142,9 @@ func (order *lockOrder) checkInodeOrder(c *ctx, inode InodeId, kind locker) {
 	}
 }
 
+const lockInversionLog = "Lock inversion detected. New Lock %d Inode %d"
 func (order *lockOrder) alertInversion(c *ctx, inode InodeId, kind locker) {
-	c.elog("Lock inversion detected. New Lock %d Inode %d", int64(kind),
-		int64(inode))
+	c.elog(lockInversionLog, int64(kind), int64(inode))
 	order.printStack(c)
 }
 
