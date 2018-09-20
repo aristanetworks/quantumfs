@@ -146,7 +146,7 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeIdInfo,
 	// Since we have an inodeId this child is or will be instantiated and so is
 	// placed in the effective set.
 
-	maintenance = func(){}
+	maintenance = func() {}
 	utils.Assert(inodeId.id != quantumfs.InodeIdInvalid,
 		"setRecord without inodeId")
 
@@ -291,7 +291,7 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 	record := container.deleteChild(c, oldName)
 	if record == nil {
 		c.vlog("oldName doesn't exist")
-		return func(){}
+		return func() {}
 	}
 	record.SetFilename(newName)
 
@@ -312,10 +312,10 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 
 	defer c.funcIn("ChildContainer::modifyChildWithFunc").Out()
 
-	maintenance = func(){}
+	maintenance = func() {}
 	record := container._recordByInodeId(c, inodeId)
 	if record == nil {
-		return func(){}
+		return func() {}
 	}
 
 	_, hasEffective := container.effective[inodeId]
