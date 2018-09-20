@@ -10,8 +10,8 @@ import (
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
-
 type locker int
+
 // These enums are specifically in the locking order, leafs first
 const (
 	lockerMapMutexLock locker = iota
@@ -26,13 +26,13 @@ const (
 )
 
 type lockInfo struct {
-	kind	locker
-	inode		InodeId
+	kind  locker
+	inode InodeId
 }
 
 type lockOrder struct {
-	stack	[]lockInfo
-	disabled	bool
+	stack    []lockInfo
+	disabled bool
 }
 
 // The lock being requested must already be held so we can do checks with it
@@ -53,9 +53,9 @@ func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
 		}
 	}
 
-	order.stack = append(order.stack, lockInfo {
-		kind:	kind,
-		inode:		inode,
+	order.stack = append(order.stack, lockInfo{
+		kind:  kind,
+		inode: inode,
 	})
 }
 
@@ -70,7 +70,7 @@ func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
 	// same order that we locked. We can't assume we're popping the last element,
 	// have to find it instead and remove it
 	removeIdx := -1
-	for i := len(order.stack)-1; i >= 0; i-- {
+	for i := len(order.stack) - 1; i >= 0; i-- {
 		entry := order.stack[i]
 		if entry.inode == inode && entry.kind == kind {
 			removeIdx = i
@@ -121,7 +121,7 @@ func (order *lockOrder) checkInodeOrder(c *ctx, inode InodeId, kind locker) {
 
 	// Iterating backwards, we should never see our parent, or any other inode
 	// type lock from this inode
-	for i := len(order.stack)-1; i >= 0; i-- {
+	for i := len(order.stack) - 1; i >= 0; i-- {
 		entry := order.stack[i]
 		if entry.inode == parent {
 			order.alertInversion(c, inode, kind)
@@ -153,12 +153,12 @@ func (order *lockOrder) printStack(c *ctx) {
 
 // Generics
 type orderedRwMutexUnlocker struct {
-	mutex	*utils.DeferableRwMutex
+	mutex *utils.DeferableRwMutex
 
-	inode	InodeId
-	kind	locker
+	inode InodeId
+	kind  locker
 
-	c	*ctx
+	c *ctx
 }
 
 func (m *orderedRwMutexUnlocker) RUnlock() {
@@ -181,11 +181,11 @@ func (m *orderedRwMutex) RLock(c *ctx, inode InodeId,
 	m.mutex.RLock()
 	c.lockOrder.Push_(c, inode, kind)
 
-	return &orderedRwMutexUnlocker {
-		mutex:	&m.mutex,
-		inode:	inode,
-		kind:	kind,
-		c:	c,
+	return &orderedRwMutexUnlocker{
+		mutex: &m.mutex,
+		inode: inode,
+		kind:  kind,
+		c:     c,
 	}
 }
 
@@ -195,11 +195,11 @@ func (m *orderedRwMutex) Lock(c *ctx, inode InodeId,
 	m.mutex.Lock()
 	c.lockOrder.Push_(c, inode, kind)
 
-	return &orderedRwMutexUnlocker {
-		mutex:	&m.mutex,
-		inode:	inode,
-		kind:	kind,
-		c:	c,
+	return &orderedRwMutexUnlocker{
+		mutex: &m.mutex,
+		inode: inode,
+		kind:  kind,
+		c:     c,
 	}
 }
 
@@ -229,7 +229,7 @@ func (m *orderedMutex) Unlock(c *ctx, inode InodeId, kind locker) {
 
 // Lock types
 type orderedMapMutex struct {
-	mutex	orderedRwMutex
+	mutex orderedRwMutex
 }
 
 func (m *orderedMapMutex) RLock(c *ctx) utils.NeedReadUnlock {
@@ -245,7 +245,7 @@ func (m *orderedMapMutex) Unlock(c *ctx) {
 }
 
 type orderedLookupCount struct {
-	mutex	orderedMutex
+	mutex orderedMutex
 }
 
 func (m *orderedLookupCount) Lock(c *ctx) utils.NeedWriteUnlock {
@@ -257,7 +257,7 @@ func (m *orderedLookupCount) Unlock(c *ctx) {
 }
 
 type orderedFlusher struct {
-	mutex	orderedMutex
+	mutex orderedMutex
 }
 
 func (m *orderedFlusher) Lock(c *ctx) utils.NeedWriteUnlock {
@@ -269,7 +269,7 @@ func (m *orderedFlusher) Unlock(c *ctx) {
 }
 
 type orderedInstantiation struct {
-	mutex	orderedMutex
+	mutex orderedMutex
 }
 
 func (m *orderedInstantiation) Lock(c *ctx) utils.NeedWriteUnlock {
