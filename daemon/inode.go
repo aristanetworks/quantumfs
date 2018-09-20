@@ -106,7 +106,7 @@ type Inode interface {
 	// Must be called with the instantiation lock
 	// Instantiate the Inode for the given child on demand.
 	instantiateChild_(c *ctx, inodeNum InodeId) Inode
-	finishInit(c *ctx) []inodePair
+	finishInit(c *ctx) []loadedInfo
 
 	name() string
 	setName(name string)
@@ -396,9 +396,18 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
-	defer c.funcIn("InodeCommon::parentSetChildAttr").Out()
-
 	defer inode.ParentRLock(c).RUnlock()
+
+	return inode.parentSetChildAttr_(c, inodeNum, newType, attr, out,
+		updateMtime)
+}
+
+// Must be called with the parentlock held for reads
+func (inode *InodeCommon) parentSetChildAttr_(c *ctx, inodeNum InodeId,
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+
+	defer c.funcIn("InodeCommon::parentSetChildAttr_").Out()
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
@@ -701,7 +710,7 @@ func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 	panic(msg)
 }
 
-func (inode *InodeCommon) finishInit(c *ctx) []inodePair {
+func (inode *InodeCommon) finishInit(c *ctx) []loadedInfo {
 	return nil
 }
 
@@ -896,8 +905,6 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		return
 	}
 
-	defer inode.ParentLock(c).Unlock()
-
 	toRelease := func() bool {
 		defer c.qfs.mapMutex.Lock(c).Unlock()
 
@@ -914,6 +921,9 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		c.qfs.setInode_(c, inode.inodeNum(), nil)
 		delete(c.qfs.inodeRefcounts, inode.inodeNum())
 
+		// Note: it is a little dangerous to grab parentId_() without the
+		// parent lock, but *in theory* nobody else should have a reference
+		// to this inode anymore so there shouldn't be any races possible.
 		c.qfs.addUninstantiated_(c, []inodePair{
 			newInodePair(inode.inodeNum(), inode.parentId_())})
 		return true
@@ -923,6 +933,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 	}
 
 	// This Inode is now unlisted and unreachable
+	defer inode.ParentLock(c).Unlock()
 
 	if !inode.isOrphaned_() {
 		parent, release := inode.parent_(c)

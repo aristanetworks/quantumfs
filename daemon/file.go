@@ -161,6 +161,8 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 	if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 		result := func() fuse.Status {
+			parentUnlock := callOnce(fi.ParentRLock(c).RUnlock)
+			defer parentUnlock.invoke()
 			defer fi.Lock(c).Unlock()
 
 			c.vlog("Got file lock")
@@ -175,12 +177,14 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 			}
 			endBlkIdx, _ := fi.accessor.blockIdxInfo(c, attr.Size-1)
 
-			err := fi.reconcileFileType(c, endBlkIdx)
+			err := fi.reconcileFileType_(c, endBlkIdx)
 			if err != nil {
 				c.elog("Could not reconcile file type with new end" +
 					" blockIdx")
 				return fuse.EIO
 			}
+			// release the parent lock early
+			parentUnlock.invoke()
 
 			result := fi.accessor.truncate(c, uint64(attr.Size))
 			if result != fuse.OK {
@@ -312,9 +316,10 @@ func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 }
 
 // Given the block index to write into the file, ensure that we are the
-// correct file type
-func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
-	defer c.funcIn("File::reconcileFileType").Out()
+// correct file type.
+// Must be called with the parentlock held for reads
+func (fi *File) reconcileFileType_(c *ctx, blockIdx int) error {
+	defer c.funcIn("File::reconcileFileType_").Out()
 
 	neededType := calcTypeGivenBlocks(blockIdx + 1)
 	c.vlog("blockIdx %d", blockIdx)
@@ -326,7 +331,7 @@ func (fi *File) reconcileFileType(c *ctx, blockIdx int) error {
 	if fi.accessor != newAccessor {
 		fi.accessor = newAccessor
 		var attr fuse.SetAttrIn
-		fi.parentSetChildAttr(c, fi.id, &neededType, &attr, nil, false)
+		fi.parentSetChildAttr_(c, fi.id, &neededType, &attr, nil, false)
 	}
 	return nil
 }
@@ -358,12 +363,13 @@ type blockAccessor interface {
 	truncate(c *ctx, newLength uint64) fuse.Status
 }
 
-func (fi *File) writeBlock(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
+// Must be called with the file parentlock held for reads
+func (fi *File) writeBlock_(c *ctx, blockIdx int, offset uint64, buf []byte) (int,
 	error) {
 
-	defer c.funcIn("File::writeBlock").Out()
+	defer c.funcIn("File::writeBlock_").Out()
 
-	err := fi.reconcileFileType(c, blockIdx)
+	err := fi.reconcileFileType_(c, blockIdx)
 	if err != nil {
 		c.elog("Could not reconcile file type with new blockIdx")
 		return 0, err
@@ -463,6 +469,8 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	c.vlog("offset %d size %d flags %x", offset, size, flags)
 
 	writeCount, result := func() (uint32, fuse.Status) {
+		parentUnlock := callOnce(fi.ParentRLock(c).RUnlock)
+		defer parentUnlock.invoke()
 		defer fi.Lock(c).Unlock()
 
 		// Ensure size and buf are consistent
@@ -472,12 +480,13 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 		writeCount_ := 0
 		err := operateOnBlocks(c, fi.accessor, offset, size,
 			func(c *ctx, blockIdx int, offset uint64) error {
-				written, err := fi.writeBlock(c, blockIdx,
+				written, err := fi.writeBlock_(c, blockIdx,
 					offset, buf[writeCount_:])
 
 				writeCount_ += written
 				return err
 			})
+		parentUnlock.invoke()
 
 		if err != nil {
 			if errno, ok := err.(syscall.Errno); ok {

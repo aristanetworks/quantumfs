@@ -92,7 +92,7 @@ func (rc *RefreshContext) attachLocalRecord(c *ctx, parentId InodeId,
 		// match the new incarnation
 		fileId = remoteRecord.FileId()
 		loadRecord, found = rc.fileMap[remoteRecord.FileId()]
-		utils.Assert(found, "Dir moved, but not found in buildmap %d",
+		utils.Assert(found, "Dir moved, but not found in buildmap %s",
 			localRecord.Filename())
 
 		moved = false
@@ -503,7 +503,7 @@ func (wsr *WorkspaceRoot) unlinkStaleHardlinks(c *ctx,
 		loadRecord, exists := rc.fileMap[fileId]
 		if !exists {
 			c.vlog("Removing hardlink id %d, inode %d, nlink %d",
-				fileId, entry.inodeId, entry.nlink)
+				fileId, entry.inodeId.id, entry.nlink)
 
 			func() {
 				inode, release := c.qfs.inodeNoInstantiate(c,
