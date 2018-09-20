@@ -195,9 +195,9 @@ func fillAttrOutCacheData(c *ctx, out *fuse.AttrOut) {
 }
 
 type inodeRemoval struct {
-	id	InodeId
-	name	string
-	parent	InodeId
+	id     InodeId
+	name   string
+	parent InodeId
 }
 
 func handleRemovals(c *ctx, removals []inodeRemoval) {
@@ -241,10 +241,10 @@ func updateChildren_(c *ctx, names []string, inodeMap *map[string]InodeIdInfo,
 			// naturally.
 			delete(*inodeMap, name)
 			delete(*nameMap, id.id)
-			rtn = append(rtn, inodeRemoval {
-				id:	id.id,
-				name:	name,
-				parent:	parent.inodeNum(),
+			rtn = append(rtn, inodeRemoval{
+				id:     id.id,
+				name:   name,
+				parent: parent.inodeNum(),
 			})
 		}
 	}
@@ -327,8 +327,8 @@ func getParentInfo_(c *ctx, inode Inode, fillParent listingAttrFill,
 	typespace string, namespace string) directoryContents {
 
 	rtn := directoryContents{
-		filename:	"..",
-		fuseType:	fuse.S_IFDIR,
+		filename: "..",
+		fuseType: fuse.S_IFDIR,
 	}
 
 	parentId := inode.parentId_()
@@ -352,7 +352,7 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	return children
 }
 
-func (tsl* TypespaceList) getChildSnapshotRemovals(c *ctx,
+func (tsl *TypespaceList) getChildSnapshotRemovals(c *ctx,
 	typespaces []string) (rems []inodeRemoval, children []directoryContents) {
 
 	parentUnlock := callOnce(tsl.getParentLock().RLock().RUnlock)
@@ -411,7 +411,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 	}
 
 	var rems []inodeRemoval
-	rtn := func () fuse.Status {
+	rtn := func() fuse.Status {
 		defer tsl.Lock().Unlock()
 		rems = updateChildren_(c, list, &tsl.typespacesByName,
 			&tsl.typespacesById, tsl)
@@ -428,7 +428,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 		fillTypespaceAttr(c, &out.Attr, inodeNum.id, name, "")
 
 		return fuse.OK
-	} ()
+	}()
 	handleRemovals(c, rems)
 
 	return rtn
@@ -753,7 +753,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 	}
 
 	var rems []inodeRemoval
-	rtn := func () fuse.Status {
+	rtn := func() fuse.Status {
 		defer nsl.Lock().Unlock()
 		rems = updateChildren_(c, list, &nsl.namespacesByName,
 			&nsl.namespacesById, nsl)
@@ -771,7 +771,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 		fillNamespaceAttr(c, &out.Attr, inodeNum.id, nsl.typespaceName, name)
 
 		return fuse.OK
-	} ()
+	}()
 	handleRemovals(c, rems)
 
 	return rtn
@@ -1074,10 +1074,10 @@ func (wsl *WorkspaceList) determineRemovedChildren_(c *ctx,
 			// from their parents
 			delete(wsl.workspacesByName, name)
 			delete(wsl.workspacesById, info.id.id)
-			rtn = append(rtn, inodeRemoval {
-				id:	info.id.id,
-				name:	name,
-				parent:	wsl.inodeNum(),
+			rtn = append(rtn, inodeRemoval{
+				id:     info.id.id,
+				name:   name,
+				parent: wsl.inodeNum(),
 			})
 		}
 	}
@@ -1130,10 +1130,10 @@ func (wsl *WorkspaceList) getChildSnapshotRemovals(c *ctx,
 
 	if len(workspaces) > 0 {
 		// We only accept positive lists
-		rems := func () []inodeRemoval {
+		rems := func() []inodeRemoval {
 			defer wsl.Lock().Unlock()
 			return wsl.determineRemovedChildren_(c, workspaces)
-		} ()
+		}()
 		handleRemovals(c, rems)
 	}
 
@@ -1182,10 +1182,10 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 
 	// This lock-unlock-locking is code smell, so we have to be careful in
 	// updateNewChildren to only add when the old has been removed
-	rems := func () []inodeRemoval {
+	rems := func() []inodeRemoval {
 		defer wsl.Lock().Unlock()
 		return wsl.determineRemovedChildren_(c, workspaces)
-	} ()
+	}()
 	handleRemovals(c, rems)
 
 	defer wsl.Lock().Unlock()
