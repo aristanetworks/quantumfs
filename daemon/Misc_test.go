@@ -371,8 +371,8 @@ func TestLockCheckStack(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		workspace := test.NewWorkspace()
 		test.AssertNoErr(os.MkdirAll(workspace+"/dirA/dirB", 0777))
-		fileA := workspace+"/dirA/dirB/fileA"
-		fileB := workspace+"/dirA/dirB/fileB"
+		fileA := workspace + "/dirA/dirB/fileA"
+		fileB := workspace + "/dirA/dirB/fileB"
 		test.AssertNoErr(testutils.PrintToFile(fileA, "some data"))
 		test.AssertNoErr(syscall.Link(fileA, fileB))
 
@@ -392,7 +392,7 @@ func TestLockCheckStack(t *testing.T) {
 		// in parallel now, trigger the lock going up
 		c := test.qfs.c.NewThread()
 		c.fuseCtx = &fuse.Context{}
-		go func () {
+		go func() {
 			inode, unlock := test.qfs.RLockTreeGetInode(c, fileAId)
 			defer unlock()
 
@@ -401,7 +401,7 @@ func TestLockCheckStack(t *testing.T) {
 			input.Size = quantumfs.MaxSmallFileSize() + 100
 			var out fuse.AttrOut
 			inode.SetAttr(c, &input, &out)
-		} ()
+		}()
 
 		// wait for our other thread to block
 		test.WaitForLogString(fmt.Sprintf("modifyChildWithFunc inode %d",
@@ -442,7 +442,7 @@ func TestLockCheckInvertedStack(t *testing.T) {
 		inodeUnlock := callOnce(fileParent.Lock(c).Unlock)
 		defer inodeUnlock.invoke()
 
-		go func () {
+		go func() {
 			inode, unlock := test.qfs.RLockTreeGetInode(c,
 				fileParent.inodeNum())
 			defer unlock()
@@ -450,7 +450,7 @@ func TestLockCheckInvertedStack(t *testing.T) {
 			var input fuse.CreateIn
 			var out fuse.CreateOut
 			inode.Create(c, &input, "newFile", &out)
-		} ()
+		}()
 
 		test.WaitForLogString("Lock inversion detected", "Locks to invert")
 

@@ -32,8 +32,8 @@ type lockInfo struct {
 
 func newLockInfo(k locker, i InodeId) lockInfo {
 	return lockInfo{
-		kind:	k,
-		inode:	i,
+		kind:  k,
+		inode: i,
 	}
 }
 
@@ -143,6 +143,7 @@ func (order *lockOrder) checkInodeOrder(c *ctx, inode InodeId, kind locker) {
 }
 
 const lockInversionLog = "Lock inversion detected. New Lock %d Inode %d"
+
 func (order *lockOrder) alertInversion(c *ctx, inode InodeId, kind locker) {
 	c.elog(lockInversionLog, int64(kind), int64(inode))
 	order.printStack(c)
