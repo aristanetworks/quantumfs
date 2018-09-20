@@ -1131,7 +1131,7 @@ func (wsl *WorkspaceList) getChildSnapshotRemovals(c *ctx,
 	if len(workspaces) > 0 {
 		// We only accept positive lists
 		rems := func () []inodeRemoval {
-			defer wsl.Lock().Unlock()
+			defer wsl.Lock(c).Unlock()
 			return wsl.determineRemovedChildren_(c, workspaces)
 		} ()
 		handleRemovals(c, rems)
@@ -1188,7 +1188,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	} ()
 	handleRemovals(c, rems)
 
-	defer wsl.Lock().Unlock()
+	defer wsl.Lock(c).Unlock()
 	wsl.updateNewChildren_(c, workspaces)
 
 	if !exists {
