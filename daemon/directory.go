@@ -103,18 +103,27 @@ func initDirectory(c *ctx, name string, dir *Directory,
 
 func (dir *Directory) finishInit(c *ctx) (uninstantiated []loadedInfo) {
 	defer c.funcIn("Directory::finishInit").Out()
-	defer dir.childRecordLock.Unlock()
+	func() {
+		defer dir.childRecordLock.Unlock()
 
-	utils.Assert(dir.children == nil, "children already loaded")
+		utils.Assert(dir.children == nil, "children already loaded")
 
-	wsrInode := dir.hardlinkTable.getWorkspaceRoot().inodeNum()
-	// pre-set child container to a safe instance to ensure we don't leave it nil
-	dir.children, uninstantiated = newChildContainer(c, dir,
-		quantumfs.EmptyDirKey, wsrInode)
+		wsrInode := dir.hardlinkTable.getWorkspaceRoot().inodeNum()
+		// pre-set child container to a safe instance to ensure
+		// we don't leave it nil
+		dir.children, uninstantiated = newChildContainer(c, dir,
+			quantumfs.EmptyDirKey, wsrInode)
 
-	// now attempt to load the children, which may panic / fail
-	dir.children, uninstantiated = newChildContainer(c, dir, dir.baseLayerId,
-		wsrInode)
+		// now attempt to load the children, which may panic / fail
+		dir.children, uninstantiated = newChildContainer(c, dir,
+			dir.baseLayerId, wsrInode)
+	}()
+
+	if len(uninstantiated) > 0 {
+		// check each new child for hardlinks we need to track
+		dir.traceHardlinks(c, uninstantiated)
+	}
+
 	return uninstantiated
 }
 

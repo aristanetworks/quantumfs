@@ -874,12 +874,6 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	if instantiated {
 		uninstantiated := inode.finishInit(c)
 		if len(uninstantiated) > 0 {
-			// check each new child for hardlinks we need to track
-			dir := asDirectoryQuiet(inode)
-			if dir != nil {
-				dir.traceHardlinks(c, uninstantiated)
-			}
-
 			newInodes := make([]inodePair, 0, len(uninstantiated))
 			for _, newInode := range uninstantiated {
 				newInodes = append(newInodes,
