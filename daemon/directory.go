@@ -1204,9 +1204,6 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 		if unlockParent != nil {
 			unlockParent()
 		}
-		if unlockParent != nil {
-			unlockParent()
-		}
 	}()
 	defer dir.Lock(c).Unlock()
 
