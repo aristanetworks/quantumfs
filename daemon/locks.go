@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"fmt"
+	"runtime/debug"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -63,7 +64,8 @@ func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
 		return
 	}
 
-	c.Assert(len(order.stack) > 0, "Empty stack got a pop")
+	c.Assert(len(order.stack) > 0, "Empty stack got a pop %s",
+		utils.BytesToString(debug.Stack()))
 
 	// Popping has an odd mechanism in that we don't necessarily unlock in the
 	// same order that we locked. We can't assume we're popping the last element,
@@ -135,8 +137,8 @@ func (order *lockOrder) checkInodeOrder(c *ctx, inode InodeId, kind locker) {
 }
 
 func (order *lockOrder) alertInversion(c *ctx, inode InodeId, kind locker) {
-	c.elog("Lock inversion detected. New Lock %d Inode %d", int64(kind),
-		int64(inode))
+	c.elog("Lock inversion detected. New Lock %d Inode %d\n%s", int64(kind),
+		int64(inode), utils.BytesToString(debug.Stack()))
 	order.printStack(c)
 }
 
