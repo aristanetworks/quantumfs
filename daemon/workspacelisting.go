@@ -327,11 +327,11 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	}
 
 	var parentInfo directoryContents
-	func () {
+	func() {
 		defer tsl.getParentLock().RLock().RUnlock()
 		parentInfo = getParentInfo_(c, tsl.parentId_(), fillRootAttrWrapper,
 			"", "")
-	} ()
+	}()
 
 	defer tsl.Lock().Unlock()
 
@@ -669,11 +669,11 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 	}
 
 	var parentInfo directoryContents
-	func () {
+	func() {
 		defer nsl.getParentLock().RLock().RUnlock()
 		parentInfo = getParentInfo_(c, nsl.parentId_(), fillRootAttrWrapper,
 			nsl.typespaceName, "")
-	} ()
+	}()
 
 	defer nsl.Lock().Unlock()
 
@@ -1055,11 +1055,11 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 	}
 
 	var parentInfo directoryContents
-	func () {
+	func() {
 		defer wsl.getParentLock().RLock().RUnlock()
 		parentInfo = getParentInfo_(c, wsl.parentId_(), fillTypespaceAttr,
 			wsl.typespaceName, wsl.namespaceName)
-	} ()
+	}()
 
 	defer wsl.Lock().Unlock()
 
