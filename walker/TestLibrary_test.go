@@ -314,6 +314,7 @@ func (th *testHelper) nopWalkFn(bestEffort bool) (map[string]struct{},
 	var pathMutex utils.DeferableMutex
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
 		objType quantumfs.ObjectType, err error) error {
+
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
 				err.Error())
@@ -334,6 +335,7 @@ func (th *testHelper) nopWalkFn(bestEffort bool) (map[string]struct{},
 
 func walkWithCtx(c *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
+
 	return walk(newContext(c, dsGet, rootID, wf))
 }
 

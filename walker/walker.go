@@ -23,28 +23,29 @@ import (
 // leaves it upto the walker library to decide whether it wishes
 // to exit or continue walking.
 // This error will not be treated as an error during workspace walk.
-var ErrSkipHierarchy = errors.New("skip this hiearchy")
+var ErrSkipHierarchy = errors.New("skip this hierarchy")
 
 // WalkFunc is the type of the function called for each data block under the
-// Workspace. Every error encountered by walker library can be filtered
-// by WalkFunc. So walker library does not log any errors, instead it forwards
-// all errors to the walkFunc. Hence the right place to harvest errors is the
-// WalkFunc. Hence even if Walk returns nil error, it could still mean that
-// there were errors during the walk. If WalkFunc returns any error, except
-// ErrSkipHierarchy, then the workspace walk is stopped.
-// So depending on the error handling behaviour of WalkFunc, Walk API
-// can be used to do a fail-fast (abort walk on first error) or a
-// best-effort walk (continue walk amidst errors).
+// Workspace. Every error encountered by walker library can be filtered by
+// WalkFunc. So walker library does not log any errors, instead it forwards all
+// errors to the walkFunc. Hence the right place to harvest errors is the
+// WalkFunc. Hence even if Walk returns nil error, it could still mean that there
+// were errors during the walk. If WalkFunc returns any error, except
+// ErrSkipDirectory, then the workspace walk is stopped. So depending on the error
+// handling behaviour of WalkFunc, Walk API can be used to do a fail-fast (abort walk
+// on first error) or a best-effort walk (continue walk amidst errors).
+//
 // When err argument is non-nil, size is invalid.
-// When err argument is non-nil, path may be empty. When path is empty,
-// key, size and objType are invalid.
+//
+// When err argument is non-nil, path may be empty. When path is empty, key, size
+// and objType are invalid.
 type WalkFunc func(ctx *Ctx, path string, key quantumfs.ObjectKey,
 	size uint64, objType quantumfs.ObjectType,
 	err error) error
 
 // filterErrByWalkFunc is used to forward the walker library
 // encountered errors to walkFunc. Use of this function
-// makes the error forwarding more clearer than using the
+// makes the error forwarding more clear than using the
 // walkFunc directly.
 func filterErrByWalkFunc(c *Ctx, path string, key quantumfs.ObjectKey,
 	objTyp quantumfs.ObjectType, err error) error {
@@ -79,20 +80,7 @@ type workerData struct {
 
 const panicErrFmt = "PANIC %s\n%v"
 
-// panicHandler converts panic to error which is then
-// forwarded to walkFunc.
-// pErr is the error created out of panic and
-// wfErr is the error that walkFunc returns when
-// pErr is forwarded to it.
-// Both pErr and wfErr are passed by to the caller so that
-// caller can use them to decide if walk should be continued
-// or not.
-func panicHandler(c *Ctx, pErr *error, wfErr *error) {
-	exception := recover()
-	if exception == nil {
-		return
-	}
-
+func panicToError(exception interface{}) error {
 	var result string
 	switch exception.(type) {
 	default:
@@ -104,17 +92,8 @@ func panicHandler(c *Ctx, pErr *error, wfErr *error) {
 	}
 
 	trace := utils.BytesToString(debug.Stack())
-	pErrTmp := fmt.Errorf(panicErrFmt, result, trace)
-	if pErr != nil {
-		*pErr = pErrTmp
-	}
-	// since objType is invalid when path is empty
-	// use ObjectTypeSmallFile as a dummy value
-	wfErrTmp := filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
-		quantumfs.ObjectTypeSmallFile, pErrTmp)
-	if wfErr != nil {
-		*wfErr = wfErrTmp
-	}
+
+	return fmt.Errorf(panicErrFmt, result, trace)
 }
 
 const walkerErrLog = "desc: %s key: %s err: %s"
@@ -169,15 +148,15 @@ func newContext(cq *quantumfs.Ctx, dsGet walkDsGet,
 func Walk(cq *quantumfs.Ctx, ds quantumfs.DataStore, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
 
-	c := newContext(cq, nil, rootID, wf)
-
 	getter := func(cq *quantumfs.Ctx, path string,
 		key quantumfs.ObjectKey, typ quantumfs.ObjectType,
 		buf quantumfs.Buffer) error {
 
 		return ds.Get(cq, key, buf)
 	}
-	c.dsGet = getter
+
+	c := newContext(cq, getter, rootID, wf)
+
 	// since test routines directly call walk()
 	// ensure that Walk() doesn't add anything
 	// else here.
@@ -220,31 +199,22 @@ func walk(c *Ctx) error {
 	for i := 0; i < conc; i++ {
 
 		c.group.Go(func() (err error) {
-			var wErr, panicErr, panicWfErr error
-			for {
-				// When worker panics and walkFunc filters
-				// the error, then call worker again so
-				// that other keys in keyChan can be processed.
-				// In all other cases, finish the worker
-				// goroutine.
-				wErr, panicErr, panicWfErr = worker(c, keyChan)
-				if panicErr != nil {
-					if panicWfErr == ErrSkipHierarchy {
-						continue
-					}
-					return panicWfErr
-				}
-				return wErr
-			}
+			return worker(c, keyChan)
 		})
 	}
 
 	c.group.Go(func() (err error) {
 		defer close(keyChan)
-		// If walker goroutine panics then irrespective
-		// of walkFunc error filtering, we'll end the
-		// workspace walk.
-		defer panicHandler(c, &err, nil)
+		defer func() {
+			if exception := recover(); exception != nil {
+				// If walker goroutine panics then irrespective
+				// of walkFunc error filtering, we'll end the
+				// workspace walk.
+				err = panicToError(exception)
+				filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
+					quantumfs.ObjectTypeSmallFile, err)
+			}
+		}()
 
 		// WSR
 		if err = writeToChan(c, keyChan, "[rootId]", c.rootID,
@@ -580,19 +550,17 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 	return nil
 }
 
-// worker returns 3 errors
-// err is the error returned by walkFunc or caller detecting that
-//     errorgroup is terminating.
-// panicErr is the error created out of panic by panicHandler.
-// panicWfErr is the error returned by walkFunc when panicErr was
-//   forwarded to it.
-//
-// These 3 errors enable caller to determine if worker should be
-// re-spawned or not.
-func worker(c *Ctx,
-	keyChan <-chan *workerData) (err error, panicErr error, panicWfErr error) {
+func worker(c *Ctx, keyChan <-chan *workerData) (err error) {
+	defer func() {
+		if exception := recover(); exception != nil {
+			// The panic in walkFunc is converted to error and the
+			// filtered error is returned.
+			err = panicToError(exception)
+			err = filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
+				quantumfs.ObjectTypeSmallFile, err)
+		}
+	}()
 
-	defer panicHandler(c, &panicErr, &panicWfErr)
 	var keyItem *workerData
 	for {
 		select {
@@ -602,14 +570,14 @@ func worker(c *Ctx,
 			return
 		case keyItem = <-keyChan:
 			if keyItem == nil {
+				err = nil
 				return
 			}
 		}
-		if wfErr := c.wf(c, keyItem.path, keyItem.key, keyItem.size,
-			keyItem.objType, nil); wfErr != nil &&
-			wfErr != ErrSkipHierarchy {
+		if err = c.wf(c, keyItem.path, keyItem.key, keyItem.size,
+			keyItem.objType, nil); err != nil &&
+			err != ErrSkipHierarchy {
 
-			err = wfErr
 			return
 		}
 	}
