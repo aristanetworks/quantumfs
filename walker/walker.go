@@ -23,14 +23,14 @@ import (
 var ErrSkipDirectory = errors.New("skip this directory")
 
 // WalkFunc is the type of the function called for each data block under the
-// Workspace. Every error encountered by walker library can be filtered
-// by WalkFunc. So walker library does not log any errors, instead it forwards
-// all errors to the walkFunc. Hence the right place to harvest errors is the
-// WalkFunc. Hence even if Walk returns nil error, it could still mean that
-// there were errors during the walk. If WalkFunc returns any error, except
-// ErrSkipDirectory, then the workspace walk is stopped. So depending on the
-// error handling behaviour of WalkFunc, Walk API can be used to do a fail-fast
-// (abort walk on first error) or a best-effort walk (continue walk amidst errors).
+// Workspace. Every error encountered by walker library can be filtered by
+// WalkFunc. So walker library does not log any errors, instead it forwards all
+// errors to the walkFunc. Hence the right place to harvest errors is the
+// WalkFunc. Hence even if Walk returns nil error, it could still mean that there
+// were errors during the walk. If WalkFunc returns any error, except
+// ErrSkipDirectory, then the workspace walk is stopped. So depending on the error
+// handling behaviour of WalkFunc, Walk API can be used to do a fail-fast (abort walk
+// on first error) or a best-effort walk (continue walk amidst errors).
 //
 // When err argument is non-nil, size is invalid.
 //
@@ -77,24 +77,7 @@ type workerData struct {
 
 const panicErrFmt = "PANIC %s\n%v"
 
-// panicHandler converts panic to error which is then
-// forwarded to walkFunc.
-//
-// walkFuncInputErr is the error created out of panic
-// and input to the walkFunc.
-//
-// walkFuncFilteredErr is the error returned by walkFunc
-// when it is invoked with walkFuncInputErr.
-//
-// Both walkFuncInputErr and walkFuncFilteredErr are passed
-// by to the caller so that caller can use them to decide if
-// walk should be continued or not.
-func panicHandler(c *Ctx, walkFuncInputErr *error, walkFuncFilteredErr *error) {
-	exception := recover()
-	if exception == nil {
-		return
-	}
-
+func panicToError(exception interface{}) error {
 	var result string
 	switch exception.(type) {
 	default:
@@ -106,17 +89,8 @@ func panicHandler(c *Ctx, walkFuncInputErr *error, walkFuncFilteredErr *error) {
 	}
 
 	trace := utils.BytesToString(debug.Stack())
-	walkFuncInputErrTmp := fmt.Errorf(panicErrFmt, result, trace)
-	if walkFuncInputErr != nil {
-		*walkFuncInputErr = walkFuncInputErrTmp
-	}
-	// since objType is invalid when path is empty
-	// use ObjectTypeSmallFile as a dummy value
-	walkFuncFilteredErrTmp := filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
-		quantumfs.ObjectTypeSmallFile, walkFuncInputErrTmp)
-	if walkFuncFilteredErr != nil {
-		*walkFuncFilteredErr = walkFuncFilteredErrTmp
-	}
+
+	return fmt.Errorf(panicErrFmt, result, trace)
 }
 
 const walkerErrLog = "desc: %s key: %s err: %s"
@@ -228,10 +202,16 @@ func walk(c *Ctx) error {
 
 	c.group.Go(func() (err error) {
 		defer close(keyChan)
-		// If walker goroutine panics then irrespective
-		// of walkFunc error filtering, we'll end the
-		// workspace walk.
-		defer panicHandler(c, &err, nil)
+		defer func() {
+			if exception := recover(); exception != nil {
+				// If walker goroutine panics then irrespective
+				// of walkFunc error filtering, we'll end the
+				// workspace walk.
+				err = panicToError(exception)
+				filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
+					quantumfs.ObjectTypeSmallFile, err)
+			}
+		}()
 
 		// WSR
 		if err = writeToChan(c, keyChan, "[rootId]", c.rootID,
@@ -546,19 +526,15 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 }
 
 func worker(c *Ctx, keyChan <-chan *workerData) (err error) {
-	var filteredPanicErr error
-
 	defer func() {
-		// now that panicHandler has run, figure out what
-		// single error to bubble up.
-		if filteredPanicErr != nil {
-			err = filteredPanicErr
+		if exception := recover(); exception != nil {
+			// The panic in walkFunc is converted to error and the
+			// filtered error is returned.
+			err = panicToError(exception)
+			err = filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
+				quantumfs.ObjectTypeSmallFile, err)
 		}
 	}()
-
-	// Since we are in fail-fast mode, ignore the error created
-	// out of panic. Only use the filteredPanicErr.
-	defer panicHandler(c, nil, &filteredPanicErr)
 
 	var keyItem *workerData
 	for {
