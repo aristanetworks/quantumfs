@@ -389,7 +389,6 @@ func doPanicStringTest(bestEffort bool) func(*testHelper) {
 		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
-			return
 		} else {
 			test.AssertErr(err)
 			test.Assert(strings.Contains(err.Error(),
@@ -447,7 +446,6 @@ func doPanicErrTest(bestEffort bool) func(*testHelper) {
 		test.expectQlogErrs([]string{walkerErrLog})
 		if bestEffort {
 			test.AssertNoErr(err)
-			return
 		} else {
 			test.AssertErr(err)
 			test.Assert(strings.Contains(err.Error(),
@@ -647,7 +645,6 @@ func doHLGetErrTest(bestEffort bool) func(*testHelper) {
 			_, exists := paths["/"]
 			test.Assert(exists,
 				"root dir path missing, walk did not continue")
-			return
 		} else {
 			test.AssertErr(err)
 			test.Assert(err.Error() == hleGetError.Error(),
@@ -707,7 +704,6 @@ func doDEGetErrTest(bestEffort bool) func(*testHelper) {
 			_, exists := paths["/dir-2"]
 			test.Assert(exists,
 				"dir-2 path missing, walk did not continue")
-			return
 		} else {
 			test.AssertErr(err)
 			test.Assert(err.Error() == deGetError.Error(),
@@ -768,7 +764,6 @@ func doEAGetErrTest(bestEffort bool) func(*testHelper) {
 			_, exists := paths["/file-1"]
 			test.Assert(exists,
 				"file-1 path missing, walk did not continue")
-			return
 		} else {
 			test.AssertErr(err)
 			test.Assert(err.Error() == eaGetError.Error(),
@@ -844,7 +839,6 @@ func doEAAttrGetErrTest(bestEffort bool) func(*testHelper) {
 			_, exists = types[quantumfs.ObjectTypeExtendedAttribute]
 			test.Assert(exists,
 				"other extattrs on file-0 were not walked")
-			return
 		} else {
 			test.AssertErr(err)
 			test.Assert(err.Error() == eaGetError.Error(),
@@ -908,7 +902,6 @@ func doMultiBlockGetErrTest(bestEffort bool) func(*testHelper) {
 			_, exists = paths["/file-1"]
 			test.Assert(exists,
 				"file-1 absent, walk should have continued")
-			return
 		} else {
 			test.AssertErr(err)
 			test.Assert(err.Error() == mbGetBlock0Error.Error(),
@@ -975,7 +968,6 @@ func doVLFileGetFirstErrTest(bestEffort bool) func(*testHelper) {
 			_, exists = paths["/file-1"]
 			test.Assert(exists,
 				"file-1 absent, walk should have continued")
-			return
 		} else {
 			test.AssertErr(err)
 			test.Assert(err.Error() == vlGetBlock0Error.Error(),
@@ -1050,7 +1042,6 @@ func doVLFileGetNextErrTest(bestEffort bool) func(*testHelper) {
 			_, exists = paths["/file-1"]
 			test.Assert(exists,
 				"file-1 absent, walk should have continued")
-			return
 		} else {
 			test.AssertErr(err)
 			test.Assert(err.Error() == vlGetBlock1Error.Error(),

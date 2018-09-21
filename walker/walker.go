@@ -588,8 +588,7 @@ func _worker(c *Ctx, keyChan <-chan *workerData) (err error) {
 	}
 }
 
-// worker handles multiple items from keyChan and knows when to terminate the worker
-// goroutine.
+// worker knows when to terminate the worker goroutine.
 func worker(c *Ctx, keyChan <-chan *workerData) (err error) {
 	for {
 		err = _worker(c, keyChan)
