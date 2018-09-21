@@ -400,17 +400,6 @@ func hasPermissionIds_(c *ctx, inode Inode, checkUid uint32,
 	return fuse.EACCES
 }
 
-func asDirectoryQuiet(inode Inode) *Directory {
-	switch v := inode.(type) {
-	case *WorkspaceRoot:
-		return &v.Directory
-	case *Directory:
-		return v
-	default:
-		return nil
-	}
-}
-
 func asDirectory(inode Inode) *Directory {
 	switch v := inode.(type) {
 	case *WorkspaceRoot:
