@@ -583,6 +583,11 @@ func (inode *InodeCommon) orphan(c *ctx, record quantumfs.DirectoryRecord) {
 func (inode *InodeCommon) orphan_(c *ctx, record quantumfs.DirectoryRecord) {
 	defer c.FuncIn("InodeCommon::orphan_", "inode %d", inode.inodeNum()).Out()
 
+	// Since orphan_ isn't a no-op for orphans, we have to do a check to be safe
+	if inode.isOrphaned_() {
+		return
+	}
+
 	oldParent, release := c.qfs.inodeNoInstantiate(c, inode.parentId)
 	utils.Assert(oldParent != nil, "oldParent is nil")
 	defer release()

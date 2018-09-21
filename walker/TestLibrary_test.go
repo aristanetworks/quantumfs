@@ -266,6 +266,14 @@ func (th *testHelper) expectWalkerErrors(errs []string) {
 	}
 }
 
+func tstNopWalkFn() WalkFunc {
+	return func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+		objType quantumfs.ObjectType) error {
+
+		return nil
+	}
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 
