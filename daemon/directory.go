@@ -1173,12 +1173,8 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 	if overwrittenInode != nil {
 		defer overwrittenInode.getParentLock().Lock().Unlock()
 	}
-	unlockParent := dir.parentLock.RLock().RUnlock
-	defer func() {
-		if unlockParent != nil {
-			unlockParent()
-		}
-	}()
+	unlockParent := callOnce(dir.parentLock.RLock().RUnlock)
+	defer unlockParent.invoke()
 	defer dir.Lock().Unlock()
 
 	oldInodeId, record, result := func() (InodeId,
@@ -1205,8 +1201,7 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 		if err != fuse.OK {
 			return quantumfs.InodeIdInvalid, nil, err
 		}
-		unlockParent()
-		unlockParent = nil
+		unlockParent.invoke()
 
 		if oldName == newName {
 			return quantumfs.InodeIdInvalid, nil, fuse.OK
