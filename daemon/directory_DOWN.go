@@ -78,14 +78,14 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		srcParent.Sync_DOWN(c)
 	}
 
-	maintenance := func() {}
+	doUnlocked := func() {}
 	func() {
 		// We cannot lock earlier because the parent of srcInode may be us
 		defer dir.Lock().Unlock()
 
 		func() {
 			defer dir.childRecordLock.Lock().Unlock()
-			maintenance = dir.children.setRecord(c, inodeInfo, newRecord)
+			doUnlocked = dir.children.setRecord(c, inodeInfo, newRecord)
 		}()
 
 		dir.self.markAccessed(c, newName,
@@ -104,7 +104,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		// Hardlinks aren't tracked by the uninstantiated list, they need a
 		// more complicated ref counting system handled by workspaceroot
 	}()
-	maintenance()
+	doUnlocked()
 
 	return fuse.OK
 }
@@ -170,12 +170,12 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
 
 func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 	childname string) (copy quantumfs.DirectoryRecord, needsSync bool,
-	inodeIdInfo InodeIdInfo, maintenance func(), err fuse.Status) {
+	inodeIdInfo InodeIdInfo, doUnlocked func(), err fuse.Status) {
 
 	defer c.FuncIn("Directory::convertToHardlinkLeg_DOWN",
 		"name %s", childname).Out()
 
-	maintenance = func() {}
+	doUnlocked = func() {}
 	childId := dir.children.inodeNum(childname)
 
 	c.vlog("Converting inode %d to hardlink", childId.id)
@@ -183,14 +183,14 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 	child := dir.children.recordByName(c, childname)
 	if child == nil {
 		c.elog("No child record for name %s", childname)
-		return nil, false, invalidIdInfo(), maintenance, fuse.ENOENT
+		return nil, false, invalidIdInfo(), doUnlocked, fuse.ENOENT
 	}
 
 	// If it's already a hardlink, great no more work is needed
 	if link, isLink := child.(*HardlinkLeg); isLink {
 		c.vlog("Already a hardlink")
 		recordCopy := *link
-		return &recordCopy, false, invalidIdInfo(), maintenance, fuse.OK
+		return &recordCopy, false, invalidIdInfo(), doUnlocked, fuse.OK
 	}
 
 	// record must be a file type to be hardlinked
@@ -199,7 +199,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 		child.Type() != quantumfs.ObjectTypeSpecial {
 
 		c.vlog("Cannot hardlink %s - not a file", child.Filename())
-		return nil, false, invalidIdInfo(), maintenance, fuse.EINVAL
+		return nil, false, invalidIdInfo(), doUnlocked, fuse.EINVAL
 	}
 
 	// remove the record from the childmap before donating it to be a hardlink
@@ -210,10 +210,10 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 
 	linkSrcCopy := newLink.Clone()
 	linkSrcCopy.SetFilename(childname)
-	maintenance = dir.children.setRecord(c, childId, linkSrcCopy)
+	doUnlocked = dir.children.setRecord(c, childId, linkSrcCopy)
 
 	newLink.setCreationTime(quantumfs.NewTime(time.Now()))
-	return newLink, true, childId, maintenance, fuse.OK
+	return newLink, true, childId, doUnlocked, fuse.OK
 }
 
 // the toLink parentLock must be locked
@@ -232,15 +232,15 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 			fuse.OK
 	}
 
-	maintenance := func() {}
+	doUnlocked := func() {}
 	func() {
 		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 
-		copy, needsSync, inodeIdInfo, maintenance,
+		copy, needsSync, inodeIdInfo, doUnlocked,
 			err = dir.convertToHardlinkLeg_DOWN(c, toLink.name())
 	}()
-	maintenance()
+	doUnlocked()
 
 	return copy, needsSync, inodeIdInfo, err
 }
