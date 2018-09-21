@@ -1201,7 +1201,7 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 	}
 	unlockParent := callOnce(dir.parentLock.RLock().RUnlock)
 	defer unlockParent.invoke()
-	defer dir.Lock().Unlock()
+	defer dir.Lock(c).Unlock()
 
 	oldInodeId, record, result := func() (InodeId,
 		quantumfs.ImmutableDirectoryRecord, fuse.Status) {
