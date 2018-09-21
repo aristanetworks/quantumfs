@@ -565,7 +565,7 @@ func checkCopyDirStayOnFs(ignoreFails bool) error {
 
 	// make a bunch of file system removals in parallel
 	var perr error
-	go func () {
+	go func() {
 		for i := 0; i < dirs; i += 10 {
 			perr = os.Remove(fmt.Sprintf(src+"/dir%d", i))
 			if perr != nil {
@@ -574,7 +574,7 @@ func checkCopyDirStayOnFs(ignoreFails bool) error {
 
 			time.Sleep(time.Millisecond)
 		}
-	} ()
+	}()
 
 	err = copyDirStayOnFs(src, dst, ignoreFails)
 
