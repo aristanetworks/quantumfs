@@ -670,7 +670,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 				wsr.fillWorkspaceAttrReal(c, &parentInfo.attr)
 			} else {
 				c.vlog("Got record from grandparent")
-				parent.parentGetChildAttr_(c, parent.inodeNum(),
+				parent.parentGetChildAttr(c, parent.inodeNum(),
 					&parentInfo.attr, c.fuseCtx.Owner)
 			}
 			parentInfo.fuseType = parentInfo.attr.Mode
@@ -1199,12 +1199,8 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 	if overwrittenInode != nil {
 		defer overwrittenInode.getParentLock().Lock().Unlock()
 	}
-	unlockParent := dir.parentLock.RLock().RUnlock
-	defer func() {
-		if unlockParent != nil {
-			unlockParent()
-		}
-	}()
+	unlockParent := callOnce(dir.parentLock.RLock().RUnlock)
+	defer unlockParent.invoke()
 	defer dir.Lock().Unlock()
 
 	oldInodeId, record, result := func() (InodeId,
@@ -1231,8 +1227,8 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 		if err != fuse.OK {
 			return quantumfs.InodeIdInvalid, nil, err
 		}
-		unlockParent()
-		unlockParent = nil
+		// Don't need the parent lock now - unlock early to reduce contention
+		unlockParent.invoke()
 
 		if oldName == newName {
 			return quantumfs.InodeIdInvalid, nil, fuse.OK
