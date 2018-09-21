@@ -172,6 +172,8 @@ func walk(c *Ctx) error {
 	// but we don't overwrite the c.dsGet since thats the
 	// caller provided dsGet
 	adsGet := aggregateDsGetter(c.dsGet)
+	// a dsGet wrapper which first queries from aggregate datastore and then the
+	// real datastore. Any error during dsGet is filtered using walkFunc.
 	adsGetEF := dsErrFilter(c, adsGet)
 
 	var err error
@@ -247,7 +249,7 @@ func walk(c *Ctx) error {
 	return c.group.Wait()
 }
 
-func handleHardLinks(c *Ctx, dsGet walkDsGet,
+func handleHardLinks(c *Ctx, adsGetEF walkDsGet,
 	hle quantumfs.HardlinkEntry, keyChan chan<- *workerData) error {
 
 	for {
@@ -257,7 +259,7 @@ func handleHardLinks(c *Ctx, dsGet walkDsGet,
 			hlr := hle.Entry(idx)
 			dr := hlr.Record()
 			linkPath := dr.Filename()
-			err := handleDirectoryRecord(c, linkPath, dsGet, dr,
+			err := handleDirectoryRecord(c, linkPath, adsGetEF, dr,
 				keyChan)
 			if err != nil {
 				return err
@@ -271,7 +273,7 @@ func handleHardLinks(c *Ctx, dsGet walkDsGet,
 
 		key := hle.Next()
 		buf := simplebuffer.New(nil, key)
-		if err := dsGet(c.Qctx, "[hardlink table]",
+		if err := adsGetEF(c.Qctx, "[hardlink table]",
 			key, quantumfs.ObjectTypeHardlink, buf); err != nil {
 
 			if err == ErrSkipHierarchy {
@@ -370,12 +372,12 @@ func handleVeryLargeFile(c *Ctx, path string, dsGet walkDsGet,
 	return nil
 }
 
-func handleDirectoryEntry(c *Ctx, path string, dsGet walkDsGet,
+func handleDirectoryEntry(c *Ctx, path string, adsGetEF walkDsGet,
 	key quantumfs.ObjectKey, keyChan chan<- *workerData) error {
 
 	for {
 		buf := simplebuffer.New(nil, key)
-		if err := dsGet(c.Qctx, path, key,
+		if err := adsGetEF(c.Qctx, path, key,
 			quantumfs.ObjectTypeDirectory, buf); err != nil {
 
 			if err == ErrSkipHierarchy {
@@ -400,7 +402,7 @@ func handleDirectoryEntry(c *Ctx, path string, dsGet walkDsGet,
 
 		de := buf.AsDirectoryEntry()
 		for i := 0; i < de.NumEntries(); i++ {
-			if err := handleDirectoryRecord(c, path, dsGet,
+			if err := handleDirectoryRecord(c, path, adsGetEF,
 				de.Entry(i), keyChan); err != nil {
 
 				return err
@@ -415,7 +417,7 @@ func handleDirectoryEntry(c *Ctx, path string, dsGet walkDsGet,
 	return nil
 }
 
-func handleDirectoryRecord(c *Ctx, path string, dsGet walkDsGet,
+func handleDirectoryRecord(c *Ctx, path string, adsGetEF walkDsGet,
 	dr *quantumfs.EncodedDirectoryRecord, keyChan chan<- *workerData) error {
 
 	// NOTE: some of the EncodedDirectoryRecord accesses eg: Filename, Size etc
@@ -429,7 +431,7 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet walkDsGet,
 	//       meaningless info, the default values work fine.
 	fpath := filepath.Join(path, dr.Filename())
 
-	if err := handleExtendedAttributes(c, fpath, dsGet,
+	if err := handleExtendedAttributes(c, fpath, adsGetEF,
 		dr, keyChan); err != nil {
 
 		return err
@@ -441,11 +443,11 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet walkDsGet,
 		fallthrough
 	case quantumfs.ObjectTypeLargeFile:
 		return handleMultiBlockFile(c, fpath,
-			dsGet, key, dr.Type(), keyChan)
+			adsGetEF, key, dr.Type(), keyChan)
 	case quantumfs.ObjectTypeVeryLargeFile:
-		return handleVeryLargeFile(c, fpath, dsGet, key, keyChan)
+		return handleVeryLargeFile(c, fpath, adsGetEF, key, keyChan)
 	case quantumfs.ObjectTypeDirectory:
-		return handleDirectoryEntry(c, fpath, dsGet, key, keyChan)
+		return handleDirectoryEntry(c, fpath, adsGetEF, key, keyChan)
 	case quantumfs.ObjectTypeHardlink:
 		// This ObjectType will only be seen when looking at a
 		// directoryRecord reached from directoryEntry and not
@@ -482,7 +484,8 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet walkDsGet,
 		} else {
 			// hldr could be of any of the supported ObjectTypes so
 			// handle the directoryRecord accordingly
-			return handleDirectoryRecord(c, fpath, dsGet, hldr, keyChan)
+			return handleDirectoryRecord(c, fpath, adsGetEF, hldr,
+				keyChan)
 		}
 	case quantumfs.ObjectTypeSpecial:
 		fallthrough
@@ -495,7 +498,7 @@ func handleDirectoryRecord(c *Ctx, path string, dsGet walkDsGet,
 	}
 }
 
-func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
+func handleExtendedAttributes(c *Ctx, fpath string, adsGetEF walkDsGet,
 	dr quantumfs.DirectoryRecord, keyChan chan<- *workerData) error {
 
 	extKey := dr.ExtendedAttributes()
@@ -504,7 +507,7 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 	}
 
 	buf := simplebuffer.New(nil, extKey)
-	if err := dsGet(c.Qctx, fpath, extKey,
+	if err := adsGetEF(c.Qctx, fpath, extKey,
 		quantumfs.ObjectTypeExtendedAttribute, buf); err != nil {
 
 		if err == ErrSkipHierarchy {
@@ -527,7 +530,7 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 		_, key := attributeList.Attribute(i)
 
 		buf := simplebuffer.New(nil, key)
-		if err := dsGet(c.Qctx, fpath, key,
+		if err := adsGetEF(c.Qctx, fpath, key,
 			quantumfs.ObjectTypeExtendedAttribute, buf); err != nil {
 
 			if err == ErrSkipHierarchy {
@@ -550,7 +553,9 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 	return nil
 }
 
-func worker(c *Ctx, keyChan <-chan *workerData) (err error) {
+// _worker handles multiple items from keyChan and converts any panics into errors
+// during processing.
+func _worker(c *Ctx, keyChan <-chan *workerData) (err error) {
 	defer func() {
 		if exception := recover(); exception != nil {
 			// The panic in walkFunc is converted to error and the
@@ -574,10 +579,23 @@ func worker(c *Ctx, keyChan <-chan *workerData) (err error) {
 				return
 			}
 		}
+
 		if err = c.wf(c, keyItem.path, keyItem.key, keyItem.size,
 			keyItem.objType, nil); err != nil &&
 			err != ErrSkipHierarchy {
+			return
+		}
+	}
+}
 
+// worker handles multiple items from keyChan and knows when to terminate the worker
+// goroutine.
+func worker(c *Ctx, keyChan <-chan *workerData) (err error) {
+	for {
+		err = _worker(c, keyChan)
+		// close the worker is an err different than Errskiphierarchy
+		// is seen or when the walker goroutine has terminated.
+		if err == nil || err != ErrSkipHierarchy {
 			return
 		}
 	}

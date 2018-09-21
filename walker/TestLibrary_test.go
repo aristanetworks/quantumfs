@@ -309,6 +309,7 @@ func (th *testHelper) expectQlogErrs(errs []string) {
 
 func (th *testHelper) nopWalkFn(bestEffort bool) (map[string]struct{},
 	map[quantumfs.ObjectType]struct{}, WalkFunc) {
+
 	paths := make(map[string]struct{})
 	types := make(map[quantumfs.ObjectType]struct{})
 	var pathMutex utils.DeferableMutex
@@ -389,11 +390,13 @@ func doPanicStringTest(bestEffort bool) func(*testHelper) {
 		if bestEffort {
 			test.AssertNoErr(err)
 			return
+		} else {
+			test.AssertErr(err)
+			test.Assert(strings.Contains(err.Error(),
+				expectedErr.Error()),
+				"Walk did not get the %v, instead got %v",
+				expectedErr, err)
 		}
-		test.AssertErr(err)
-		test.Assert(strings.Contains(err.Error(), expectedErr.Error()),
-			"Walk did not get the %v, instead got %v", expectedErr,
-			err)
 	}
 }
 
@@ -445,12 +448,13 @@ func doPanicErrTest(bestEffort bool) func(*testHelper) {
 		if bestEffort {
 			test.AssertNoErr(err)
 			return
+		} else {
+			test.AssertErr(err)
+			test.Assert(strings.Contains(err.Error(),
+				expectedErr.Error()),
+				"Walk wants %s instead got %s",
+				expectedErr.Error(), err.Error())
 		}
-		test.AssertErr(err)
-		test.Assert(strings.Contains(err.Error(),
-			expectedErr.Error()),
-			"Walk did not get the expectedErr value, instead got %v",
-			err)
 	}
 }
 
@@ -630,7 +634,7 @@ func doHLGetErrTest(bestEffort bool) func(*testHelper) {
 			errs[0] = hleGetError.Error()
 			for i := 1; i < errCount; i++ {
 				// walkInErrors[0] == hleGetError
-				// rest should be sasame as test.walkInErrors[1]
+				// rest should be same as test.walkInErrors[1]
 				errs[i] = test.walkFuncInputErrs[1].Error()
 			}
 			test.AssertNoErr(err)
@@ -644,15 +648,16 @@ func doHLGetErrTest(bestEffort bool) func(*testHelper) {
 			test.Assert(exists,
 				"root dir path missing, walk did not continue")
 			return
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == hleGetError.Error(),
+				"Walk did not get the %v, instead got %v",
+				hleGetError, err)
+			test.assertWalkFuncInputErrs([]string{hleGetError.Error()})
+			// root dir should not be walked since HLE DS get failed
+			_, exists := paths["/"]
+			test.Assert(!exists, "root dir walked, walk did not abort")
 		}
-		test.AssertErr(err)
-		test.Assert(err.Error() == hleGetError.Error(),
-			"Walk did not get the %v, instead got %v", hleGetError,
-			err)
-		test.assertWalkFuncInputErrs([]string{hleGetError.Error()})
-		// root dir should not be walked since HLE DS get failed
-		_, exists := paths["/"]
-		test.Assert(!exists, "root dir walked, walk did not abort")
 	}
 }
 
@@ -703,11 +708,12 @@ func doDEGetErrTest(bestEffort bool) func(*testHelper) {
 			test.Assert(exists,
 				"dir-2 path missing, walk did not continue")
 			return
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == deGetError.Error(),
+				"Walk did not get the %v, instead got %v",
+				deGetError, err)
 		}
-		test.AssertErr(err)
-		test.Assert(err.Error() == deGetError.Error(),
-			"Walk did not get the %v, instead got %v", deGetError,
-			err)
 	}
 }
 
@@ -763,11 +769,12 @@ func doEAGetErrTest(bestEffort bool) func(*testHelper) {
 			test.Assert(exists,
 				"file-1 path missing, walk did not continue")
 			return
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == eaGetError.Error(),
+				"Walk did not get the %v, instead got %v",
+				eaGetError, err)
 		}
-		test.AssertErr(err)
-		test.Assert(err.Error() == eaGetError.Error(),
-			"Walk did not get the %v, instead got %v", eaGetError,
-			err)
 	}
 }
 
@@ -838,11 +845,12 @@ func doEAAttrGetErrTest(bestEffort bool) func(*testHelper) {
 			test.Assert(exists,
 				"other extattrs on file-0 were not walked")
 			return
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == eaGetError.Error(),
+				"Walk did not get the %v, instead got %v",
+				eaGetError, err)
 		}
-		test.AssertErr(err)
-		test.Assert(err.Error() == eaGetError.Error(),
-			"Walk did not get the %v, instead got %v", eaGetError,
-			err)
 	}
 }
 
@@ -901,11 +909,12 @@ func doMultiBlockGetErrTest(bestEffort bool) func(*testHelper) {
 			test.Assert(exists,
 				"file-1 absent, walk should have continued")
 			return
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == mbGetBlock0Error.Error(),
+				"Walk did not get the %v, instead got %v",
+				mbGetBlock0Error, err)
 		}
-		test.AssertErr(err)
-		test.Assert(err.Error() == mbGetBlock0Error.Error(),
-			"Walk did not get the %v, instead got %v", mbGetBlock0Error,
-			err)
 	}
 }
 
@@ -967,11 +976,12 @@ func doVLFileGetFirstErrTest(bestEffort bool) func(*testHelper) {
 			test.Assert(exists,
 				"file-1 absent, walk should have continued")
 			return
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == vlGetBlock0Error.Error(),
+				"Walk did not get the %v, instead got %v",
+				vlGetBlock0Error, err)
 		}
-		test.AssertErr(err)
-		test.Assert(err.Error() == vlGetBlock0Error.Error(),
-			"Walk did not get the %v, instead got %v", vlGetBlock0Error,
-			err)
 	}
 }
 
@@ -1041,11 +1051,12 @@ func doVLFileGetNextErrTest(bestEffort bool) func(*testHelper) {
 			test.Assert(exists,
 				"file-1 absent, walk should have continued")
 			return
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == vlGetBlock1Error.Error(),
+				"Walk did not get the %v, instead got %v",
+				vlGetBlock1Error, err)
 		}
-		test.AssertErr(err)
-		test.Assert(err.Error() == vlGetBlock1Error.Error(),
-			"Walk did not get the %v, instead got %v", vlGetBlock1Error,
-			err)
 	}
 }
 
