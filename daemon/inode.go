@@ -906,6 +906,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		c.vlog("Uninstantiating inode %d", inode.inodeNum())
 
 		c.qfs.setInode_(c, inode.inodeNum(), nil)
+		// This Inode is now unlisted and unreachable
 		delete(c.qfs.inodeRefcounts, inode.inodeNum())
 
 		// Note: it is a little dangerous to grab parentId_() without the
@@ -919,7 +920,6 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		return
 	}
 
-	// This Inode is now unlisted and unreachable
 	defer inode.parentLock.Lock().Unlock()
 
 	if !inode.isOrphaned_() {
