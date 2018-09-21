@@ -170,7 +170,7 @@ func (dir *Directory) followPath_DOWN(c *ctx, path []string) (terminalDir Inode,
 
 func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 	childname string) (copy quantumfs.DirectoryRecord, needsSync bool,
-	inodeIdInfo InodeIdInfo, doUnlocked func(), err fuse.Status) {
+	inodeIdInfo InodeIdInfo, err fuse.Status, doUnlocked func()) {
 
 	defer c.FuncIn("Directory::convertToHardlinkLeg_DOWN",
 		"name %s", childname).Out()
@@ -183,14 +183,14 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 	child := dir.children.recordByName(c, childname)
 	if child == nil {
 		c.elog("No child record for name %s", childname)
-		return nil, false, invalidIdInfo(), doUnlocked, fuse.ENOENT
+		return nil, false, invalidIdInfo(), fuse.ENOENT, doUnlocked
 	}
 
 	// If it's already a hardlink, great no more work is needed
 	if link, isLink := child.(*HardlinkLeg); isLink {
 		c.vlog("Already a hardlink")
 		recordCopy := *link
-		return &recordCopy, false, invalidIdInfo(), doUnlocked, fuse.OK
+		return &recordCopy, false, invalidIdInfo(), fuse.OK, doUnlocked
 	}
 
 	// record must be a file type to be hardlinked
@@ -199,7 +199,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 		child.Type() != quantumfs.ObjectTypeSpecial {
 
 		c.vlog("Cannot hardlink %s - not a file", child.Filename())
-		return nil, false, invalidIdInfo(), doUnlocked, fuse.EINVAL
+		return nil, false, invalidIdInfo(), fuse.EINVAL, doUnlocked
 	}
 
 	// remove the record from the childmap before donating it to be a hardlink
@@ -213,7 +213,7 @@ func (dir *Directory) convertToHardlinkLeg_DOWN(c *ctx,
 	doUnlocked = dir.children.setRecord(c, childId, linkSrcCopy)
 
 	newLink.setCreationTime(quantumfs.NewTime(time.Now()))
-	return newLink, true, childId, doUnlocked, fuse.OK
+	return newLink, true, childId, fuse.OK, doUnlocked
 }
 
 // the toLink parentLock must be locked
@@ -237,8 +237,8 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 		defer dir.Lock().Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 
-		copy, needsSync, inodeIdInfo, doUnlocked,
-			err = dir.convertToHardlinkLeg_DOWN(c, toLink.name())
+		copy, needsSync, inodeIdInfo, err,
+			doUnlocked = dir.convertToHardlinkLeg_DOWN(c, toLink.name())
 	}()
 	doUnlocked()
 

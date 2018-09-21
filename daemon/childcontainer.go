@@ -135,6 +135,7 @@ func (container *ChildContainer) loadChild(c *ctx,
 // Use this when you know the child's InodeId. Either the child must be instantiated
 // and dirty, or markPublishable() must be called immediately afterwards for the
 // changes set here to eventually be published.
+
 // Returns a doUnlocked function which *must* be called without the container.dir
 // inode locks held.
 func (container *ChildContainer) setRecord(c *ctx, inodeId InodeIdInfo,
@@ -277,7 +278,7 @@ func (container *ChildContainer) deleteChild(c *ctx,
 }
 
 func (container *ChildContainer) renameChild(c *ctx, oldName string,
-	newName string) func() {
+	newName string) (doUnlocked func()) {
 
 	defer c.FuncIn("ChildContainer::renameChild", "%s -> %s",
 		oldName, newName).Out()

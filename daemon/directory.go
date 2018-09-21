@@ -724,8 +724,8 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 // Needs inode lock for write
 func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 	rdev uint32, constructor InodeConstructor, type_ quantumfs.ObjectType,
-	key quantumfs.ObjectKey, out *fuse.EntryOut) (doUnlocked func(),
-	newInode Inode) {
+	key quantumfs.ObjectKey, out *fuse.EntryOut) (newInode Inode,
+	doUnlocked func()) {
 
 	defer c.funcIn("Directory::create_").Out()
 
@@ -766,7 +766,7 @@ func (dir *Directory) create_(c *ctx, name string, mode uint32, umask uint32,
 
 	newEntity.dirty(c)
 
-	return doUnlocked, newEntity
+	return newEntity, doUnlocked
 }
 
 func (dir *Directory) childExists(c *ctx, name string) fuse.Status {
@@ -805,7 +805,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 
 		c.vlog("Creating file: '%s'", name)
 
-		doUnlocked, file = dir.create_(c, name, input.Mode, input.Umask,
+		file, doUnlocked = dir.create_(c, name, input.Mode, input.Umask,
 			0, newSmallFile, quantumfs.ObjectTypeSmallFile,
 			quantumfs.EmptyBlockKey, &out.EntryOut)
 		return fuse.OK
@@ -864,7 +864,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 			return err
 		}
 
-		doUnlocked, newDir = dir.create_(c, name, input.Mode, input.Umask,
+		newDir, doUnlocked = dir.create_(c, name, input.Mode, input.Umask,
 			0, newDirectory, quantumfs.ObjectTypeDirectory,
 			quantumfs.EmptyDirKey, out)
 		if newDir != nil {
@@ -1068,7 +1068,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return result
 		}
 
-		maintCreate, inode = dir.create_(c, name, 0777, 0777, 0, newSymlink,
+		inode, maintCreate = dir.create_(c, name, 0777, 0777, 0, newSymlink,
 			quantumfs.ObjectTypeSymlink, quantumfs.EmptyBlockKey, out)
 
 		link := inode.(*Symlink)
@@ -1141,11 +1141,11 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFBLK) ||
 			utils.BitFlagsSet(uint(input.Mode), syscall.S_IFCHR) {
 
-			doUnlocked, inode = dir.create_(c, name, input.Mode,
+			inode, doUnlocked = dir.create_(c, name, input.Mode,
 				input.Umask, input.Rdev, newSpecial,
 				quantumfs.ObjectTypeSpecial, zeroSpecial, out)
 		} else if utils.BitFlagsSet(uint(input.Mode), syscall.S_IFREG) {
-			doUnlocked, inode = dir.create_(c, name, input.Mode,
+			inode, doUnlocked = dir.create_(c, name, input.Mode,
 				input.Umask, 0, newSmallFile,
 				quantumfs.ObjectTypeSmallFile,
 				quantumfs.EmptyBlockKey, out)
@@ -1170,12 +1170,11 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 
 	defer c.FuncIn("Directory::RenameChild", "%s -> %s", oldName, newName).Out()
 
-	fileType, doUnlocked, overwritten, result := dir.renameChild(c, oldName,
+	fileType, overwritten, result, doUnlocked := dir.renameChild(c, oldName,
 		newName)
 	doUnlocked()
 
 	if result == fuse.OK {
-
 		if overwritten != nil {
 			dir.self.markAccessed(c, overwritten.Filename(),
 				markType(overwritten.Type(),
@@ -1196,8 +1195,9 @@ func (dir *Directory) RenameChild(c *ctx, oldName string,
 }
 
 func (dir *Directory) renameChild(c *ctx, oldName string,
-	newName string) (fileType quantumfs.ObjectType, doUnlocked func(),
-	overwrittenRecord quantumfs.ImmutableDirectoryRecord, result fuse.Status) {
+	newName string) (fileType quantumfs.ObjectType,
+	overwrittenRecord quantumfs.ImmutableDirectoryRecord, result fuse.Status,
+	doUnlocked func()) {
 
 	doUnlocked = func() {}
 	defer dir.updateSize(c, result)
