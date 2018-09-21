@@ -665,7 +665,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 				wsr.fillWorkspaceAttrReal(c, &parentInfo.attr)
 			} else {
 				c.vlog("Got record from grandparent")
-				parent.parentGetChildAttr_(c, parent.inodeNum(),
+				parent.parentGetChildAttr(c, parent.inodeNum(),
 					&parentInfo.attr, c.fuseCtx.Owner)
 			}
 			parentInfo.fuseType = parentInfo.attr.Mode
