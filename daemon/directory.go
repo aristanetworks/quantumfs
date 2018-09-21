@@ -1201,6 +1201,7 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 		if err != fuse.OK {
 			return quantumfs.InodeIdInvalid, nil, err
 		}
+		// Don't need the parent lock now - unlock early to reduce contention
 		unlockParent.invoke()
 
 		if oldName == newName {
