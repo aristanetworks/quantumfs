@@ -304,7 +304,7 @@ func (tsl *TypespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 }
 
 // Must be called with the inode's parent lock held for reads
-func getParentInfo_(c *ctx, inode Inode, fillParent listingAttrFill,
+func getParentInfo_(c *ctx, parent InodeId, fillParent listingAttrFill,
 	typespace string, namespace string) directoryContents {
 
 	rtn := directoryContents{
@@ -312,8 +312,7 @@ func getParentInfo_(c *ctx, inode Inode, fillParent listingAttrFill,
 		fuseType: fuse.S_IFDIR,
 	}
 
-	parentId := inode.parentId_()
-	fillParent(c, &rtn.attr, parentId, typespace, namespace)
+	fillParent(c, &rtn.attr, parent, typespace, namespace)
 	return rtn
 }
 
@@ -327,13 +326,14 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 		typespaces = []string{}
 	}
 
-	parentUnlock := callOnce(tsl.getParentLock().RLock().RUnlock)
-	defer parentUnlock.invoke()
-	defer tsl.Lock().Unlock()
+	var parentInfo directoryContents
+	func () {
+		defer tsl.getParentLock().RLock().RUnlock()
+		parentInfo = getParentInfo_(c, tsl.parentId_(), fillRootAttrWrapper,
+			"", "")
+	} ()
 
-	parentInfo := getParentInfo_(c, tsl, fillRootAttrWrapper, "", "")
-	// unlock the parent early
-	parentUnlock.invoke()
+	defer tsl.Lock().Unlock()
 
 	if err == nil {
 		// We only accept positive lists
@@ -668,14 +668,14 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 		namespaces = []string{}
 	}
 
-	parentUnlock := callOnce(nsl.getParentLock().RLock().RUnlock)
-	defer parentUnlock.invoke()
-	defer nsl.Lock().Unlock()
+	var parentInfo directoryContents
+	func () {
+		defer nsl.getParentLock().RLock().RUnlock()
+		parentInfo = getParentInfo_(c, nsl.parentId_(), fillRootAttrWrapper,
+			nsl.typespaceName, "")
+	} ()
 
-	parentInfo := getParentInfo_(c, nsl, fillRootAttrWrapper, nsl.typespaceName,
-		"")
-	// unlock the parent early
-	parentUnlock.invoke()
+	defer nsl.Lock().Unlock()
 
 	if err == nil {
 		// We only accept positive lists
@@ -1054,14 +1054,14 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 		workspaces = map[string]quantumfs.WorkspaceNonce{}
 	}
 
-	parentUnlock := callOnce(wsl.getParentLock().RLock().RUnlock)
-	defer parentUnlock.invoke()
-	defer wsl.Lock().Unlock()
+	var parentInfo directoryContents
+	func () {
+		defer wsl.getParentLock().RLock().RUnlock()
+		parentInfo = getParentInfo_(c, wsl.parentId_(), fillTypespaceAttr,
+			wsl.typespaceName, wsl.namespaceName)
+	} ()
 
-	parentInfo := getParentInfo_(c, wsl, fillTypespaceAttr, wsl.typespaceName,
-		wsl.namespaceName)
-	// unlock the parent early
-	parentUnlock.invoke()
+	defer wsl.Lock().Unlock()
 
 	if err == nil {
 		// We only accept positive lists
