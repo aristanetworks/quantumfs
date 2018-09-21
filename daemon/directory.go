@@ -103,7 +103,7 @@ func initDirectory(c *ctx, name string, dir *Directory,
 
 func (dir *Directory) finishInit(c *ctx) (uninstantiated []loadedInfo) {
 	defer c.funcIn("Directory::finishInit").Out()
-	func () {
+	func() {
 		defer dir.childRecordLock.Unlock()
 
 		utils.Assert(dir.children == nil, "children already loaded")
@@ -117,7 +117,7 @@ func (dir *Directory) finishInit(c *ctx) (uninstantiated []loadedInfo) {
 		// now attempt to load the children, which may panic / fail
 		dir.children, uninstantiated = newChildContainer(c, dir,
 			dir.baseLayerId, wsrInode)
-	} ()
+	}()
 
 	if len(uninstantiated) > 0 {
 		// check each new child for hardlinks we need to track
