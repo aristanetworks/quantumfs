@@ -353,7 +353,7 @@ func (tsl *TypespaceList) getChildSnapshot(c *ctx) []directoryContents {
 }
 
 func (tsl *TypespaceList) getChildSnapshotRemovals(c *ctx,
-	typespaces []string) (rems []inodeRemoval, children []directoryContents) {
+	typespaces []string) (removed []inodeRemoval, children []directoryContents) {
 
 	parentUnlock := callOnce(tsl.getParentLock().RLock().RUnlock)
 	defer parentUnlock.invoke()
@@ -365,7 +365,7 @@ func (tsl *TypespaceList) getChildSnapshotRemovals(c *ctx,
 
 	if len(typespaces) > 0 {
 		// We only accept positive lists
-		rems = updateChildren_(c, typespaces, &tsl.typespacesByName,
+		removed = updateChildren_(c, typespaces, &tsl.typespacesByName,
 			&tsl.typespacesById, tsl)
 	}
 
@@ -381,7 +381,7 @@ func (tsl *TypespaceList) getChildSnapshotRemovals(c *ctx,
 	fillApiAttr(c, &api.attr)
 	children = append(children, api)
 
-	return rems, children
+	return removed, children
 }
 
 func (tsl *TypespaceList) Lookup(c *ctx, name string,
@@ -410,10 +410,10 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 		}
 	}
 
-	var rems []inodeRemoval
+	var removed []inodeRemoval
 	rtn := func() fuse.Status {
 		defer tsl.Lock(c).Unlock()
-		rems = updateChildren_(c, list, &tsl.typespacesByName,
+		removed = updateChildren_(c, list, &tsl.typespacesByName,
 			&tsl.typespacesById, tsl)
 
 		if !exists {
@@ -429,7 +429,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 		return fuse.OK
 	}()
-	handleRemovals(c, rems)
+	handleRemovals(c, removed)
 
 	return rtn
 }
@@ -710,7 +710,7 @@ func (nsl *NamespaceList) getChildSnapshot(c *ctx) []directoryContents {
 }
 
 func (nsl *NamespaceList) getChildSnapshotRemovals(c *ctx,
-	namespaces []string) (rems []inodeRemoval, children []directoryContents) {
+	namespaces []string) (removed []inodeRemoval, children []directoryContents) {
 
 	parentUnlock := callOnce(nsl.getParentLock().RLock().RUnlock)
 	defer parentUnlock.invoke()
@@ -723,7 +723,7 @@ func (nsl *NamespaceList) getChildSnapshotRemovals(c *ctx,
 
 	if len(namespaces) > 0 {
 		// We only accept positive lists
-		rems = updateChildren_(c, namespaces, &nsl.namespacesByName,
+		removed = updateChildren_(c, namespaces, &nsl.namespacesByName,
 			&nsl.namespacesById, nsl)
 	}
 
@@ -731,7 +731,7 @@ func (nsl *NamespaceList) getChildSnapshotRemovals(c *ctx,
 		nsl.typespaceName, "", fillNamespaceAttr, fillTypespaceAttr,
 		parentInfo)
 
-	return rems, children
+	return removed, children
 }
 
 func (nsl *NamespaceList) Lookup(c *ctx, name string,
@@ -752,10 +752,10 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 		}
 	}
 
-	var rems []inodeRemoval
+	var removed []inodeRemoval
 	rtn := func() fuse.Status {
 		defer nsl.Lock(c).Unlock()
-		rems = updateChildren_(c, list, &nsl.namespacesByName,
+		removed = updateChildren_(c, list, &nsl.namespacesByName,
 			&nsl.namespacesById, nsl)
 
 		if !exists {
@@ -772,7 +772,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 
 		return fuse.OK
 	}()
-	handleRemovals(c, rems)
+	handleRemovals(c, removed)
 
 	return rtn
 }
@@ -1056,10 +1056,10 @@ func (wsl *WorkspaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 
 // Update the internal workspace list with the most recent available listing
 // Must be called with the wsl inode lock held
-func (wsl *WorkspaceList) determineRemovedChildren_(c *ctx,
+func (wsl *WorkspaceList) updateChildren_(c *ctx,
 	names map[string]quantumfs.WorkspaceNonce) []inodeRemoval {
 
-	defer c.FuncIn("WorkspaceList::updateChildren", "Parent Inode %d",
+	defer c.FuncIn("WorkspaceList::updateChildren_", "Parent Inode %d",
 		wsl.inodeNum()).Out()
 
 	// First delete any outdated entries
@@ -1082,13 +1082,6 @@ func (wsl *WorkspaceList) determineRemovedChildren_(c *ctx,
 		}
 	}
 
-	return rtn
-}
-
-// Must be called with the wsl inode lock held
-func (wsl *WorkspaceList) updateNewChildren_(c *ctx,
-	names map[string]quantumfs.WorkspaceNonce) {
-
 	// Then re-add any new entries
 	for name, nonce := range names {
 		if _, exists := wsl.workspacesByName[name]; !exists {
@@ -1105,6 +1098,7 @@ func (wsl *WorkspaceList) updateNewChildren_(c *ctx,
 		}
 	}
 
+	return rtn
 }
 
 func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
@@ -1125,24 +1119,15 @@ func (wsl *WorkspaceList) getChildSnapshot(c *ctx) []directoryContents {
 }
 
 func (wsl *WorkspaceList) getChildSnapshotRemovals(c *ctx,
-	workspaces map[string]quantumfs.WorkspaceNonce) (rems []inodeRemoval,
+	workspaces map[string]quantumfs.WorkspaceNonce) (removed []inodeRemoval,
 	children []directoryContents) {
-
-	if len(workspaces) > 0 {
-		// We only accept positive lists
-		rems := func() []inodeRemoval {
-			defer wsl.Lock(c).Unlock()
-			return wsl.determineRemovedChildren_(c, workspaces)
-		}()
-		handleRemovals(c, rems)
-	}
 
 	parentUnlock := callOnce(wsl.getParentLock().RLock().RUnlock)
 	defer parentUnlock.invoke()
 	defer wsl.Lock(c).Unlock()
 
 	if len(workspaces) > 0 {
-		wsl.updateNewChildren_(c, workspaces)
+		removed = wsl.updateChildren_(c, workspaces)
 	}
 
 	parentInfo := getParentInfo_(c, wsl, fillTypespaceAttr, wsl.typespaceName,
@@ -1158,7 +1143,7 @@ func (wsl *WorkspaceList) getChildSnapshotRemovals(c *ctx,
 		wsl.namespaceName, fillWorkspaceAttrFake, fillNamespaceAttr,
 		parentInfo)
 
-	return rems, children
+	return removed, children
 }
 
 func (wsl *WorkspaceList) Lookup(c *ctx, name string,
@@ -1180,30 +1165,28 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 		}
 	}
 
-	// This lock-unlock-locking is code smell, so we have to be careful in
-	// updateNewChildren to only add when the old has been removed
-	rems := func() []inodeRemoval {
+	var removed []inodeRemoval
+	rtn := func() fuse.Status {
 		defer wsl.Lock(c).Unlock()
-		return wsl.determineRemovedChildren_(c, workspaces)
+		removed = wsl.updateChildren_(c, workspaces)
+
+		if !exists {
+			return fuse.ENOENT
+		}
+		c.vlog("Workspace exists")
+
+		inodeInfo := wsl.workspacesByName[name]
+		c.qfs.incrementLookupCount(c, inodeInfo.id.id)
+		out.NodeId = uint64(inodeInfo.id.id)
+		out.Generation = inodeInfo.id.generation
+		fillEntryOutCacheData(c, out)
+		fillWorkspaceAttrFake(c, &out.Attr, inodeInfo.id.id, "", "")
+
+		return fuse.OK
 	}()
-	handleRemovals(c, rems)
+	handleRemovals(c, removed)
 
-	defer wsl.Lock(c).Unlock()
-	wsl.updateNewChildren_(c, workspaces)
-
-	if !exists {
-		return fuse.ENOENT
-	}
-	c.vlog("Workspace exists")
-
-	inodeInfo := wsl.workspacesByName[name]
-	c.qfs.incrementLookupCount(c, inodeInfo.id.id)
-	out.NodeId = uint64(inodeInfo.id.id)
-	out.Generation = inodeInfo.id.generation
-	fillEntryOutCacheData(c, out)
-	fillWorkspaceAttrFake(c, &out.Attr, inodeInfo.id.id, "", "")
-
-	return fuse.OK
+	return rtn
 }
 
 func (wsl *WorkspaceList) Create(c *ctx, input *fuse.CreateIn, name string,
