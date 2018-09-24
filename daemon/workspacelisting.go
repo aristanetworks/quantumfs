@@ -1131,9 +1131,9 @@ func (wsl *WorkspaceList) getChildSnapshotRemovals(c *ctx,
 
 	defer wsl.Lock().Unlock()
 
-	if err == nil {
+	if len(workspaces) > 0 {
 		// We only accept positive lists
-		wsl.updateChildren(c, workspaces)
+		removed = wsl.updateChildren_(c, workspaces)
 	}
 
 	namesAndIds := make(map[string]InodeIdInfo, len(wsl.workspacesByName))
