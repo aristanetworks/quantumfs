@@ -296,7 +296,7 @@ func newApiHandle(c *ctx, treeState *TreeState, api *ApiInode) *ApiHandle {
 	handle := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
 			id:         c.qfs.newFileHandleId(),
-			inode:   api,
+			inode:      api,
 			treeState_: treeState,
 		},
 		responses: make(chan fuse.ReadResult, 10),

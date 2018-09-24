@@ -989,7 +989,7 @@ type FileHandleId uint64
 
 type FileHandleCommon struct {
 	id         FileHandleId
-	inode       Inode
+	inode      Inode
 	treeState_ *TreeState
 }
 
