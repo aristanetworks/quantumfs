@@ -500,6 +500,7 @@ func (inode *InodeCommon) parentGetChildAttr(c *ctx, inodeNum InodeId,
 	inode.parentGetChildAttr_(c, inodeNum, out, owner)
 }
 
+// Must be called with the inode's parentLock held
 func (inode *InodeCommon) parentGetChildAttr_(c *ctx, inodeNum InodeId,
 	out *fuse.Attr, owner fuse.Owner) {
 
