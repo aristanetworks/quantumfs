@@ -1056,8 +1056,8 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 	defer c.funcIn("Directory::Symlink").Out()
 
-	maintCreate := func() {}
-	maintModify := func() {}
+	unlockCreate := func() {}
+	unlockModify := func() {}
 	var inode Inode
 	result := func() fuse.Status {
 		defer dir.parentLock.RLock().RUnlock()
@@ -1073,7 +1073,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 			return result
 		}
 
-		inode, maintCreate = dir.create_(c, name, 0777, 0777, 0, newSymlink,
+		inode, unlockCreate = dir.create_(c, name, 0777, 0777, 0, newSymlink,
 			quantumfs.ObjectTypeSymlink, quantumfs.EmptyBlockKey, out)
 
 		link := inode.(*Symlink)
@@ -1082,7 +1082,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 		link.setLink(c, pointedTo)
 		func() {
 			defer dir.childRecordLock.Lock().Unlock()
-			maintModify = dir.children.modifyChildWithFunc(c,
+			unlockModify = dir.children.modifyChildWithFunc(c,
 				inode.inodeNum(),
 				func(record quantumfs.DirectoryRecord) {
 
@@ -1096,8 +1096,8 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 
 		return fuse.OK
 	}()
-	maintCreate()
-	maintModify()
+	unlockCreate()
+	unlockModify()
 
 	if result == fuse.OK {
 		inode.markSelfAccessed(c, quantumfs.PathCreated)
@@ -1253,15 +1253,15 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 
 		now := quantumfs.NewTime(time.Now())
 		if hardlink, isHardlink := record.(*HardlinkLeg); !isHardlink {
-			modMaint := dir.children.modifyChildWithFunc(c, oldInodeId_,
+			unlockMod := dir.children.modifyChildWithFunc(c, oldInodeId_,
 				func(record quantumfs.DirectoryRecord) {
 
 					record.SetContentTime(now)
 				})
-			renameMaint := doUnlocked
+			unlockRename := doUnlocked
 			doUnlocked = func() {
-				renameMaint()
-				modMaint()
+				unlockRename()
+				unlockMod()
 			}
 		} else {
 			hardlink.setCreationTime(now)
