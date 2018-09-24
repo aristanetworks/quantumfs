@@ -317,6 +317,7 @@ func calcTypeGivenBlocks(numBlocks int) quantumfs.ObjectType {
 
 // Given the block index to write into the file, ensure that we are the
 // correct file type.
+
 // Must be called with the parentlock held for reads
 func (fi *File) reconcileFileType_(c *ctx, blockIdx int) error {
 	defer c.funcIn("File::reconcileFileType_").Out()
@@ -486,6 +487,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 				writeCount_ += written
 				return err
 			})
+		// unlock early to reduce parent lock hold time
 		parentUnlock.invoke()
 
 		if err != nil {
