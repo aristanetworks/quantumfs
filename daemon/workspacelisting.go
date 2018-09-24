@@ -1166,7 +1166,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 	}
 
 	var removed []inodeRemoval
-	rtn := func () fuse.Status {
+	rtn := func() fuse.Status {
 		defer wsl.Lock().Unlock()
 		removed = wsl.updateChildren_(c, workspaces)
 
