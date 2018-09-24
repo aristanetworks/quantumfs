@@ -400,17 +400,6 @@ func hasPermissionIds_(c *ctx, inode Inode, checkUid uint32,
 	return fuse.EACCES
 }
 
-func asDirectoryQuiet(inode Inode) *Directory {
-	switch v := inode.(type) {
-	case *WorkspaceRoot:
-		return &v.Directory
-	case *Directory:
-		return v
-	default:
-		return nil
-	}
-}
-
 func asDirectory(inode Inode) *Directory {
 	switch v := inode.(type) {
 	case *WorkspaceRoot:
@@ -474,25 +463,22 @@ func publishNow(c *ctx, buf ImmutableBuffer) (quantumfs.ObjectKey, error) {
 	return buf.Key(&c.Ctx)
 }
 
-// this struct is to allow deferring a lock unlock, while allowing it be unlocked
-// early as well
+// this is for ensuring that a given function is only called once via the struct
 type callOnceHandle struct {
-	fn     func()
-	called bool
+	fn func()
 }
 
 func callOnce(fn func()) *callOnceHandle {
 	return &callOnceHandle{
-		fn:     fn,
-		called: false,
+		fn: fn,
 	}
 }
 
 func (c *callOnceHandle) invoke() {
-	if c.called {
+	if c.fn == nil {
 		return
 	}
 
 	c.fn()
-	c.called = true
+	c.fn = nil
 }
