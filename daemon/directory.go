@@ -101,8 +101,10 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	utils.Assert(dir.treeState() != nil, "Directory treeState nil at init")
 }
 
-func (dir *Directory) finishInit(c *ctx) (uninstantiated []loadedInfo) {
+func (dir *Directory) finishInit(c *ctx) (newInodes []inodePair) {
 	defer c.funcIn("Directory::finishInit").Out()
+
+	var uninstantiated []loadedInfo
 	func() {
 		defer dir.childRecordLock.Unlock()
 
@@ -124,7 +126,14 @@ func (dir *Directory) finishInit(c *ctx) (uninstantiated []loadedInfo) {
 		dir.traceHardlinks(c, uninstantiated)
 	}
 
-	return uninstantiated
+	// convert the loadedInfos into inodePairs
+	newInodes = make([]inodePair, 0, len(uninstantiated))
+	for _, newInode := range uninstantiated {
+		newInodes = append(newInodes, newInodePair(newInode.child,
+			newInode.parent))
+	}
+
+	return newInodes
 }
 
 func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uint64,
@@ -849,7 +858,6 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 
 	doUnlocked := func() {}
 	var newDir Inode
-	var uninstantiated []loadedInfo
 	result := func() fuse.Status {
 		defer dir.parentLock.RLock().RUnlock()
 		defer dir.Lock().Unlock()
@@ -867,15 +875,12 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 		newDir, doUnlocked = dir.create_(c, name, input.Mode, input.Umask,
 			0, newDirectory, quantumfs.ObjectTypeDirectory,
 			quantumfs.EmptyDirKey, out)
-		if newDir != nil {
-			uninstantiated = newDir.finishInit(c)
-		}
 		return fuse.OK
 	}()
 	doUnlocked()
 
 	if result == fuse.OK {
-		dir.traceHardlinks(c, uninstantiated)
+		newDir.finishInit(c)
 		newDir.markSelfAccessed(c, quantumfs.PathCreated|
 			quantumfs.PathIsDir)
 	}
