@@ -106,7 +106,7 @@ type Inode interface {
 	// Must be called with the instantiation lock
 	// Instantiate the Inode for the given child on demand.
 	instantiateChild_(c *ctx, inodeNum InodeId) Inode
-	finishInit(c *ctx) []loadedInfo
+	finishInit(c *ctx) []inodePair
 
 	name() string
 	setName(name string)
@@ -509,6 +509,7 @@ func (inode *InodeCommon) parentGetChildAttr(c *ctx, inodeNum InodeId,
 	inode.parentGetChildAttr_(c, inodeNum, out, owner)
 }
 
+// Must be called with the inode's parentLock held
 func (inode *InodeCommon) parentGetChildAttr_(c *ctx, inodeNum InodeId,
 	out *fuse.Attr, owner fuse.Owner) {
 
@@ -697,7 +698,7 @@ func (inode *InodeCommon) syncChild(c *ctx, inodeId InodeId,
 	panic(msg)
 }
 
-func (inode *InodeCommon) finishInit(c *ctx) []loadedInfo {
+func (inode *InodeCommon) finishInit(c *ctx) []inodePair {
 	return nil
 }
 
@@ -906,6 +907,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		c.vlog("Uninstantiating inode %d", inode.inodeNum())
 
 		c.qfs.setInode_(c, inode.inodeNum(), nil)
+		// This Inode is now unlisted and unreachable
 		delete(c.qfs.inodeRefcounts, inode.inodeNum())
 
 		// Note: it is a little dangerous to grab parentId_() without the
@@ -919,7 +921,6 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		return
 	}
 
-	// This Inode is now unlisted and unreachable
 	defer inode.parentLock.Lock().Unlock()
 
 	if !inode.isOrphaned_() {
