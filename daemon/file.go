@@ -129,8 +129,8 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	}
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeState())
-	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor, fi)
+	fileDescriptor := newFileDescriptor(fi, fileHandleNum, fi.treeState())
+	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	c.vlog(OpenedInodeDebug, fi.inodeNum(), fileHandleNum)
 
@@ -515,13 +515,13 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
-func newFileDescriptor(file *File, inodeNum InodeId,
-	fileHandleId FileHandleId, treeState *TreeState) FileHandle {
+func newFileDescriptor(file *File, fileHandleId FileHandleId,
+	treeState *TreeState) FileHandle {
 
 	fd := &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{
 			id:         fileHandleId,
-			inodeNum:   inodeNum,
+			inode:      file,
 			treeState_: treeState,
 		},
 		file: file,

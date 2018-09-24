@@ -110,11 +110,6 @@ type MetaInodeDeletionRecord struct {
 	name     string
 }
 
-type fileHandleReferenced struct {
-	fh     FileHandle
-	source Inode
-}
-
 type QuantumFs struct {
 	fuse.RawFileSystem
 	server        *fuse.Server
@@ -140,7 +135,7 @@ type QuantumFs struct {
 	inodeRefcounts map[InodeId]int32
 
 	// Must only be manipulated via setFileHandle_
-	fileHandles sync.Map // map[FileHandleId]fileHandleReferenced
+	fileHandles sync.Map // map[FileHandleId]FileHandle
 
 	flusher *Flusher
 
@@ -233,7 +228,7 @@ func (qfs *QuantumFs) fileHandleReleaser(ids []uint64) {
 	defer qfs.c.statsFuncIn(ReleaseFileHandleLog).Out()
 	defer qfs.mapMutex.Lock().Unlock()
 	for _, id := range ids {
-		qfs.setFileHandle_(&qfs.c, FileHandleId(id), nil, nil)
+		qfs.setFileHandle_(&qfs.c, FileHandleId(id), nil)
 	}
 }
 
@@ -1136,51 +1131,41 @@ func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 		return nil
 	}
 
-	return fileHandle.(fileHandleReferenced).fh
+	return fileHandle.(FileHandle)
 }
 
 // Set a file handle in a thread safe way, set to nil to delete
-func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle,
-	source Inode) {
-
+func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
 	defer c.funcIn("Mux::setFileHandle").Out()
 	defer qfs.mapMutex.Lock().Unlock()
 
-	qfs.setFileHandle_(c, id, fileHandle, source)
+	qfs.setFileHandle_(c, id, fileHandle)
 }
 
 // Must hold mapMutex exclusively
 func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
-	fileHandle FileHandle, source Inode) {
+	fileHandle FileHandle) {
 
-	var handle fileHandleReferenced
-	exists := false
-	lastHandle, exists := qfs.fileHandles.Load(id)
-	if lastHandle != nil {
-		handle = lastHandle.(fileHandleReferenced)
-	}
+	handle, exists := qfs.fileHandles.Load(id)
 
 	if fileHandle != nil {
-		utils.Assert(source != nil, "Setting a fh with nil inode")
+		utils.Assert(fileHandle.Inode() != nil,
+			"Setting a fh with nil inode")
 		if !exists {
 			// If we're setting a new handle, add a ref count
-			addInodeRef_(c, source.inodeNum())
+			addInodeRef_(c, fileHandle.Inode().inodeNum())
 		}
 
-		qfs.fileHandles.Store(id,
-			fileHandleReferenced{
-				fh:     fileHandle,
-				source: source,
-			})
+		qfs.fileHandles.Store(id, fileHandle)
 	} else {
-		if exists {
-			// clean remaining response queue size from the apiFileSize
-			if api, ok := handle.fh.(*ApiHandle); ok {
-				api.drainResponseData(c)
-			}
+		// clean remaining response queue size from the apiFileSize
+		if api, ok := handle.(*ApiHandle); ok {
+			api.drainResponseData(c)
+		}
 
-			// Release the refcount as we clear
-			go handle.source.delRef(c)
+		// Release the refcount as we clear
+		if fh, ok := handle.(FileHandle); ok && exists {
+			go fh.Inode().delRef(c)
 		}
 
 		qfs.fileHandles.Delete(id)

@@ -183,7 +183,7 @@ func TestApiAccessListApiFileSizeResidue(t *testing.T) {
 			"Error two maps different")
 
 		const ApiFileHandleNum = 1
-		test.qfs.setFileHandle(&test.qfs.c, ApiFileHandleNum, nil, nil)
+		test.qfs.setFileHandle(&test.qfs.c, ApiFileHandleNum, nil)
 		queueSize2 := atomic.LoadInt64(&test.qfs.apiFileSize)
 		test.Assert(queueSize1 >= int64(expectedSize) && queueSize2 == 0,
 			"The apiFileSize: %d %d, the actual response size: %d)",
