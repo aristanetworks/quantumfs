@@ -874,15 +874,8 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	if instantiated {
 		uninstantiated := inode.finishInit(c)
 		if len(uninstantiated) > 0 {
-			newInodes := make([]inodePair, 0, len(uninstantiated))
-			for _, newInode := range uninstantiated {
-				newInodes = append(newInodes,
-					newInodePair(newInode.child,
-						newInode.parent))
-			}
-
 			defer qfs.mapMutex.Lock().Unlock()
-			qfs.addUninstantiated_(c, newInodes)
+			qfs.addUninstantiated_(c, uninstantiated)
 		}
 	}
 
