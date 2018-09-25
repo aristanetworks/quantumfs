@@ -101,21 +101,39 @@ func initDirectory(c *ctx, name string, dir *Directory,
 	utils.Assert(dir.treeState() != nil, "Directory treeState nil at init")
 }
 
-func (dir *Directory) finishInit(c *ctx) (uninstantiated []inodePair) {
+func (dir *Directory) finishInit(c *ctx) (newInodes []inodePair) {
 	defer c.funcIn("Directory::finishInit").Out()
-	defer dir.childRecordLock.Unlock()
 
-	utils.Assert(dir.children == nil, "children already loaded")
+	var uninstantiated []loadedInfo
+	func() {
+		defer dir.childRecordLock.Unlock()
 
-	wsrInode := dir.hardlinkTable.getWorkspaceRoot().inodeNum()
-	// pre-set child container to a safe instance to ensure we don't leave it nil
-	dir.children, uninstantiated = newChildContainer(c, dir,
-		quantumfs.EmptyDirKey, wsrInode)
+		utils.Assert(dir.children == nil, "children already loaded")
 
-	// now attempt to load the children, which may panic / fail
-	dir.children, uninstantiated = newChildContainer(c, dir, dir.baseLayerId,
-		wsrInode)
-	return uninstantiated
+		wsrInode := dir.hardlinkTable.getWorkspaceRoot().inodeNum()
+		// pre-set child container to a safe instance to ensure
+		// we don't leave it nil
+		dir.children, uninstantiated = newChildContainer(c, dir,
+			quantumfs.EmptyDirKey, wsrInode)
+
+		// now attempt to load the children, which may panic / fail
+		dir.children, uninstantiated = newChildContainer(c, dir,
+			dir.baseLayerId, wsrInode)
+	}()
+
+	if len(uninstantiated) > 0 {
+		// check each new child for hardlinks we need to track
+		dir.traceHardlinks(c, uninstantiated)
+	}
+
+	// convert the loadedInfos into inodePairs
+	newInodes = make([]inodePair, 0, len(uninstantiated))
+	for _, newInode := range uninstantiated {
+		newInodes = append(newInodes, newInodePair(newInode.child,
+			newInode.parent))
+	}
+
+	return newInodes
 }
 
 func newDirectory(c *ctx, name string, baseLayerId quantumfs.ObjectKey, size uint64,
@@ -847,13 +865,11 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 		newDir = dir.create_(c, name, input.Mode, input.Umask, 0,
 			newDirectory, quantumfs.ObjectTypeDirectory,
 			quantumfs.EmptyDirKey, out)
-		if newDir != nil {
-			newDir.finishInit(c)
-		}
 		return fuse.OK
 	}()
 
 	if result == fuse.OK {
+		newDir.finishInit(c)
 		newDir.markSelfAccessed(c, quantumfs.PathCreated|
 			quantumfs.PathIsDir)
 	}
@@ -1787,7 +1803,7 @@ func createNewEntry(c *ctx, name string, mode uint32,
 // Needs exclusive Inode lock
 func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask uint32,
 	rdev uint32, size uint64, uid quantumfs.UID, gid quantumfs.GID,
-	type_ quantumfs.ObjectType, key quantumfs.ObjectKey) {
+	type_ quantumfs.ObjectType, key quantumfs.ObjectKey) quantumfs.FileId {
 
 	defer c.FuncIn("Directory::duplicateInode_", "name %s", name).Out()
 
@@ -1806,6 +1822,29 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 	c.qfs.addUninstantiated(c, []inodePair{newInodePair(inodeNum, parent)})
 
 	c.qfs.noteChildCreated(c, dir.inodeNum(), name)
+	return entry.FileId()
+}
+
+func (dir *Directory) traceHardlinks(c *ctx, newChildren []loadedInfo) {
+	defer c.funcIn("Directory::traceHardlinks").Out()
+
+	defer dir.parentLock.RLock().RUnlock()
+
+	for _, child := range newChildren {
+		// discard file ids that aren't real or non-hardlinks
+		if child.fileId == quantumfs.InvalidFileId ||
+			child.filetype != quantumfs.ObjectTypeHardlink {
+
+			continue
+		}
+
+		if dir.InodeCommon.isWorkspaceRoot() {
+			dir.hardlinkTable.markHardlinkPath(c, child.name,
+				child.fileId)
+		} else {
+			dir.markLink_(c, child.name, child.fileId)
+		}
+	}
 }
 
 func (dir *Directory) markHardlinkPath(c *ctx, path string,
@@ -1818,9 +1857,13 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 		return
 	}
 
-	path = dir.name() + "/" + path
-
 	defer dir.InodeCommon.parentLock.RLock().RUnlock()
+	dir.markLink_(c, path, fileId)
+}
+
+// Must be called with the parentLock held
+func (dir *Directory) markLink_(c *ctx, path string, fileId quantumfs.FileId) {
+	path = dir.name() + "/" + path
 	parent, release := dir.InodeCommon.parent_(c)
 	defer release()
 
