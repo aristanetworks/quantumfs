@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -281,12 +282,14 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 	}
 	exitNoRestart(c, "Typespace list should not be empty", len(tsl) != 0)
 
+	sort.Strings(tsl)
 	for _, ts := range tsl {
 		nsl, err := c.wsdb.NamespaceList(c.qctx, ts)
 		if err != nil {
 			c.elog("NamespaceList(%s) failed: %s", ts, err.Error())
 			continue
 		}
+		sort.Strings(nsl)
 		for _, ns := range nsl {
 			wsMap, err := c.wsdb.WorkspaceList(c.qctx, ts, ns)
 			if err != nil {
@@ -294,7 +297,16 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 					ts, ns, err.Error())
 				continue
 			}
-			for ws := range wsMap {
+
+			wsList := make([]string, len(wsMap))
+			i := 0
+			for w := range wsMap {
+				wsList[i] = w
+				i++
+			}
+			sort.Strings(wsList)
+
+			for _, ws := range wsList {
 				wsFullPath := fmt.Sprintf("%s/%s/%s", ts, ns, ws)
 				if !c.wsNameMatcher(wsFullPath) {
 					c.vlog("skipped walk of ws %s due to ws name match rule",
