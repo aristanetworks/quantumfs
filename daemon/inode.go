@@ -163,6 +163,8 @@ type Inode interface {
 	parentRemoveChildXAttr(c *ctx, inodeNum InodeId, attr string) fuse.Status
 	parentGetChildAttr(c *ctx, inodeNum InodeId, out *fuse.Attr,
 		owner fuse.Owner)
+	parentGetChildAttr_(c *ctx, inodeNum InodeId, out *fuse.Attr,
+		owner fuse.Owner)
 	parentHasAncestor(c *ctx, ancestor Inode) bool
 
 	getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status)
@@ -377,9 +379,18 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
-	defer c.funcIn("InodeCommon::parentSetChildAttr").Out()
-
 	defer inode.parentLock.RLock().RUnlock()
+
+	return inode.parentSetChildAttr_(c, inodeNum, newType, attr, out,
+		updateMtime)
+}
+
+// Must be called with the parentlock held for reads
+func (inode *InodeCommon) parentSetChildAttr_(c *ctx, inodeNum InodeId,
+	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
+	out *fuse.AttrOut, updateMtime bool) fuse.Status {
+
+	defer c.funcIn("InodeCommon::parentSetChildAttr_").Out()
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
@@ -494,9 +505,15 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) parentGetChildAttr(c *ctx, inodeNum InodeId,
 	out *fuse.Attr, owner fuse.Owner) {
 
-	defer c.funcIn("InodeCommon::parentGetChildAttr").Out()
-
 	defer inode.parentLock.RLock().RUnlock()
+	inode.parentGetChildAttr_(c, inodeNum, out, owner)
+}
+
+// Must be called with the inode's parentLock held
+func (inode *InodeCommon) parentGetChildAttr_(c *ctx, inodeNum InodeId,
+	out *fuse.Attr, owner fuse.Owner) {
+
+	defer c.funcIn("InodeCommon::parentGetChildAttr_").Out()
 
 	if !inode.isOrphaned_() {
 		parent, release := inode.parent_(c)
@@ -876,8 +893,6 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		return
 	}
 
-	defer inode.parentLock.Lock().Unlock()
-
 	toRelease := func() bool {
 		defer c.qfs.mapMutex.Lock().Unlock()
 
@@ -892,8 +907,12 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		c.vlog("Uninstantiating inode %d", inode.inodeNum())
 
 		c.qfs.setInode_(c, inode.inodeNum(), nil)
+		// This Inode is now unlisted and unreachable
 		delete(c.qfs.inodeRefcounts, inode.inodeNum())
 
+		// Note: it is a little dangerous to grab parentId_() without the
+		// parent lock, but *in theory* nobody else should have a reference
+		// to this inode anymore so there shouldn't be any races possible.
 		c.qfs.addUninstantiated_(c, []inodePair{
 			newInodePair(inode.inodeNum(), inode.parentId_())})
 		return true
@@ -902,7 +921,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		return
 	}
 
-	// This Inode is now unlisted and unreachable
+	defer inode.parentLock.Lock().Unlock()
 
 	if !inode.isOrphaned_() {
 		parent, release := inode.parent_(c)

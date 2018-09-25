@@ -974,6 +974,26 @@ func newInodePair(c InodeId, p InodeId) inodePair {
 	}
 }
 
+type loadedInfo struct {
+	child    InodeId
+	parent   InodeId
+	name     string
+	filetype quantumfs.ObjectType
+	fileId   quantumfs.FileId
+}
+
+func newLoadedInfo(c InodeId, p InodeId, n string, t quantumfs.ObjectType,
+	f quantumfs.FileId) loadedInfo {
+
+	return loadedInfo{
+		child:    c,
+		parent:   p,
+		name:     n,
+		filetype: t,
+		fileId:   f,
+	}
+}
+
 func (qfs *QuantumFs) addUninstantiated(c *ctx, uninstantiated []inodePair) {
 	defer qfs.mapMutex.Lock().Unlock()
 
