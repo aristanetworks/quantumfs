@@ -484,6 +484,6 @@ func TestWorkspaceImmutabilityAfterDelete(t *testing.T) {
 			"type1", "name1", "work1")
 		utils.Assert(err.(quantumfs.WorkspaceDbErr).Code ==
 			quantumfs.WSDB_WORKSPACE_NOT_FOUND,
-			"Workspace immutable flag exists after delete", err)
+			"Workspace immutable flag exists after delete %v", err)
 	})
 }
