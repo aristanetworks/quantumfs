@@ -17,6 +17,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/daemon"
+	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/utils"
 )
@@ -45,6 +46,7 @@ func runTestCommon(t *testing.T, test walkerTest) {
 		},
 	}
 
+	th.walkFuncInputErrs = make([]error, 0)
 	th.Timeout = 7000 * time.Millisecond
 	th.CreateTestDirs()
 	defer th.EndTest()
@@ -58,6 +60,9 @@ func runTestCommon(t *testing.T, test walkerTest) {
 type testHelper struct {
 	daemon.TestHelper
 	config daemon.QuantumFsConfig
+
+	walkFuncInputErrsMutex utils.DeferableMutex
+	walkFuncInputErrs      []error // errors input into WalkFunc
 }
 
 type walkerTest func(test *testHelper)
@@ -133,8 +138,14 @@ func (th *testHelper) checkSmallFileHardlinkKey(workspace string,
 		root, err)
 
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, objType quantumfs.ObjectType) error {
+		size uint64, objType quantumfs.ObjectType, err error) error {
 
+		if err != nil {
+			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
+				path, key.String(), err.Error())
+			th.appendWalkFuncInputErr(err)
+			return err
+		}
 		// this check works for small files (1 block) only
 		if _, exists := hlpaths[path]; exists {
 			if !th.HardlinkKeyExists(workspace, key) {
@@ -220,8 +231,14 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 	var walkerMap = make(map[string]int)
 	var mapLock utils.DeferableMutex
 	wf := func(c *Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, objType quantumfs.ObjectType) error {
+		size uint64, objType quantumfs.ObjectType, err error) error {
 
+		if err != nil {
+			c.Qctx.Elog(qlog.LogTool, walkerErrLog,
+				path, key.String(), err.Error())
+			th.appendWalkFuncInputErr(err)
+			return err
+		}
 		// NOTE: In the TTL walker this path comparison will be
 		// replaced by a TTL comparison.
 		if skipDirTest && objType == quantumfs.ObjectTypeDirectory &&
@@ -259,10 +276,48 @@ func (th *testHelper) printMap(name string, m map[string]int) {
 	}
 }
 
-func (th *testHelper) expectWalkerErrors(errs []string) {
+func (th *testHelper) appendWalkFuncInputErr(err error) {
+	defer th.walkFuncInputErrsMutex.Lock().Unlock()
+	th.walkFuncInputErrs = append(th.walkFuncInputErrs, err)
+}
+
+// assertWalkFuncInErrs asserts the input error strings to walkFunc.
+func (th *testHelper) assertWalkFuncInputErrs(errs []string) {
+	th.Assert(len(th.walkFuncInputErrs) == len(errs),
+		"want %d errors, got %d errors",
+		len(errs), len(th.walkFuncInputErrs))
+	for _, e := range errs {
+		found := false
+		for _, w := range th.walkFuncInputErrs {
+			if strings.Contains(w.Error(), e) {
+				found = true
+				break
+			}
+		}
+		th.Assert(found, "substring \"%s\" not found in any errors", e)
+	}
+}
+
+// expectQlogErrs asserts the error format strings
+// expected in qlog.
+func (th *testHelper) expectQlogErrs(errs []string) {
 	th.ExpectedErrors = make(map[string]struct{})
 	for _, e := range errs {
 		th.ExpectedErrors["ERROR: "+e] = struct{}{}
+	}
+}
+
+func (th *testHelper) nopWalkFn() WalkFunc {
+	return func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+		objType quantumfs.ObjectType, err error) error {
+
+		if err != nil {
+			c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
+				err.Error())
+			th.appendWalkFuncInputErr(err)
+			return err
+		}
+		return nil
 	}
 }
 
@@ -270,14 +325,6 @@ func walkWithCtx(c *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
 	wf WalkFunc) error {
 
 	return walk(newContext(c, dsGet, rootID, wf))
-}
-
-func tstNopWalkFn() WalkFunc {
-	return func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-		objType quantumfs.ObjectType) error {
-
-		return nil
-	}
 }
 
 func TestMain(m *testing.M) {
