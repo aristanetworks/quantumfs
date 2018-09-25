@@ -134,7 +134,7 @@ type QuantumFs struct {
 	inodes         map[InodeId]Inode
 	inodeRefcounts map[InodeId]int32
 
-	// Must only be manipulated via setFileHandle_
+	// Must only be manipulated via setFileHandle
 	fileHandles sync.Map // map[FileHandleId]FileHandle
 
 	flusher *Flusher
@@ -226,9 +226,8 @@ const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
 
 func (qfs *QuantumFs) fileHandleReleaser(ids []uint64) {
 	defer qfs.c.statsFuncIn(ReleaseFileHandleLog).Out()
-	defer qfs.mapMutex.Lock().Unlock()
 	for _, id := range ids {
-		qfs.setFileHandle_(&qfs.c, FileHandleId(id), nil)
+		qfs.setFileHandle(&qfs.c, FileHandleId(id), nil)
 	}
 }
 
@@ -1137,14 +1136,6 @@ func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 // Set a file handle in a thread safe way, set to nil to delete
 func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
 	defer c.funcIn("Mux::setFileHandle").Out()
-	defer qfs.mapMutex.Lock().Unlock()
-
-	qfs.setFileHandle_(c, id, fileHandle)
-}
-
-// Must hold mapMutex exclusively
-func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
-	fileHandle FileHandle) {
 
 	handle, exists := qfs.fileHandles.Load(id)
 
@@ -1152,8 +1143,11 @@ func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
 		utils.Assert(fileHandle.Inode() != nil,
 			"Setting a fh with nil inode")
 		if !exists {
-			// If we're setting a new handle, add a ref count
-			addInodeRef_(c, fileHandle.Inode().inodeNum())
+			func() {
+				defer qfs.mapMutex.Lock().Unlock()
+				// If we're setting a new handle, add a ref count
+				addInodeRef_(c, fileHandle.Inode().inodeNum())
+			}()
 		}
 
 		qfs.fileHandles.Store(id, fileHandle)
