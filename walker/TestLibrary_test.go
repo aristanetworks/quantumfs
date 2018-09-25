@@ -307,18 +307,31 @@ func (th *testHelper) expectQlogErrs(errs []string) {
 	}
 }
 
-func (th *testHelper) nopWalkFn() WalkFunc {
-	return func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
+func (th *testHelper) nopWalkFn(bestEffort bool) (map[string]struct{},
+	map[quantumfs.ObjectType]struct{}, WalkFunc) {
+
+	paths := make(map[string]struct{})
+	types := make(map[quantumfs.ObjectType]struct{})
+	var pathMutex utils.DeferableMutex
+	wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
 		objType quantumfs.ObjectType, err error) error {
 
 		if err != nil {
 			c.Qctx.Elog(qlog.LogTool, walkerErrLog, path, key.String(),
 				err.Error())
 			th.appendWalkFuncInputErr(err)
+			if bestEffort {
+				return ErrSkipHierarchy
+			}
 			return err
 		}
+		// capture the paths and types visited by walkFunc
+		defer pathMutex.Lock().Unlock()
+		paths[path] = struct{}{}
+		types[objType] = struct{}{}
 		return nil
 	}
+	return paths, types, wf
 }
 
 func walkWithCtx(c *quantumfs.Ctx, dsGet walkDsGet, rootID quantumfs.ObjectKey,
@@ -360,6 +373,9 @@ func doPanicStringTest(bestEffort bool) func(*testHelper) {
 				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
 					key.String(), err.Error())
 				test.appendWalkFuncInputErr(err)
+				if bestEffort {
+					return ErrSkipHierarchy
+				}
 				return err
 			}
 
@@ -369,12 +385,17 @@ func doPanicStringTest(bestEffort bool) func(*testHelper) {
 			return nil
 		}
 		err = Walk(c, ds, rootID, wf)
-		test.AssertErr(err)
-		test.Assert(strings.Contains(err.Error(), expectedErr.Error()),
-			"Walk did not get the %v, instead got %v", expectedErr,
-			err)
 		test.assertWalkFuncInputErrs([]string{expectedString})
 		test.expectQlogErrs([]string{walkerErrLog})
+		if bestEffort {
+			test.AssertNoErr(err)
+		} else {
+			test.AssertErr(err)
+			test.Assert(strings.Contains(err.Error(),
+				expectedErr.Error()),
+				"Walk did not get the %v, instead got %v",
+				expectedErr, err)
+		}
 	}
 }
 
@@ -409,6 +430,9 @@ func doPanicErrTest(bestEffort bool) func(*testHelper) {
 				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
 					key.String(), err.Error())
 				test.appendWalkFuncInputErr(err)
+				if bestEffort {
+					return ErrSkipHierarchy
+				}
 				return err
 			}
 
@@ -418,13 +442,17 @@ func doPanicErrTest(bestEffort bool) func(*testHelper) {
 			return nil
 		}
 		err = Walk(c, ds, rootID, wf)
-		test.AssertErr(err)
-		test.Assert(strings.Contains(err.Error(),
-			expectedErr.Error()),
-			"Walk did not get the expectedErr value, instead got %v",
-			err)
 		test.assertWalkFuncInputErrs([]string{expectedErr.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
+		if bestEffort {
+			test.AssertNoErr(err)
+		} else {
+			test.AssertErr(err)
+			test.Assert(strings.Contains(err.Error(),
+				expectedErr.Error()),
+				"Walk wants %s instead got %s",
+				expectedErr.Error(), err.Error())
+		}
 	}
 }
 
@@ -471,39 +499,42 @@ func doWalkLibraryPanicErrTest(bestEffort bool) func(*testHelper) {
 			return ds.Get(c, key, buf)
 		}
 
-		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			objType quantumfs.ObjectType, err error) error {
+		paths, _, wf := test.nopWalkFn(bestEffort)
+
+		panicWf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+			size uint64, objType quantumfs.ObjectType,
+			err error) error {
 
 			if err == hleGetError {
 				panic("walker library panic")
 			}
-			if err != nil {
-				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
-					key.String(), err.Error())
-				test.appendWalkFuncInputErr(err)
-				return err
-			}
-			return nil
+			return wf(c, path, key, size, objType, err)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, wf)
+		err = walkWithCtx(c, dsGet, rootID, panicWf)
+		test.expectQlogErrs([]string{walkerErrLog})
+
+		// walker library panic will abort the walk
+		// irrespective of fail-fast or best-effort mode.
 		test.AssertErr(err)
 		test.Assert(strings.Contains(err.Error(), "PANIC"),
-			"Walk error did not contain PANIC, got %v", err)
+			"Walk error does not contain PANIC, got %v",
+			err)
 		test.assertWalkFuncInputErrs([]string{"PANIC"})
-		test.expectQlogErrs([]string{walkerErrLog})
+		// root dir should not be walked since HLE DS get failed
+		_, exists := paths["/"]
+		test.Assert(!exists, "root dir walked, walk did not abort")
 	}
 }
 
 func doWalkErrTest(bestEffort bool) func(*testHelper) {
 	return func(test *testHelper) {
 
-		data := daemon.GenData(133)
 		workspace := test.NewWorkspace()
-		expectedErr := fmt.Errorf("send error")
+		expectedErr := fmt.Errorf("walkFunc failed on /errorfile")
 
-		// Write File 1
-		filename := workspace + "/errorFile"
+		filename := fmt.Sprintf("%s/errorfile", workspace)
+		data := daemon.GenData(50)
 		err := ioutil.WriteFile(filename, []byte(data), os.ModePerm)
 		test.Assert(err == nil, "Write failed (%s): %s",
 			filename, err)
@@ -518,22 +549,23 @@ func doWalkErrTest(bestEffort bool) func(*testHelper) {
 		test.Assert(err == nil, "Error getting rootID for %v: %v",
 			root, err)
 
-		wf := func(c *Ctx, path string, key quantumfs.ObjectKey, size uint64,
-			objType quantumfs.ObjectType, err error) error {
+		_, _, wf := test.nopWalkFn(bestEffort)
+		errWf := func(c *Ctx, path string, key quantumfs.ObjectKey,
+			size uint64, objType quantumfs.ObjectType,
+			err error) error {
 
-			if err != nil {
-				c.Qctx.Elog(qlog.LogTool, walkerErrLog, path,
-					key.String(), err.Error())
-				test.appendWalkFuncInputErr(err)
-				return err
+			if err == nil {
+				if path == "/errorfile" {
+					return expectedErr
+				}
 			}
-
-			if strings.HasSuffix(path, "/errorFile") {
-				return expectedErr
-			}
-			return nil
+			return wf(c, path, key, size, objType, err)
 		}
-		err = Walk(c, ds, rootID, wf)
+
+		err = Walk(c, ds, rootID, errWf)
+		// even in best-effort mode, Walk will return the error from
+		// walkFunc as is since the error is not reflected back to
+		// walkFunc.
 		test.AssertErr(err)
 		test.Assert(err.Error() == expectedErr.Error(),
 			"Walk did not get the %v, instead got %v", expectedErr,
@@ -588,13 +620,41 @@ func doHLGetErrTest(bestEffort bool) func(*testHelper) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
-		test.AssertErr(err)
-		test.Assert(err.Error() == hleGetError.Error(),
-			"Walk did not get the %v, instead got %v", hleGetError,
-			err)
-		test.assertWalkFuncInputErrs([]string{hleGetError.Error()})
+		paths, _, wf := test.nopWalkFn(bestEffort)
+		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.expectQlogErrs([]string{walkerErrLog})
+		if bestEffort {
+			// both link- and file- walks will result in
+			// "missing in WSR hardlink info" error, plus one
+			// HLE get DS error
+			errCount := quantumfs.MaxDirectoryRecords()*2 + 1
+			errs := make([]string, errCount)
+			errs[0] = hleGetError.Error()
+			for i := 1; i < errCount; i++ {
+				// walkInErrors[0] == hleGetError
+				// rest should be same as test.walkInErrors[1]
+				errs[i] = test.walkFuncInputErrs[1].Error()
+			}
+			test.AssertNoErr(err)
+			test.assertWalkFuncInputErrs(errs)
+
+			// since root dir is walked AFTER handling hardlinks,
+			// check that root dir was in the captured path even
+			// though there was an HLE ds.Get error thus confirming
+			// that walk continued.
+			_, exists := paths["/"]
+			test.Assert(exists,
+				"root dir path missing, walk did not continue")
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == hleGetError.Error(),
+				"Walk did not get the %v, instead got %v",
+				hleGetError, err)
+			test.assertWalkFuncInputErrs([]string{hleGetError.Error()})
+			// root dir should not be walked since HLE DS get failed
+			_, exists := paths["/"]
+			test.Assert(!exists, "root dir walked, walk did not abort")
+		}
 	}
 }
 
@@ -635,13 +695,21 @@ func doDEGetErrTest(bestEffort bool) func(*testHelper) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
-		test.AssertErr(err)
-		test.Assert(err.Error() == deGetError.Error(),
-			"Walk did not get the %v, instead got %v", deGetError,
-			err)
+		paths, _, wf := test.nopWalkFn(bestEffort)
+		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInputErrs([]string{deGetError.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
+		if bestEffort {
+			test.AssertNoErr(err)
+			_, exists := paths["/dir-2"]
+			test.Assert(exists,
+				"dir-2 path missing, walk did not continue")
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == deGetError.Error(),
+				"Walk did not get the %v, instead got %v",
+				deGetError, err)
+		}
 	}
 }
 
@@ -687,13 +755,21 @@ func doEAGetErrTest(bestEffort bool) func(*testHelper) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
-		test.AssertErr(err)
-		test.Assert(err.Error() == eaGetError.Error(),
-			"Walk did not get the %v, instead got %v", eaGetError,
-			err)
+		paths, _, wf := test.nopWalkFn(bestEffort)
+		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInputErrs([]string{eaGetError.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
+		if bestEffort {
+			test.AssertNoErr(err)
+			_, exists := paths["/file-1"]
+			test.Assert(exists,
+				"file-1 path missing, walk did not continue")
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == eaGetError.Error(),
+				"Walk did not get the %v, instead got %v",
+				eaGetError, err)
+		}
 	}
 }
 
@@ -750,13 +826,25 @@ func doEAAttrGetErrTest(bestEffort bool) func(*testHelper) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
-		test.AssertErr(err)
-		test.Assert(err.Error() == eaGetError.Error(),
-			"Walk did not get the %v, instead got %v", eaGetError,
-			err)
+		paths, types, wf := test.nopWalkFn(bestEffort)
+		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInputErrs([]string{eaGetError.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
+		if bestEffort {
+			test.AssertNoErr(err)
+			_, exists := paths["/file-1"]
+			test.Assert(exists,
+				"file-1 path missing, walk did not continue")
+			// ensure that other extattrs on file-0 were walked
+			_, exists = types[quantumfs.ObjectTypeExtendedAttribute]
+			test.Assert(exists,
+				"other extattrs on file-0 were not walked")
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == eaGetError.Error(),
+				"Walk did not get the %v, instead got %v",
+				eaGetError, err)
+		}
 	}
 }
 
@@ -802,13 +890,24 @@ func doMultiBlockGetErrTest(bestEffort bool) func(*testHelper) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
-		test.AssertErr(err)
-		test.Assert(err.Error() == mbGetBlock0Error.Error(),
-			"Walk did not get the %v, instead got %v", mbGetBlock0Error,
-			err)
+		paths, _, wf := test.nopWalkFn(bestEffort)
+		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInputErrs([]string{mbGetBlock0Error.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
+		if bestEffort {
+			test.AssertNoErr(err)
+			_, exists := paths["/file-0"]
+			test.Assert(!exists,
+				"file-0 present, walk should skip this file")
+			_, exists = paths["/file-1"]
+			test.Assert(exists,
+				"file-1 absent, walk should have continued")
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == mbGetBlock0Error.Error(),
+				"Walk did not get the %v, instead got %v",
+				mbGetBlock0Error, err)
+		}
 	}
 }
 
@@ -857,14 +956,24 @@ func doVLFileGetFirstErrTest(bestEffort bool) func(*testHelper) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
-		test.AssertErr(err)
-		test.Assert(err.Error() == vlGetBlock0Error.Error(),
-			"Walk did not get the %v, instead got %v", vlGetBlock0Error,
-			err)
+		paths, _, wf := test.nopWalkFn(bestEffort)
+		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInputErrs([]string{vlGetBlock0Error.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
-
+		if bestEffort {
+			test.AssertNoErr(err)
+			_, exists := paths["/file-0"]
+			test.Assert(!exists,
+				"file-0 present, walk should skip this file")
+			_, exists = paths["/file-1"]
+			test.Assert(exists,
+				"file-1 absent, walk should have continued")
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == vlGetBlock0Error.Error(),
+				"Walk did not get the %v, instead got %v",
+				vlGetBlock0Error, err)
+		}
 	}
 }
 
@@ -921,13 +1030,24 @@ func doVLFileGetNextErrTest(bestEffort bool) func(*testHelper) {
 			return ds.Get(c, key, buf)
 		}
 
-		err = walkWithCtx(c, dsGet, rootID, test.nopWalkFn())
-		test.AssertErr(err)
-		test.Assert(err.Error() == vlGetBlock1Error.Error(),
-			"Walk did not get the %v, instead got %v", vlGetBlock1Error,
-			err)
+		paths, _, wf := test.nopWalkFn(bestEffort)
+		err = walkWithCtx(c, dsGet, rootID, wf)
 		test.assertWalkFuncInputErrs([]string{vlGetBlock1Error.Error()})
 		test.expectQlogErrs([]string{walkerErrLog})
+		if bestEffort {
+			test.AssertNoErr(err)
+			_, exists := paths["/file-0"]
+			test.Assert(exists,
+				"file-0 present, should skip file partially")
+			_, exists = paths["/file-1"]
+			test.Assert(exists,
+				"file-1 absent, walk should have continued")
+		} else {
+			test.AssertErr(err)
+			test.Assert(err.Error() == vlGetBlock1Error.Error(),
+				"Walk did not get the %v, instead got %v",
+				vlGetBlock1Error, err)
+		}
 	}
 }
 
