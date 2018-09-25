@@ -6,6 +6,7 @@ package daemon
 import (
 	"fmt"
 	"runtime/debug"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -29,18 +30,28 @@ const (
 type lockInfo struct {
 	kind  locker
 	inode InodeId
+	push  time.Time
 }
 
-func newLockInfo(k locker, i InodeId) lockInfo {
+func newLockInfoQuick(k locker, i InodeId) lockInfo {
 	return lockInfo{
 		kind:  k,
 		inode: i,
 	}
 }
 
+func newLockInfo(k locker, i InodeId, t time.Time) lockInfo {
+	return lockInfo{
+		kind:  k,
+		inode: i,
+		push:  t,
+	}
+}
+
 type lockOrder struct {
 	stack    []lockInfo
 	disabled bool
+	timings  bool	// Disable during production for performance
 }
 
 // The lock being requested must already be held so we can do checks with it
@@ -61,10 +72,13 @@ func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
 		}
 	}
 
-	order.stack = append(order.stack, lockInfo{
-		kind:  kind,
-		inode: inode,
-	})
+	var newInfo lockInfo
+	if order.timings {
+		newInfo = newLockInfo(kind, inode, time.Now())
+	} else {
+		newInfo = newLockInfoQuick(kind, inode)
+	}
+	order.stack = append(order.stack, newInfo)
 }
 
 func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
@@ -94,6 +108,11 @@ func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
 			int64(kind), int64(inode))
 		order.printStack(c)
 		return
+	}
+
+	if order.timings {
+		c.vlog("Lock %d held for %d ns", kind,
+			time.Since(order.stack[removeIdx].push).Nanoseconds())
 	}
 
 	order.stack = append(order.stack[:removeIdx], order.stack[removeIdx+1:]...)
