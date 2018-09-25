@@ -538,3 +538,47 @@ func TestNonPersistentChrootRelWsrRelDirRelCmd(t *testing.T) {
 
 	}()
 }
+
+func TestCopyDirStayOnFs(t *testing.T) {
+	err := checkCopyDirStayOnFs(true)
+	utils.Assert(err == nil, "Unable to copy source dir %s", err)
+}
+
+func TestCopyDirStayOnFsToFail(t *testing.T) {
+	err := checkCopyDirStayOnFs(false)
+	utils.Assert(err != nil, "Test not checking race condition")
+}
+
+func checkCopyDirStayOnFs(ignoreFails bool) error {
+	src, err := ioutil.TempDir("", "SourceDir")
+	utils.Assert(err == nil, "Unable to create source dir")
+
+	dst, err := ioutil.TempDir("", "DestDir")
+	utils.Assert(err == nil, "Unable to create destination dir")
+
+	// Create enough directories to make copyDirStayOnFs take a while
+	dirs := 1000
+	for i := 0; i < dirs; i++ {
+		err = os.MkdirAll(fmt.Sprintf(src+"/dir%d", i), 0777)
+		utils.Assert(err == nil, "Unable to create directory %d", i)
+	}
+
+	// make a bunch of file system removals in parallel
+	var perr error
+	go func() {
+		for i := 0; i < dirs; i += 10 {
+			perr = os.Remove(fmt.Sprintf(src+"/dir%d", i))
+			if perr != nil {
+				return
+			}
+
+			time.Sleep(time.Millisecond)
+		}
+	}()
+
+	err = copyDirStayOnFs(src, dst, ignoreFails)
+
+	utils.Assert(perr == nil, "Unable to remove source dirs")
+
+	return err
+}
