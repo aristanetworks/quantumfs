@@ -239,7 +239,8 @@ func switchUser(username string) error {
 	return nil
 }
 
-func copyDirStayOnFs(src string, dst string) error {
+// Allow files walked to have been removed if ignoreRemoves is true
+func copyDirStayOnFs(src string, dst string, ignoreRemoves bool) error {
 	var srcfs syscall.Statfs_t
 	if err := syscall.Statfs(src, &srcfs); err != nil {
 		return fmt.Errorf("Statfs directory %s error: %s",
@@ -252,6 +253,9 @@ func copyDirStayOnFs(src string, dst string) error {
 		err error) error {
 
 		if err != nil {
+			if ignoreRemoves && os.IsNotExist(err) {
+				return nil
+			}
 			return fmt.Errorf("Walking file/directory %s error: %s",
 				name, err.Error())
 		}
@@ -260,6 +264,9 @@ func copyDirStayOnFs(src string, dst string) error {
 			var dirfs syscall.Statfs_t
 			errDirfs := syscall.Statfs(name, &dirfs)
 			if errDirfs != nil {
+				if ignoreRemoves && os.IsNotExist(errDirfs) {
+					return nil
+				}
 				return fmt.Errorf("Statfs directory %s error: %s",
 					name, errDirfs.Error())
 			}
@@ -292,6 +299,9 @@ func copyDirStayOnFs(src string, dst string) error {
 		} else if (finfo.Mode() & os.ModeSymlink) != 0 {
 			oldPath, errOldPath := os.Readlink(name)
 			if errOldPath != nil {
+				if ignoreRemoves && os.IsNotExist(errOldPath) {
+					return nil
+				}
 				return fmt.Errorf("Readlink %s error: %s",
 					name, errOldPath.Error())
 			}
@@ -299,6 +309,9 @@ func copyDirStayOnFs(src string, dst string) error {
 			nameDst := filepath.Join(dst, name[len(src):])
 			errSymlink := syscall.Symlink(oldPath, nameDst)
 			if errSymlink != nil {
+				if ignoreRemoves && os.IsNotExist(errSymlink) {
+					return nil
+				}
 				return fmt.Errorf("Symlink %s->%s error: %s",
 					nameDst, oldPath, errSymlink.Error())
 			}
@@ -413,7 +426,7 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 					dst, errMnt.Error())
 			}
 
-			if err := copyDirStayOnFs("/dev", dst); err != nil {
+			if err := copyDirStayOnFs("/dev", dst, true); err != nil {
 				return fmt.Errorf("Copying /dev error: %s",
 					err.Error())
 			}
