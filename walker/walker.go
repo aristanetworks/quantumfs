@@ -583,6 +583,7 @@ func _worker(c *Ctx, keyChan <-chan *workerData) (err error) {
 		if err = c.wf(c, keyItem.path, keyItem.key, keyItem.size,
 			keyItem.objType, nil); err != nil &&
 			err != ErrSkipHierarchy {
+
 			return
 		}
 	}
@@ -592,7 +593,7 @@ func _worker(c *Ctx, keyChan <-chan *workerData) (err error) {
 func worker(c *Ctx, keyChan <-chan *workerData) (err error) {
 	for {
 		err = _worker(c, keyChan)
-		// close the worker is an err different than Errskiphierarchy
+		// close the worker is an err different than ErrSkipHierarchy
 		// is seen or when the walker goroutine has terminated.
 		if err == nil || err != ErrSkipHierarchy {
 			return
