@@ -77,14 +77,7 @@ type workerData struct {
 
 const panicErrFmt = "PANIC %s\n%v"
 
-// panicHandler converts panics to error. Such
-// error is also forwarded to walkFunc.
-func panicHandler(c *Ctx, err *error) {
-	exception := recover()
-	if exception == nil {
-		return
-	}
-
+func panicToError(exception interface{}) error {
 	var result string
 	switch exception.(type) {
 	default:
@@ -96,11 +89,8 @@ func panicHandler(c *Ctx, err *error) {
 	}
 
 	trace := utils.BytesToString(debug.Stack())
-	pErr := fmt.Errorf(panicErrFmt, result, trace)
-	// since objType is invalid when path is empty
-	// use ObjectTypeSmallFile as a dummy value
-	*err = filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
-		quantumfs.ObjectTypeSmallFile, pErr)
+
+	return fmt.Errorf(panicErrFmt, result, trace)
 }
 
 const walkerErrLog = "desc: %s key: %s err: %s"
@@ -206,14 +196,22 @@ func walk(c *Ctx) error {
 	for i := 0; i < conc; i++ {
 
 		c.group.Go(func() (err error) {
-			defer panicHandler(c, &err)
 			return worker(c, keyChan)
 		})
 	}
 
 	c.group.Go(func() (err error) {
-		defer panicHandler(c, &err)
 		defer close(keyChan)
+		defer func() {
+			if exception := recover(); exception != nil {
+				// If walker goroutine panics then irrespective
+				// of walkFunc error filtering, we'll end the
+				// workspace walk.
+				err = panicToError(exception)
+				filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
+					quantumfs.ObjectTypeSmallFile, err)
+			}
+		}()
 
 		// WSR
 		if err = writeToChan(c, keyChan, "[rootId]", c.rootID,
@@ -527,23 +525,35 @@ func handleExtendedAttributes(c *Ctx, fpath string, dsGet walkDsGet,
 	return nil
 }
 
-func worker(c *Ctx, keyChan <-chan *workerData) error {
+func worker(c *Ctx, keyChan <-chan *workerData) (err error) {
+	defer func() {
+		if exception := recover(); exception != nil {
+			// The panic in walkFunc is converted to error and the
+			// filtered error is returned.
+			err = panicToError(exception)
+			err = filterErrByWalkFunc(c, "", quantumfs.ObjectKey{},
+				quantumfs.ObjectTypeSmallFile, err)
+		}
+	}()
+
 	var keyItem *workerData
 	for {
 		select {
 		case <-c.Done():
-			return fmt.Errorf("Quitting worker because at least one " +
+			err = fmt.Errorf("Quitting worker because at least one " +
 				"goroutine failed with an error")
+			return
 		case keyItem = <-keyChan:
 			if keyItem == nil {
-				return nil
+				err = nil
+				return
 			}
 		}
-		if err := c.wf(c, keyItem.path, keyItem.key, keyItem.size,
+		if err = c.wf(c, keyItem.path, keyItem.key, keyItem.size,
 			keyItem.objType, nil); err != nil &&
 			err != ErrSkipDirectory {
 
-			return err
+			return
 		}
 	}
 }
