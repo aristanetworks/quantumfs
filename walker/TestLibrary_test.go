@@ -243,7 +243,7 @@ func (th *testHelper) readWalkCompare(workspace string, skipDirTest bool) {
 		// replaced by a TTL comparison.
 		if skipDirTest && objType == quantumfs.ObjectTypeDirectory &&
 			strings.HasSuffix(path, "/dir1") {
-			return ErrSkipDirectory
+			return ErrSkipHierarchy
 		}
 
 		// Skip, since constant and embedded keys will not

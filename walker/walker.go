@@ -17,10 +17,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// ErrSkipDirectory is a special error from WalkFunc to indicate that
-// the directory named in the call is to be skipped.
+// ErrSkipHierarchy is a special error from WalkFunc to indicate that
+// the walker should skip the current workspace hiearchy and
+// continue with rest of the workspace walk. This error also
+// leaves it upto the walker library to decide whether it wishes
+// to exit or continue walking.
 // This error will not be treated as an error during workspace walk.
-var ErrSkipDirectory = errors.New("skip this directory")
+var ErrSkipHierarchy = errors.New("skip this hierarchy")
 
 // WalkFunc is the type of the function called for each data block under the
 // Workspace. Every error encountered by walker library can be filtered by
@@ -349,7 +352,7 @@ func handleVeryLargeFile(c *Ctx, path string, dsGet walkDsGet,
 		// ObjectTypeLargeFile objects
 		if err := handleMultiBlockFile(c, path, dsGet,
 			vlf.LargeFileKey(part), quantumfs.ObjectTypeLargeFile,
-			keyChan); err != nil && err != ErrSkipDirectory {
+			keyChan); err != nil && err != ErrSkipHierarchy {
 
 			return err
 		}
@@ -372,12 +375,12 @@ func handleDirectoryEntry(c *Ctx, path string, dsGet walkDsGet,
 		simplebuffer.AssertNonZeroBuf(buf,
 			"DirectoryEntry buffer %s", key.String())
 
-		// When wf returns ErrSkipDirectory for a DirectoryEntry,
+		// When wf returns ErrSkipHierarchy for a DirectoryEntry,
 		// we can skip the DirectoryRecords in that DirectoryEntry
 		if err := c.wf(c, path, key, uint64(buf.Size()),
 			quantumfs.ObjectTypeDirectory, nil); err != nil {
 
-			if err == ErrSkipDirectory {
+			if err == ErrSkipHierarchy {
 				return nil
 			}
 			return err
@@ -551,7 +554,7 @@ func worker(c *Ctx, keyChan <-chan *workerData) (err error) {
 		}
 		if err = c.wf(c, keyItem.path, keyItem.key, keyItem.size,
 			keyItem.objType, nil); err != nil &&
-			err != ErrSkipDirectory {
+			err != ErrSkipHierarchy {
 
 			return
 		}
