@@ -28,9 +28,9 @@ const (
 )
 
 type lockInfo struct {
-	kind  locker
-	inode InodeId
-	heldSince  time.Time
+	kind      locker
+	inode     InodeId
+	heldSince time.Time
 }
 
 func newLockInfoQuick(k locker, i InodeId) lockInfo {
@@ -42,16 +42,16 @@ func newLockInfoQuick(k locker, i InodeId) lockInfo {
 
 func newLockInfo(k locker, i InodeId, t time.Time) lockInfo {
 	return lockInfo{
-		kind:  k,
-		inode: i,
-		heldSince:  t,
+		kind:      k,
+		inode:     i,
+		heldSince: t,
 	}
 }
 
 type lockOrder struct {
 	stack    []lockInfo
 	disabled bool
-	timings  bool	// Disable during production for performance
+	timings  bool // Disable during production for performance
 }
 
 // The lock being requested must already be held so we can do checks with it
@@ -227,7 +227,7 @@ type orderedRwMutex struct {
 func (m *orderedRwMutex) RLock(c *ctx, inode InodeId,
 	kind locker) utils.NeedReadUnlock {
 
-	c.lockOrder.Push_(c, inode, kind, func() {m.mutex.RLock()})
+	c.lockOrder.Push_(c, inode, kind, func() { m.mutex.RLock() })
 
 	return &orderedRwMutexUnlocker{
 		mutex: &m.mutex,
@@ -240,7 +240,7 @@ func (m *orderedRwMutex) RLock(c *ctx, inode InodeId,
 func (m *orderedRwMutex) Lock(c *ctx, inode InodeId,
 	kind locker) utils.NeedWriteUnlock {
 
-	c.lockOrder.Push_(c, inode, kind, func() {m.mutex.Lock()})
+	c.lockOrder.Push_(c, inode, kind, func() { m.mutex.Lock() })
 
 	return &orderedRwMutexUnlocker{
 		mutex: &m.mutex,
