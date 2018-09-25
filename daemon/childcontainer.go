@@ -135,8 +135,11 @@ func (container *ChildContainer) loadChild(c *ctx,
 // Use this when you know the child's InodeId. Either the child must be instantiated
 // and dirty, or markPublishable() must be called immediately afterwards for the
 // changes set here to eventually be published.
+
+// Returns a doUnlocked function which *must* be called without the container.dir
+// inode locks held.
 func (container *ChildContainer) setRecord(c *ctx, inodeId InodeIdInfo,
-	record quantumfs.DirectoryRecord) {
+	record quantumfs.DirectoryRecord) (doUnlocked func()) {
 
 	defer c.FuncIn("ChildContainer::setRecord", "inode %d name %s", inodeId.id,
 		record.Filename()).Out()
@@ -144,6 +147,7 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeIdInfo,
 	// Since we have an inodeId this child is or will be instantiated and so is
 	// placed in the effective set.
 
+	doUnlocked = func() {}
 	utils.Assert(inodeId.id != quantumfs.InodeIdInvalid,
 		"setRecord without inodeId")
 
@@ -156,13 +160,18 @@ func (container *ChildContainer) setRecord(c *ctx, inodeId InodeIdInfo,
 
 	// Build the hardlink path list if we just set a hardlink record
 	if record.Type() == quantumfs.ObjectTypeHardlink {
-		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
+		doUnlocked = func() {
+			container.dir.markHardlinkPath(c, record.Filename(),
+				record.FileId())
+		}
 
 		// The child is a hardlink which means it will be part of the
 		// hardlink map in wsr the next time wsr gets published, therefore,
 		// we can mark it as publishable.
 		container.makePublishable(c, record.Filename())
 	}
+
+	return doUnlocked
 }
 
 func (container *ChildContainer) recordByName(c *ctx,
@@ -269,7 +278,7 @@ func (container *ChildContainer) deleteChild(c *ctx,
 }
 
 func (container *ChildContainer) renameChild(c *ctx, oldName string,
-	newName string) {
+	newName string) (doUnlocked func()) {
 
 	defer c.FuncIn("ChildContainer::renameChild", "%s -> %s",
 		oldName, newName).Out()
@@ -283,7 +292,7 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 	record := container.deleteChild(c, oldName)
 	if record == nil {
 		c.vlog("oldName doesn't exist")
-		return
+		return func() {}
 	}
 	record.SetFilename(newName)
 
@@ -291,22 +300,23 @@ func (container *ChildContainer) renameChild(c *ctx, oldName string,
 	// path
 	if hardlink, isHardlink := record.(*HardlinkLeg); isHardlink {
 		hardlink.setCreationTime(quantumfs.NewTime(time.Now()))
-		container.dir.markHardlinkPath(c, record.Filename(), record.FileId())
 	}
-	container.setRecord(c, inodeId, record)
+
+	return container.setRecord(c, inodeId, record)
 }
 
 // Modify the effective view of a child with the given function. The child Inode must
 // be instantiated and must be on the dirty queue in order for this changes to
 // eventually be publishable.
 func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
-	modify func(record quantumfs.DirectoryRecord)) {
+	modify func(record quantumfs.DirectoryRecord)) (doUnlocked func()) {
 
 	defer c.funcIn("ChildContainer::modifyChildWithFunc").Out()
 
+	doUnlocked = func() {}
 	record := container._recordByInodeId(c, inodeId)
 	if record == nil {
-		return
+		return func() {}
 	}
 
 	_, hasEffective := container.effective[inodeId]
@@ -316,10 +326,12 @@ func (container *ChildContainer) modifyChildWithFunc(c *ctx, inodeId InodeId,
 		// have an effective entry we must create one. Hardlinks are always
 		// publishable, so do not create an effective entry for those types.
 		record = quantumfs.ToThinRecord(record)
-		container.setRecord(c, container.inodeNum(record.Filename()), record)
+		doUnlocked = container.setRecord(c,
+			container.inodeNum(record.Filename()), record)
 	}
 
 	modify(record)
+	return doUnlocked
 }
 
 type inodeVisitFn func(InodeId) bool
