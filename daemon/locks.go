@@ -30,7 +30,7 @@ const (
 type lockInfo struct {
 	kind  locker
 	inode InodeId
-	push  time.Time
+	heldSince  time.Time
 }
 
 func newLockInfoQuick(k locker, i InodeId) lockInfo {
@@ -44,7 +44,7 @@ func newLockInfo(k locker, i InodeId, t time.Time) lockInfo {
 	return lockInfo{
 		kind:  k,
 		inode: i,
-		push:  t,
+		heldSince:  t,
 	}
 }
 
@@ -55,11 +55,28 @@ type lockOrder struct {
 }
 
 // The lock being requested must already be held so we can do checks with it
-func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
+func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker, lock func()) {
+	ensuredLock := callOnce(lock)
+	defer ensuredLock.invoke()
+
 	if order.disabled {
 		return
 	}
 
+	var gotLock time.Time
+	if order.timings {
+		beforeLock := time.Now()
+		ensuredLock.invoke()
+		gotLock = time.Now()
+
+		c.vlog("Locks: %d took %d ns to get", int64(kind),
+			gotLock.Sub(beforeLock).Nanoseconds())
+	} else {
+		ensuredLock.invoke()
+	}
+
+	// Some of these checks require that the lock we're pushing has already been
+	// acquired, so make sure ensuredLock is invoked first
 	if len(order.stack) != 0 {
 		if isInodeLock(kind) {
 			order.checkInodeOrder(c, inode, kind)
@@ -74,7 +91,7 @@ func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
 
 	var newInfo lockInfo
 	if order.timings {
-		newInfo = newLockInfo(kind, inode, time.Now())
+		newInfo = newLockInfo(kind, inode, gotLock)
 	} else {
 		newInfo = newLockInfoQuick(kind, inode)
 	}
@@ -111,8 +128,8 @@ func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
 	}
 
 	if order.timings {
-		c.vlog("Lock %d held for %d ns", kind,
-			time.Since(order.stack[removeIdx].push).Nanoseconds())
+		c.vlog("Locks: %d held for %d ns", int64(kind),
+			time.Since(order.stack[removeIdx].heldSince).Nanoseconds())
 	}
 
 	order.stack = append(order.stack[:removeIdx], order.stack[removeIdx+1:]...)
@@ -210,8 +227,7 @@ type orderedRwMutex struct {
 func (m *orderedRwMutex) RLock(c *ctx, inode InodeId,
 	kind locker) utils.NeedReadUnlock {
 
-	m.mutex.RLock()
-	c.lockOrder.Push_(c, inode, kind)
+	c.lockOrder.Push_(c, inode, kind, func() {m.mutex.RLock()})
 
 	return &orderedRwMutexUnlocker{
 		mutex: &m.mutex,
@@ -224,8 +240,7 @@ func (m *orderedRwMutex) RLock(c *ctx, inode InodeId,
 func (m *orderedRwMutex) Lock(c *ctx, inode InodeId,
 	kind locker) utils.NeedWriteUnlock {
 
-	m.mutex.Lock()
-	c.lockOrder.Push_(c, inode, kind)
+	c.lockOrder.Push_(c, inode, kind, func() {m.mutex.Lock()})
 
 	return &orderedRwMutexUnlocker{
 		mutex: &m.mutex,
