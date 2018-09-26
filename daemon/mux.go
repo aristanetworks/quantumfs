@@ -1137,29 +1137,29 @@ func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
 	defer c.funcIn("Mux::setFileHandle").Out()
 
-	handle, exists := qfs.fileHandles.Load(id)
-
 	if fileHandle != nil {
 		utils.Assert(fileHandle.Inode() != nil,
 			"Setting a fh with nil inode")
-		if !exists {
-			func() {
-				defer qfs.mapMutex.Lock().Unlock()
-				// If we're setting a new handle, add a ref count
-				addInodeRef_(c, fileHandle.Inode().inodeNum())
-			}()
-		}
 
-		qfs.fileHandles.Store(id, fileHandle)
+		_, existed := qfs.fileHandles.LoadOrStore(id, fileHandle)
+		// We do not currently support overwriting file handles
+		utils.Assert(!existed, "File handle overwritten")
+
+		func() {
+			defer qfs.mapMutex.Lock().Unlock()
+			// If we're setting a new handle, add a ref count
+			addInodeRef_(c, fileHandle.Inode().inodeNum())
+		}()
 	} else {
-		// clean remaining response queue size from the apiFileSize
-		if api, ok := handle.(*ApiHandle); ok {
+		// clean up any remaining response queue size from the apiFileSize
+		fh, exists := qfs.fileHandles.Load(id)
+		if api, ok := fh.(*ApiHandle); ok {
 			api.drainResponseData(c)
 		}
 
 		// Release the refcount as we clear
-		if fh, ok := handle.(FileHandle); ok && exists {
-			go fh.Inode().delRef(c)
+		if handle, ok := fh.(FileHandle); ok && exists {
+			go handle.Inode().delRef(c)
 		}
 
 		qfs.fileHandles.Delete(id)
