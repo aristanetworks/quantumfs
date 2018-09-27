@@ -157,10 +157,13 @@ func hasAccessPermission(c *ctx, inode Inode, mode uint32, uid uint32,
 	}
 
 	pid := c.fuseCtx.Pid
-	return hasPermissionIds(c, inode, uid, gid, pid, checkFlags, -1)
+
+	defer inode.getParentLock().RLock().RUnlock()
+	return hasPermissionIds_(c, inode, uid, gid, pid, checkFlags, -1)
 }
 
-func hasDirectoryWritePermSticky(c *ctx, inode Inode,
+// Must be called with the parentLock
+func hasDirectoryWritePermSticky_(c *ctx, inode Inode,
 	childOwner quantumfs.UID) fuse.Status {
 
 	if c.fuseCtx == nil {
@@ -169,11 +172,12 @@ func hasDirectoryWritePermSticky(c *ctx, inode Inode,
 	checkFlags := uint32(quantumfs.PermWriteAll | quantumfs.PermExecAll)
 	owner := c.fuseCtx.Owner
 	pid := c.fuseCtx.Pid
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags,
+	return hasPermissionIds_(c, inode, owner.Uid, owner.Gid, pid, checkFlags,
 		int32(childOwner))
 }
 
-func hasDirectoryWritePerm(c *ctx, inode Inode) fuse.Status {
+// Must be called with the parentLock
+func hasDirectoryWritePerm_(c *ctx, inode Inode) fuse.Status {
 	// Directories require execute permission in order to traverse them.
 	// So, we must check both write and execute bits
 
@@ -183,7 +187,7 @@ func hasDirectoryWritePerm(c *ctx, inode Inode) fuse.Status {
 	checkFlags := uint32(quantumfs.PermWriteAll | quantumfs.PermExecAll)
 	owner := c.fuseCtx.Owner
 	pid := c.fuseCtx.Pid
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
+	return hasPermissionIds_(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
 }
 
 func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
@@ -206,7 +210,9 @@ func hasPermissionOpenFlags(c *ctx, inode Inode, openFlags uint32) fuse.Status {
 
 	owner := c.fuseCtx.Owner
 	pid := c.fuseCtx.Pid
-	return hasPermissionIds(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
+
+	defer inode.getParentLock().RLock().RUnlock()
+	return hasPermissionIds_(c, inode, owner.Uid, owner.Gid, pid, checkFlags, -1)
 }
 
 // Determine if the process has a matching group. Normally the primary group is all
@@ -297,7 +303,8 @@ func hasMatchingGid(c *ctx, userGid uint32, pid uint32, inodeGid uint32) bool {
 	}
 }
 
-func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
+// parentLock must be held
+func hasPermissionIds_(c *ctx, inode Inode, checkUid uint32,
 	checkGid uint32, pid uint32, checkFlags uint32,
 	stickyAltOwner int32) fuse.Status {
 
@@ -306,7 +313,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 		return fuse.OK
 	}
 
-	defer c.FuncIn("hasPermissionIds", "%d %d %d %d %o", checkUid, checkGid,
+	defer c.FuncIn("hasPermissionIds_", "%d %d %d %d %o", checkUid, checkGid,
 		pid, stickyAltOwner, checkFlags).Out()
 
 	// If the inode is a workspace root, it is always permitted to modify the
@@ -319,7 +326,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 
 	var attr fuse.Attr
 	owner := fuse.Owner{Uid: checkUid, Gid: checkGid}
-	inode.parentGetChildAttr(c, inode.inodeNum(), &attr, owner)
+	inode.parentGetChildAttr_(c, inode.inodeNum(), &attr, owner)
 	inodeOwner := attr.Owner.Uid
 	inodeGroup := attr.Owner.Gid
 	permission := attr.Mode
@@ -389,7 +396,7 @@ func hasPermissionIds(c *ctx, inode Inode, checkUid uint32,
 		return fuse.OK
 	}
 
-	c.vlog("hasPermissionIds (%o & %o) vs %o", checkFlags, permMask, permission)
+	c.vlog("hasPermissionIds_ (%o & %o) vs %o", checkFlags, permMask, permission)
 	return fuse.EACCES
 }
 
@@ -454,4 +461,24 @@ type publishFn func(*ctx, ImmutableBuffer) (quantumfs.ObjectKey, error)
 
 func publishNow(c *ctx, buf ImmutableBuffer) (quantumfs.ObjectKey, error) {
 	return buf.Key(&c.Ctx)
+}
+
+// this is for ensuring that a given function is only called once via the struct
+type callOnceHandle struct {
+	fn func()
+}
+
+func callOnce(fn func()) *callOnceHandle {
+	return &callOnceHandle{
+		fn: fn,
+	}
+}
+
+func (c *callOnceHandle) invoke() {
+	if c.fn == nil {
+		return
+	}
+
+	c.fn()
+	c.fn = nil
 }
