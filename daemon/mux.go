@@ -63,7 +63,6 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 		},
 	}
 
-	qfs.c.elog("HACK BUILD - refresh DISABLED by PWN")
 	qfs.c.vlog("Random seed: %d", utils.RandomSeed)
 
 	qfs.c.qfs = qfs
@@ -503,8 +502,14 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	}
 
 	parts := strings.Split(name, "/")
-	wsr, cleanup, ok := qfs.getWorkspaceRoot(c, parts[0], parts[1], parts[2])
+	wsr, cleanup, ok := qfs.getWorkspaceRootNoInstantiate(c, parts[0], parts[1],
+		parts[2])
 	defer cleanup()
+
+	if wsr == nil {
+		c.vlog("No need to refresh uninstantiated workspace")
+		return
+	}
 
 	if !ok {
 		c.wlog("No workspace root for workspace %s", name)
@@ -1490,7 +1495,32 @@ func (qfs *QuantumFs) getWsrLineage(c *ctx,
 		return
 	}
 	ids = append(ids, InodeId(workspaceRootAttr.NodeId))
+	cleanup = func() {
+		qfs.Forget(workspaceRootAttr.NodeId, nLookup)
+		qfs.Forget(namespaceAttr.NodeId, nLookup)
+		qfs.Forget(typespaceAttr.NodeId, nLookup)
+	}
 	return
+}
+
+func (qfs *QuantumFs) getWorkspaceRootNoInstantiate(c *ctx, typespace, namespace,
+	workspace string) (*WorkspaceRoot, func(), bool) {
+
+	defer c.FuncIn("QuantumFs::getWorkspaceRootNoInstantiate",
+		"Workspace %s/%s/%s", typespace, namespace, workspace).Out()
+	ids, err := qfs.getWsrLineageNoInstantiate(c, typespace, namespace,
+		workspace)
+	if err != nil || len(ids) != 4 {
+		c.vlog("Workspace inode not found")
+		return nil, func() {}, false
+	}
+
+	wsrInode := ids[3]
+	inode, release := qfs.inodeNoInstantiate(c, wsrInode)
+	if inode == nil {
+		return nil, release, false
+	}
+	return inode.(*WorkspaceRoot), release, true
 }
 
 // The returned cleanup function of workspaceroot should be called at the end of the
@@ -1501,22 +1531,23 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).Out()
 	ids, cleanup := qfs.getWsrLineage(c, typespace, namespace, workspace)
-	defer cleanup()
 	if len(ids) != 4 {
 		c.vlog("Workspace inode not found")
-		return nil, func() {}, false
+		return nil, cleanup, false
 	}
+
 	wsrInode := ids[3]
 	c.vlog("Instantiating workspace inode %d", wsrInode)
 	inode, release := qfs.inode(c, wsrInode)
-	if inode == nil {
-		release()
-		return nil, func() {}, false
-	}
 	wsrCleanup := func() {
+		cleanup()
 		release()
-		qfs.Forget(uint64(wsrInode), 1)
 	}
+
+	if inode == nil {
+		return nil, wsrCleanup, false
+	}
+
 	return inode.(*WorkspaceRoot), wsrCleanup, true
 }
 
