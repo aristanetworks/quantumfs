@@ -1218,11 +1218,11 @@ func (qfs *QuantumFs) newInodeIdInfo(id InodeId) InodeIdInfo {
 }
 
 // Retrieves a unique inode number
-func (qfs *QuantumFs) newInodeId() InodeIdInfo {
+func (qfs *QuantumFs) newInodeId(c *ctx) InodeIdInfo {
 	for {
 		// When we get a new id, it's possible that we're still using it.
 		// If it's still in use, grab another one instead
-		newId, reused := qfs.inodeIds.newInodeId(&qfs.c)
+		newId, reused := qfs.inodeIds.newInodeId(c)
 
 		// If this is a reused id, then it's safe to use immediately
 		if reused {
@@ -1234,7 +1234,7 @@ func (qfs *QuantumFs) newInodeId() InodeIdInfo {
 		idIsFree := func() bool {
 			defer qfs.mapMutex.Lock().Unlock()
 
-			inode, inodeIdUsed := qfs.getInode_(&qfs.c, newId)
+			inode, inodeIdUsed := qfs.getInode_(c, newId)
 			return inode == nil && !inodeIdUsed
 		}()
 
