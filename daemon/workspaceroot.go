@@ -207,6 +207,12 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 		return
 	}
 
+	// HACK DISABLE REFRESH
+	if true {
+		c.elog("Disabled refresh")
+		return
+	}
+
 	rc := newRefreshContext_(c, wsr.publishedRootId, publishedRootId)
 	c.vlog("Workspace Refreshing %s rootid: %s::%s -> %s::%s", workspaceName,
 		wsr.publishedRootId.String(), wsr.nonce.String(),
