@@ -1526,29 +1526,40 @@ func (qfs *QuantumFs) getWorkspaceRootNoInstantiate(c *ctx, typespace, namespace
 // The returned cleanup function of workspaceroot should be called at the end of the
 // caller
 func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
-	workspace string) (*WorkspaceRoot, func(), bool) {
+	workspace string) (wsr *WorkspaceRoot, toClean func(), found bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRoot", "Workspace %s/%s/%s",
 		typespace, namespace, workspace).Out()
 	ids, cleanup := qfs.getWsrLineage(c, typespace, namespace, workspace)
+	toClean = cleanup
 	if len(ids) != 4 {
 		c.vlog("Workspace inode not found")
-		return nil, cleanup, false
+		return nil, toClean, false
 	}
+
+	panicked := true
+	defer func() {
+		if panicked {
+			toClean()
+		}
+	} ()
 
 	wsrInode := ids[3]
 	c.vlog("Instantiating workspace inode %d", wsrInode)
 	inode, release := qfs.inode(c, wsrInode)
-	wsrCleanup := func() {
+
+	// Since we did not panic during inode(), it's safe to return cleanup
+	panicked = false
+	toClean = func() {
 		cleanup()
 		release()
 	}
 
 	if inode == nil {
-		return nil, wsrCleanup, false
+		return nil, toClean, false
 	}
 
-	return inode.(*WorkspaceRoot), wsrCleanup, true
+	return inode.(*WorkspaceRoot), toClean, true
 }
 
 func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
