@@ -1329,6 +1329,13 @@ func (dir *Directory) orphanChild_(c *ctx, name string,
 		return
 	}
 	if inode == nil {
+		// This in theory should be impossible. The inode should have been
+		// instantiated, and so either removedRecord AND inode are nil,
+		// or there is an inode and the removedRecord shouldn't be nil.
+		c.elog("orphanChild_ instantiation mismatch %d", removedId)
+		// This is a bit racy, since we're not locking across inode's
+		// instantiation and this check, but this is an error case so try
+		// to recover for now.
 		c.qfs.removeUninstantiated(c, []InodeId{removedId})
 	} else {
 		inode.orphan_(c, removedRecord)
