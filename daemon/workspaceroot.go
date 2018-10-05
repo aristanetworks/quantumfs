@@ -502,7 +502,10 @@ func (wsr *WorkspaceRoot) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 		}
 	}
 
-	wsr.Directory.foreachDirectInode(c, visitFn)
+	unlock := wsr.Directory.lockChildren()
+	defer unlock()
+
+	wsr.Directory.foreachDirectInode_(c, visitFn)
 }
 
 func (wsr *WorkspaceRoot) cleanup(c *ctx) {

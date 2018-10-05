@@ -311,9 +311,11 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (tsl *TypespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer tsl.Lock().Unlock()
+func (tsl *TypespaceList) lockChildren() func() {
+	return tsl.Lock().Unlock
+}
 
+func (tsl *TypespaceList) foreachDirectInode_(c *ctx, visitFn inodeVisitFn) {
 	for k, _ := range tsl.typespacesById {
 		iterateAgain := visitFn(k)
 		if !iterateAgain {
@@ -682,9 +684,11 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer nsl.Lock().Unlock()
+func (nsl *NamespaceList) lockChildren() func () {
+	return nsl.Lock().Unlock
+}
 
+func (nsl *NamespaceList) foreachDirectInode_(c *ctx, visitFn inodeVisitFn) {
 	for k, _ := range nsl.namespacesById {
 		iterateAgain := visitFn(k)
 		if !iterateAgain {
@@ -1043,9 +1047,11 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer wsl.Lock().Unlock()
+func (wsl *WorkspaceList) lockChildren() func () {
+	return wsl.Lock().Unlock
+}
 
+func (wsl *WorkspaceList) foreachDirectInode_(c *ctx, visitFn inodeVisitFn) {
 	for k, _ := range wsl.workspacesById {
 		iterateAgain := visitFn(k)
 		if !iterateAgain {

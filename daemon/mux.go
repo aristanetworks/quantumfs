@@ -439,7 +439,7 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	inode, release := qfs.inodeNoInstantiate(c, id)
 	defer release()
 	if inode == nil {
-		// Since the inode is not instantiate, we must remove it from the
+		// Since the inode is not instantiated, we must remove it from the
 		// parentOfUninstantiated map since nobody else will via delRef
 		c.qfs.removeUninstantiated_(c, []InodeId{id})
 		return
@@ -1023,15 +1023,9 @@ func (qfs *QuantumFs) addUninstantiated_(c *ctx, uninstantiated []inodePair) {
 }
 
 // Remove a list of inode numbers from the parentOfUninstantiated list
-func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
-	defer c.funcIn("Mux::removeUninstantiated").Out()
-	defer qfs.mapMutex.Lock().Unlock()
-
-	qfs.removeUninstantiated_(c, uninstantiated)
-}
-
 // Must be called with the mapmutex lock
 func (qfs *QuantumFs) removeUninstantiated_(c *ctx, uninstantiated []InodeId) {
+	defer c.funcIn("Mux::removeUninstantiated_").Out()
 	for _, inodeNum := range uninstantiated {
 		if _, hasRefs := qfs.inodeRefcounts[inodeNum]; !hasRefs {
 			// It's only safe to release the inode id when it has been

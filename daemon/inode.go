@@ -213,7 +213,9 @@ type Inode interface {
 }
 
 type inodeHolder interface {
-	foreachDirectInode(c *ctx, visitFn inodeVisitFn)
+	lockChildren() (unlock func())
+	// Must be called within lockChildren
+	foreachDirectInode_(c *ctx, visitFn inodeVisitFn)
 }
 
 type TreeState struct {
@@ -915,6 +917,19 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		// to this inode anymore so there shouldn't be any races possible.
 		c.qfs.addUninstantiated_(c, []inodePair{
 			newInodePair(inode.inodeNum(), inode.parentId_())})
+
+		// Note: it is also dangerous to iterate through the children without
+		// the childRecordLock, but again *in theory* nobody else should
+		// be able to change the children without a reference to the inode
+		if dir, isDir := inode.self.(inodeHolder); isDir {
+			inodeChildren := make([]InodeId, 0, 200)
+			dir.foreachDirectInode_(c, func(i InodeId) bool {
+				inodeChildren = append(inodeChildren, i)
+				return true
+			})
+			c.qfs.removeUninstantiated_(c, inodeChildren)
+		}
+
 		return true
 	}()
 	if !toRelease {
@@ -928,15 +943,6 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		defer release()
 
 		parent.delRef(c)
-	}
-
-	if dir, isDir := inode.self.(inodeHolder); isDir {
-		inodeChildren := make([]InodeId, 0, 200)
-		dir.foreachDirectInode(c, func(i InodeId) bool {
-			inodeChildren = append(inodeChildren, i)
-			return true
-		})
-		c.qfs.removeUninstantiated(c, inodeChildren)
 	}
 
 	inode.cleanup(c)
