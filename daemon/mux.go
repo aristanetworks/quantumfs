@@ -1539,7 +1539,7 @@ func (qfs *QuantumFs) getWorkspaceRoot(c *ctx, typespace, namespace,
 		if panicked {
 			toClean()
 		}
-	} ()
+	}()
 
 	wsrInode := ids[3]
 	c.vlog("Instantiating workspace inode %d", wsrInode)

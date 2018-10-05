@@ -684,7 +684,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (nsl *NamespaceList) lockChildren() func () {
+func (nsl *NamespaceList) lockChildren() func() {
 	return nsl.Lock().Unlock
 }
 
@@ -1047,7 +1047,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 	return fuse.OK
 }
 
-func (wsl *WorkspaceList) lockChildren() func () {
+func (wsl *WorkspaceList) lockChildren() func() {
 	return wsl.Lock().Unlock
 }
 

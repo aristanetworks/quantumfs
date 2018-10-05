@@ -934,7 +934,7 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	return nil
 }
 
-func (dir *Directory) lockChildren() func () {
+func (dir *Directory) lockChildren() func() {
 	return dir.childRecordLock.Lock().Unlock
 }
 
@@ -1338,10 +1338,10 @@ func (dir *Directory) orphanChild_(c *ctx, name string,
 		// This is a bit racy, since we're not locking across inode's
 		// instantiation and this check, but this is an error case so try
 		// to recover for now.
-		func () {
+		func() {
 			defer c.qfs.mapMutex.Lock().Unlock()
 			c.qfs.removeUninstantiated_(c, []InodeId{removedId})
-		} ()
+		}()
 	} else {
 		inode.orphan_(c, removedRecord)
 	}
