@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"container/list"
+	"runtime/debug"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -124,7 +125,8 @@ func (ids *inodeIds) push_(c *ctx, id InodeId) {
 	_, exists := ids.reusableMap[id]
 	if exists {
 		// This should never happen, but recover if it does
-		c.elog("Double push of inode id %d", int64(id))
+		c.elog("Double push of inode id %d\n%s", int64(id),
+			utils.BytesToString(debug.Stack()))
 		return
 	}
 
