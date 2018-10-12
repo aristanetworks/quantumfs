@@ -213,8 +213,7 @@ type Inode interface {
 }
 
 type inodeHolder interface {
-	lockChildren() (unlock func())
-	// Must be called within lockChildren
+	// Must be called with children of inode protected
 	foreachDirectInode_(c *ctx, visitFn inodeVisitFn)
 }
 

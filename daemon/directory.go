@@ -934,10 +934,6 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	return nil
 }
 
-func (dir *Directory) lockChildren() func() {
-	return dir.childRecordLock.Lock().Unlock
-}
-
 func (dir *Directory) foreachDirectInode_(c *ctx, visitFn inodeVisitFn) {
 	dir.children.foreachDirectInode(c, visitFn)
 }
