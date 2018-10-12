@@ -1504,7 +1504,7 @@ func (qfs *QuantumFs) getWsrLineage(c *ctx,
 }
 
 func (qfs *QuantumFs) getWorkspaceRootNoInstantiate(c *ctx, typespace, namespace,
-	workspace string) (*WorkspaceRoot, func(), bool) {
+	workspace string) (wsr *WorkspaceRoot, toClean func(), found bool) {
 
 	defer c.FuncIn("QuantumFs::getWorkspaceRootNoInstantiate",
 		"Workspace %s/%s/%s", typespace, namespace, workspace).Out()

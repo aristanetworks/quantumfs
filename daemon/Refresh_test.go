@@ -1837,3 +1837,21 @@ func TestRefreshMultiDirtyHardlinks(t *testing.T) {
 		test.verifyContentStartsWith(file, content1)
 	})
 }
+
+func TestRefreshDoesntInstantiate(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		api := test.getApi()
+
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/file", "data"))
+		test.AssertNoErr(api.Branch(test.RelPath(workspace), "A/B/C"))
+
+		var nonce quantumfs.WorkspaceNonce
+		test.qfs.refreshWorkspace(&test.qfs.c, "A/B/C",
+			quantumfs.EmptyBlockKey, nonce)
+
+		prevented := test.TestLogContains("No need to refresh " +
+			"uninstantiated workspace")
+		test.Assert(prevented == true, "Refreshed uninstantiated wsr")
+	})
+}
