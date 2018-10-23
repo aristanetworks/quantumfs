@@ -390,7 +390,7 @@ func TestLockCheckStack(t *testing.T) {
 		defer linkUnlock.invoke()
 
 		// in parallel now, trigger the lock going up
-		c := test.qfs.c.NewThread()
+		c := test.qfs.c.newThread()
 		c.fuseCtx = &fuse.Context{}
 		go func() {
 			inode, unlock := test.qfs.RLockTreeGetInode(c, fileAId)
@@ -426,7 +426,7 @@ func TestLockCheckInvertedStack(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 		test.ExpectedErrors = make(map[string]struct{})
 		test.ExpectedErrors["ERROR: "+lockInversionLog] = struct{}{}
-		test.ExpectedErrors["ERROR: Stack: %s"] = struct{}{}
+		test.ExpectedErrors["ERROR: Stack: %s\n%s"] = struct{}{}
 
 		workspace := test.NewWorkspace()
 		test.AssertNoErr(testutils.PrintToFile(workspace+"/file",
@@ -436,7 +436,7 @@ func TestLockCheckInvertedStack(t *testing.T) {
 
 		fileParent := test.getInode(workspace)
 
-		c := test.qfs.c.NewThread()
+		c := test.qfs.c.newThread()
 		c.fuseCtx = &fuse.Context{}
 
 		inodeUnlock := callOnce(fileParent.Lock(c).Unlock)
