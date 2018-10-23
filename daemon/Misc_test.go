@@ -439,8 +439,7 @@ func TestLockCheckInvertedStack(t *testing.T) {
 		c := test.qfs.c.newThread()
 		c.fuseCtx = &fuse.Context{}
 
-		inodeUnlock := callOnce(fileParent.Lock(c).Unlock)
-		defer inodeUnlock.invoke()
+		defer fileParent.Lock(c).Unlock()
 
 		go func() {
 			inode, unlock := test.qfs.RLockTreeGetInode(c,
@@ -453,7 +452,5 @@ func TestLockCheckInvertedStack(t *testing.T) {
 		}()
 
 		test.WaitForLogString("Lock inversion detected", "Locks to invert")
-
-		inodeUnlock.invoke()
 	})
 }
