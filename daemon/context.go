@@ -37,7 +37,7 @@ func (c *ctx) newThread() *ctx {
 }
 
 func (c *ctx) DisableLockCheck() *ctx {
-	rtn := c.NewThread()
+	rtn := c.newThread()
 	rtn.lockOrder.disabled = true
 	return rtn
 }
