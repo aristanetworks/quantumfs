@@ -378,20 +378,22 @@ func (qfs *QuantumFs) verifyNoLeaks(c *ctx) {
 }
 
 func (qfs *QuantumFs) Serve() {
-	qfs.c.dlog("QuantumFs::Serve Serving")
+	c := qfs.c.newThread()
+
+	c.dlog("QuantumFs::Serve Serving")
 	qfs.server.Serve()
-	qfs.c.dlog("QuantumFs::Serve Finished serving")
+	c.dlog("QuantumFs::Serve Finished serving")
 
-	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
+	c.dlog("QuantumFs::Serve Waiting for flush thread to end")
 
-	for qfs.flusher.syncAll(&qfs.c) != nil {
-		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
+	for qfs.flusher.syncAll(c) != nil {
+		c.dlog("Cannot give up on syncing, retrying shortly")
 		time.Sleep(100 * time.Millisecond)
 
 		if qfs.syncAllRetries < 0 {
 			continue
 		} else if qfs.syncAllRetries == 0 {
-			qfs.c.elog("Unable to syncAll after Serve")
+			c.elog("Unable to syncAll after Serve")
 			break
 		}
 
