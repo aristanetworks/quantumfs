@@ -28,7 +28,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	newRecord, inodeInfo, needsSync, err := func() (quantumfs.DirectoryRecord,
 		InodeIdInfo, bool, fuse.Status) {
 
-		defer srcInode.ParentLock(c).Unlock()
+		defer srcInode.parentLock(c).Unlock()
 
 		// ensure we're not orphaned
 		if srcInode.isOrphaned_() {
@@ -84,7 +84,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 		defer dir.Lock(c).Unlock()
 
 		func() {
-			defer dir.ChildRecordLock(c).Unlock()
+			defer dir.childRecordLock(c).Unlock()
 			doUnlocked = dir.children.setRecord(c, inodeInfo, newRecord)
 		}()
 
@@ -235,7 +235,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 	doUnlocked := func() {}
 	func() {
 		defer dir.Lock(c).Unlock()
-		defer dir.ChildRecordLock(c).Unlock()
+		defer dir.childRecordLock(c).Unlock()
 
 		copy, needsSync, inodeIdInfo, err,
 			doUnlocked = dir.convertToHardlinkLeg_DOWN(c, toLink.name())
@@ -278,7 +278,7 @@ func (dir *Directory) convertHardlinks_DOWN_(c *ctx,
 	defer release()
 	if inode != nil {
 		func() {
-			defer inode.ParentLock(c).Unlock()
+			defer inode.parentLock(c).Unlock()
 			dir.hardlinkTable.claimAsChild_(c, inode)
 		}()
 	}
@@ -321,12 +321,12 @@ func (dir *Directory) moveHardlinkLeg_DOWN(c *ctx, newParent Inode, oldName stri
 	// Unlike regular rename, we throw away the result of deleteChild and
 	// just use the new remote record for creating the move destination
 	func() {
-		defer dir.ChildRecordLock(c).Unlock()
+		defer dir.childRecordLock(c).Unlock()
 		dir.children.deleteChild(c, oldName)
 	}()
 
 	dst := asDirectory(newParent)
-	defer dst.ChildRecordLock(c).Unlock()
+	defer dst.childRecordLock(c).Unlock()
 	dst.children.setRecord(c, inodeId, remoteRecord)
 }
 
@@ -426,7 +426,7 @@ func (dir *Directory) updateRefreshMap_DOWN(c *ctx, rc *RefreshContext,
 
 	defer c.funcIn("Directory::updateRefreshMap_DOWN").Out()
 
-	defer dir.ChildRecordLock(c).Unlock()
+	defer dir.childRecordLock(c).Unlock()
 
 	remoteEntries := make(map[string]quantumfs.DirectoryRecord, 0)
 	if baseLayerId != nil {
@@ -501,7 +501,7 @@ func (dir *Directory) refresh_DOWN(c *ctx, rc *RefreshContext,
 	uninstantiated := make([]inodePair, 0)
 
 	localEntries := make(map[string]InodeIdInfo, 0)
-	defer dir.ChildRecordLock(c).Unlock()
+	defer dir.childRecordLock(c).Unlock()
 	dir.children.foreachChild(c, func(childname string, childId InodeIdInfo) {
 		localEntries[childname] = childId
 	})
@@ -571,7 +571,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	// check write permission for both directories
 
 	result = func() fuse.Status {
-		defer dstInode.ParentRLock(c).RUnlock()
+		defer dstInode.parentRLock(c).RUnlock()
 		return hasDirectoryWritePerm_(c, dstInode)
 	}()
 	if result != fuse.OK {
@@ -579,8 +579,8 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	}
 
 	result = func() fuse.Status {
-		defer dir.ParentRLock(c).RUnlock()
-		defer dir.ChildRecordLock(c).Unlock()
+		defer dir.parentRLock(c).RUnlock()
+		defer dir.childRecordLock(c).Unlock()
 
 		record := dir.children.recordByName(c, oldName)
 		return hasDirectoryWritePermSticky_(c, dir, record.Owner())
@@ -606,12 +606,12 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	c.vlog("Aquiring locks")
 	if childInode != nil && overwrittenInode != nil {
 		firstChild, lastChild := getLockOrder(childInode, overwrittenInode)
-		defer firstChild.ParentLock(c).Unlock()
-		defer lastChild.ParentLock(c).Unlock()
+		defer firstChild.parentLock(c).Unlock()
+		defer lastChild.parentLock(c).Unlock()
 	} else if childInode != nil {
-		defer childInode.ParentLock(c).Unlock()
+		defer childInode.parentLock(c).Unlock()
 	} else if overwrittenInode != nil {
-		defer overwrittenInode.ParentLock(c).Unlock()
+		defer overwrittenInode.parentLock(c).Unlock()
 	}
 
 	// The locking here is subtle.
@@ -630,7 +630,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 
 	result = func() fuse.Status {
 		c.vlog("Checking if destination is an empty directory")
-		defer dst.ChildRecordLock(c).Unlock()
+		defer dst.childRecordLock(c).Unlock()
 
 		dstRecord := dst.children.recordByName(c, newName)
 		if dstRecord != nil &&
@@ -650,7 +650,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	// directories are locked.
 	c.vlog("Removing source")
 	newEntry := func() quantumfs.DirectoryRecord {
-		defer dir.ChildRecordLock(c).Unlock()
+		defer dir.childRecordLock(c).Unlock()
 		return dir.children.deleteChild(c, oldName)
 	}()
 	if newEntry == nil {
@@ -688,7 +688,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	// Add to destination, possibly removing the overwritten inode
 	c.vlog("Adding to destination directory")
 	func() {
-		defer dst.ChildRecordLock(c).Unlock()
+		defer dst.childRecordLock(c).Unlock()
 		overwritten = dst.orphanChild_(c, newName, overwrittenInode)
 		dst.children.setRecord(c, childInodeId, newEntry)
 

@@ -300,7 +300,7 @@ func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
 
 	// Fill in correct data for ..
 	func() {
-		defer wsr.ParentRLock(c).RUnlock()
+		defer wsr.parentRLock(c).RUnlock()
 		fillNamespaceAttr(c, &children[1].attr, wsr.parentId_(),
 			wsr.typespace, wsr.namespace)
 		children[1].fuseType = children[1].attr.Mode
@@ -420,7 +420,7 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 
 func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(c *ctx, attr *fuse.Attr) {
 	var numChildDirectories uint32
-	defer wsr.ChildRecordLock(c).Unlock()
+	defer wsr.childRecordLock(c).Unlock()
 	for _, entry := range wsr.children.records() {
 		if entry.Type() == quantumfs.ObjectTypeDirectory {
 			numChildDirectories++
