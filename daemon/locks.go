@@ -152,7 +152,7 @@ func (order *lockOrder) printStack(c *ctx) {
 			int64(info.inode))
 	}
 
-	c.elog("Stack: %s", stackStr)
+	c.elog("Stack: %s\n%s", stackStr, utils.BytesToString(debug.Stack()))
 }
 
 // Generics
