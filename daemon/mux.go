@@ -1186,7 +1186,7 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHand
 
 		// Release the refcount as we clear
 		if handle, ok := fh.(FileHandle); ok && exists {
-			go handle.Inode().delRef(c)
+			go handle.Inode().delRef(c.newThread())
 		}
 
 		qfs.fileHandles.Delete(id)

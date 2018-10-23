@@ -244,7 +244,7 @@ type InodeCommon struct {
 
 	// Note: parentId must not be accessed or changed without the parentLock
 	parentLock_ orderedRwMutex
-	parentId   InodeId
+	parentId    InodeId
 
 	inodeLock orderedRwMutex
 
