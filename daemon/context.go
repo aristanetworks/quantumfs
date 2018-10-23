@@ -132,7 +132,7 @@ func (c *ctx) StatsFuncIn(funcName string, extraFmtStr string,
 // Allow us to assert something, resulting in an error message. Error messages are
 // preferrable to panics in non-crucial asserts, or asserts in gothreads which
 // die silently.
-func (c *ctx) Assert(condition bool, format string, args ...interface{}) {
+func (c *ctx) ErrorIf(condition bool, format string, args ...interface{}) {
 	if !condition {
 		c.elog(format, args)
 	}
