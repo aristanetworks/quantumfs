@@ -134,6 +134,7 @@ type QuantumFs struct {
 	inodes         map[InodeId]Inode
 	inodeRefcounts map[InodeId]int32
 
+	// Must only be manipulated via setFileHandle
 	fileHandles sync.Map // map[FileHandleId]FileHandle
 
 	flusher *Flusher
@@ -211,7 +212,7 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	}
 
 	go qfs.adjustKernelKnobs()
-	go batchProcessor(qfs.c.NewThread(), qfs.toBeReleased,
+	go batchProcessor(qfs.c.newThread(), qfs.toBeReleased,
 		qfs.fileHandleReleaser)
 	go qfs.fuseNotifier()
 	go qfs.waitForSignals()
@@ -226,14 +227,15 @@ const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
 
 func (qfs *QuantumFs) fileHandleReleaser(c *ctx, ids []uint64) {
 	defer qfs.c.statsFuncIn(ReleaseFileHandleLog).Out()
-	defer qfs.mapMutex.Lock(c).Unlock()
 	for _, id := range ids {
-		qfs.setFileHandle_(&qfs.c, FileHandleId(id), nil)
+		qfs.setFileHandle(&qfs.c, FileHandleId(id), nil)
 	}
 }
 
-func batchProcessor(c *ctx, inputChan <-chan uint64, handleBatch func(c *ctx,
-	ids []uint64)) {
+func batchProcessor(c *ctx, inputChan <-chan uint64,
+	handleBatch func(c *ctx, ids []uint64)) {
+
+	defer logRequestPanic(c)
 
 	const maxPerCycle = 1000
 	i := 0
@@ -343,7 +345,7 @@ func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 				// Release the memory
 				debug.FreeOSMemory()
 			case syscall.SIGUSR2:
-				qfs.verifyNoLeaks(qfs.c.NewThread())
+				qfs.verifyNoLeaks(qfs.c.newThread())
 			}
 
 		case <-qfs.stopWaitingForSignals:
@@ -417,9 +419,9 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 
 	for name, state := range updates {
 		if state.Deleted {
-			go qfs.handleDeletedWorkspace(c.NewThread(), name)
+			go qfs.handleDeletedWorkspace(c.newThread(), name)
 		} else {
-			go qfs.refreshWorkspace(c.NewThread(), name, state.RootId,
+			go qfs.refreshWorkspace(c.newThread(), name, state.RootId,
 				state.Nonce)
 		}
 	}
@@ -795,7 +797,7 @@ func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
 		inode.addRef_(c)
 
 		return inode, func() {
-			go inode.delRef(c.NewThread())
+			go inode.delRef(c.newThread())
 		}
 	} else {
 		return nil, release
@@ -811,7 +813,7 @@ func releaserFn(c *ctx, inode Inode) func() {
 	// delRef calls a number of locks, and so calling this synchronously could
 	// cause deadlocks if the caller isn't careful about what they have locked.
 	return func() {
-		go inode.delRef(c.NewThread())
+		go inode.delRef(c.newThread())
 	}
 }
 
@@ -1160,20 +1162,29 @@ func (qfs *QuantumFs) fileHandle(c *ctx, id FileHandleId) FileHandle {
 func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHandle) {
 	defer c.funcIn("Mux::setFileHandle").Out()
 
-	qfs.setFileHandle_(c, id, fileHandle)
-}
-
-// Must hold mapMutex exclusively
-func (qfs *QuantumFs) setFileHandle_(c *ctx, id FileHandleId,
-	fileHandle FileHandle) {
-
 	if fileHandle != nil {
-		qfs.fileHandles.Store(id, fileHandle)
+		utils.Assert(fileHandle.Inode() != nil,
+			"Setting a fh with nil inode")
+
+		_, existed := qfs.fileHandles.LoadOrStore(id, fileHandle)
+		// We do not currently support overwriting file handles
+		utils.Assert(!existed, "File handle overwritten")
+
+		func() {
+			defer qfs.mapMutex.Lock(c).Unlock()
+			// If we're setting a new handle, add a ref count
+			addInodeRef_(c, fileHandle.Inode().inodeNum())
+		}()
 	} else {
 		// clean up any remaining response queue size from the apiFileSize
-		fh, _ := qfs.fileHandles.Load(id)
+		fh, exists := qfs.fileHandles.Load(id)
 		if api, ok := fh.(*ApiHandle); ok {
 			api.drainResponseData(c)
+		}
+
+		// Release the refcount as we clear
+		if handle, ok := fh.(FileHandle); ok && exists {
+			go handle.Inode().delRef(c)
 		}
 
 		qfs.fileHandles.Delete(id)

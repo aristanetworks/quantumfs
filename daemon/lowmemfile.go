@@ -127,7 +127,7 @@ func (lm *LowMemFile) Open(c *ctx, flags uint32, mode uint32,
 	defer c.FuncIn("LowMemFile::Open", "flags %d mode %d", flags, mode).Out()
 
 	out.OpenFlags = 0
-	handle := newLowMemFileHandle(c, lm.treeState())
+	handle := newLowMemFileHandle(c, lm, lm.treeState())
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
 	out.Fh = uint64(handle.FileHandleCommon.id)
 	return fuse.OK
@@ -263,13 +263,15 @@ func (lm *LowMemFile) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func newLowMemFileHandle(c *ctx, treeState *TreeState) *LowMemFileHandle {
+func newLowMemFileHandle(c *ctx, lm *LowMemFile,
+	treeState *TreeState) *LowMemFileHandle {
+
 	defer c.funcIn("newLowMemFileHandle").Out()
 
 	lmh := LowMemFileHandle{
 		FileHandleCommon: FileHandleCommon{
 			id:         c.qfs.newFileHandleId(),
-			inodeNum:   quantumfs.InodeIdLowMemMarker,
+			inode:      lm,
 			treeState_: treeState,
 		},
 	}

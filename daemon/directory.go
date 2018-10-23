@@ -631,7 +631,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 		return err
 	}
 
-	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource))
+	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource), dir)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	c.vlog(OpenedInodeDebug, dir.inodeNum(), ds.FileHandleCommon.id)
@@ -831,8 +831,8 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	dir.updateSize(c, result)
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(file.(*File), file.inodeNum(),
-		fileHandleNum, file.treeState())
+	fileDescriptor := newFileDescriptor(file.(*File), fileHandleNum,
+		file.treeState())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	c.vlog("New file inode %d, Fh %d", file.inodeNum(), fileHandleNum)
@@ -2001,14 +2001,15 @@ type directorySnapshotSource interface {
 	generation() uint64
 }
 
-func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapshot {
+func newDirectorySnapshot(c *ctx, src directorySnapshotSource,
+	dir Inode) *directorySnapshot {
 
 	defer c.funcIn("newDirectorySnapshot").Out()
 
 	ds := directorySnapshot{
 		FileHandleCommon: FileHandleCommon{
 			id:         c.qfs.newFileHandleId(),
-			inodeNum:   src.inodeNum(),
+			inode:      dir,
 			treeState_: src.treeState(),
 		},
 		_generation: src.generation(),
