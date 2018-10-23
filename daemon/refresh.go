@@ -303,7 +303,7 @@ func detachInode(c *ctx, inode Inode, staleRecord *FileRemoveRecord) {
 	defer c.FuncIn("detachInode", "name %s inode %d", staleRecord.name,
 		staleRecord.inodeId).Out()
 	dir := asDirectory(inode)
-	defer dir.ChildRecordLock(c).Unlock()
+	defer dir.childRecordLock(c).Unlock()
 	staleRecord.toOrphan = dir.children.deleteChild(c, staleRecord.name)
 	c.qfs.noteDeletedInode(c, dir.id, staleRecord.inodeId, staleRecord.name)
 }

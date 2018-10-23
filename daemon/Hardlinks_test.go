@@ -656,7 +656,7 @@ func (th *TestHelper) getHardlinkLeg(c *ctx, parentPath string,
 	parent := th.getInode(parentPath)
 	parentDir := asDirectory(parent)
 
-	defer parentDir.ChildRecordLock(th.qfs.c.NewThread()).Unlock()
+	defer parentDir.childRecordLock(th.qfs.c.newThread()).Unlock()
 	record := parentDir.children.recordByName(c, leg)
 	return record.(*HardlinkLeg).Clone().(*HardlinkLeg)
 }

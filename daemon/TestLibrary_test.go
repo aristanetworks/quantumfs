@@ -806,7 +806,7 @@ func (test *testHelper) withInodeRecord(inodeId InodeId,
 	parent := asDirectory(parent_)
 
 	defer parent.RLock(c).RUnlock()
-	defer parent.ChildRecordLock(test.qfs.c.NewThread()).Unlock()
+	defer parent.childRecordLock(test.qfs.c.newThread()).Unlock()
 
 	record := parent.getRecordChildCall_(test.qfs.c.newThread(), inodeId)
 	test.Assert(record != nil, "Child record not found")
