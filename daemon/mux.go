@@ -450,7 +450,7 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	if inode == nil {
 		return
 	}
-	defer inode.ParentLock(c).Unlock()
+	defer inode.parentLock(c).Unlock()
 	if inode.isOrphaned_() {
 		return
 	}
@@ -1534,7 +1534,7 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 	// The default cases will be inode such as file, symlink, hardlink etc, they
 	// get workspaceroots from their parents.
 	default:
-		defer inode.ParentRLock(c).RUnlock()
+		defer inode.parentRLock(c).RUnlock()
 		// if inode is already forgotten, the workspace doesn't process it.
 		if inode.isOrphaned_() {
 			return true

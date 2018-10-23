@@ -80,7 +80,7 @@ func (th *TestHelper) GetRecord(path string) quantumfs.ImmutableDirectoryRecord 
 	inode := th.getInode(path)
 
 	parentId := func() InodeId {
-		defer inode.ParentRLock(th.qfs.c.NewThread()).RUnlock()
+		defer inode.parentRLock(th.qfs.c.newThread()).RUnlock()
 		return inode.parentId_()
 	}()
 

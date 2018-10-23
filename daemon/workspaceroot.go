@@ -300,7 +300,7 @@ func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
 
 	// Fill in correct data for ..
 	func() {
-		defer wsr.ParentRLock(c).RUnlock()
+		defer wsr.parentRLock(c).RUnlock()
 		fillNamespaceAttr(c, &children[1].attr, wsr.parentId_(),
 			wsr.typespace, wsr.namespace)
 		children[1].fuseType = children[1].attr.Mode

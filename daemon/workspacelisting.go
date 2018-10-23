@@ -356,7 +356,7 @@ func (tsl *TypespaceList) getChildSnapshotRemovals(c *ctx,
 
 	var parentInfo directoryContents
 	func() {
-		defer tsl.ParentRLock(c).RUnlock()
+		defer tsl.parentRLock(c).RUnlock()
 		parentInfo = getParentInfo_(c, tsl.parentId_(), fillRootAttrWrapper,
 			"", "")
 	}()
@@ -714,7 +714,7 @@ func (nsl *NamespaceList) getChildSnapshotRemovals(c *ctx,
 
 	var parentInfo directoryContents
 	func() {
-		defer nsl.ParentRLock(c).RUnlock()
+		defer nsl.parentRLock(c).RUnlock()
 		parentInfo = getParentInfo_(c, nsl.parentId_(), fillRootAttrWrapper,
 			nsl.typespaceName, "")
 	}()
@@ -1124,7 +1124,7 @@ func (wsl *WorkspaceList) getChildSnapshotRemovals(c *ctx,
 
 	var parentInfo directoryContents
 	func() {
-		defer wsl.ParentRLock(c).RUnlock()
+		defer wsl.parentRLock(c).RUnlock()
 		parentInfo = getParentInfo_(c, wsl.parentId_(), fillTypespaceAttr,
 			wsl.typespaceName, wsl.namespaceName)
 	}()
