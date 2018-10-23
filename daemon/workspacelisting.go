@@ -303,7 +303,7 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 
 	defer c.funcIn("TypespaceList::OpenDir").Out()
 
-	ds := newDirectorySnapshot(c, tsl)
+	ds := newDirectorySnapshot(c, tsl, tsl)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
@@ -356,7 +356,7 @@ func (tsl *TypespaceList) getChildSnapshotRemovals(c *ctx,
 
 	var parentInfo directoryContents
 	func() {
-		defer tsl.ParentRLock(c).RUnlock()
+		defer tsl.parentRLock(c).RUnlock()
 		parentInfo = getParentInfo_(c, tsl.parentId_(), fillRootAttrWrapper,
 			"", "")
 	}()
@@ -674,7 +674,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 
 	defer c.funcIn("NamespaceList::OpenDir").Out()
 
-	ds := newDirectorySnapshot(c, nsl)
+	ds := newDirectorySnapshot(c, nsl, nsl)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
@@ -714,7 +714,7 @@ func (nsl *NamespaceList) getChildSnapshotRemovals(c *ctx,
 
 	var parentInfo directoryContents
 	func() {
-		defer nsl.ParentRLock(c).RUnlock()
+		defer nsl.parentRLock(c).RUnlock()
 		parentInfo = getParentInfo_(c, nsl.parentId_(), fillRootAttrWrapper,
 			nsl.typespaceName, "")
 	}()
@@ -1035,7 +1035,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 
 	defer c.funcIn("WorkspaceList::OpenDir").Out()
 
-	ds := newDirectorySnapshot(c, wsl)
+	ds := newDirectorySnapshot(c, wsl, wsl)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	out.OpenFlags = fuse.FOPEN_KEEP_CACHE
@@ -1124,7 +1124,7 @@ func (wsl *WorkspaceList) getChildSnapshotRemovals(c *ctx,
 
 	var parentInfo directoryContents
 	func() {
-		defer wsl.ParentRLock(c).RUnlock()
+		defer wsl.parentRLock(c).RUnlock()
 		parentInfo = getParentInfo_(c, wsl.parentId_(), fillTypespaceAttr,
 			wsl.typespaceName, wsl.namespaceName)
 	}()

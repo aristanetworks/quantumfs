@@ -99,7 +99,7 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 		wsrId := test.getInodeNum(workspace)
 		fileId := test.getInodeNum(fileName)
 
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		test.ForceForget(fileId)
 		test.Assert(!test.inodeIsInstantiated(c, fileId),
 			"Failed to forget file inode")
@@ -156,7 +156,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// we need to lock to do this without racing
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		test.qfs.mapMutex.Lock(c)
 		numUninstantiatedOld := len(test.qfs.parentOfUninstantiated)
 		test.qfs.mapMutex.Unlock(c)
@@ -237,7 +237,7 @@ func TestLookupCountAfterCommand(t *testing.T) {
 		test.Assert(err == nil, "Failed call the command")
 
 		test.ForceForget(fileId)
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		test.Assert(!test.inodeIsInstantiated(c, fileId),
 			"Failed to forget file inode")
 
@@ -282,7 +282,7 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		test.Assert(!test.inodeIsInstantiated(c, fileId),
 			"Failed to forget directory inode")
 
@@ -315,7 +315,7 @@ func TestLookupCountHardlinks(t *testing.T) {
 			test.qfs.Lookup(&header, "test", &out)
 		}
 
-		count, exists := test.qfs.lookupCount(test.qfs.c.NewThread(),
+		count, exists := test.qfs.lookupCount(&test.qfs.c,
 			inodeNum)
 		test.Assert(exists, "Lookup count missing for file")
 
@@ -347,7 +347,7 @@ func TestForgetMarking(t *testing.T) {
 
 		// We need to trigger, ourselves, the kind of Forget sequence where
 		// markings are necessary: parent, childA, then childB
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		test.Assert(test.inodeIsInstantiated(c, parentId),
 			"Parent not loaded when expected")
 
@@ -439,7 +439,7 @@ func TestForgetUnlinkedInstantiated(t *testing.T) {
 			test.AssertNoErr(syscall.Unlink(fullname))
 		}()
 		test.SyncAllWorkspaces()
-		_, exists := test.qfs.lookupCount(test.qfs.c.NewThread(), inodeId)
+		_, exists := test.qfs.lookupCount(&test.qfs.c, inodeId)
 
 		utils.Assert(!exists, "file %s still exists in the lookup map", name)
 	})
@@ -458,8 +458,7 @@ func TestForgetUnlinkedUninstantiated(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		test.WaitFor("dropping fileA's inode", func() bool {
-			_, exists := test.qfs.lookupCount(test.qfs.c.NewThread(),
-				inodeId)
+			_, exists := test.qfs.lookupCount(&test.qfs.c, inodeId)
 			return !exists
 		})
 	})

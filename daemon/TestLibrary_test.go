@@ -236,7 +236,7 @@ type testHelper struct {
 func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
 	handles := make([]*FileDescriptor, 0)
 
-	defer th.qfs.mapMutex.Lock(th.qfs.c.NewThread()).Unlock()
+	defer th.qfs.mapMutex.Lock(th.qfs.c.newThread()).Unlock()
 
 	th.qfs.fileHandles.Range(func(k interface{}, file interface{}) bool {
 		fh, ok := file.(*FileDescriptor)
@@ -244,7 +244,7 @@ func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescrip
 			return true
 		}
 
-		if fh.inodeNum == InodeId(inodeNum) {
+		if fh.Inode().inodeNum() == InodeId(inodeNum) {
 			handles = append(handles, fh)
 		}
 		return true
@@ -259,7 +259,7 @@ func (th *testHelper) WaitToBeUninstantiated(inode InodeId) {
 
 	msg := fmt.Sprintf("inode %d to be uninstantiated", inode)
 	th.WaitFor(msg, func() bool {
-		if !th.inodeIsInstantiated(th.qfs.c.NewThread(), inode) {
+		if !th.inodeIsInstantiated(th.qfs.c.newThread(), inode) {
 			return true
 		}
 		th.SyncAllWorkspaces()
@@ -427,7 +427,7 @@ func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 func (th *testHelper) getAccessList(workspace string) *quantumfs.PathsAccessed {
 	wsr, cleanup := th.GetWorkspaceRoot(workspace)
 	defer cleanup()
-	accessed := wsr.getList(th.qfs.c.NewThread())
+	accessed := wsr.getList(th.qfs.c.newThread())
 	return &accessed
 }
 
@@ -795,20 +795,20 @@ func (test *testHelper) waitForPropagate(file string, data []byte) {
 func (test *testHelper) withInodeRecord(inodeId InodeId,
 	verify func(record quantumfs.ImmutableDirectoryRecord)) {
 
-	inode, release := test.qfs.inode(test.qfs.c.NewThread(), inodeId)
+	inode, release := test.qfs.inode(test.qfs.c.newThread(), inodeId)
 	defer release()
 	test.Assert(inode != nil, "No Inode found for inode %d", inodeId)
 
-	c := test.qfs.c.NewThread()
-	defer inode.ParentRLock(c).RUnlock()
-	parent_, release := inode.parent_(test.qfs.c.NewThread())
+	c := test.qfs.c.newThread()
+	defer inode.parentRLock(c).RUnlock()
+	parent_, release := inode.parent_(test.qfs.c.newThread())
 	defer release()
 	parent := asDirectory(parent_)
 
 	defer parent.RLock(c).RUnlock()
-	defer parent.ChildRecordLock(test.qfs.c.NewThread()).Unlock()
+	defer parent.childRecordLock(test.qfs.c.newThread()).Unlock()
 
-	record := parent.getRecordChildCall_(test.qfs.c.NewThread(), inodeId)
+	record := parent.getRecordChildCall_(test.qfs.c.newThread(), inodeId)
 	test.Assert(record != nil, "Child record not found")
 
 	verify(record)
