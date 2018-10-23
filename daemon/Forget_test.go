@@ -99,7 +99,7 @@ func TestConfirmWorkspaceMutabilityAfterUninstantiation(t *testing.T) {
 		wsrId := test.getInodeNum(workspace)
 		fileId := test.getInodeNum(fileName)
 
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		test.ForceForget(fileId)
 		test.Assert(!test.inodeIsInstantiated(c, fileId),
 			"Failed to forget file inode")
@@ -156,7 +156,7 @@ func TestForgetUninstantiatedChildren(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// we need to lock to do this without racing
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		test.qfs.mapMutex.Lock(c)
 		numUninstantiatedOld := len(test.qfs.parentOfUninstantiated)
 		test.qfs.mapMutex.Unlock(c)
@@ -237,7 +237,7 @@ func TestLookupCountAfterCommand(t *testing.T) {
 		test.Assert(err == nil, "Failed call the command")
 
 		test.ForceForget(fileId)
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		test.Assert(!test.inodeIsInstantiated(c, fileId),
 			"Failed to forget file inode")
 
@@ -282,7 +282,7 @@ func TestLookupCountAfterInsertInode(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		// Make sure that the workspace has already been uninstantiated
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		test.Assert(!test.inodeIsInstantiated(c, fileId),
 			"Failed to forget directory inode")
 
@@ -346,7 +346,7 @@ func TestForgetMarking(t *testing.T) {
 
 		// We need to trigger, ourselves, the kind of Forget sequence where
 		// markings are necessary: parent, childA, then childB
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		test.Assert(test.inodeIsInstantiated(c, parentId),
 			"Parent not loaded when expected")
 

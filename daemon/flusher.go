@@ -596,7 +596,7 @@ func (flusher *Flusher) queueDirtyInode_(c *ctx, inode Inode) *list.Element {
 	treeState := inode.treeState()
 	dq := flusher.dqs[treeState]
 	if launch {
-		go dq.flusher(c.NewThread())
+		go dq.flusher(c.newThread())
 		go dq.kicker(c.flusherCtx())
 	}
 

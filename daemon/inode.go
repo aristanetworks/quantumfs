@@ -997,6 +997,8 @@ type FileHandle interface {
 	Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (
 		uint32, fuse.Status)
 
+	Inode() Inode
+
 	treeState() *TreeState
 	LockTree() utils.NeedWriteUnlock
 	RLockTree() utils.NeedReadUnlock
@@ -1006,8 +1008,12 @@ type FileHandleId uint64
 
 type FileHandleCommon struct {
 	id         FileHandleId
-	inodeNum   InodeId
+	inode      Inode
 	treeState_ *TreeState
+}
+
+func (file *FileHandleCommon) Inode() Inode {
+	return file.inode
 }
 
 func (file *FileHandleCommon) treeState() *TreeState {

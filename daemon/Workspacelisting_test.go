@@ -147,7 +147,7 @@ func TestWorkspaceDeletionManualForget(t *testing.T) {
 		test.AssertNoErr(err)
 		defer fileHandle.Close()
 
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		workspaceInodeId := test.getInodeNum(test.AbsPath(workspaceName))
 		err = test.qfs.c.workspaceDB.DeleteWorkspace(&c.Ctx,
 			"testA", "testB", "testC")
@@ -189,7 +189,7 @@ func TestRemoteNamespaceDeletion(t *testing.T) {
 		defer fileHandle.Close()
 
 		// Now simulate the namespace being remotely removed
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		err = test.qfs.c.workspaceDB.DeleteWorkspace(&c.Ctx,
 			"testA", "testB", "testC")
 		test.AssertNoErr(err)
@@ -204,7 +204,7 @@ func TestRemoteNamespaceDeletion(t *testing.T) {
 
 		// Make sure we cause updateChildren on the typespace
 		typespaceInode := test.getInode(test.AbsPath("testA"))
-		ManualLookup(test.qfs.c.NewThread(), typespaceInode, "testB2")
+		ManualLookup(&test.qfs.c, typespaceInode, "testB2")
 
 		// Check to ensure that we can't access the workspace's child
 		_, err = fileHandle.Stat()
