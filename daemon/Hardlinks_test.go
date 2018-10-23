@@ -681,7 +681,7 @@ func TestHardlinkCreatedTime(t *testing.T) {
 		test.AssertNoErr(syscall.Link(fileC, fileD))
 		test.AssertNoErr(syscall.Link(fileD, fileE))
 
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		recordA := test.getHardlinkLeg(c, dirA, "fileA")
 		recordB := test.getHardlinkLeg(c, dirA, "fileB")
 		recordC := test.getHardlinkLeg(c, workspace, "fileC")
@@ -764,7 +764,7 @@ func TestHardlinkRenameCreation(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(fileA, "dataA"))
 		test.AssertNoErr(syscall.Link(fileA, fileB))
 
-		c := test.qfs.c.NewThread()
+		c := &test.qfs.c
 		recordA := test.getHardlinkLeg(c, dirA, "fileA")
 		recordB := test.getHardlinkLeg(c, dirA, "fileB")
 
@@ -870,7 +870,7 @@ func checkParentOfInstantiated(test *testHelper, wsrPath string, dirPath string,
 	ioutil.ReadDir(wsrPath + "/" + dirPath)
 	link := test.getInode(wsrPath + "/" + dirPath + "/" + filename)
 	defer link.getParentLock().Lock().Unlock()
-	parent, release := link.parent_(test.qfs.c.NewThread())
+	parent, release := link.parent_(&test.qfs.c)
 	defer release()
 
 	test.Assert(parent.isWorkspaceRoot(),
@@ -884,7 +884,7 @@ func checkParentOfUninstantiated(test *testHelper, wsrPath string, dirPath strin
 	link := test.getInodeNum(wsrPath + "/" + dirPath + "/" + filename)
 	wsr := test.getInodeNum(wsrPath)
 
-	defer test.qfs.mapMutex.RLock(test.qfs.c.NewThread()).RUnlock()
+	defer test.qfs.mapMutex.RLock(&test.qfs.c).RUnlock()
 	test.Assert(test.qfs.parentOfUninstantiated[link] == wsr,
 		"Hardlink parent isn't workspace root")
 }
@@ -998,7 +998,7 @@ func TestNormalizationRace(t *testing.T) {
 		test.AssertNoErr(os.Remove(dir + "/linkC"))
 
 		// Ensure it gets normalized
-		parentDir.normalizeChildren(test.qfs.c.NewThread())
+		parentDir.normalizeChildren(&test.qfs.c)
 
 		// Before that propagates, link it again
 		test.AssertNoErr(syscall.Link(dir+"/linkA", workspace+"/linkA2"))
