@@ -27,7 +27,7 @@ type ctx struct {
 	lockOrder   lockOrder
 }
 
-func (c *ctx) NewThread() *ctx {
+func (c *ctx) newThread() *ctx {
 	// Copy everything, but provide a separate lock order stack
 	var rtn ctx
 	rtn = *c
@@ -37,7 +37,7 @@ func (c *ctx) NewThread() *ctx {
 }
 
 func (c *ctx) DisableLockCheck() *ctx {
-	rtn := c.NewThread()
+	rtn := c.newThread()
 	rtn.lockOrder.disabled = true
 	return rtn
 }
@@ -65,7 +65,7 @@ func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
 }
 
 func (c *ctx) req(header *fuse.InHeader) *ctx {
-	return c.NewThread().reqId(header.Unique, &header.Context)
+	return c.newThread().reqId(header.Unique, &header.Context)
 }
 
 var refreshRequestIdGenerator = qlog.RefreshRequestIdMin
@@ -138,7 +138,7 @@ func (c *ctx) StatsFuncIn(funcName string, extraFmtStr string,
 // Allow us to assert something, resulting in an error message. Error messages are
 // preferrable to panics in non-crucial asserts, or asserts in gothreads which
 // die silently.
-func (c *ctx) Assert(condition bool, format string, args ...interface{}) {
+func (c *ctx) ErrorIf(condition bool, format string, args ...interface{}) {
 	if !condition {
 		c.elog(format, args)
 	}

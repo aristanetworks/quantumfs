@@ -61,7 +61,7 @@ func (th *TestHelper) getInodeNum(path string) InodeId {
 // Retrieve the Inode from Quantumfs. Returns nil is not instantiated
 func (th *TestHelper) getInode(path string) Inode {
 	inodeNum := th.getInodeNum(path)
-	newInode, release := th.qfs.inodeNoInstantiate(th.qfs.c.NewThread(),
+	newInode, release := th.qfs.inodeNoInstantiate(th.qfs.c.newThread(),
 		inodeNum)
 	// For now, we don't care too much about the inode being uninstantiated
 	// early during a test
@@ -70,7 +70,7 @@ func (th *TestHelper) getInode(path string) Inode {
 }
 
 func (th *TestHelper) inodeIsInstantiated(c *ctx, inodeId InodeId) bool {
-	inode, release := th.qfs.inodeNoInstantiate(th.qfs.c.NewThread(), inodeId)
+	inode, release := th.qfs.inodeNoInstantiate(th.qfs.c.newThread(), inodeId)
 	defer release()
 
 	return inode != nil
@@ -80,11 +80,11 @@ func (th *TestHelper) GetRecord(path string) quantumfs.ImmutableDirectoryRecord 
 	inode := th.getInode(path)
 
 	parentId := func() InodeId {
-		defer inode.ParentRLock(th.qfs.c.NewThread()).RUnlock()
+		defer inode.parentRLock(th.qfs.c.newThread()).RUnlock()
 		return inode.parentId_()
 	}()
 
-	c := th.qfs.c.NewThread()
+	c := th.qfs.c.newThread()
 	parent, release := th.qfs.inodeNoInstantiate(c, parentId)
 	defer release()
 
@@ -597,7 +597,7 @@ func (th *TestHelper) GetWorkspaceRoot(workspace string) (wsr *WorkspaceRoot,
 	cleanup func()) {
 
 	parts := strings.Split(th.RelPath(workspace), "/")
-	wsr, cleanup, ok := th.qfs.getWorkspaceRoot(th.qfs.c.NewThread(),
+	wsr, cleanup, ok := th.qfs.getWorkspaceRoot(th.qfs.c.newThread(),
 		parts[0], parts[1], parts[2])
 	th.Assert(ok, "WorkspaceRoot object for %s not found", workspace)
 

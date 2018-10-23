@@ -132,8 +132,8 @@ type Inode interface {
 	parent_(c *ctx) (parent Inode, release func())
 	setParent(c *ctx, newParent Inode)
 	setParent_(c *ctx, newParent Inode)
-	ParentLock(c *ctx) utils.NeedWriteUnlock
-	ParentRLock(c *ctx) utils.NeedReadUnlock
+	parentLock(c *ctx) utils.NeedWriteUnlock
+	parentRLock(c *ctx) utils.NeedReadUnlock
 
 	// An orphaned Inode is one which is parented to itself. That is, it is
 	// orphaned from the directory tree and cannot be accessed except directly by
@@ -243,8 +243,8 @@ type InodeCommon struct {
 	accessed_ uint32
 
 	// Note: parentId must not be accessed or changed without the parentLock
-	parentLock orderedRwMutex
-	parentId   InodeId
+	parentLock_ orderedRwMutex
+	parentId    InodeId
 
 	inodeLock orderedRwMutex
 
@@ -271,12 +271,12 @@ func (inode *InodeCommon) Lock(c *ctx) utils.NeedWriteUnlock {
 	return inode.inodeLock.Lock(c, inode.id, lockerInodeLock)
 }
 
-func (inode *InodeCommon) ParentRLock(c *ctx) utils.NeedReadUnlock {
-	return inode.parentLock.RLock(c, inode.id, lockerParentLock)
+func (inode *InodeCommon) parentRLock(c *ctx) utils.NeedReadUnlock {
+	return inode.parentLock_.RLock(c, inode.id, lockerParentLock)
 }
 
-func (inode *InodeCommon) ParentLock(c *ctx) utils.NeedWriteUnlock {
-	return inode.parentLock.Lock(c, inode.id, lockerParentLock)
+func (inode *InodeCommon) parentLock(c *ctx) utils.NeedWriteUnlock {
+	return inode.parentLock_.Lock(c, inode.id, lockerParentLock)
 }
 
 func (inode *InodeCommon) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -315,7 +315,7 @@ func (inode *InodeCommon) parentMarkAccessed(c *ctx, path string,
 	defer c.FuncIn("InodeCommon::parentMarkAccessed", "path %s CRUD %x", path,
 		op).Out()
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 
 	if inode.isOrphaned_() {
 		utils.Assert(path == inode.name(),
@@ -344,7 +344,7 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 
 	defer c.FuncIn("InodeCommon::parentSyncChild", "%d", inode.id).Out()
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 	defer inode.Lock(c).Unlock()
 
 	// We want to ensure that the orphan check and the parent sync are done
@@ -372,7 +372,7 @@ func (inode *InodeCommon) parentUpdateSize(c *ctx,
 
 	defer c.funcIn("InodeCommon::parentUpdateSize").Out()
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 	defer inode.Lock(c).Unlock()
 
 	var attr fuse.SetAttrIn
@@ -396,7 +396,7 @@ func (inode *InodeCommon) parentSetChildAttr(c *ctx, inodeNum InodeId,
 	newType *quantumfs.ObjectType, attr *fuse.SetAttrIn,
 	out *fuse.AttrOut, updateMtime bool) fuse.Status {
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 
 	return inode.parentSetChildAttr_(c, inodeNum, newType, attr, out,
 		updateMtime)
@@ -430,7 +430,7 @@ func (inode *InodeCommon) parentGetChildXAttrSize(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("InodeCommon::parentGetChildXAttrSize").Out()
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 	if !inode.isOrphaned_() {
 		parent, release := inode.parent_(c)
 		defer release()
@@ -448,7 +448,7 @@ func (inode *InodeCommon) parentGetChildXAttrData(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("InodeCommon::parentGetChildXAttrData").Out()
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 	if !inode.isOrphaned_() {
 		parent, release := inode.parent_(c)
 		defer release()
@@ -466,7 +466,7 @@ func (inode *InodeCommon) parentListChildXAttr(c *ctx,
 
 	defer c.funcIn("InodeCommon::parentListChildXAttr").Out()
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 	if !inode.isOrphaned_() {
 		parent, release := inode.parent_(c)
 		defer release()
@@ -484,7 +484,7 @@ func (inode *InodeCommon) parentSetChildXAttr(c *ctx, inodeNum InodeId, attr str
 
 	defer c.funcIn("InodeCommon::parentSetChildXAttr").Out()
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
@@ -504,7 +504,7 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 
 	defer c.funcIn("InodeCommon::parentRemoveChildXAttr").Out()
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 
 	if !inode.isOrphaned_() {
 		inode.dirty(c)
@@ -522,7 +522,7 @@ func (inode *InodeCommon) parentRemoveChildXAttr(c *ctx, inodeNum InodeId,
 func (inode *InodeCommon) parentGetChildAttr(c *ctx, inodeNum InodeId,
 	out *fuse.Attr, owner fuse.Owner) {
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 	inode.parentGetChildAttr_(c, inodeNum, out, owner)
 }
 
@@ -551,7 +551,7 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	defer c.FuncIn("InodeCommon::parentHadAncestor", "%d %d", inode.inodeNum(),
 		ancestor.inodeNum())
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 	if ancestor.inodeNum() == inode.parentId_() {
 		return true
 	}
@@ -563,7 +563,7 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 	toCheck, release := inode.parent_(c)
 	defer release()
 	for {
-		defer toCheck.ParentRLock(c).RUnlock()
+		defer toCheck.parentRLock(c).RUnlock()
 
 		if ancestor.inodeNum() == toCheck.parentId_() {
 			return true
@@ -579,7 +579,7 @@ func (inode *InodeCommon) parentHasAncestor(c *ctx, ancestor Inode) bool {
 }
 
 func (inode *InodeCommon) setParent(c *ctx, newParent Inode) {
-	defer inode.ParentLock(c).Unlock()
+	defer inode.parentLock(c).Unlock()
 	inode.setParent_(c, newParent)
 }
 
@@ -599,13 +599,13 @@ func (inode *InodeCommon) setParent_(c *ctx, newParent Inode) {
 }
 
 func (inode *InodeCommon) isOrphaned(c *ctx) bool {
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 
 	return inode.isOrphaned_()
 }
 
 func (inode *InodeCommon) orphan(c *ctx, record quantumfs.DirectoryRecord) {
-	defer inode.ParentLock(c).Unlock()
+	defer inode.parentLock(c).Unlock()
 	inode.orphan_(c, record)
 }
 
@@ -679,7 +679,7 @@ func (inode *InodeCommon) markUnclean_(dirtyElement *list.Element) (already bool
 }
 
 func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) {
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 
 	var record quantumfs.ImmutableDirectoryRecord
 	if inode.isOrphaned_() {
@@ -793,7 +793,7 @@ func (inode *InodeCommon) absPath(c *ctx, path string) string {
 		panic("Orphaned file")
 	}
 
-	defer inode.ParentRLock(c).RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 	return inode.absPath_(c, path)
 }
 
@@ -849,7 +849,7 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 		err fuse.Status)) fuse.Status {
 
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", inode.inodeNum()).Out()
-	defer inode.ParentLock(c).Unlock()
+	defer inode.parentLock(c).Unlock()
 	defer inode.Lock(c).Unlock()
 
 	// One of this inode's names is going away, reset the accessed cache to
@@ -934,7 +934,7 @@ func (inode *InodeCommon) delRef(c *ctx) {
 		return
 	}
 
-	defer inode.ParentLock(c).Unlock()
+	defer inode.parentLock(c).Unlock()
 
 	if !inode.isOrphaned_() {
 		parent, release := inode.parent_(c)
@@ -1010,6 +1010,8 @@ type FileHandle interface {
 	Write(c *ctx, offset uint64, size uint32, flags uint32, buf []byte) (
 		uint32, fuse.Status)
 
+	Inode() Inode
+
 	treeState() *TreeState
 	LockTree() utils.NeedWriteUnlock
 	RLockTree() utils.NeedReadUnlock
@@ -1019,8 +1021,12 @@ type FileHandleId uint64
 
 type FileHandleCommon struct {
 	id         FileHandleId
-	inodeNum   InodeId
+	inode      Inode
 	treeState_ *TreeState
+}
+
+func (file *FileHandleCommon) Inode() Inode {
+	return file.inode
 }
 
 func (file *FileHandleCommon) treeState() *TreeState {

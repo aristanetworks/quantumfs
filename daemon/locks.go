@@ -60,7 +60,7 @@ func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
 	})
 }
 
-func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
+func (order *lockOrder) Remove(c *ctx, inode InodeId, kind locker) {
 	if order.disabled {
 		return
 	}
@@ -70,7 +70,7 @@ func (order *lockOrder) Pop(c *ctx, inode InodeId, kind locker) {
 			utils.BytesToString(debug.Stack()))
 	}
 
-	// Popping has an odd mechanism in that we don't necessarily unlock in the
+	// Removing has an odd mechanism in that we don't necessarily unlock in the
 	// same order that we locked. We can't assume we're popping the last element,
 	// have to find it instead and remove it
 	removeIdx := -1
@@ -152,7 +152,7 @@ func (order *lockOrder) printStack(c *ctx) {
 			int64(info.inode))
 	}
 
-	c.elog("Stack: %s", stackStr)
+	c.elog("Stack: %s\n%s", stackStr, utils.BytesToString(debug.Stack()))
 }
 
 // Generics
@@ -167,12 +167,12 @@ type orderedRwMutexUnlocker struct {
 
 func (m *orderedRwMutexUnlocker) RUnlock() {
 	defer m.mutex.RUnlock()
-	m.c.lockOrder.Pop(m.c, m.inode, m.kind)
+	m.c.lockOrder.Remove(m.c, m.inode, m.kind)
 }
 
 func (m *orderedRwMutexUnlocker) Unlock() {
 	defer m.mutex.Unlock()
-	m.c.lockOrder.Pop(m.c, m.inode, m.kind)
+	m.c.lockOrder.Remove(m.c, m.inode, m.kind)
 }
 
 type orderedRwMutex struct {
@@ -209,12 +209,12 @@ func (m *orderedRwMutex) Lock(c *ctx, inode InodeId,
 
 func (m *orderedRwMutex) RUnlock(c *ctx, inode InodeId, kind locker) {
 	defer m.mutex.RUnlock()
-	c.lockOrder.Pop(c, inode, kind)
+	c.lockOrder.Remove(c, inode, kind)
 }
 
 func (m *orderedRwMutex) Unlock(c *ctx, inode InodeId, kind locker) {
 	defer m.mutex.Unlock()
-	c.lockOrder.Pop(c, inode, kind)
+	c.lockOrder.Remove(c, inode, kind)
 }
 
 type orderedMutex struct {

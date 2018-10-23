@@ -28,7 +28,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	newRecord, inodeInfo, needsSync, err := func() (quantumfs.DirectoryRecord,
 		InodeIdInfo, bool, fuse.Status) {
 
-		defer srcInode.ParentLock(c).Unlock()
+		defer srcInode.parentLock(c).Unlock()
 
 		// ensure we're not orphaned
 		if srcInode.isOrphaned_() {
@@ -278,7 +278,7 @@ func (dir *Directory) convertHardlinks_DOWN_(c *ctx,
 	defer release()
 	if inode != nil {
 		func() {
-			defer inode.ParentLock(c).Unlock()
+			defer inode.parentLock(c).Unlock()
 			dir.hardlinkTable.claimAsChild_(c, inode)
 		}()
 	}
@@ -571,7 +571,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	// check write permission for both directories
 
 	result = func() fuse.Status {
-		defer dstInode.ParentRLock(c).RUnlock()
+		defer dstInode.parentRLock(c).RUnlock()
 		return hasDirectoryWritePerm_(c, dstInode)
 	}()
 	if result != fuse.OK {
@@ -579,7 +579,7 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	}
 
 	result = func() fuse.Status {
-		defer dir.ParentRLock(c).RUnlock()
+		defer dir.parentRLock(c).RUnlock()
 		defer dir.ChildRecordLock(c).Unlock()
 
 		record := dir.children.recordByName(c, oldName)
@@ -606,12 +606,12 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	c.vlog("Aquiring locks")
 	if childInode != nil && overwrittenInode != nil {
 		firstChild, lastChild := getLockOrder(childInode, overwrittenInode)
-		defer firstChild.ParentLock(c).Unlock()
-		defer lastChild.ParentLock(c).Unlock()
+		defer firstChild.parentLock(c).Unlock()
+		defer lastChild.parentLock(c).Unlock()
 	} else if childInode != nil {
-		defer childInode.ParentLock(c).Unlock()
+		defer childInode.parentLock(c).Unlock()
 	} else if overwrittenInode != nil {
-		defer overwrittenInode.ParentLock(c).Unlock()
+		defer overwrittenInode.parentLock(c).Unlock()
 	}
 
 	// The locking here is subtle.

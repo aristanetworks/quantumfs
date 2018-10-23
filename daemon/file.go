@@ -129,7 +129,7 @@ func (fi *File) Open(c *ctx, flags uint32, mode uint32,
 	}
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(fi, fi.id, fileHandleNum, fi.treeState())
+	fileDescriptor := newFileDescriptor(fi, fileHandleNum, fi.treeState())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	c.vlog(OpenedInodeDebug, fi.inodeNum(), fileHandleNum)
@@ -161,7 +161,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 
 	if utils.BitFlagsSet(uint(attr.Valid), fuse.FATTR_SIZE) {
 		result := func() fuse.Status {
-			parentUnlock := callOnce(fi.ParentRLock(c).RUnlock)
+			parentUnlock := callOnce(fi.parentRLock(c).RUnlock)
 			defer parentUnlock.invoke()
 			defer fi.Lock(c).Unlock()
 
@@ -470,7 +470,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	c.vlog("offset %d size %d flags %x", offset, size, flags)
 
 	writeCount, result := func() (uint32, fuse.Status) {
-		parentUnlock := callOnce(fi.ParentRLock(c).RUnlock)
+		parentUnlock := callOnce(fi.parentRLock(c).RUnlock)
 		defer parentUnlock.invoke()
 		defer fi.Lock(c).Unlock()
 
@@ -526,13 +526,13 @@ func (fi *File) flush(c *ctx) quantumfs.ObjectKey {
 	return key
 }
 
-func newFileDescriptor(file *File, inodeNum InodeId,
-	fileHandleId FileHandleId, treeState *TreeState) FileHandle {
+func newFileDescriptor(file *File, fileHandleId FileHandleId,
+	treeState *TreeState) FileHandle {
 
 	fd := &FileDescriptor{
 		FileHandleCommon: FileHandleCommon{
 			id:         fileHandleId,
-			inodeNum:   inodeNum,
+			inode:      file,
 			treeState_: treeState,
 		},
 		file: file,

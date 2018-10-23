@@ -438,7 +438,7 @@ func (dir *Directory) normalizeChild(c *ctx, inodeId InodeId,
 	defer release()
 
 	defer c.qfs.instantiationLock.Lock(c).Unlock()
-	defer inode.ParentLock(c).Unlock()
+	defer inode.parentLock(c).Unlock()
 	defer dir.Lock(c).Unlock()
 	defer dir.ChildRecordLock(c).Unlock()
 	defer c.qfs.flusher.lock.Lock(c).Unlock()
@@ -636,7 +636,7 @@ func (dir *Directory) OpenDir(c *ctx, flags uint32, mode uint32,
 		return err
 	}
 
-	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource))
+	ds := newDirectorySnapshot(c, dir.self.(directorySnapshotSource), dir)
 	c.qfs.setFileHandle(c, ds.FileHandleCommon.id, ds)
 	out.Fh = uint64(ds.FileHandleCommon.id)
 	c.vlog(OpenedInodeDebug, dir.inodeNum(), ds.FileHandleCommon.id)
@@ -656,7 +656,7 @@ func (dir *Directory) getChildSnapshot(c *ctx) []directoryContents {
 
 	dir.self.markSelfAccessed(c, quantumfs.PathRead|quantumfs.PathIsDir)
 
-	defer dir.ParentRLock(c).RUnlock()
+	defer dir.parentRLock(c).RUnlock()
 	defer dir.RLock(c).RUnlock()
 
 	if dir.childSnapshot != nil && dir.snapshotGeneration == dir.generation() {
@@ -804,7 +804,7 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	doUnlocked := func() {}
 	var file Inode
 	result := func() fuse.Status {
-		defer dir.ParentRLock(c).RUnlock()
+		defer dir.parentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -836,8 +836,8 @@ func (dir *Directory) Create(c *ctx, input *fuse.CreateIn, name string,
 	dir.updateSize(c, result)
 
 	fileHandleNum := c.qfs.newFileHandleId()
-	fileDescriptor := newFileDescriptor(file.(*File), file.inodeNum(),
-		fileHandleNum, file.treeState())
+	fileDescriptor := newFileDescriptor(file.(*File), fileHandleNum,
+		file.treeState())
 	c.qfs.setFileHandle(c, fileHandleNum, fileDescriptor)
 
 	c.vlog("New file inode %d, Fh %d", file.inodeNum(), fileHandleNum)
@@ -864,7 +864,7 @@ func (dir *Directory) Mkdir(c *ctx, name string, input *fuse.MkdirIn,
 	doUnlocked := func() {}
 	var newDir Inode
 	result := func() fuse.Status {
-		defer dir.ParentRLock(c).RUnlock()
+		defer dir.parentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -959,7 +959,7 @@ func (dir *Directory) Unlink(c *ctx, name string) fuse.Status {
 	result := child.deleteSelf(c, func() (quantumfs.DirectoryRecord,
 		fuse.Status) {
 
-		defer dir.ParentRLock(c).RUnlock()
+		defer dir.parentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		record, err := func() (quantumfs.ImmutableDirectoryRecord,
@@ -1014,7 +1014,7 @@ func (dir *Directory) Rmdir(c *ctx, name string) fuse.Status {
 	result := child.deleteSelf(c, func() (quantumfs.DirectoryRecord,
 		fuse.Status) {
 
-		defer dir.ParentRLock(c).RUnlock()
+		defer dir.parentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		result := func() fuse.Status {
@@ -1065,7 +1065,7 @@ func (dir *Directory) Symlink(c *ctx, pointedTo string, name string,
 	unlockModify := func() {}
 	var inode Inode
 	result := func() fuse.Status {
-		defer dir.ParentRLock(c).RUnlock()
+		defer dir.parentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -1132,7 +1132,7 @@ func (dir *Directory) Mknod(c *ctx, name string, input *fuse.MknodIn,
 	doUnlocked := func() {}
 	var inode Inode
 	result := func() fuse.Status {
-		defer dir.ParentRLock(c).RUnlock()
+		defer dir.parentRLock(c).RUnlock()
 		defer dir.Lock(c).Unlock()
 
 		recordErr := dir.childExists(c, name)
@@ -1216,9 +1216,9 @@ func (dir *Directory) renameChild(c *ctx, oldName string,
 	defer release()
 
 	if overwrittenInode != nil {
-		defer overwrittenInode.ParentLock(c).Unlock()
+		defer overwrittenInode.parentLock(c).Unlock()
 	}
-	unlockParent := callOnce(dir.ParentRLock(c).RUnlock)
+	unlockParent := callOnce(dir.parentRLock(c).RUnlock)
 	defer unlockParent.invoke()
 	defer dir.Lock(c).Unlock()
 
@@ -1892,7 +1892,7 @@ func (dir *Directory) duplicateInode_(c *ctx, name string, mode uint32, umask ui
 func (dir *Directory) traceHardlinks(c *ctx, newChildren []loadedInfo) {
 	defer c.funcIn("Directory::traceHardlinks").Out()
 
-	defer dir.ParentRLock(c).RUnlock()
+	defer dir.parentRLock(c).RUnlock()
 
 	for _, child := range newChildren {
 		// discard file ids that aren't real or non-hardlinks
@@ -1921,7 +1921,7 @@ func (dir *Directory) markHardlinkPath(c *ctx, path string,
 		return
 	}
 
-	defer dir.InodeCommon.ParentRLock(c).RUnlock()
+	defer dir.InodeCommon.parentRLock(c).RUnlock()
 	dir.markLink_(c, path, fileId)
 }
 
@@ -2006,14 +2006,15 @@ type directorySnapshotSource interface {
 	generation() uint64
 }
 
-func newDirectorySnapshot(c *ctx, src directorySnapshotSource) *directorySnapshot {
+func newDirectorySnapshot(c *ctx, src directorySnapshotSource,
+	dir Inode) *directorySnapshot {
 
 	defer c.funcIn("newDirectorySnapshot").Out()
 
 	ds := directorySnapshot{
 		FileHandleCommon: FileHandleCommon{
 			id:         c.qfs.newFileHandleId(),
-			inodeNum:   src.inodeNum(),
+			inode:      dir,
 			treeState_: src.treeState(),
 		},
 		_generation: src.generation(),
