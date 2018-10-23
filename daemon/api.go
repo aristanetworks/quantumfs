@@ -152,7 +152,7 @@ func (api *ApiInode) Open(c *ctx, flags uint32, mode uint32,
 	}
 
 	out.OpenFlags = 0
-	handle := newApiHandle(c, api.treeState())
+	handle := newApiHandle(c, api.treeState(), api)
 	c.qfs.setFileHandle(c, handle.FileHandleCommon.id, handle)
 
 	c.vlog(OpenedInodeDebug, api.id, handle.id)
@@ -290,19 +290,19 @@ func (api *ApiInode) flush(c *ctx) quantumfs.ObjectKey {
 	return quantumfs.EmptyBlockKey
 }
 
-func newApiHandle(c *ctx, treeState *TreeState) *ApiHandle {
+func newApiHandle(c *ctx, treeState *TreeState, api *ApiInode) *ApiHandle {
 	defer c.funcIn("newApiHandle").Out()
 
-	api := ApiHandle{
+	handle := ApiHandle{
 		FileHandleCommon: FileHandleCommon{
 			id:         c.qfs.newFileHandleId(),
-			inodeNum:   quantumfs.InodeIdApi,
+			inode:      api,
 			treeState_: treeState,
 		},
 		responses: make(chan fuse.ReadResult, 10),
 	}
-	utils.Assert(api.treeState() != nil, "ApiHandle treeState nil at init")
-	return &api
+	utils.Assert(handle.treeState() != nil, "ApiHandle treeState nil at init")
+	return &handle
 }
 
 // ApiHandle represents the user's interactions with quantumfs and is not necessarily
