@@ -212,7 +212,7 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 	}
 
 	go qfs.adjustKernelKnobs()
-	go batchProcessor(qfs.c.NewThread(), qfs.toBeReleased,
+	go batchProcessor(qfs.c.newThread(), qfs.toBeReleased,
 		qfs.fileHandleReleaser)
 	go qfs.fuseNotifier()
 	go qfs.waitForSignals()
@@ -345,7 +345,7 @@ func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 				// Release the memory
 				debug.FreeOSMemory()
 			case syscall.SIGUSR2:
-				qfs.verifyNoLeaks(qfs.c.NewThread())
+				qfs.verifyNoLeaks(qfs.c.newThread())
 			}
 
 		case <-qfs.stopWaitingForSignals:
@@ -419,9 +419,9 @@ func (qfs *QuantumFs) handleWorkspaceChanges(
 
 	for name, state := range updates {
 		if state.Deleted {
-			go qfs.handleDeletedWorkspace(c.NewThread(), name)
+			go qfs.handleDeletedWorkspace(c.newThread(), name)
 		} else {
-			go qfs.refreshWorkspace(c.NewThread(), name, state.RootId,
+			go qfs.refreshWorkspace(c.newThread(), name, state.RootId,
 				state.Nonce)
 		}
 	}
@@ -794,7 +794,7 @@ func (qfs *QuantumFs) inodeNoInstantiate(c *ctx, id InodeId) (newInode Inode,
 		inode.addRef_(c)
 
 		return inode, func() {
-			go inode.delRef(c.NewThread())
+			go inode.delRef(c.newThread())
 		}
 	} else {
 		return nil, release
@@ -810,7 +810,7 @@ func releaserFn(c *ctx, inode Inode) func() {
 	// delRef calls a number of locks, and so calling this synchronously could
 	// cause deadlocks if the caller isn't careful about what they have locked.
 	return func() {
-		go inode.delRef(c.NewThread())
+		go inode.delRef(c.newThread())
 	}
 }
 

@@ -27,7 +27,7 @@ type ctx struct {
 	lockOrder   lockOrder
 }
 
-func (c *ctx) NewThread() *ctx {
+func (c *ctx) newThread() *ctx {
 	// Copy everything, but provide a separate lock order stack
 	var rtn ctx
 	rtn = *c
@@ -59,7 +59,7 @@ func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
 }
 
 func (c *ctx) req(header *fuse.InHeader) *ctx {
-	return c.NewThread().reqId(header.Unique, &header.Context)
+	return c.newThread().reqId(header.Unique, &header.Context)
 }
 
 var refreshRequestIdGenerator = qlog.RefreshRequestIdMin
