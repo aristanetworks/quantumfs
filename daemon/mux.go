@@ -226,9 +226,9 @@ func (qfs *QuantumFs) Mount(mountOptions fuse.MountOptions) error {
 const ReleaseFileHandleLog = "Mux::fileHandleReleaser"
 
 func (qfs *QuantumFs) fileHandleReleaser(c *ctx, ids []uint64) {
-	defer qfs.c.statsFuncIn(ReleaseFileHandleLog).Out()
+	defer c.statsFuncIn(ReleaseFileHandleLog).Out()
 	for _, id := range ids {
-		qfs.setFileHandle(&qfs.c, FileHandleId(id), nil)
+		qfs.setFileHandle(c, FileHandleId(id), nil)
 	}
 }
 
@@ -1218,7 +1218,7 @@ func (qfs *QuantumFs) newInodeId(c *ctx) InodeIdInfo {
 	for {
 		// When we get a new id, it's possible that we're still using it.
 		// If it's still in use, grab another one instead
-		newId, reused := qfs.inodeIds.newInodeId(&qfs.c)
+		newId, reused := qfs.inodeIds.newInodeId(c)
 
 		// If this is a reused id, then it's safe to use immediately
 		if reused {
@@ -1230,7 +1230,7 @@ func (qfs *QuantumFs) newInodeId(c *ctx) InodeIdInfo {
 		idIsFree := func() bool {
 			defer qfs.mapMutex.Lock(c).Unlock()
 
-			inode, inodeIdUsed := qfs.getInode_(&qfs.c, newId)
+			inode, inodeIdUsed := qfs.getInode_(c, newId)
 			return inode == nil && !inodeIdUsed
 		}()
 
