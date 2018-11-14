@@ -46,7 +46,7 @@ func init() {
 }
 
 // A helper function to test whether a path is a legitimate workspaceroot
-// by checking whether /usr/share/Artools directory is present
+// by checking whether /usr/bin/sh is present
 func isLegitimateWorkspaceRoot(wsr string) bool {
 	toolPath := wsr + workspaceTool
 	if toolInfo, err := os.Stat(toolPath); err == nil && !toolInfo.IsDir() {
