@@ -25,7 +25,7 @@ const (
 	sudo          = "/usr/bin/sudo"
 	umount        = "/usr/bin/umount"
 	sh            = "/usr/bin/sh"
-	workspaceTool = "/usr/bin/ls"
+	workspaceTool = sh
 	oldroot       = "/mnt"
 	pivot_root    = "/usr/sbin/pivot_root"
 )
