@@ -301,8 +301,6 @@ func main() {
 	// Disable lock checking in production until we know the performance impact
 	config.DisableLockChecks = true
 	quantumfs, err := daemon.NewQuantumFs(config, "QuantumFs "+version)
-	// Disable lock checking in production until we know the performance impact
-	quantumfs.disableLockChecks = true
 
 	if err != nil {
 		fmt.Printf("Could not initilize quantumfs: %s\n", err.Error())
