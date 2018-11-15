@@ -800,7 +800,7 @@ func (test *testHelper) withInodeRecord(inodeId InodeId,
 	test.Assert(inode != nil, "No Inode found for inode %d", inodeId)
 
 	c := test.qfs.c.newThread()
-	defer inode.getParentLock().RLock().RUnlock()
+	defer inode.parentRLock(c).RUnlock()
 	parent_, release := inode.parent_(test.qfs.c.newThread())
 	defer release()
 	parent := asDirectory(parent_)

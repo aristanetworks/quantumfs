@@ -503,7 +503,7 @@ func (wsr *WorkspaceRoot) unlinkStaleHardlinks(c *ctx,
 		loadRecord, exists := rc.fileMap[fileId]
 		if !exists {
 			c.vlog("Removing hardlink id %d, inode %d, nlink %d",
-				fileId, entry.inodeId, entry.nlink)
+				fileId, entry.inodeId.id, entry.nlink)
 
 			func() {
 				inode, release := c.qfs.inodeNoInstantiate(c,

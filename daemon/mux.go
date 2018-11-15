@@ -452,7 +452,7 @@ func (qfs *QuantumFs) handleMetaInodeRemoval(c *ctx, id InodeId, name string,
 	if inode == nil {
 		return
 	}
-	defer inode.getParentLock().Lock().Unlock()
+	defer inode.parentLock(c).Unlock()
 	if inode.isOrphaned_() {
 		return
 	}
@@ -622,7 +622,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 func (qfs *QuantumFs) flushInode_(c *ctx, inode Inode) bool {
 	defer c.funcIn("Mux::flushInode_").Out()
 
-	if inode.isOrphaned() {
+	if inode.isOrphaned(c) {
 		return true
 	}
 	return inode.flush(c).IsValid()
@@ -1188,7 +1188,7 @@ func (qfs *QuantumFs) setFileHandle(c *ctx, id FileHandleId, fileHandle FileHand
 
 		// Release the refcount as we clear
 		if handle, ok := fh.(FileHandle); ok && exists {
-			go handle.Inode().delRef(c)
+			go handle.Inode().delRef(c.newThread())
 		}
 
 		qfs.fileHandles.Delete(id)
@@ -1536,7 +1536,7 @@ func (qfs *QuantumFs) workspaceIsMutable(c *ctx, inode Inode) bool {
 	// The default cases will be inode such as file, symlink, hardlink etc, they
 	// get workspaceroots from their parents.
 	default:
-		defer inode.getParentLock().RLock().RUnlock()
+		defer inode.parentRLock(c).RUnlock()
 		// if inode is already forgotten, the workspace doesn't process it.
 		if inode.isOrphaned_() {
 			return true
