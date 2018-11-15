@@ -136,13 +136,6 @@ func setupWorkspace(t *testing.T) string {
 			err.Error())
 	}
 
-	dirUsrShareArtools := dirUsrShare + "/Artools"
-	if err := runCommand("cp", "-ax", ArtoolsDir,
-		dirUsrShareArtools); err != nil {
-
-		t.Fatal(err.Error())
-	}
-
 	dirUsrMnt := dirTest + "/mnt"
 	if err := syscall.Mkdir(dirUsrMnt, 0777); err != nil {
 		t.Fatalf("Creating directory %s error: %s", dirUsrMnt,
