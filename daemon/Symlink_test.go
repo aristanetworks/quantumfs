@@ -214,7 +214,7 @@ func TestSymlinkBeforeSync(t *testing.T) {
 
 		inode := test.getInode(workspace)
 		dir := inode.(*WorkspaceRoot)
-		c := &test.qfs.c
+		c := test.TestCtx()
 
 		func() {
 			defer dir.RLock(c).RUnlock()
