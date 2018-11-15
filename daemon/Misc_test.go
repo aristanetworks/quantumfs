@@ -413,10 +413,10 @@ func TestLockCheckStack(t *testing.T) {
 		linkUnlock.invoke()
 
 		compare := make([]lockInfo, 4, 4)
-		compare[0] = newLockInfo(lockerParentLock, fileAId)
-		compare[1] = newLockInfo(lockerInodeLock, fileAId)
-		compare[2] = newLockInfo(lockerInodeLock, dirId)
-		compare[3] = newLockInfo(lockerChildRecordLock, dirId)
+		compare[0] = newLockInfoQuick(lockerParentLock, fileAId)
+		compare[1] = newLockInfoQuick(lockerInodeLock, fileAId)
+		compare[2] = newLockInfoQuick(lockerInodeLock, dirId)
+		compare[3] = newLockInfoQuick(lockerChildRecordLock, dirId)
 		test.Assert(stacksMatch(stack, compare), "stacks mismatch %v %v",
 			stack, compare)
 	})

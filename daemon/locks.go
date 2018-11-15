@@ -6,6 +6,7 @@ package daemon
 import (
 	"fmt"
 	"runtime/debug"
+	"time"
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/utils"
@@ -27,28 +28,55 @@ const (
 )
 
 type lockInfo struct {
-	kind  locker
-	inode InodeId
+	kind      locker
+	inode     InodeId
+	heldSince time.Time
 }
 
-func newLockInfo(k locker, i InodeId) lockInfo {
+func newLockInfoQuick(k locker, i InodeId) lockInfo {
 	return lockInfo{
 		kind:  k,
 		inode: i,
 	}
 }
 
+func newLockInfo(k locker, i InodeId, t time.Time) lockInfo {
+	return lockInfo{
+		kind:      k,
+		inode:     i,
+		heldSince: t,
+	}
+}
+
 type lockOrder struct {
 	stack    []lockInfo
 	disabled bool
+	timings  bool // Disable during production for performance
 }
 
 // The lock being requested must already be held so we can do checks with it
-func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
+func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker, lock func()) {
+	ensuredLock := callOnce(lock)
+	defer ensuredLock.invoke()
+
 	if c.qfs.disableLockChecks || order.disabled {
 		return
 	}
 
+	var gotLock time.Time
+	if order.timings {
+		beforeLock := time.Now()
+		ensuredLock.invoke()
+		gotLock = time.Now()
+
+		c.vlog("Locks: %d took %d ns to get", int64(kind),
+			gotLock.Sub(beforeLock).Nanoseconds())
+	} else {
+		ensuredLock.invoke()
+	}
+
+	// Some of these checks require that the lock we're pushing has already been
+	// acquired, so make sure ensuredLock is invoked first
 	if len(order.stack) != 0 {
 		if isInodeLock(kind) {
 			order.checkInodeOrder(c, inode, kind)
@@ -61,10 +89,13 @@ func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
 		}
 	}
 
-	order.stack = append(order.stack, lockInfo{
-		kind:  kind,
-		inode: inode,
-	})
+	var newInfo lockInfo
+	if order.timings {
+		newInfo = newLockInfo(kind, inode, gotLock)
+	} else {
+		newInfo = newLockInfoQuick(kind, inode)
+	}
+	order.stack = append(order.stack, newInfo)
 }
 
 func (order *lockOrder) Remove(c *ctx, inode InodeId, kind locker) {
@@ -94,6 +125,11 @@ func (order *lockOrder) Remove(c *ctx, inode InodeId, kind locker) {
 			int64(kind), int64(inode))
 		order.printStack(c)
 		return
+	}
+
+	if order.timings {
+		c.vlog("Locks: %d held for %d ns", int64(kind),
+			time.Since(order.stack[removeIdx].heldSince).Nanoseconds())
 	}
 
 	order.stack = append(order.stack[:removeIdx], order.stack[removeIdx+1:]...)
@@ -191,8 +227,7 @@ type orderedRwMutex struct {
 func (m *orderedRwMutex) RLock(c *ctx, inode InodeId,
 	kind locker) utils.NeedReadUnlock {
 
-	m.mutex.RLock()
-	c.lockOrder.Push_(c, inode, kind)
+	c.lockOrder.Push_(c, inode, kind, func() { m.mutex.RLock() })
 
 	return &orderedRwMutexUnlocker{
 		mutex: &m.mutex,
@@ -205,8 +240,7 @@ func (m *orderedRwMutex) RLock(c *ctx, inode InodeId,
 func (m *orderedRwMutex) Lock(c *ctx, inode InodeId,
 	kind locker) utils.NeedWriteUnlock {
 
-	m.mutex.Lock()
-	c.lockOrder.Push_(c, inode, kind)
+	c.lockOrder.Push_(c, inode, kind, func() { m.mutex.Lock() })
 
 	return &orderedRwMutexUnlocker{
 		mutex: &m.mutex,
