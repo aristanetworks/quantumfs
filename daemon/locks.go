@@ -16,6 +16,7 @@ type locker int
 // These enums are specifically in the locking order, leafs first
 const (
 	lockerMapMutexLock locker = iota
+	lockerLookupCountLock
 	lockerFlusherLock
 	lockerLinkLock
 	lockerChildRecordLock
@@ -245,4 +246,40 @@ func (m *orderedMapMutex) Lock(c *ctx) utils.NeedWriteUnlock {
 
 func (m *orderedMapMutex) Unlock(c *ctx) {
 	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerMapMutexLock)
+}
+
+type orderedLookupCount struct {
+	mutex orderedMutex
+}
+
+func (m *orderedLookupCount) Lock(c *ctx) utils.NeedWriteUnlock {
+	return m.mutex.Lock(c, quantumfs.InodeIdInvalid, lockerLookupCountLock)
+}
+
+func (m *orderedLookupCount) Unlock(c *ctx) {
+	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerLookupCountLock)
+}
+
+type orderedFlusher struct {
+	mutex orderedMutex
+}
+
+func (m *orderedFlusher) Lock(c *ctx) utils.NeedWriteUnlock {
+	return m.mutex.Lock(c, quantumfs.InodeIdInvalid, lockerFlusherLock)
+}
+
+func (m *orderedFlusher) Unlock(c *ctx) {
+	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerFlusherLock)
+}
+
+type orderedInstantiation struct {
+	mutex orderedMutex
+}
+
+func (m *orderedInstantiation) Lock(c *ctx) utils.NeedWriteUnlock {
+	return m.mutex.Lock(c, quantumfs.InodeIdInvalid, lockerInstantiationLock)
+}
+
+func (m *orderedInstantiation) Unlock(c *ctx) {
+	m.mutex.Unlock(c, quantumfs.InodeIdInvalid, lockerInstantiationLock)
 }

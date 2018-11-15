@@ -148,7 +148,7 @@ type QuantumFs struct {
 	//
 	// This lock must always be grabbed before the mapMutex to ensure consistent
 	// lock ordering.
-	instantiationLock utils.DeferableMutex
+	instantiationLock orderedInstantiation
 
 	// Uninstantiated Inodes are inode numbers which have been reserved for a
 	// particular inode, but the corresponding Inode has not yet been
@@ -167,7 +167,7 @@ type QuantumFs struct {
 	// be instantiated. Some inode numbers will have an entry with a zero value.
 	// These are instantiated inodes waiting to be uninstantiated. Inode numbers
 	// with positive values are still referenced by the kernel.
-	lookupCountLock utils.DeferableMutex
+	lookupCountLock orderedLookupCount
 	lookupCounts    map[InodeId]uint64
 
 	// The workspaceMutability defines whether all inodes in each of the local
@@ -360,8 +360,8 @@ func (qfs *QuantumFs) signalHandler(sigChan chan os.Signal) {
 
 func (qfs *QuantumFs) verifyNoLeaks(c *ctx) {
 	defer c.funcIn("QuantumFs::verifyNoLeaks").Out()
-	defer qfs.instantiationLock.Lock().Unlock()
-	defer qfs.lookupCountLock.Lock().Unlock()
+	defer qfs.instantiationLock.Lock(c).Unlock()
+	defer qfs.lookupCountLock.Lock(c).Unlock()
 	defer qfs.mapMutex.Lock(c).Unlock()
 
 	for id, parent := range qfs.parentOfUninstantiated {
@@ -380,20 +380,22 @@ func (qfs *QuantumFs) verifyNoLeaks(c *ctx) {
 }
 
 func (qfs *QuantumFs) Serve() {
-	qfs.c.dlog("QuantumFs::Serve Serving")
+	c := qfs.c.newThread()
+
+	c.dlog("QuantumFs::Serve Serving")
 	qfs.server.Serve()
-	qfs.c.dlog("QuantumFs::Serve Finished serving")
+	c.dlog("QuantumFs::Serve Finished serving")
 
-	qfs.c.dlog("QuantumFs::Serve Waiting for flush thread to end")
+	c.dlog("QuantumFs::Serve Waiting for flush thread to end")
 
-	for qfs.flusher.syncAll(&qfs.c) != nil {
-		qfs.c.dlog("Cannot give up on syncing, retrying shortly")
+	for qfs.flusher.syncAll(c) != nil {
+		c.dlog("Cannot give up on syncing, retrying shortly")
 		time.Sleep(100 * time.Millisecond)
 
 		if qfs.syncAllRetries < 0 {
 			continue
 		} else if qfs.syncAllRetries == 0 {
-			qfs.c.elog("Unable to syncAll after Serve")
+			c.elog("Unable to syncAll after Serve")
 			break
 		}
 
@@ -845,7 +847,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 	instantiated := false
 	parent := InodeId(0)
 	func() {
-		defer qfs.instantiationLock.Lock().Unlock()
+		defer qfs.instantiationLock.Lock(c).Unlock()
 		defer qfs.mapMutex.Lock(c).Unlock()
 
 		parent = qfs.parentOfUninstantiated[id]
@@ -859,7 +861,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 		//
 		// See QuantumFs.inode_()
 		if instantiated {
-			defer qfs.lookupCountLock.Lock().Unlock()
+			defer qfs.lookupCountLock.Lock(c).Unlock()
 			if _, exists := qfs.lookupCounts[id]; !exists {
 				c.vlog("Removing speculative lookup reference")
 				inode.delRef(c)
@@ -873,7 +875,7 @@ func (qfs *QuantumFs) inode(c *ctx, id InodeId) (newInode Inode, release func())
 		if panicErr := recover(); panicErr != nil {
 			// rollback instantiation
 			releaserFn(c, inode)()
-			defer qfs.instantiationLock.Lock().Unlock()
+			defer qfs.instantiationLock.Lock(c).Unlock()
 			defer qfs.mapMutex.Lock(c).Unlock()
 			qfs.parentOfUninstantiated[id] = parent
 			qfs.setInode_(c, id, nil)
@@ -1047,7 +1049,7 @@ func (qfs *QuantumFs) removeUninstantiated(c *ctx, uninstantiated []InodeId) {
 // returned.
 func (qfs *QuantumFs) incrementLookupCount(c *ctx, inodeId InodeId) {
 	defer c.FuncIn("Mux::incrementLookupCount", "inode %d", inodeId).Out()
-	defer qfs.lookupCountLock.Lock().Unlock()
+	defer qfs.lookupCountLock.Lock(c).Unlock()
 	qfs.incrementLookupCount_(c, inodeId)
 }
 
@@ -1055,7 +1057,7 @@ func (qfs *QuantumFs) incrementLookupCount(c *ctx, inodeId InodeId) {
 func (qfs *QuantumFs) incrementLookupCounts(c *ctx, children []directoryContents) {
 	defer c.FuncIn("Mux::incrementLookupCounts", "%d inodes",
 		len(children)).Out()
-	defer qfs.lookupCountLock.Lock().Unlock()
+	defer qfs.lookupCountLock.Lock(c).Unlock()
 	for _, child := range children {
 		if child.filename == "." || child.filename == ".." {
 			continue
@@ -1090,8 +1092,8 @@ func (qfs *QuantumFs) incrementLookupCount_(c *ctx, inodeId InodeId) {
 	}
 }
 
-func (qfs *QuantumFs) lookupCount(inodeId InodeId) (uint64, bool) {
-	defer qfs.lookupCountLock.Lock().Unlock()
+func (qfs *QuantumFs) lookupCount(c *ctx, inodeId InodeId) (uint64, bool) {
+	defer qfs.lookupCountLock.Lock(c).Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
 		return 0, false
@@ -1113,7 +1115,7 @@ func (qfs *QuantumFs) shouldForget(c *ctx, inodeId InodeId, count uint64) bool {
 
 	forgotten := false
 
-	defer qfs.lookupCountLock.Lock().Unlock()
+	defer qfs.lookupCountLock.Lock(c).Unlock()
 	lookupCount, exists := qfs.lookupCounts[inodeId]
 	if !exists {
 		c.vlog("inode %d has not been instantiated", inodeId)
