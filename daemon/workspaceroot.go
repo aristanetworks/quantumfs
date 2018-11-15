@@ -212,7 +212,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 		wsr.publishedRootId.String(), wsr.nonce.String(),
 		publishedRootId.String(), nonce.String())
 
-	wsr.refreshTo_(c, rc)
+	wsr.refreshTo_(c.DisableLockCheck(), rc)
 	wsr.publishedRootId = publishedRootId
 }
 

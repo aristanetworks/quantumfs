@@ -537,6 +537,9 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 	}
 
 	defer wsr.LockTree().Unlock()
+	// from this point on we have exclusive access to the tree, so ignore
+	// locking order since we need to do some wild stuff
+	c = c.DisableLockCheck()
 
 	err := qfs.flusher.syncWorkspace_(c, name)
 	if err != nil {
@@ -1876,7 +1879,8 @@ func (qfs *QuantumFs) Rename(input *fuse.RenameIn, oldName string,
 		return fuse.EROFS
 	}
 
-	return srcInode.MvChild_DOWN(c, dstInode, oldName, newName)
+	return srcInode.MvChild_DOWN(c.DisableLockCheck(), dstInode, oldName,
+		newName)
 }
 
 const LinkLog = "Mux::Link"
@@ -1927,7 +1931,7 @@ func (qfs *QuantumFs) Link(input *fuse.LinkIn, filename string,
 		defer lastLock.LockTree().Unlock()
 	}
 
-	return dstInode.link_DOWN(c, srcInode, filename, out)
+	return dstInode.link_DOWN(c.DisableLockCheck(), srcInode, filename, out)
 }
 
 const SymlinkLog = "Mux::Symlink"
@@ -2073,7 +2077,7 @@ func getQuantumfsExtendedKey(c *ctx, qfs *QuantumFs, inodeId InodeId) ([]byte,
 	}
 
 	// Update the Hash value before generating the key
-	inode.Sync_DOWN(c)
+	inode.Sync_DOWN(c.DisableLockCheck())
 
 	return inode.getQuantumfsExtendedKey(c)
 }
