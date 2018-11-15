@@ -351,3 +351,106 @@ func TestInodeIdsReuseGeneration(t *testing.T) {
 			fileAGen)
 	})
 }
+
+func stacksMatch(a []lockInfo, b []lockInfo) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for idx, info := range a {
+		other := b[idx]
+		if info.kind != other.kind || info.inode != other.inode {
+			return false
+		}
+	}
+
+	return true
+}
+
+func TestLockCheckStack(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		workspace := test.NewWorkspace()
+		test.AssertNoErr(os.MkdirAll(workspace+"/dirA/dirB", 0777))
+		fileA := workspace + "/dirA/dirB/fileA"
+		fileB := workspace + "/dirA/dirB/fileB"
+		test.AssertNoErr(testutils.PrintToFile(fileA, "some data"))
+		test.AssertNoErr(syscall.Link(fileA, fileB))
+
+		test.SyncAllWorkspaces()
+
+		// We're targeting the setChildAttr path for hardlinks, via
+		// reconcileFileType, to get as much stack as we can
+		wsr := test.getInode(workspace).(*WorkspaceRoot)
+		test.Assert(wsr != nil, "Unable to get workspaceroot")
+		fileAId := test.getInodeNum(fileA)
+		// parent is workspaceroot since they're hardlinks
+		dirId := test.getInodeNum(workspace)
+
+		linkUnlock := callOnce(wsr.hardlinkTable.linkLock.Lock().Unlock)
+		defer linkUnlock.invoke()
+
+		// in parallel now, trigger the lock going up
+		c := test.qfs.c.newThread()
+		c.fuseCtx = &fuse.Context{}
+		go func() {
+			inode, unlock := test.qfs.RLockTreeGetInode(c, fileAId)
+			defer unlock()
+
+			var input fuse.SetAttrIn
+			input.Valid |= fuse.FATTR_SIZE
+			input.Size = quantumfs.MaxSmallFileSize() + 100
+			var out fuse.AttrOut
+			inode.SetAttr(c, &input, &out)
+		}()
+
+		// wait for our other thread to block
+		test.WaitForLogString(fmt.Sprintf("modifyChildWithFunc inode %d",
+			fileAId), "Parallel thread to iterate up")
+
+		// copy the stack
+		stack := make([]lockInfo, len(c.lockOrder.stack))
+		copy(stack, c.lockOrder.stack)
+		linkUnlock.invoke()
+
+		compare := make([]lockInfo, 4, 4)
+		compare[0] = newLockInfo(lockerParentLock, fileAId)
+		compare[1] = newLockInfo(lockerInodeLock, fileAId)
+		compare[2] = newLockInfo(lockerInodeLock, dirId)
+		compare[3] = newLockInfo(lockerChildRecordLock, dirId)
+		test.Assert(stacksMatch(stack, compare), "stacks mismatch %v %v",
+			stack, compare)
+	})
+}
+
+func TestLockCheckInvertedStack(t *testing.T) {
+	runTest(t, func(test *testHelper) {
+		test.ExpectedErrors = make(map[string]struct{})
+		test.ExpectedErrors["ERROR: "+lockInversionLog] = struct{}{}
+		test.ExpectedErrors["ERROR: Stack: %s\n%s"] = struct{}{}
+
+		workspace := test.NewWorkspace()
+		test.AssertNoErr(testutils.PrintToFile(workspace+"/file",
+			"some data"))
+
+		test.SyncAllWorkspaces()
+
+		fileParent := test.getInode(workspace)
+
+		c := test.qfs.c.newThread()
+		c.fuseCtx = &fuse.Context{}
+
+		defer fileParent.Lock(c).Unlock()
+
+		go func() {
+			inode, unlock := test.qfs.RLockTreeGetInode(c,
+				fileParent.inodeNum())
+			defer unlock()
+
+			var input fuse.CreateIn
+			var out fuse.CreateOut
+			inode.Create(c, &input, "newFile", &out)
+		}()
+
+		test.WaitForLogString("Lock inversion detected", "Locks to invert")
+	})
+}
