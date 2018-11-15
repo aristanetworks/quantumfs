@@ -192,7 +192,7 @@ type Inode interface {
 
 	inodeNum() InodeId
 
-	Lock(*ctx) utils.NeedWriteUnlock
+	Lock(c *ctx) utils.NeedWriteUnlock
 
 	treeState() *TreeState
 	LockTree() utils.NeedWriteUnlock
