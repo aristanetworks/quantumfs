@@ -66,6 +66,7 @@ func NewQuantumFs_(config QuantumFsConfig, qlogIn *qlog.Qlog) *QuantumFs {
 	qfs.c.vlog("Random seed: %d", utils.RandomSeed)
 
 	qfs.c.qfs = qfs
+	qfs.disableLockChecks = config.DisableLockChecks
 
 	typespaceList := NewTypespaceList()
 	qfs.inodes[quantumfs.InodeIdRoot] = typespaceList
@@ -112,11 +113,12 @@ type MetaInodeDeletionRecord struct {
 
 type QuantumFs struct {
 	fuse.RawFileSystem
-	server        *fuse.Server
-	config        QuantumFsConfig
-	inodeIds      *inodeIds
-	fileHandleNum uint64
-	c             ctx
+	server            *fuse.Server
+	config            QuantumFsConfig
+	inodeIds          *inodeIds
+	fileHandleNum     uint64
+	c                 ctx
+	disableLockChecks bool
 
 	syncAllRetries int
 

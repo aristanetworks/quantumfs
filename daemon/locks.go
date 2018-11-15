@@ -31,11 +31,16 @@ type lockInfo struct {
 }
 
 type lockOrder struct {
-	stack []lockInfo
+	stack    []lockInfo
+	disabled bool
 }
 
 // The lock being requested must already be held so we can do checks with it
 func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
+	if c.qfs.disableLockChecks || order.disabled {
+		return
+	}
+
 	if len(order.stack) != 0 {
 		if isInodeLock(kind) {
 			order.checkInodeOrder(c, inode, kind)
@@ -55,6 +60,10 @@ func (order *lockOrder) Push_(c *ctx, inode InodeId, kind locker) {
 }
 
 func (order *lockOrder) Remove(c *ctx, inode InodeId, kind locker) {
+	if c.qfs.disableLockChecks || order.disabled {
+		return
+	}
+
 	if len(order.stack) <= 0 {
 		c.elog("Empty stack got a pop %v",
 			utils.BytesToString(debug.Stack()))
