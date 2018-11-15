@@ -1850,8 +1850,7 @@ func TestRefreshDoesntInstantiate(t *testing.T) {
 		test.qfs.refreshWorkspace(&test.qfs.c, "A/B/C",
 			quantumfs.EmptyBlockKey, nonce)
 
-		prevented := test.TestLogContains("No need to refresh " +
-			"uninstantiated workspace")
+		prevented := test.TestLogContains("No workspace root for workspace")
 		test.Assert(prevented == true, "Refreshed uninstantiated wsr")
 	})
 }

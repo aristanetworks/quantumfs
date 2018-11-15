@@ -506,12 +506,7 @@ func (qfs *QuantumFs) refreshWorkspace(c *ctx, name string,
 		parts[2])
 	defer cleanup()
 
-	if wsr == nil {
-		c.vlog("No need to refresh uninstantiated workspace")
-		return
-	}
-
-	if !ok {
+	if !ok || wsr == nil {
 		c.wlog("No workspace root for workspace %s", name)
 		return
 	}
