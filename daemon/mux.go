@@ -117,6 +117,7 @@ type QuantumFs struct {
 	inodeIds      *inodeIds
 	fileHandleNum uint64
 	c             ctx
+	disableLockChecks bool
 
 	syncAllRetries int
 
