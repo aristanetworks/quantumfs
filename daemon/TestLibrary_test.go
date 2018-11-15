@@ -795,20 +795,20 @@ func (test *testHelper) waitForPropagate(file string, data []byte) {
 func (test *testHelper) withInodeRecord(inodeId InodeId,
 	verify func(record quantumfs.ImmutableDirectoryRecord)) {
 
-	inode, release := test.qfs.inode(test.qfs.c.newThread(), inodeId)
+	inode, release := test.qfs.inode(test.TestCtx(), inodeId)
 	defer release()
 	test.Assert(inode != nil, "No Inode found for inode %d", inodeId)
 
-	c := test.qfs.c.newThread()
+	c := test.TestCtx()
 	defer inode.parentRLock(c).RUnlock()
-	parent_, release := inode.parent_(test.qfs.c.newThread())
+	parent_, release := inode.parent_(test.TestCtx())
 	defer release()
 	parent := asDirectory(parent_)
 
 	defer parent.RLock(c).RUnlock()
-	defer parent.childRecordLock.Lock().Unlock()
+	defer parent.childRecordLock(test.TestCtx()).Unlock()
 
-	record := parent.getRecordChildCall_(test.qfs.c.newThread(), inodeId)
+	record := parent.getRecordChildCall_(test.TestCtx(), inodeId)
 	test.Assert(record != nil, "Child record not found")
 
 	verify(record)

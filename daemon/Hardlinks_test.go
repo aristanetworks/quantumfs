@@ -513,7 +513,7 @@ func TestHardlinkReparentRace(t *testing.T) {
 
 			// We want to race the parent change with getting the parent
 			go os.Remove(filename)
-			go ManualLookup(test.qfs.c.newThread(), parent, filename)
+			go ManualLookup(test.TestCtx(), parent, filename)
 			go syscall.Stat(filename, &stat)
 			go os.Remove(linkname)
 		}
@@ -656,7 +656,7 @@ func (th *TestHelper) getHardlinkLeg(c *ctx, parentPath string,
 	parent := th.getInode(parentPath)
 	parentDir := asDirectory(parent)
 
-	defer parentDir.childRecordLock.Lock().Unlock()
+	defer parentDir.childRecordLock(th.qfs.c.newThread()).Unlock()
 	record := parentDir.children.recordByName(c, leg)
 	return record.(*HardlinkLeg).Clone().(*HardlinkLeg)
 }
@@ -1008,12 +1008,12 @@ func TestNormalizationRace(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		go func() {
-			defer logRequestPanic(test.qfs.c.newThread())
+			defer logRequestPanic(test.TestCtx())
 			test.AssertNoErr(os.Remove(workspace + "/linkA2"))
 		}()
 
 		go func() {
-			defer logRequestPanic(test.qfs.c.newThread())
+			defer logRequestPanic(test.TestCtx())
 			test.AssertNoErr(os.Remove(dir + "/linkA"))
 		}()
 	})
