@@ -24,6 +24,16 @@ type ctx struct {
 	workspaceDB quantumfs.WorkspaceDB
 	dataStore   *dataStore
 	fuseCtx     *fuse.Context
+	lockOrder   lockOrder
+}
+
+func (c *ctx) newThread() *ctx {
+	// Copy everything, but provide a separate lock order stack
+	var rtn ctx
+	rtn = *c
+	rtn.lockOrder = lockOrder{}
+
+	return &rtn
 }
 
 func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
@@ -49,7 +59,7 @@ func (c *ctx) reqId(reqId uint64, context *fuse.Context) *ctx {
 }
 
 func (c *ctx) req(header *fuse.InHeader) *ctx {
-	return c.reqId(header.Unique, &header.Context)
+	return c.newThread().reqId(header.Unique, &header.Context)
 }
 
 var refreshRequestIdGenerator = qlog.RefreshRequestIdMin
@@ -58,6 +68,7 @@ var refreshRequestIdGenerator = qlog.RefreshRequestIdMin
 func (c *ctx) refreshCtx() *ctx {
 	nc := *c
 	nc.Ctx.RequestId = atomic.AddUint64(&refreshRequestIdGenerator, 1)
+	nc.lockOrder = lockOrder{}
 	return &nc
 }
 
@@ -67,6 +78,7 @@ var flusherRequestIdGenerator = qlog.FlusherRequestIdMin
 func (c *ctx) flusherCtx() *ctx {
 	nc := *c
 	nc.Ctx.RequestId = atomic.AddUint64(&flusherRequestIdGenerator, 1)
+	nc.lockOrder = lockOrder{}
 	return &nc
 }
 
@@ -76,6 +88,7 @@ var forgetRequestIdGenerator = qlog.ForgetRequstIdMin
 func (c *ctx) forgetCtx() *ctx {
 	nc := *c
 	nc.Ctx.RequestId = atomic.AddUint64(&forgetRequestIdGenerator, 1)
+	nc.lockOrder = lockOrder{}
 	return &nc
 }
 

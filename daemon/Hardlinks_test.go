@@ -513,7 +513,7 @@ func TestHardlinkReparentRace(t *testing.T) {
 
 			// We want to race the parent change with getting the parent
 			go os.Remove(filename)
-			go ManualLookup(&test.qfs.c, parent, filename)
+			go ManualLookup(test.qfs.c.newThread(), parent, filename)
 			go syscall.Stat(filename, &stat)
 			go os.Remove(linkname)
 		}
@@ -650,14 +650,14 @@ func TestHardlinkDeleteFromDirectory(t *testing.T) {
 	})
 }
 
-func (th *TestHelper) getHardlinkLeg(parentPath string,
+func (th *TestHelper) getHardlinkLeg(c *ctx, parentPath string,
 	leg string) *HardlinkLeg {
 
 	parent := th.getInode(parentPath)
 	parentDir := asDirectory(parent)
 
 	defer parentDir.childRecordLock.Lock().Unlock()
-	record := parentDir.children.recordByName(&th.qfs.c, leg)
+	record := parentDir.children.recordByName(c, leg)
 	return record.(*HardlinkLeg).Clone().(*HardlinkLeg)
 }
 
@@ -681,11 +681,12 @@ func TestHardlinkCreatedTime(t *testing.T) {
 		test.AssertNoErr(syscall.Link(fileC, fileD))
 		test.AssertNoErr(syscall.Link(fileD, fileE))
 
-		recordA := test.getHardlinkLeg(dirA, "fileA")
-		recordB := test.getHardlinkLeg(dirA, "fileB")
-		recordC := test.getHardlinkLeg(workspace, "fileC")
-		recordD := test.getHardlinkLeg(workspace, "fileD")
-		recordE := test.getHardlinkLeg(dirA, "fileE")
+		c := &test.qfs.c
+		recordA := test.getHardlinkLeg(c, dirA, "fileA")
+		recordB := test.getHardlinkLeg(c, dirA, "fileB")
+		recordC := test.getHardlinkLeg(c, workspace, "fileC")
+		recordD := test.getHardlinkLeg(c, workspace, "fileD")
+		recordE := test.getHardlinkLeg(c, dirA, "fileE")
 
 		var statA, statB, statC, statD, statE syscall.Stat_t
 		test.AssertNoErr(syscall.Stat(fileA, &statA))
@@ -725,11 +726,11 @@ func TestHardlinkCreatedTime(t *testing.T) {
 		_, err := ioutil.ReadFile(dirA + "/fileA")
 		test.AssertNoErr(err)
 
-		recordA2 := test.getHardlinkLeg(dirA, "fileA")
-		recordB2 := test.getHardlinkLeg(dirA, "fileB")
-		recordC2 := test.getHardlinkLeg(workspaceB, "fileC")
-		recordD2 := test.getHardlinkLeg(workspaceB, "fileD")
-		recordE2 := test.getHardlinkLeg(dirA, "fileE")
+		recordA2 := test.getHardlinkLeg(c, dirA, "fileA")
+		recordB2 := test.getHardlinkLeg(c, dirA, "fileB")
+		recordC2 := test.getHardlinkLeg(c, workspaceB, "fileC")
+		recordD2 := test.getHardlinkLeg(c, workspaceB, "fileD")
+		recordE2 := test.getHardlinkLeg(c, dirA, "fileE")
 
 		test.Assert(recordA.creationTime() == recordA2.creationTime() &&
 			recordB.creationTime() == recordB2.creationTime() &&
@@ -763,14 +764,15 @@ func TestHardlinkRenameCreation(t *testing.T) {
 		test.AssertNoErr(testutils.PrintToFile(fileA, "dataA"))
 		test.AssertNoErr(syscall.Link(fileA, fileB))
 
-		recordA := test.getHardlinkLeg(dirA, "fileA")
-		recordB := test.getHardlinkLeg(dirA, "fileB")
+		c := &test.qfs.c
+		recordA := test.getHardlinkLeg(c, dirA, "fileA")
+		recordB := test.getHardlinkLeg(c, dirA, "fileB")
 
 		test.AssertNoErr(os.Rename(fileA, fileC))
-		recordC := test.getHardlinkLeg(dirA, "fileC")
+		recordC := test.getHardlinkLeg(c, dirA, "fileC")
 
 		test.AssertNoErr(os.Rename(fileB, fileD))
-		recordD := test.getHardlinkLeg(dirB, "fileD")
+		recordD := test.getHardlinkLeg(c, dirB, "fileD")
 
 		// test both rename and mvchild
 		test.Assert(recordA.creationTime() < recordC.creationTime(),
@@ -882,7 +884,7 @@ func checkParentOfUninstantiated(test *testHelper, wsrPath string, dirPath strin
 	link := test.getInodeNum(wsrPath + "/" + dirPath + "/" + filename)
 	wsr := test.getInodeNum(wsrPath)
 
-	defer test.qfs.mapMutex.RLock().RUnlock()
+	defer test.qfs.mapMutex.RLock(&test.qfs.c).RUnlock()
 	test.Assert(test.qfs.parentOfUninstantiated[link] == wsr,
 		"Hardlink parent isn't workspace root")
 }
@@ -1006,12 +1008,12 @@ func TestNormalizationRace(t *testing.T) {
 		test.SyncAllWorkspaces()
 
 		go func() {
-			defer logRequestPanic(&test.qfs.c)
+			defer logRequestPanic(test.qfs.c.newThread())
 			test.AssertNoErr(os.Remove(workspace + "/linkA2"))
 		}()
 
 		go func() {
-			defer logRequestPanic(&test.qfs.c)
+			defer logRequestPanic(test.qfs.c.newThread())
 			test.AssertNoErr(os.Remove(dir + "/linkA"))
 		}()
 	})
