@@ -191,7 +191,7 @@ type Inode interface {
 
 	inodeNum() InodeId
 
-	Lock() utils.NeedWriteUnlock
+	Lock(c *ctx) utils.NeedWriteUnlock
 
 	treeState() *TreeState
 	LockTree() utils.NeedWriteUnlock
@@ -245,7 +245,7 @@ type InodeCommon struct {
 	parentLock utils.DeferableRwMutex
 	parentId   InodeId
 
-	utils.DeferableRwMutex
+	inodeLock orderedRwMutex
 
 	// The treeState contains some per-tree metadata and the internal lock is
 	// used to lock the entire workspace tree when certain tree-wide operations
@@ -260,6 +260,14 @@ type InodeCommon struct {
 	unlinkRecord quantumfs.DirectoryRecord
 	unlinkXAttr  map[string][]byte
 	unlinkLock   utils.DeferableRwMutex
+}
+
+func (inode *InodeCommon) RLock(c *ctx) utils.NeedReadUnlock {
+	return inode.inodeLock.RLock(c, inode.id, lockerInodeLock)
+}
+
+func (inode *InodeCommon) Lock(c *ctx) utils.NeedWriteUnlock {
+	return inode.inodeLock.Lock(c, inode.id, lockerInodeLock)
 }
 
 func (inode *InodeCommon) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
@@ -328,7 +336,7 @@ func (inode *InodeCommon) parentSyncChild(c *ctx,
 	defer c.FuncIn("InodeCommon::parentSyncChild", "%d", inode.id).Out()
 
 	defer inode.parentLock.RLock().RUnlock()
-	defer inode.Lock().Unlock()
+	defer inode.Lock(c).Unlock()
 
 	// We want to ensure that the orphan check and the parent sync are done
 	// under the same lock
@@ -356,7 +364,7 @@ func (inode *InodeCommon) parentUpdateSize(c *ctx,
 	defer c.funcIn("InodeCommon::parentUpdateSize").Out()
 
 	defer inode.parentLock.RLock().RUnlock()
-	defer inode.Lock().Unlock()
+	defer inode.Lock(c).Unlock()
 
 	var attr fuse.SetAttrIn
 	attr.Valid = fuse.FATTR_SIZE
@@ -678,7 +686,7 @@ func (inode *InodeCommon) getQuantumfsExtendedKey(c *ctx) ([]byte, fuse.Status) 
 
 		dir = asDirectory(parent)
 
-		defer dir.RLock().RUnlock()
+		defer dir.RLock(c).RUnlock()
 		defer dir.childRecordLock.Lock().Unlock()
 		record = dir.getRecordChildCall_(c, inode.inodeNum())
 	}
@@ -837,7 +845,7 @@ func (inode *InodeCommon) deleteSelf(c *ctx,
 
 	defer c.FuncIn("InodeCommon::deleteSelf", "%d", inode.inodeNum()).Out()
 	defer inode.parentLock.Lock().Unlock()
-	defer inode.Lock().Unlock()
+	defer inode.Lock(c).Unlock()
 
 	// One of this inode's names is going away, reset the accessed cache to
 	// ensure any remaining names are marked correctly.

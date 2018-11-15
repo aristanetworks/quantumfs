@@ -163,7 +163,7 @@ func (fi *File) SetAttr(c *ctx, attr *fuse.SetAttrIn,
 		result := func() fuse.Status {
 			parentUnlock := callOnce(fi.parentLock.RLock().RUnlock)
 			defer parentUnlock.invoke()
-			defer fi.Lock().Unlock()
+			defer fi.Lock(c).Unlock()
 
 			c.vlog("Got file lock")
 
@@ -433,7 +433,7 @@ func (fi *File) Read(c *ctx, offset uint64, size uint32, buf []byte,
 
 	var readCount int
 	readResult, status := func() (fuse.ReadResult, fuse.Status) {
-		defer fi.RLock().RUnlock()
+		defer fi.RLock(c).RUnlock()
 
 		// Ensure size and buf are consistent
 		buf = buf[:size]
@@ -472,7 +472,7 @@ func (fi *File) Write(c *ctx, offset uint64, size uint32, flags uint32,
 	writeCount, result := func() (uint32, fuse.Status) {
 		parentUnlock := callOnce(fi.parentLock.RLock().RUnlock)
 		defer parentUnlock.invoke()
-		defer fi.Lock().Unlock()
+		defer fi.Lock(c).Unlock()
 
 		// Ensure size and buf are consistent
 		buf = buf[:size]

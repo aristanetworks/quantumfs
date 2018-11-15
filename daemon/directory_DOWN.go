@@ -65,7 +65,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	newRecord.SetFilename(newName)
 	// Update the reference count
 	func() {
-		defer dir.Lock().Unlock()
+		defer dir.Lock(c).Unlock()
 		dir.hardlinkInc_(newRecord.FileId())
 	}()
 
@@ -81,7 +81,7 @@ func (dir *Directory) link_DOWN(c *ctx, srcInode Inode, newName string,
 	doUnlocked := func() {}
 	func() {
 		// We cannot lock earlier because the parent of srcInode may be us
-		defer dir.Lock().Unlock()
+		defer dir.Lock(c).Unlock()
 
 		func() {
 			defer dir.childRecordLock.Lock().Unlock()
@@ -234,7 +234,7 @@ func (dir *Directory) makeHardlink_DOWN_(c *ctx,
 
 	doUnlocked := func() {}
 	func() {
-		defer dir.Lock().Unlock()
+		defer dir.Lock(c).Unlock()
 		defer dir.childRecordLock.Lock().Unlock()
 
 		copy, needsSync, inodeIdInfo, err,
@@ -595,11 +595,11 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 		dir.updateSize(c, result)
 		dst.updateSize(c, result)
 	}()
-	childInodeId := dir.childInodeNum(oldName)
+	childInodeId := dir.childInodeNum(c, oldName)
 	childInode, release := c.qfs.inode(c, childInodeId.id)
 	defer release()
 
-	overwrittenInodeId := dst.childInodeNum(newName).id
+	overwrittenInodeId := dst.childInodeNum(c, newName).id
 	overwrittenInode, release := c.qfs.inode(c, overwrittenInodeId)
 	defer release()
 
@@ -625,8 +625,8 @@ func (dir *Directory) mvChild_DOWN(c *ctx, dstInode Inode, oldName string,
 	// based upon their inode number. All multi-inode locking must call
 	// getLockOrder() to facilitate this.
 	firstLock, lastLock := getLockOrder(dst, dir)
-	defer firstLock.Lock().Unlock()
-	defer lastLock.Lock().Unlock()
+	defer firstLock.Lock(c).Unlock()
+	defer lastLock.Lock(c).Unlock()
 
 	result = func() fuse.Status {
 		c.vlog("Checking if destination is an empty directory")
