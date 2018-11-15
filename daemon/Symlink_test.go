@@ -214,11 +214,11 @@ func TestSymlinkBeforeSync(t *testing.T) {
 
 		inode := test.getInode(workspace)
 		dir := inode.(*WorkspaceRoot)
-		c := &test.qfs.c
+		c := test.TestCtx()
 
 		func() {
 			defer dir.RLock(c).RUnlock()
-			defer dir.childRecordLock(test.qfs.c.newThread()).Unlock()
+			defer dir.childRecordLock(test.TestCtx()).Unlock()
 
 			record := dir.getRecordChildCall_(test.TestCtx(), linkInode)
 			test.Assert(record != nil, "Record not found")
@@ -234,7 +234,7 @@ func TestSymlinkBeforeSync(t *testing.T) {
 
 		func() {
 			defer dir.RLock(c).RUnlock()
-			defer dir.childRecordLock(test.qfs.c.newThread()).Unlock()
+			defer dir.childRecordLock(test.TestCtx()).Unlock()
 
 			record := dir.getRecordChildCall_(test.TestCtx(), linkInode)
 			test.Assert(record != nil, "Record not found")
