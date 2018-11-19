@@ -38,7 +38,7 @@ README's folder path is $GOPATH/src/github.com/aristanetworks/quantumfs/README
 	sudo yum install protobuf-devel
 
 5) Install some other necessary libraries:
-        sudo yum install glibc-static libstdc++-static
+        sudo yum install glibc-static libstdc++-static glibc.i686
 
 6) Follow the instructions in QFSClient/README to install the prerequisites for
 building QFSClient.
