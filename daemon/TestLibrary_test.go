@@ -236,7 +236,7 @@ type testHelper struct {
 func (th *testHelper) fileDescriptorFromInodeNum(inodeNum uint64) []*FileDescriptor {
 	handles := make([]*FileDescriptor, 0)
 
-	defer th.qfs.mapMutex.Lock().Unlock()
+	defer th.qfs.mapMutex.Lock(th.qfs.c.newThread()).Unlock()
 
 	th.qfs.fileHandles.Range(func(k interface{}, file interface{}) bool {
 		fh, ok := file.(*FileDescriptor)
@@ -259,7 +259,7 @@ func (th *testHelper) WaitToBeUninstantiated(inode InodeId) {
 
 	msg := fmt.Sprintf("inode %d to be uninstantiated", inode)
 	th.WaitFor(msg, func() bool {
-		if !th.inodeIsInstantiated(&th.qfs.c, inode) {
+		if !th.inodeIsInstantiated(th.qfs.c.newThread(), inode) {
 			return true
 		}
 		th.SyncAllWorkspaces()
@@ -427,7 +427,7 @@ func (th *testHelper) getWorkspaceComponents(abspath string) (string,
 func (th *testHelper) getAccessList(workspace string) *quantumfs.PathsAccessed {
 	wsr, cleanup := th.GetWorkspaceRoot(workspace)
 	defer cleanup()
-	accessed := wsr.getList(&th.qfs.c)
+	accessed := wsr.getList(th.qfs.c.newThread())
 	return &accessed
 }
 
@@ -795,19 +795,20 @@ func (test *testHelper) waitForPropagate(file string, data []byte) {
 func (test *testHelper) withInodeRecord(inodeId InodeId,
 	verify func(record quantumfs.ImmutableDirectoryRecord)) {
 
-	inode, release := test.qfs.inode(&test.qfs.c, inodeId)
+	inode, release := test.qfs.inode(test.TestCtx(), inodeId)
 	defer release()
 	test.Assert(inode != nil, "No Inode found for inode %d", inodeId)
 
-	defer inode.getParentLock().RLock().RUnlock()
-	parent_, release := inode.parent_(&test.qfs.c)
+	c := test.TestCtx()
+	defer inode.parentRLock(c).RUnlock()
+	parent_, release := inode.parent_(test.TestCtx())
 	defer release()
 	parent := asDirectory(parent_)
 
-	defer parent.RLock().RUnlock()
-	defer parent.childRecordLock.Lock().Unlock()
+	defer parent.RLock(c).RUnlock()
+	defer parent.childRecordLock(test.TestCtx()).Unlock()
 
-	record := parent.getRecordChildCall_(&test.qfs.c, inodeId)
+	record := parent.getRecordChildCall_(test.TestCtx(), inodeId)
 	test.Assert(record != nil, "Child record not found")
 
 	verify(record)

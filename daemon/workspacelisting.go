@@ -218,7 +218,7 @@ func updateChildren_(c *ctx, names []string, inodeMap *map[string]InodeIdInfo,
 	// First add any new entries
 	for _, name := range names {
 		if _, exists := (*inodeMap)[name]; !exists {
-			inodeId := c.qfs.newInodeId()
+			inodeId := c.qfs.newInodeId(c)
 			c.vlog("Adding new child %s inodeId %d generation %d", name,
 				inodeId.id, inodeId.generation)
 			(*inodeMap)[name] = inodeId
@@ -312,7 +312,7 @@ func (tsl *TypespaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (tsl *TypespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer tsl.Lock().Unlock()
+	defer tsl.Lock(c).Unlock()
 
 	for k, _ := range tsl.typespacesById {
 		iterateAgain := visitFn(k)
@@ -356,12 +356,12 @@ func (tsl *TypespaceList) getChildSnapshotRemovals(c *ctx,
 
 	var parentInfo directoryContents
 	func() {
-		defer tsl.getParentLock().RLock().RUnlock()
+		defer tsl.parentRLock(c).RUnlock()
 		parentInfo = getParentInfo_(c, tsl.parentId_(), fillRootAttrWrapper,
 			"", "")
 	}()
 
-	defer tsl.Lock().Unlock()
+	defer tsl.Lock(c).Unlock()
 
 	if len(typespaces) > 0 {
 		// We only accept positive lists
@@ -412,7 +412,7 @@ func (tsl *TypespaceList) Lookup(c *ctx, name string,
 
 	var removed []inodeRemoval
 	rtn := func() fuse.Status {
-		defer tsl.Lock().Unlock()
+		defer tsl.Lock(c).Unlock()
 		removed = updateChildren_(c, list, &tsl.typespacesByName,
 			&tsl.typespacesById, tsl)
 
@@ -580,7 +580,7 @@ func (tsl *TypespaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
 	defer c.funcIn("TypespaceList::instantiateChild_").Out()
-	defer tsl.Lock().Unlock()
+	defer tsl.Lock(c).Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
 	// release immediately. We can't hold the mapMutex while we instantiate,
@@ -683,7 +683,7 @@ func (nsl *NamespaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (nsl *NamespaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer nsl.Lock().Unlock()
+	defer nsl.Lock(c).Unlock()
 
 	for k, _ := range nsl.namespacesById {
 		iterateAgain := visitFn(k)
@@ -714,12 +714,12 @@ func (nsl *NamespaceList) getChildSnapshotRemovals(c *ctx,
 
 	var parentInfo directoryContents
 	func() {
-		defer nsl.getParentLock().RLock().RUnlock()
+		defer nsl.parentRLock(c).RUnlock()
 		parentInfo = getParentInfo_(c, nsl.parentId_(), fillRootAttrWrapper,
 			nsl.typespaceName, "")
 	}()
 
-	defer nsl.Lock().Unlock()
+	defer nsl.Lock(c).Unlock()
 
 	if len(namespaces) > 0 {
 		// We only accept positive lists
@@ -754,7 +754,7 @@ func (nsl *NamespaceList) Lookup(c *ctx, name string,
 
 	var removed []inodeRemoval
 	rtn := func() fuse.Status {
-		defer nsl.Lock().Unlock()
+		defer nsl.Lock(c).Unlock()
 		removed = updateChildren_(c, list, &nsl.namespacesByName,
 			&nsl.namespacesById, nsl)
 
@@ -923,7 +923,7 @@ func (nsl *NamespaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
 	defer c.funcIn("NamespaceList::instantiateChild_").Out()
-	defer nsl.Lock().Unlock()
+	defer nsl.Lock(c).Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
 	// release immediately. We can't hold the mapMutex while we instantiate,
@@ -1044,7 +1044,7 @@ func (wsl *WorkspaceList) OpenDir(c *ctx, flags uint32,
 }
 
 func (wsl *WorkspaceList) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer wsl.Lock().Unlock()
+	defer wsl.Lock(c).Unlock()
 
 	for k, _ := range wsl.workspacesById {
 		iterateAgain := visitFn(k)
@@ -1086,7 +1086,7 @@ func (wsl *WorkspaceList) updateChildren_(c *ctx,
 	for name, nonce := range names {
 		if _, exists := wsl.workspacesByName[name]; !exists {
 			c.vlog("Adding new child %s (%s)", name, nonce.String())
-			inodeId := c.qfs.newInodeId()
+			inodeId := c.qfs.newInodeId(c)
 			wsl.workspacesByName[name] = workspaceInfo{
 				id:    inodeId,
 				nonce: nonce,
@@ -1124,12 +1124,12 @@ func (wsl *WorkspaceList) getChildSnapshotRemovals(c *ctx,
 
 	var parentInfo directoryContents
 	func() {
-		defer wsl.getParentLock().RLock().RUnlock()
+		defer wsl.parentRLock(c).RUnlock()
 		parentInfo = getParentInfo_(c, wsl.parentId_(), fillTypespaceAttr,
 			wsl.typespaceName, wsl.namespaceName)
 	}()
 
-	defer wsl.Lock().Unlock()
+	defer wsl.Lock(c).Unlock()
 
 	if len(workspaces) > 0 {
 		// We only accept positive lists
@@ -1168,7 +1168,7 @@ func (wsl *WorkspaceList) Lookup(c *ctx, name string,
 
 	var removed []inodeRemoval
 	rtn := func() fuse.Status {
-		defer wsl.Lock().Unlock()
+		defer wsl.Lock(c).Unlock()
 		removed = wsl.updateChildren_(c, workspaces)
 
 		if !exists {
@@ -1339,7 +1339,7 @@ func (wsl *WorkspaceList) instantiateChild_(c *ctx,
 	inodeNum InodeId) Inode {
 
 	defer c.funcIn("WorkspaceList::instantiateChild_").Out()
-	defer wsl.Lock().Unlock()
+	defer wsl.Lock(c).Unlock()
 
 	inode, release := c.qfs.inodeNoInstantiate(c, inodeNum)
 	// release immediately. We can't hold the mapMutex while we instantiate,

@@ -296,7 +296,7 @@ func mergeWorkspaceRoot(c *ctx, base quantumfs.ObjectKey, remote quantumfs.Objec
 	var uploadErr error
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go mergeUploader(c, toSet, &uploadErr, &wg)
+	go mergeUploader(c.newThread(), toSet, &uploadErr, &wg)
 	defer func() {
 		// Ensure everything is uploaded before we return. Defer this close
 		// to ensure that the mergeUploader thread ends even if we panic

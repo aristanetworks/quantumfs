@@ -8,7 +8,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -23,12 +22,12 @@ import (
 )
 
 const (
-	sudo       = "/usr/bin/sudo"
-	umount     = "/usr/bin/umount"
-	sh         = "/usr/bin/sh"
-	ArtoolsDir = "/usr/share/Artools"
-	oldroot    = "/mnt"
-	pivot_root = "/usr/sbin/pivot_root"
+	sudo          = "/usr/bin/sudo"
+	umount        = "/usr/bin/umount"
+	sh            = "/usr/bin/sh"
+	workspaceTool = sh
+	oldroot       = "/mnt"
+	pivot_root    = "/usr/sbin/pivot_root"
 )
 
 const (
@@ -47,10 +46,10 @@ func init() {
 }
 
 // A helper function to test whether a path is a legitimate workspaceroot
-// by checking whether /usr/share/Artools directory is present
+// by checking whether /usr/bin/sh is present
 func isLegitimateWorkspaceRoot(wsr string) bool {
-	toolDir := wsr + ArtoolsDir
-	if toolInfo, err := os.Stat(toolDir); err == nil && toolInfo.IsDir() {
+	toolPath := wsr + workspaceTool
+	if toolInfo, err := os.Stat(toolPath); err == nil && !toolInfo.IsDir() {
 		return true
 	}
 	return false
@@ -121,31 +120,33 @@ func homedirs() []string {
 	return homes
 }
 
-// process the architecture string
-func processArchitecture(arch string) (string, error) {
-	archs := strings.Split(arch, "_")
-	archStr := strings.Join(archs[:len(archs)-1], "_")
-
-	switch archStr {
-	case "i386":
-		return "i686", nil
-	case "x86_64":
-		return "x86_64", nil
-	}
-
-	return "", fmt.Errorf("Unrecognized architecture")
-}
-
 // get the architecture of the workspace
 func getArchitecture(rootdir string) (string, error) {
-	platform, err := ioutil.ReadFile(rootdir + ArtoolsDir + "/platform")
+	cmd := exec.Command("objdump", "-f", rootdir+workspaceTool)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
 	}
 
-	platStr := string(platform[:len(platform)-1])
+	archLine := strings.Split(string(output), "architecture: ")[1]
+	arch := strings.Split(archLine, ",")[0]
 
-	return processArchitecture(platStr)
+	archStr := ""
+	err = fmt.Errorf("Unrecognized architecture: %s", arch)
+
+	switch arch {
+	case "i386":
+		archStr = "i686"
+		err = nil
+	case "x86_64":
+		archStr = "x86_64"
+		err = nil
+	case "i386:x86-64":
+		archStr = "x86_64"
+		err = nil
+	}
+
+	return archStr, err
 }
 
 func setArchitecture(arch string) error {
@@ -358,6 +359,12 @@ func mountTmpfsAt(dst string, permissions os.FileMode) error {
 func nonPersistentChroot(username string, rootdir string, workingdir string,
 	cmd []string) error {
 
+	archStr, err := getArchitecture(rootdir)
+	if err != nil {
+		return fmt.Errorf("Getting architecture string error: %s",
+			err.Error())
+	}
+
 	// Unshare() is an OS thread specific attribute. We must ensure that all the
 	// subsequent operations are performed on the thread which is in the new
 	// namespace. Failure to do so might result in mounting the chroot root over
@@ -373,7 +380,7 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 
 	// pivot_root will only work when current root directory is a private
 	// mountpoint
-	err := syscall.Mount("/", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, "")
+	err = syscall.Mount("/", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, "")
 	if err != nil {
 		return fmt.Errorf("Remounting / private error: %s", err.Error())
 	}
@@ -527,12 +534,6 @@ func nonPersistentChroot(username string, rootdir string, workingdir string,
 	if err := os.Chdir(workingdir); err != nil {
 		return fmt.Errorf("Changing directory to %s error: %s",
 			workingdir, err.Error())
-	}
-
-	archStr, err := getArchitecture("/")
-	if err != nil {
-		return fmt.Errorf("Getting architecture string error: %s",
-			err.Error())
 	}
 
 	// Switch to non-root user
