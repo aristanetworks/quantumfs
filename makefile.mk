@@ -163,9 +163,6 @@ qfsRPM: check-fpm $(COMMANDS)
 	$(FPM) -n QuantumFS-tool \
 		--description='A distributed filesystem optimized for large scale software development' \
 		--no-depends \
-		--after-install systemd_reload \
-		--after-remove systemd_reload \
-		--after-upgrade systemd_reload \
 		./qfs=/usr/bin/qfs \
 		./qparse=/usr/sbin/qparse
 
@@ -174,9 +171,6 @@ qfsRPMi686: check-fpm $(COMMANDS386)
 		-a i686 \
 		--description='A distributed filesystem optimized for large scale software development' \
 		--no-depends \
-		--after-install systemd_reload \
-		--after-remove systemd_reload \
-		--after-upgrade systemd_reload \
 		./qfs-386=/usr/bin/qfs \
 		./qparse-386=/usr/sbin/qparse
 
