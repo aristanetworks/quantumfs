@@ -939,9 +939,7 @@ func (dir *Directory) getRecordChildCall_(c *ctx,
 	return nil
 }
 
-func (dir *Directory) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer dir.childRecordLock(c).Unlock()
-
+func (dir *Directory) foreachDirectInode_(c *ctx, visitFn inodeVisitFn) {
 	dir.children.foreachDirectInode(c, visitFn)
 }
 
@@ -1334,7 +1332,10 @@ func (dir *Directory) orphanChild_(c *ctx, name string,
 		return
 	}
 	if inode == nil {
-		c.qfs.removeUninstantiated(c, []InodeId{removedId})
+		// This in theory should be impossible. The inode should have been
+		// instantiated, and so either removedRecord AND inode are nil,
+		// or there is an inode and the removedRecord shouldn't be nil.
+		c.elog("orphanChild_ instantiation mismatch %d", removedId)
 	} else {
 		inode.orphan_(c, removedRecord)
 	}

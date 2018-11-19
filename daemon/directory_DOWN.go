@@ -113,11 +113,14 @@ func (dir *Directory) Sync_DOWN(c *ctx) fuse.Status {
 	defer c.FuncIn("Directory::Sync_DOWN", "dir %d", dir.inodeNum()).Out()
 
 	children := make([]InodeId, 0)
-	dir.foreachDirectInode(c, func(child InodeId) bool {
-		children = append(children, child)
+	func() {
+		defer dir.childRecordLock(c).Unlock()
+		dir.children.foreachDirectInode(c, func(child InodeId) bool {
+			children = append(children, child)
 
-		return true
-	})
+			return true
+		})
+	}()
 
 	for _, child := range children {
 		func() {

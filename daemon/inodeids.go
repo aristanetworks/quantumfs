@@ -5,6 +5,7 @@ package daemon
 
 import (
 	"container/list"
+	"runtime/debug"
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
@@ -85,7 +86,7 @@ func (ids *inodeIds) releaseInodeId(c *ctx, id InodeId) {
 		return
 	}
 
-	ids.push_(id)
+	ids.push_(c, id)
 }
 
 const inodeIdsGb = "Garbage collected highmark %d %d"
@@ -120,7 +121,15 @@ func (ids *inodeIds) allocateFreshId_() InodeId {
 }
 
 // ids.lock must be locked
-func (ids *inodeIds) push_(id InodeId) {
+func (ids *inodeIds) push_(c *ctx, id InodeId) {
+	_, exists := ids.reusableMap[id]
+	if exists {
+		// This should never happen, but recover if it does
+		c.elog("Double push of inode id %d\n%s", int64(id),
+			utils.BytesToString(debug.Stack()))
+		return
+	}
+
 	ids.reusableIds.PushBack(reusableId{
 		id:     id,
 		usable: time.Now().Add(ids.reusableDelay),

@@ -489,7 +489,11 @@ func unlinkStaleDentries(c *ctx, rc *RefreshContext) {
 			}
 		}()
 
-		c.qfs.removeUninstantiated(c, []InodeId{staleRecord.inodeId})
+		func() {
+			defer c.qfs.mapMutex.Lock(c).Unlock()
+			c.qfs.removeUninstantiated_(c,
+				[]InodeId{staleRecord.inodeId})
+		}()
 	}
 }
 
