@@ -74,7 +74,7 @@ func newWorkspaceRoot(c *ctx, typespace string, namespace string, workspace stri
 		},
 	}
 
-	defer wsr.Lock().Unlock()
+	defer wsr.Lock(c).Unlock()
 
 	wsr.self = &wsr
 	wsr.treeState_ = wsr.realTreeState
@@ -212,7 +212,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 		wsr.publishedRootId.String(), wsr.nonce.String(),
 		publishedRootId.String(), nonce.String())
 
-	wsr.refreshTo_(c, rc)
+	wsr.refreshTo_(c.DisableLockCheck(), rc)
 	wsr.publishedRootId = publishedRootId
 }
 
@@ -261,7 +261,7 @@ func handleAdvanceError(c *ctx, wsr *WorkspaceRoot, rootId quantumfs.ObjectKey,
 func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 	defer c.funcIn("WorkspaceRoot::publish").Out()
 
-	defer wsr.RLock().RUnlock()
+	defer wsr.RLock(c).RUnlock()
 
 	wsr.hardlinkTable.apply(c, wsr.Directory.hardlinkDelta)
 
@@ -300,7 +300,7 @@ func (wsr *WorkspaceRoot) getChildSnapshot(c *ctx) []directoryContents {
 
 	// Fill in correct data for ..
 	func() {
-		defer wsr.getParentLock().RLock().RUnlock()
+		defer wsr.parentRLock(c).RUnlock()
 		fillNamespaceAttr(c, &children[1].attr, wsr.parentId_(),
 			wsr.typespace, wsr.namespace)
 		children[1].fuseType = children[1].attr.Mode
@@ -387,7 +387,7 @@ func (wsr *WorkspaceRoot) syncChild(c *ctx, inodeNum InodeId,
 
 	if isHardlink {
 		func() {
-			defer wsr.Lock().Unlock()
+			defer wsr.Lock(c).Unlock()
 			wsr.self.dirty(c)
 			wsr.hardlinkTable.setID(c, fileId, newKey)
 		}()
@@ -410,7 +410,7 @@ func (wsr *WorkspaceRoot) Access(c *ctx, mask uint32, uid uint32,
 
 func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 	defer c.funcIn("WorkspaceRoot::GetAttr").Out()
-	defer wsr.RLock().RUnlock()
+	defer wsr.RLock(c).RUnlock()
 
 	out.AttrValid = c.config.CacheTimeSeconds
 	out.AttrValidNsec = c.config.CacheTimeNsecs
@@ -420,7 +420,7 @@ func (wsr *WorkspaceRoot) GetAttr(c *ctx, out *fuse.AttrOut) fuse.Status {
 
 func (wsr *WorkspaceRoot) fillWorkspaceAttrReal(c *ctx, attr *fuse.Attr) {
 	var numChildDirectories uint32
-	defer wsr.childRecordLock.Lock().Unlock()
+	defer wsr.childRecordLock(c).Unlock()
 	for _, entry := range wsr.children.records() {
 		if entry.Type() == quantumfs.ObjectTypeDirectory {
 			numChildDirectories++
@@ -491,9 +491,7 @@ func (wsr *WorkspaceRoot) handleFlushFailure_(c *ctx) bool {
 	return nil == forceMerge(c, wsr)
 }
 
-func (wsr *WorkspaceRoot) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
-	defer wsr.Lock().Unlock()
-
+func (wsr *WorkspaceRoot) foreachDirectInode_(c *ctx, visitFn inodeVisitFn) {
 	// Iterate through hardlinks first to ensure we can escape early
 	for inodeNum, _ := range wsr.hardlinkTable.inodeToLink {
 		iterateAgain := visitFn(inodeNum)
@@ -502,7 +500,7 @@ func (wsr *WorkspaceRoot) foreachDirectInode(c *ctx, visitFn inodeVisitFn) {
 		}
 	}
 
-	wsr.Directory.foreachDirectInode(c, visitFn)
+	wsr.Directory.foreachDirectInode_(c, visitFn)
 }
 
 func (wsr *WorkspaceRoot) cleanup(c *ctx) {

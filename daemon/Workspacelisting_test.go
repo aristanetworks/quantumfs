@@ -147,8 +147,9 @@ func TestWorkspaceDeletionManualForget(t *testing.T) {
 		test.AssertNoErr(err)
 		defer fileHandle.Close()
 
+		c := &test.qfs.c
 		workspaceInodeId := test.getInodeNum(test.AbsPath(workspaceName))
-		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx,
+		err = test.qfs.c.workspaceDB.DeleteWorkspace(&c.Ctx,
 			"testA", "testB", "testC")
 		test.AssertNoErr(err)
 
@@ -158,7 +159,7 @@ func TestWorkspaceDeletionManualForget(t *testing.T) {
 		// Make sure we cause updateChildren on the namespace
 		namespaceInode := test.getInode(test.AbsPath("testA/testB"))
 		test.Assert(namespaceInode != nil, "cannot fetch namespace inode")
-		ManualLookup(&test.qfs.c, namespaceInode, "testC2")
+		ManualLookup(c, namespaceInode, "testC2")
 
 		_, err = fileHandle.Stat()
 		// We should still be able to stat our orphaned file
@@ -188,7 +189,8 @@ func TestRemoteNamespaceDeletion(t *testing.T) {
 		defer fileHandle.Close()
 
 		// Now simulate the namespace being remotely removed
-		err = test.qfs.c.workspaceDB.DeleteWorkspace(&test.qfs.c.Ctx,
+		c := &test.qfs.c
+		err = test.qfs.c.workspaceDB.DeleteWorkspace(&c.Ctx,
 			"testA", "testB", "testC")
 		test.AssertNoErr(err)
 

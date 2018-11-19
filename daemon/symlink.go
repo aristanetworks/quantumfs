@@ -120,7 +120,7 @@ func (link *Symlink) Readlink(c *ctx) ([]byte, fuse.Status) {
 	// Mark accessed must happen outside of the inode lock
 	link.self.markSelfAccessed(c, quantumfs.PathRead)
 
-	defer link.Lock().Unlock()
+	defer link.Lock(c).Unlock()
 
 	// If we have an unflushed pointsTo, then use it
 	if link.dirtyPointsTo != "" {
@@ -213,6 +213,6 @@ func (link *Symlink) flush(c *ctx) quantumfs.ObjectKey {
 func (link *Symlink) setLink(c *ctx, pointTo string) {
 	defer c.FuncIn("Symlink::setLink", "%s", pointTo).Out()
 
-	defer link.Lock().Unlock()
+	defer link.Lock(c).Unlock()
 	link.dirtyPointsTo = pointTo
 }

@@ -914,7 +914,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 		// necessary to get the tree lock of the WorkspaceRoot exclusively
 		// here.
 		defer workspace.LockTree().Unlock()
-		return workspace.followPath_DOWN(c, dst)
+		return workspace.followPath_DOWN(c.DisableLockCheck(), dst)
 	}()
 	defer cleanup()
 	if err != nil {
@@ -960,7 +960,7 @@ func (api *ApiHandle) insertInode(c *ctx, buf []byte) int {
 
 	var fileId quantumfs.FileId
 	func() {
-		defer parent.Lock().Unlock()
+		defer parent.Lock(c).Unlock()
 		fileId = parent.duplicateInode_(c, target, permissions, 0, 0, size,
 			quantumfs.UID(uid), quantumfs.GID(gid), type_, key)
 	}()

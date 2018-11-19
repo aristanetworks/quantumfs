@@ -303,7 +303,7 @@ func detachInode(c *ctx, inode Inode, staleRecord *FileRemoveRecord) {
 	defer c.FuncIn("detachInode", "name %s inode %d", staleRecord.name,
 		staleRecord.inodeId).Out()
 	dir := asDirectory(inode)
-	defer dir.childRecordLock.Lock().Unlock()
+	defer dir.childRecordLock(c).Unlock()
 	staleRecord.toOrphan = dir.children.deleteChild(c, staleRecord.name)
 	c.qfs.noteDeletedInode(c, dir.id, staleRecord.inodeId, staleRecord.name)
 }
@@ -489,7 +489,11 @@ func unlinkStaleDentries(c *ctx, rc *RefreshContext) {
 			}
 		}()
 
-		c.qfs.removeUninstantiated(c, []InodeId{staleRecord.inodeId})
+		func() {
+			defer c.qfs.mapMutex.Lock(c).Unlock()
+			c.qfs.removeUninstantiated_(c,
+				[]InodeId{staleRecord.inodeId})
+		}()
 	}
 }
 
@@ -503,7 +507,7 @@ func (wsr *WorkspaceRoot) unlinkStaleHardlinks(c *ctx,
 		loadRecord, exists := rc.fileMap[fileId]
 		if !exists {
 			c.vlog("Removing hardlink id %d, inode %d, nlink %d",
-				fileId, entry.inodeId, entry.nlink)
+				fileId, entry.inodeId.id, entry.nlink)
 
 			func() {
 				inode, release := c.qfs.inodeNoInstantiate(c,

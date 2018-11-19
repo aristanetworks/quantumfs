@@ -61,7 +61,8 @@ func (th *TestHelper) getInodeNum(path string) InodeId {
 // Retrieve the Inode from Quantumfs. Returns nil is not instantiated
 func (th *TestHelper) getInode(path string) Inode {
 	inodeNum := th.getInodeNum(path)
-	newInode, release := th.qfs.inodeNoInstantiate(&th.qfs.c, inodeNum)
+	newInode, release := th.qfs.inodeNoInstantiate(th.qfs.c.newThread(),
+		inodeNum)
 	// For now, we don't care too much about the inode being uninstantiated
 	// early during a test
 	release()
@@ -69,7 +70,7 @@ func (th *TestHelper) getInode(path string) Inode {
 }
 
 func (th *TestHelper) inodeIsInstantiated(c *ctx, inodeId InodeId) bool {
-	inode, release := th.qfs.inodeNoInstantiate(&th.qfs.c, inodeId)
+	inode, release := th.qfs.inodeNoInstantiate(th.qfs.c.newThread(), inodeId)
 	defer release()
 
 	return inode != nil
@@ -79,19 +80,19 @@ func (th *TestHelper) GetRecord(path string) quantumfs.ImmutableDirectoryRecord 
 	inode := th.getInode(path)
 
 	parentId := func() InodeId {
-		lock := inode.getParentLock()
-		defer (*lock).RLock().RUnlock()
+		defer inode.parentRLock(th.qfs.c.newThread()).RUnlock()
 		return inode.parentId_()
 	}()
 
-	parent, release := th.qfs.inodeNoInstantiate(&th.qfs.c, parentId)
+	c := th.qfs.c.newThread()
+	parent, release := th.qfs.inodeNoInstantiate(c, parentId)
 	defer release()
 
 	th.Assert(parent != nil, "Parent not instantiated")
 	parentDir := asDirectory(parent)
 
-	defer parentDir.childRecordLock.Lock().Unlock()
-	return parentDir.getRecordChildCall_(&th.qfs.c, inode.inodeNum())
+	defer parentDir.childRecordLock(c).Unlock()
+	return parentDir.getRecordChildCall_(c, inode.inodeNum())
 }
 
 func logFuseWaiting(prefix string, th *TestHelper) {
@@ -596,7 +597,7 @@ func (th *TestHelper) GetWorkspaceRoot(workspace string) (wsr *WorkspaceRoot,
 	cleanup func()) {
 
 	parts := strings.Split(th.RelPath(workspace), "/")
-	wsr, cleanup, ok := th.qfs.getWorkspaceRoot(&th.qfs.c,
+	wsr, cleanup, ok := th.qfs.getWorkspaceRoot(th.qfs.c.newThread(),
 		parts[0], parts[1], parts[2])
 	th.Assert(ok, "WorkspaceRoot object for %s not found", workspace)
 
