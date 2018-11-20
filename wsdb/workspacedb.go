@@ -190,7 +190,7 @@ type WorkspaceDB interface {
 	//  ErrWorkspaceOutOfDate: The workspace rootID was changed
 	//  	remotely so the local instance is out of date
 	AdvanceWorkspace(c ether.Ctx, typespace string, namespace string, workspace string,
-		nonce WorkspaceNonce, currentRootID ObjectKey, newRootID ObjectKey) (ObjectKey, error)
+		nonce WorkspaceNonce, currentRootID ObjectKey, newRootID ObjectKey) (ObjectKey, WorkspaceNonce, error)
 
 	SetWorkspaceImmutable(c ether.Ctx, typespace string, namespace string,
 		workspace string) error
