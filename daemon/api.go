@@ -642,7 +642,7 @@ func (api *ApiHandle) mergeWorkspace(c *ctx, buf []byte) int {
 			"Merge failed: %s", err.Error())
 	}
 
-	_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],
+	_, _, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, local[0], local[1],
 		local[2], localNonce, localRootId, newRootId)
 	if err != nil {
 		c.vlog("Workspace can't advance after merge began, try again: %s",
@@ -727,7 +727,7 @@ func (api *ApiHandle) advanceWSDB(c *ctx, buf []byte) int {
 			cmd.ReferenceWorkspace)
 	}
 
-	rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, workspace[0],
+	rootId, _, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, workspace[0],
 		workspace[1], workspace[2], nonce, wsr.publishedRootId, refRootId)
 
 	if err != nil {

@@ -352,7 +352,8 @@ func (wsdb *WorkspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootId quantumfs.ObjectKey,
-	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey,
+	quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"processlocal::AdvanceWorkspace").Out()
@@ -363,25 +364,26 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		wsdbErr := err.(quantumfs.WorkspaceDbErr)
 		e := quantumfs.NewWorkspaceDbErr(wsdbErr.Code, "Advance failed: %s",
 			wsdbErr.ErrorCode())
-		return quantumfs.ZeroKey, e
+		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{}, e
 	}
 
 	if !nonce.SameIncarnation(&info.nonce) {
 		e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE,
 			"Nonce %s does not match WSDB (%s)",
 			nonce.String(), info.nonce.String())
-		return info.key, e
+		return info.key, quantumfs.WorkspaceNonce{}, e
 	}
+	nonce = nonce.GetAdvanceNonce()
 
 	if !currentRootId.IsEqualTo(info.key) {
 		e := quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE,
 			"%s vs %s Advance failed.", currentRootId.String(),
 			info.key.String())
-		return info.key, e
+		return info.key, quantumfs.WorkspaceNonce{}, e
 	}
 
 	wsdb.cache[typespace][namespace][workspace].key = newRootId
-	info.nonce.PublishTime = uint64(time.Now().UnixNano())
+	wsdb.cache[typespace][namespace][workspace].nonce = nonce
 
 	wsdb.notifySubscribers_(c, typespace, namespace, workspace, true)
 
@@ -389,7 +391,7 @@ func (wsdb *WorkspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		typespace, namespace, workspace, currentRootId.String(),
 		newRootId.String())
 
-	return newRootId, nil
+	return newRootId, nonce, nil
 }
 
 func (wsdb *WorkspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,

@@ -48,7 +48,7 @@ func TestAdvanceFail(t *testing.T) {
 
 		wsdb := test.GetWorkspaceDB()
 		ctx := test.TestCtx()
-		_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
+		_, _, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
 			wsNamespaceName, wsWorkspaceName, nonce, oldRootId,
 			newRootId)
 		test.Assert(err != nil, "Advance must not succeed")
@@ -72,7 +72,7 @@ func TestAdvanceSucceed(t *testing.T) {
 		// This workspace advance will succeed as it is using the correct
 		// currentRootId, however, it will cause all future changes to the
 		// workspace to fail.
-		_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
+		_, _, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
 			wsNamespaceName, wsWorkspaceName, nonce, newRootId2,
 			newRootId1)
 		test.AssertNoErr(err)
@@ -97,7 +97,7 @@ func TestAdvanceGoBackToOld(t *testing.T) {
 		// This workspace advance will succeed as it is using the correct
 		// currentRootId, however, it will cause all future changes to the
 		// workspace to fail.
-		_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
+		_, _, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
 			wsNamespaceName, wsWorkspaceName, nonce, newRootId1,
 			oldRootId)
 		test.AssertNoErr(err)

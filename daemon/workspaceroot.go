@@ -201,6 +201,12 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 		return
 	}
 
+	if nonce.IsOlderThan(&wsr.nonce) {
+		c.elog("Rejecting stale update with nonce %s as we are at %s",
+			nonce.String(), wsr.nonce.String())
+		return
+	}
+
 	if wsr.publishedRootId.IsEqualTo(publishedRootId) {
 		c.vlog("Not refreshing workspace %s as there has been no updates",
 			workspaceName)
@@ -214,6 +220,7 @@ func (wsr *WorkspaceRoot) refresh_(c *ctx) {
 
 	wsr.refreshTo_(c.DisableLockCheck(), rc)
 	wsr.publishedRootId = publishedRootId
+	wsr.nonce = nonce
 }
 
 func publishWorkspaceRoot(c *ctx, baseLayer quantumfs.ObjectKey,
@@ -273,9 +280,9 @@ func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 
 	// Update workspace rootId
 	if !newRootId.IsEqualTo(wsr.publishedRootId) {
-		rootId, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
-			wsr.namespace, wsr.workspace, wsr.nonce, wsr.publishedRootId,
-			newRootId)
+		rootId, nonce, err := c.workspaceDB.AdvanceWorkspace(&c.Ctx,
+			wsr.typespace, wsr.namespace, wsr.workspace, wsr.nonce,
+			wsr.publishedRootId, newRootId)
 
 		if err != nil {
 			return handleAdvanceError(c, wsr, rootId, newRootId, err)
@@ -284,6 +291,7 @@ func (wsr *WorkspaceRoot) publish(c *ctx) bool {
 		c.vlog("Advanced rootId %s -> %s", wsr.publishedRootId.String(),
 			rootId.String())
 		wsr.publishedRootId = rootId
+		wsr.nonce = nonce
 	}
 
 	return true

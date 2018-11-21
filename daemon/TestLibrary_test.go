@@ -539,7 +539,7 @@ func (test *testHelper) advanceWorkspace(workspace string,
 	wsTypespaceName, wsNamespaceName, wsWorkspaceName :=
 		test.getWorkspaceComponents(workspace)
 
-	_, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
+	_, _, err := wsdb.AdvanceWorkspace(&ctx.Ctx, wsTypespaceName,
 		wsNamespaceName, wsWorkspaceName, nonce, src, dst)
 	test.AssertNoErr(err)
 }

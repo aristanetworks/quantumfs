@@ -512,7 +512,8 @@ func (wsdb *workspaceDB) FetchAndSubscribeWorkspace(c *quantumfs.Ctx,
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootId quantumfs.ObjectKey,
-	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey,
+	quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncInName(qlog.LogWorkspaceDb,
 		"systemlocal::AdvanceWorkspace").Out()
@@ -552,7 +553,8 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		// The workspace exists and the caller has the uptodate rootid, so
 		// advance the rootid in the DB.
 		info.Key = encodeKey(newRootId)
-		info.Nonce.PublishTime = uint64(time.Now().UnixNano())
+		info.Nonce = info.Nonce.GetAdvanceNonce()
+		nonce = info.Nonce
 		err := setWorkspaceInfo_(tx, typespace, namespace, workspace, *info)
 		if err == nil {
 			dbRootId = info.Key
@@ -560,7 +562,7 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		return err
 	})
 
-	return decodeKey(dbRootId), err
+	return decodeKey(dbRootId), nonce, err
 }
 
 func (wsdb *workspaceDB) WorkspaceIsImmutable(c *quantumfs.Ctx, typespace string,
