@@ -877,7 +877,8 @@ const AdvanceWorkspaceDebug = "%s from %s to %s"
 func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootId quantumfs.ObjectKey,
-	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey,
+	quantumfs.WorkspaceNonce, error) {
 
 	workspaceName := typespace + "/" + namespace + "/" + workspace
 
@@ -890,18 +891,19 @@ func (wsdb *workspaceDB) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 
 	err := retry(c, "AdvanceWorkspace", func(c *quantumfs.Ctx) error {
 		var err error
-		result, err = wsdb.advanceWorkspace(c, typespace, namespace,
+		result, nonce, err = wsdb.advanceWorkspace(c, typespace, namespace,
 			workspace, nonce, currentRootId, newRootId)
 		return err
 	})
 
-	return result, err
+	return result, nonce, err
 }
 
 func (wsdb *workspaceDB) advanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootId quantumfs.ObjectKey,
-	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey,
+	quantumfs.WorkspaceNonce, error) {
 
 	workspaceName := typespace + "/" + namespace + "/" + workspace
 
@@ -921,17 +923,20 @@ func (wsdb *workspaceDB) advanceWorkspace(c *quantumfs.Ctx, typespace string,
 	response, err := (*server).AdvanceWorkspace(context.TODO(), &request)
 	if err != nil {
 		c.Vlog(qlog.LogWorkspaceDb, "Received grpc error: %s", err.Error())
-		return quantumfs.ZeroKey, wsdb.handleGrpcError(err, serverConnIdx)
+		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{},
+			wsdb.handleGrpcError(err, serverConnIdx)
 	}
 
 	if response.Header.Err != 0 {
 		c.Vlog(qlog.LogWorkspaceDb, "Received wsdb error %d: %s",
 			response.Header.Err, response.Header.ErrCause)
-		return quantumfs.ZeroKey, wsdb.convertErr(*response.Header)
+		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{},
+			wsdb.convertErr(*response.Header)
 	}
 
 	newKey := quantumfs.NewObjectKeyFromBytes(response.NewKey.GetData())
-	return newKey, nil
+	nonce.PublishTime = response.Nonce.PublishTime
+	return newKey, nonce, nil
 }
 
 const WorkspaceIsImmutableLog = "grpc::WorkspaceIsImmutable"

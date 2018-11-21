@@ -204,7 +204,7 @@ func TestPubSubAdvanceAndUnsubscribe(t *testing.T) {
 		key, nonce, err := wsdb.Workspace(test.ctx, "test", "test", "test")
 		test.AssertNoErr(err)
 
-		_, err = wsdb.AdvanceWorkspace(test.ctx, "test", "test", "test",
+		_, _, err = wsdb.AdvanceWorkspace(test.ctx, "test", "test", "test",
 			nonce, key, key)
 		test.AssertNoErr(err)
 

@@ -144,6 +144,7 @@ message AdvanceWorkspaceRequest {
 message AdvanceWorkspaceResponse {
 	Response header = 1;
 	ObjectKey newKey = 2;
+	WorkspaceNonce nonce = 3;
 }
 
 message FetchWorkspaceResponse {

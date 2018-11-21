@@ -7,6 +7,7 @@ package quantumfs
 import (
 	"fmt"
 	"runtime/debug"
+	"time"
 
 	"github.com/aristanetworks/quantumfs/utils"
 )
@@ -26,6 +27,21 @@ type WorkspaceNonce struct {
 
 func (lhs *WorkspaceNonce) SameIncarnation(rhs *WorkspaceNonce) bool {
 	return lhs.Id == rhs.Id
+}
+
+func (lhs *WorkspaceNonce) IsOlderThan(rhs *WorkspaceNonce) bool {
+	return int64(lhs.PublishTime) < int64(rhs.PublishTime)
+}
+
+func (lhs *WorkspaceNonce) GetAdvanceNonce() WorkspaceNonce {
+	now := uint64(time.Now().UnixNano())
+	utils.Assert(now > lhs.PublishTime,
+		"Going back in time %d is smaller than %d",
+		now, lhs.PublishTime)
+	return WorkspaceNonce{
+		Id:          lhs.Id,
+		PublishTime: now,
+	}
 }
 
 func (v *WorkspaceNonce) String() string {
@@ -97,7 +113,7 @@ type WorkspaceDB interface {
 	// are made and the current rootID is returned such that the client can merge
 	// the changes and retry.
 	//
-	// The return value is the new rootID.
+	// The return value is the new rootID and the new nonce
 	//
 	// Possible errors are:
 	// WSDB_WORKSPACE_NOT_FOUND: The named workspace didn't exist
@@ -105,7 +121,7 @@ type WorkspaceDB interface {
 	//                   instance is out of date.
 	AdvanceWorkspace(c *Ctx, typespace string, namespace string,
 		workspace string, nonce WorkspaceNonce, currentRootId ObjectKey,
-		newRootId ObjectKey) (ObjectKey, error)
+		newRootId ObjectKey) (ObjectKey, WorkspaceNonce, error)
 
 	// Workspace RootID update subscriptions. Clients will subscribe to rootId
 	// updates in order to take the newly published data into consideration as

@@ -610,7 +610,8 @@ func (m *mux) AdvanceWorkspace(ctx context.Context,
 		newKey.String()).Out()
 
 	parts := strings.Split(request.WorkspaceName, "/")
-	dbKey, err := m.backend.AdvanceWorkspace(&c.Ctx, parts[0], parts[1],
+	nonce.PublishTime = uint64(time.Now().UnixNano())
+	dbKey, _, err := m.backend.AdvanceWorkspace(&c.Ctx, parts[0], parts[1],
 		parts[2], nonce, currentKey, newKey)
 
 	response := rpc.AdvanceWorkspaceResponse{
@@ -620,6 +621,10 @@ func (m *mux) AdvanceWorkspace(ctx context.Context,
 	ok, err := parseWorkspaceDbError(c, response.Header, err)
 	if ok {
 		response.NewKey = &rpc.ObjectKey{Data: dbKey.Value()}
+		response.Nonce = &rpc.WorkspaceNonce{
+			Id:          nonce.Id,
+			PublishTime: nonce.PublishTime,
+		}
 		m.notifyChange(c, request.WorkspaceName, request.RequestId, false)
 	}
 

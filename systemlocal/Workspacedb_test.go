@@ -258,7 +258,7 @@ func TestAdvanceOk(t *testing.T) {
 		_, nonce, err := db.Workspace(ctx, "branch", "test", "a")
 		utils.Assert(err == nil, "Error getting key: %v", err)
 
-		newRootId, err := db.AdvanceWorkspace(ctx, "branch", "test", "a",
+		newRootId, _, err := db.AdvanceWorkspace(ctx, "branch", "test", "a",
 			nonce, oldRootId, quantumfs.EmptyDirKey)
 		utils.Assert(err == nil, "Error when advancing root: %v", err)
 		utils.Assert(newRootId.IsEqualTo(quantumfs.EmptyDirKey),
@@ -275,7 +275,7 @@ func TestAdvanceNotExist(t *testing.T) {
 			quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 		utils.Assert(err == nil, "Error getting key: %v", err)
 
-		_, err = db.AdvanceWorkspace(ctx, "branch", "test", "a", nonce,
+		_, _, err = db.AdvanceWorkspace(ctx, "branch", "test", "a", nonce,
 			oldRootId, quantumfs.EmptyDirKey)
 		utils.Assert(err != nil,
 			"Succeeded advancing non-existant workspace")
@@ -299,7 +299,7 @@ func TestAdvanceOldRootId(t *testing.T) {
 		_, nonce, err := db.Workspace(ctx, "branch", "test", "a")
 		utils.Assert(err == nil, "Error getting key: %v", err)
 
-		newRootId, err := db.AdvanceWorkspace(ctx, "branch", "test", "a",
+		newRootId, _, err := db.AdvanceWorkspace(ctx, "branch", "test", "a",
 			nonce, quantumfs.EmptyBlockKey, quantumfs.EmptyDirKey)
 		utils.Assert(err != nil, "Succeeded advancing with old rootid")
 		utils.Assert(!newRootId.IsEqualTo(quantumfs.EmptyDirKey),

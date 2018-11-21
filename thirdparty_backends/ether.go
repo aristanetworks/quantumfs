@@ -602,7 +602,8 @@ const EtherAdvanceDebugLog = "%s/%s/%s %s -> %s"
 func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootId quantumfs.ObjectKey,
-	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey, error) {
+	newRootId quantumfs.ObjectKey) (quantumfs.ObjectKey,
+	quantumfs.WorkspaceNonce, error) {
 
 	defer c.StatsFuncIn(qlog.LogWorkspaceDb, EtherAdvanceLog,
 		EtherAdvanceDebugLog, typespace, namespace, workspace,
@@ -617,14 +618,16 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 		Id:          int64(nonce.Id),
 		PublishTime: int64(nonce.PublishTime),
 	}
-	key, err := w.wsdb.AdvanceWorkspace((*wsApiCtx)(c), typespace, namespace,
-		workspace, wsdbNonce, currentRootId.Value(),
+	key, wsdbNonce, err := w.wsdb.AdvanceWorkspace((*wsApiCtx)(c), typespace,
+		namespace, workspace, wsdbNonce, currentRootId.Value(),
 		newRootId.Value())
 	if err != nil {
-		return quantumfs.ZeroKey, convertWsdbError(err)
+		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{},
+			convertWsdbError(err)
 	}
+	nonce.PublishTime = uint64(wsdbNonce.PublishTime)
 
-	return quantumfs.NewObjectKeyFromBytes(key), nil
+	return quantumfs.NewObjectKeyFromBytes(key), nonce, nil
 }
 
 const EtherSetImmutableLog = "EtherWsdbTranslator::SetWorkspaceImmutable"

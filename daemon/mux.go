@@ -601,7 +601,7 @@ func forceMerge(c *ctx, wsr *WorkspaceRoot) error {
 		}
 
 		// now try to advance the workspace from the fresh id
-		_, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
+		_, _, err = c.workspaceDB.AdvanceWorkspace(&c.Ctx, wsr.typespace,
 			wsr.namespace, wsr.workspace, wsr.nonce, rootId, mergedId)
 
 		if wsdbErr, isWsdbErr := err.(quantumfs.WorkspaceDbErr); isWsdbErr &&
