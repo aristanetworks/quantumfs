@@ -11,5 +11,6 @@ package thirdparty_backends
 import "github.com/aristanetworks/quantumfs/systemlocal"
 
 func init() {
+	registerDatastore("systemlocal", systemlocal.NewDataStore)
 	registerWorkspaceDB("systemlocal", systemlocal.NewWorkspaceDB)
 }
