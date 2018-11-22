@@ -19,7 +19,7 @@ func TestObjectPath(t *testing.T) {
 		path := objectPath("root/", key)
 
 		test.Assert(path ==
-			"root/a0a1/a2a3/05a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3",
+			"root/a0/a1/05a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3",
 			"Path is incorrect: %s", path)
 
 	})

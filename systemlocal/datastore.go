@@ -35,7 +35,7 @@ type datastore struct {
 func objectPath(root string, key quantumfs.ObjectKey) string {
 	hash := hex.EncodeToString(key.Value())
 
-	path := filepath.Join(root, hash[2:6], hash[6:10], hash)
+	path := filepath.Join(root, hash[2:4], hash[4:6], hash)
 	return path
 }
 
