@@ -64,6 +64,7 @@ func (ds *datastore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 		return nil
 	}
 	c.Vlog(qlog.LogDatastore, "Read %d bytes", size)
+	data = data[:size]
 
 	buf.Set(data, key.Type())
 
