@@ -13,7 +13,7 @@ import (
 	"github.com/aristanetworks/quantumfs/qlog"
 )
 
-func NewDatastore(conf string) quantumfs.DataStore {
+func NewDataStore(conf string) quantumfs.DataStore {
 	return &datastore{
 		dbPath: conf,
 	}
