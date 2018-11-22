@@ -14,6 +14,8 @@ import (
 )
 
 func NewDataStore(conf string) quantumfs.DataStore {
+	os.MkdirAll(conf, 0600)
+
 	return &datastore{
 		dbPath: conf,
 	}
