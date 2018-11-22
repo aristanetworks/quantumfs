@@ -5,6 +5,8 @@ package systemlocal
 
 import (
 	"encoding/hex"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/aristanetworks/quantumfs"
@@ -43,7 +45,25 @@ func (ds *datastore) Get(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 	ks := key.String()
 	defer c.FuncIn(qlog.LogDatastore, "systemlocal::Get", "key: %s", ks).Out()
 
-	_ = objectPath(ds.dbPath, key)
+	path := objectPath(ds.dbPath, key)
+
+	file, err := os.Open(path)
+	if err != nil {
+		c.Vlog(qlog.LogDatastore, "object file not available: %s",
+			err.Error())
+		return nil
+	}
+	defer file.Close()
+
+	data := make([]byte, quantumfs.MaxBlockSize)
+	size, err := file.Read(data)
+	if err != nil {
+		c.Vlog(qlog.LogDatastore, "Failed reading object: %s", err.Error())
+		return nil
+	}
+	c.Vlog(qlog.LogDatastore, "Read %d bytes", size)
+
+	buf.Set(data, key.Type())
 
 	return nil
 }
@@ -53,6 +73,43 @@ func (ds *datastore) Set(c *quantumfs.Ctx, key quantumfs.ObjectKey,
 
 	ks := key.String()
 	defer c.FuncIn(qlog.LogDatastore, "systemlocal::Set", "key: %s", ks).Out()
+
+	path := objectPath(ds.dbPath, key)
+	dir := filepath.Dir(path)
+
+	err := os.MkdirAll(dir, 0600)
+	if err != nil {
+		c.Wlog(qlog.LogDatastore,
+			"Failed to create hash directory %s: %s", dir, err.Error())
+		return err
+	}
+
+	file, err := ioutil.TempFile(dir, "newobject")
+	if err != nil {
+		c.Wlog(qlog.LogDatastore, "Failed creating temp file in %s: %s",
+			dir, err.Error())
+		return err
+	}
+	defer file.Close()
+
+	size, err := file.Write(buf.Get())
+	if err != nil {
+		c.Wlog(qlog.LogDatastore, "Failed to write new object %s: %s",
+			path, err.Error())
+		return err
+	}
+	c.Vlog(qlog.LogDatastore, "Wrote new object of %d bytes", size)
+
+	err = os.Rename(file.Name(), path)
+	if err != nil {
+		c.Dlog(qlog.LogDatastore, "Object rename failed: %s", err.Error())
+		// Assume somebody beat us and the object is saved
+		err = os.Remove(file.Name())
+		if err != nil {
+			c.Elog(qlog.LogDatastore, "Object race cleanup failed: %s",
+				err.Error())
+		}
+	}
 
 	return nil
 }
