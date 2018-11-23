@@ -18,11 +18,15 @@ import (
 func (th *testHelper) systemlocalConfig() QuantumFsConfig {
 	mountPath := th.tempDir + "/mnt"
 
-	workspaceDbPath := th.tempDir + "/workspaceDB"
-
 	th.log("Starting initialization of workspaceDB")
+	workspaceDbPath := th.tempDir + "/workspaceDB"
 	workspaceDB := systemlocal.NewWorkspaceDB(workspaceDbPath)
 	th.log("Finished initialization of workspaceDB")
+
+	th.log("Starting initialization of datastore")
+	datastorePath := th.tempDir + "/datastore"
+	datastore := systemlocal.NewDatastore(datastorePath)
+	th.log("Finished initialization of datastore")
 
 	config := QuantumFsConfig{
 		CachePath:        th.tempDir + "/ramfs",
@@ -32,12 +36,12 @@ func (th *testHelper) systemlocalConfig() QuantumFsConfig {
 		DirtyFlushDelay:  30 * time.Second,
 		MountPath:        mountPath,
 		WorkspaceDB:      workspaceDB,
-		DurableStore:     processlocal.NewDataStore(""),
+		DurableStore:     datastore,
 	}
 	return config
 }
 
-func TestSmokeTestSystemlocalWorkspaceDB(t *testing.T) {
+func TestSmokeTestSystemlocal(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
 		test.startQuantumFs(test.systemlocalConfig())
 		interDirectoryRename(test)
