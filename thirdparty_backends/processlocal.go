@@ -8,7 +8,7 @@ package thirdparty_backends
 // To avoid compiling in support for processlocal datastore,
 // change "!skip_backends" in first line with "ignore"
 //
-import "github.com/aristanetworks/quantumfs/processlocal"
+import "github.com/aristanetworks/quantumfs/backends/processlocal"
 
 func init() {
 	registerDatastore("processlocal", processlocal.NewDataStore)
