@@ -60,8 +60,10 @@ func newQfsExtPair(common string,
 		qlog.FnExitStr+common, common)
 }
 
-func createExtractors() []qlogstats.StatExtractor {
-	return []qlogstats.StatExtractor{
+var extractors []qlogstats.StatExtractor
+
+func init() {
+	quantumFS := []qlogstats.StatExtractor{
 		// Critical system errors
 		qlogstats.NewExtPointStatsPartialFormat("ERROR: ", "SystemErrors"),
 
@@ -185,6 +187,8 @@ func createExtractors() []qlogstats.StatExtractor {
 			daemon.ReadDirPlusLog,
 		}),
 	}
+
+	extractors = append(extractors, quantumFS...)
 }
 
 func main() {
@@ -203,8 +207,6 @@ func main() {
 	utils.ServePprof()
 
 	db := loadTimeSeriesDB()
-
-	extractors := createExtractors()
 
 	qlogstats.AggregateLogs(qlog.ReadThenTail, lastParam, db, extractors,
 		30*time.Second)
