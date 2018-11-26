@@ -8,7 +8,7 @@ package thirdparty_backends
 // To avoid compiling in support for the systemlocal backend
 // change "!skip_backends" in first line to "ignore"
 //
-import "github.com/aristanetworks/quantumfs/systemlocal"
+import "github.com/aristanetworks/quantumfs/backends/systemlocal"
 
 func init() {
 	registerDatastore("systemlocal", systemlocal.NewDataStore)
