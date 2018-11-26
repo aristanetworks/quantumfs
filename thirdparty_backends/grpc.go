@@ -8,7 +8,7 @@ package thirdparty_backends
 // To avoid compiling in support for the grpc backend change "!skip_backends" in
 // first line to "ignore"
 //
-import "github.com/aristanetworks/quantumfs/grpc"
+import "github.com/aristanetworks/quantumfs/backends/grpc"
 
 func init() {
 	registerWorkspaceDB("grpc", grpc.NewWorkspaceDB)

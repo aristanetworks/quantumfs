@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends/grpc"
 	"github.com/aristanetworks/quantumfs/daemon"
-	"github.com/aristanetworks/quantumfs/grpc"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"

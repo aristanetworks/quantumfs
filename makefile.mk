@@ -11,8 +11,8 @@ PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
 PKGS_TO_TEST+=quantumfs/backends/systemlocal
 PKGS_TO_TEST+=quantumfs/backends/processlocal quantumfs/walker
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
-PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/grpc
-PKGS_TO_TEST+=quantumfs/grpc/server quantumfs/qlogstats
+PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/backends/grpc
+PKGS_TO_TEST+=quantumfs/backends/grpc/server quantumfs/qlogstats
 PKGS_TO_TEST+=quantumfs/cmd/qupload
 LIBRARIES=libqfs.so libqfs.h libqfs32.so libqfs32.h
 
