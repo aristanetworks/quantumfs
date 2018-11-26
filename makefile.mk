@@ -1,3 +1,9 @@
+# Configure which features to build QuantumFS with. If you change these you should
+# run 'make fetch' to ensure that all the necessary dependencies are available.
+#
+# See the files in the features directory for details.
+FEATURES=ether influxlib
+
 COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthcheck
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
@@ -52,14 +58,20 @@ endef
 check-dep-installed:
 	dep version &>/dev/null || go get -u github.com/golang/dep/cmd/dep
 
-fetch: check-dep-installed
+Gopkg.toml: makefile.mk Gopkg.tomlbase features/*/Gopkg
+	cp Gopkg.tomlbase Gopkg.toml
+	for feature in `grep ^FEATURES makefile.mk | sed 's/^.*=//'`; do \
+		cat features/$$feature/Gopkg >> Gopkg.toml; \
+	done
+
+fetch: check-dep-installed Gopkg.toml
 	dep ensure -v
 	$(fetch-cityhash)
 
-update: check-dep-installed
+update: check-dep-installed Gopkg.toml
 	dep ensure -v --update
 	$(fetch-cityhash)
-	@echo "Please review and commit any changes to Gopkg.toml and Gopkg.lock"
+	@echo "Please review and commit any changes to Gopkg.tomlbase and Gopkg.lock"
 
 vet:
 	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./cmd -true -o -type d -print`

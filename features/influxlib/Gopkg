@@ -1,0 +1,9 @@
+[[constraint]]
+  name = "github.com/aristanetworks/influxlib"
+  source = "gut.aristanetworks.com/repos/influxlib"
+  branch = "master"
+
+[[override]]
+  name = "github.com/aristanetworks/influxlib"
+  source = "gut.aristanetworks.com/repos/influxlib"
+  branch = "master"
