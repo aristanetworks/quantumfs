@@ -5,9 +5,7 @@
 
 package backends
 
-// To avoid compiling in support for ether datastore
-// change "!skip_backends" in first line with "ignore"
-// You will need to do the same in daemon/Ether_test.go as well.
+// Please see FEATURES in makefile.mk for details on how to toggle this feature.
 
 import (
 	"container/list"
