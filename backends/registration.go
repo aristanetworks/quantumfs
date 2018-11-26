@@ -3,7 +3,7 @@
 
 // Utility functions necessary for various backend to register themselves to be valid
 // options for quantumfsd to use.
-package thirdparty_backends
+package backends
 
 import "github.com/aristanetworks/quantumfs"
 

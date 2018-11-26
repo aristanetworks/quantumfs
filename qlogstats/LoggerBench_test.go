@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -24,7 +24,7 @@ func BenchmarkEndToEnd(test *testing.B) {
 	extractors := make([]StatExtractor, 0)
 	extractors = append(extractors, NewExtPointStats(fmt, "test"))
 
-	db, err := thirdparty_backends.ConnectTimeSeriesDB("memdb", "")
+	db, err := backends.ConnectTimeSeriesDB("memdb", "")
 	utils.AssertNoErr(err)
 
 	go AggregateLogs(qlog.ReadThenTail, dir+"/qlog", db, extractors,

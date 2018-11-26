@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/grpc/rpc"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/utils"
 
 	"golang.org/x/net/context"
@@ -51,7 +51,7 @@ type workspaceState struct {
 func StartWorkspaceDbd(logger *qlog.Qlog, port uint16, backend string,
 	config string) (*Server, error) {
 
-	wsdb, err := thirdparty_backends.ConnectWorkspaceDB(backend, config)
+	wsdb, err := backends.ConnectWorkspaceDB(backend, config)
 	if err != nil {
 		logger.Log(qlog.LogWorkspaceDb, 0, 0,
 			"Failed to instantiate backend: %s", err.Error())

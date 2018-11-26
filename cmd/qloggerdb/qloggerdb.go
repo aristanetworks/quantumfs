@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/qlogstats"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -35,7 +35,7 @@ func init() {
 }
 
 func loadTimeSeriesDB() quantumfs.TimeSeriesDB {
-	tsdb, err := thirdparty_backends.ConnectTimeSeriesDB(database, databaseConf)
+	tsdb, err := backends.ConnectTimeSeriesDB(database, databaseConf)
 	if err != nil {
 		fmt.Printf("TimeSeriesDB load failed\n")
 		fmt.Printf("Error: %v\n", err)

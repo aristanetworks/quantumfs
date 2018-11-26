@@ -19,10 +19,10 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/processlocal"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
@@ -279,7 +279,7 @@ func (th *TestHelper) etherFilesystemConfig() QuantumFsConfig {
 	mountPath := th.TempDir + "/mnt"
 
 	datastorePath := th.TempDir + "/ether"
-	datastore, err := thirdparty_backends.ConnectDatastore("ether.filesystem",
+	datastore, err := backends.ConnectDatastore("ether.filesystem",
 		datastorePath)
 	th.AssertNoErr(err)
 
