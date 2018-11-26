@@ -5,7 +5,7 @@ After=quantumfs.service
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/qloggerdb -db influxdb /dev/shm/quantumfs/qlog
+ExecStart=/usr/sbin/qloggerdb -db influxlib /dev/shm/quantumfs/qlog
 ExecStop=/usr/bin/killall -SIGHUP qloggerdb
 User=root
 KillMode=none
