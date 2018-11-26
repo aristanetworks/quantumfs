@@ -23,8 +23,8 @@ var database string
 var databaseConf string
 
 func init() {
-	flag.StringVar(&database, "db", "memdb",
-		"Name of database to use (memdb, influxdb)")
+	flag.StringVar(&database, "db", "processlocal",
+		"Name of database to use (processlocal, influxlib)")
 	flag.StringVar(&databaseConf, "dbConf", "", "Options to pass to database")
 
 	flag.Usage = func() {
