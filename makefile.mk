@@ -94,26 +94,26 @@ grpc/rpc/rpc.pb.go: grpc/rpc/rpc.proto
 	protoc -I grpc/rpc/ grpc/rpc/rpc.proto --go_out=plugins=grpc:grpc/rpc
 
 libqfs32.so:
-	CGO_ENABLED=1 GOARCH=386 go build -buildmode=c-shared -o libqfs32.so libqfs/wrapper/libqfs.go
+	CGO_ENABLED=1 GOARCH=386 go build -tags "$(FEATURES)" -buildmode=c-shared -o libqfs32.so libqfs/wrapper/libqfs.go
 
 libqfs.so: libqfs/wrapper/libqfs.go
-	CGO_ENABLED=1 go build -buildmode=c-shared -o libqfs.so libqfs/wrapper/libqfs.go
+	CGO_ENABLED=1 go build -tags "$(FEATURES)" -buildmode=c-shared -o libqfs.so libqfs/wrapper/libqfs.go
 
 $(COMMANDS): encoding/metadata.capnp.go
-	go build -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
+	go build -tags "$(FEATURES)" -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
 	mkdir -p $(GOPATH)/bin
 	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
 	sudo -E go test github.com/aristanetworks/quantumfs/cmd/$@
 
 $(COMMANDS_STATIC): encoding/metadata.capnp.go
-	go build -gcflags '-e' -o $@ -ldflags "-X main.version=$(version) -extldflags -static" github.com/aristanetworks/quantumfs/cmd/$(subst -static,,$@)
+	go build -tags "$(FEATURES)" -gcflags '-e' -o $@ -ldflags "-X main.version=$(version) -extldflags -static" github.com/aristanetworks/quantumfs/cmd/$(subst -static,,$@)
 
 
 $(COMMANDS386): encoding/metadata.capnp.go
-	GOARCH=386 go build -gcflags '-e' -o $@ -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$(subst -386,,$@)
+	GOARCH=386 go build -tags "$(FEATURES)" -gcflags '-e' -o $@ -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$(subst -386,,$@)
 
 wsdbservice:
-	go build -gcflags '-e' -o cmd/wsdbservice/wsdbservice -ldflags "-X main.version=$(version) -extldflags -static" github.com/aristanetworks/quantumfs/cmd/wsdbservice
+	go build -tags "$(FEATURES)" -gcflags '-e' -o cmd/wsdbservice/wsdbservice -ldflags "-X main.version=$(version) -extldflags -static" github.com/aristanetworks/quantumfs/cmd/wsdbservice
 
 dockerWsdb: wsdbservice
 	cd cmd/wsdbservice; docker build -t registry.docker.sjc.aristanetworks.com:5000/qubit-tools/wsdbservice:$(version) .
@@ -124,7 +124,7 @@ uploadDocker: dockerWsdb
 # Disable the golang test cache with '-count 1' because not all of these tests are
 # entirely deterministic and we want to get test coverage of timing differences.
 $(PKGS_TO_TEST): encoding/metadata.capnp.go grpc/rpc/rpc.pb.go
-	sudo -E go test $(QFS_GO_TEST_ARGS) -gcflags '-e' -count 1 github.com/aristanetworks/$@
+	sudo -E go test -tags "$(FEATURES)" $(QFS_GO_TEST_ARGS) -gcflags '-e' -count 1 github.com/aristanetworks/$@
 
 rpm-ver:
 	@echo "version='$(version)'"
