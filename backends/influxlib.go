@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	registerTimeSeriesDB("influxdb", newInfluxDB)
+	registerTimeSeriesDB("influxlib", newInfluxDB)
 }
 
 type influxlibAdapter struct {
@@ -28,7 +28,7 @@ type influxlibAdapter struct {
 func newInfluxDB(config string) quantumfs.TimeSeriesDB {
 	cfg := *influxlib.DefaultConfig()
 
-	flags := flag.NewFlagSet("influxdb", flag.ExitOnError)
+	flags := flag.NewFlagSet("influxlib", flag.ExitOnError)
 	flags.StringVar(&cfg.Hostname, "hostname", cfg.Hostname, "InfluxDB Hostname")
 	flags.StringVar(&cfg.Protocol, "protocol", cfg.Protocol, "InfluxDB Procotol")
 	flags.StringVar(&cfg.Database, "database", cfg.Database, "InfluxDB Database")
