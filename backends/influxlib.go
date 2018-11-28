@@ -5,8 +5,7 @@
 
 package thirdparty_backends
 
-// To avoid (compiling in) support for influxDB
-// change "!skip_backends" in first line with "ignore"
+// Please see FEATURES in makefile.mk for details on how to toggle this feature.
 
 import (
 	"flag"
