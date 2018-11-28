@@ -11,11 +11,11 @@ import (
 	"testing"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends"
+	"github.com/aristanetworks/quantumfs/backends/grpc"
 	"github.com/aristanetworks/quantumfs/daemon"
-	"github.com/aristanetworks/quantumfs/grpc"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/testutils"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/utils"
 )
 
@@ -188,8 +188,8 @@ func (th *testHelper) newClient() quantumfs.WorkspaceDB {
 func (th *testHelper) restartServer() {
 	backend := th.backend
 	if backend == nil {
-		wsdb, err := thirdparty_backends.ConnectWorkspaceDB(
-			th.backendType, th.backendConfig)
+		wsdb, err := backends.ConnectWorkspaceDB(th.backendType,
+			th.backendConfig)
 		th.AssertNoErr(err)
 		backend = wsdb
 	}

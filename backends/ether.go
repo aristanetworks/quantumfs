@@ -3,7 +3,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package thirdparty_backends
+package backends
 
 // To avoid compiling in support for ether datastore
 // change "!skip_backends" in first line with "ignore"

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/grpc/rpc"
+	"github.com/aristanetworks/quantumfs/backends/grpc/rpc"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 

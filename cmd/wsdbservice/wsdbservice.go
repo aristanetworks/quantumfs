@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aristanetworks/quantumfs/grpc/rpc"
-	"github.com/aristanetworks/quantumfs/grpc/server"
+	"github.com/aristanetworks/quantumfs/backends/grpc/rpc"
+	"github.com/aristanetworks/quantumfs/backends/grpc/server"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 )

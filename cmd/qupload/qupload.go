@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	exs "github.com/aristanetworks/quantumfs/utils/excludespec"
 	"golang.org/x/net/context"
 )
@@ -203,12 +203,12 @@ func (up *Uploader) validateParams(p *params) error {
 		return errors.New("Concurrency must be > 0")
 	}
 
-	up.dataStore, err = thirdparty_backends.ConnectDatastore(p.dsName, p.dsConf)
+	up.dataStore, err = backends.ConnectDatastore(p.dsName, p.dsConf)
 	if err != nil {
 		return err
 	}
 
-	up.wsDB, err = thirdparty_backends.ConnectWorkspaceDB(p.wsdbName,
+	up.wsDB, err = backends.ConnectWorkspaceDB(p.wsdbName,
 		p.wsdbConf)
 	if err != nil {
 		return err

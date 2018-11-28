@@ -15,8 +15,8 @@ import (
 
 	"code.cloudfoundry.org/bytefmt"
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/daemon"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/hanwen/go-fuse/fuse"
 )
@@ -152,7 +152,7 @@ func loadDatastore() {
 	maxRetryDelay := 5 * time.Second
 
 	for {
-		ds, err := thirdparty_backends.ConnectDatastore(config.DataStoreName,
+		ds, err := backends.ConnectDatastore(config.DataStoreName,
 			config.DataStoreConf)
 		if err != nil {
 			fmt.Printf("Datastore load failed, error: %v\n", err)
@@ -171,8 +171,8 @@ func loadDatastore() {
 }
 
 func loadWorkspaceDB() {
-	wsdb, err := thirdparty_backends.ConnectWorkspaceDB(
-		config.WorkspaceDbName, config.WorkspaceDbConf)
+	wsdb, err := backends.ConnectWorkspaceDB(config.WorkspaceDbName,
+		config.WorkspaceDbConf)
 	if err != nil {
 		fmt.Printf("WorkspaceDB load failed\n")
 		fmt.Printf("Error: %v\n", err)

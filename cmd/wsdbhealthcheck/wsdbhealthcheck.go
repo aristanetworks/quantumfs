@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 )
 
 const (
@@ -58,7 +58,7 @@ func main() {
 	connectWait := make(chan quantumfs.WorkspaceDB)
 
 	go func() {
-		wsdb, err := thirdparty_backends.ConnectWorkspaceDB("grpc", *address)
+		wsdb, err := backends.ConnectWorkspaceDB("grpc", *address)
 		if err != nil {
 			healthIsBad("Connection error", err)
 		}

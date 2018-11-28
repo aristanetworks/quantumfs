@@ -4,7 +4,7 @@
 package main
 
 import (
-	"github.com/aristanetworks/quantumfs/grpc"
+	"github.com/aristanetworks/quantumfs/backends/grpc"
 	"github.com/aristanetworks/quantumfs/qlogstats"
 )
 

@@ -8,11 +8,11 @@ COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthche
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
-PKGS_TO_TEST+=quantumfs/systemlocal
-PKGS_TO_TEST+=quantumfs/processlocal quantumfs/walker
+PKGS_TO_TEST+=quantumfs/backends/systemlocal
+PKGS_TO_TEST+=quantumfs/backends/processlocal quantumfs/walker
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
-PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/grpc
-PKGS_TO_TEST+=quantumfs/grpc/server quantumfs/qlogstats
+PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/backends/grpc
+PKGS_TO_TEST+=quantumfs/backends/grpc/server quantumfs/qlogstats
 PKGS_TO_TEST+=quantumfs/cmd/qupload
 LIBRARIES=libqfs.so libqfs.h libqfs32.so libqfs32.h
 
@@ -90,8 +90,8 @@ encoding/metadata.capnp.go: encoding/metadata.capnp
 		exit 1; \
 	fi
 
-grpc/rpc/rpc.pb.go: grpc/rpc/rpc.proto
-	protoc -I grpc/rpc/ grpc/rpc/rpc.proto --go_out=plugins=grpc:grpc/rpc
+backends/grpc/rpc/rpc.pb.go: backends/grpc/rpc/rpc.proto
+	protoc -I backends/grpc/rpc/ backends/grpc/rpc/rpc.proto --go_out=plugins=grpc:backends/grpc/rpc
 
 libqfs32.so:
 	CGO_ENABLED=1 GOARCH=386 go build -tags "$(FEATURES)" -buildmode=c-shared -o libqfs32.so libqfs/wrapper/libqfs.go
@@ -123,7 +123,7 @@ uploadDocker: dockerWsdb
 
 # Disable the golang test cache with '-count 1' because not all of these tests are
 # entirely deterministic and we want to get test coverage of timing differences.
-$(PKGS_TO_TEST): encoding/metadata.capnp.go grpc/rpc/rpc.pb.go
+$(PKGS_TO_TEST): encoding/metadata.capnp.go backends/grpc/rpc/rpc.pb.go
 	sudo -E go test -tags "$(FEATURES)" $(QFS_GO_TEST_ARGS) -gcflags '-e' -count 1 github.com/aristanetworks/$@
 
 rpm-ver:
