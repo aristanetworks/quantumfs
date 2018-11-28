@@ -24,7 +24,7 @@ func BenchmarkEndToEnd(test *testing.B) {
 	extractors := make([]StatExtractor, 0)
 	extractors = append(extractors, NewExtPointStats(fmt, "test"))
 
-	db, err := backends.ConnectTimeSeriesDB("memdb", "")
+	db, err := backends.ConnectTimeSeriesDB("processlocal", "")
 	utils.AssertNoErr(err)
 
 	go AggregateLogs(qlog.ReadThenTail, dir+"/qlog", db, extractors,
