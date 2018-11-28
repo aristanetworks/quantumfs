@@ -20,27 +20,6 @@
 # https://golang.org/cmd/go/#hdr-Remote_import_paths
 
 [[constraint]]
-  name = "github.com/aristanetworks/influxlib"
-  source = "gut.aristanetworks.com/repos/influxlib"
-  branch = "master"
-
-[[override]]
-  name = "github.com/aristanetworks/influxlib"
-  source = "gut.aristanetworks.com/repos/influxlib"
-  branch = "master"
-
-
-[[constraint]]
-  name = "github.com/aristanetworks/ether"
-  source = "gerrit.corp.arista.io/ether"
-  revision = "41b3aa65be520ac434a38520f06bc9663021ae85"
-
-[[override]]
-  name = "github.com/aristanetworks/ether"
-  source = "gerrit.corp.arista.io/ether"
-  revision = "41b3aa65be520ac434a38520f06bc9663021ae85"
-
-[[constraint]]
   name = "github.com/boltdb/bolt"
   version = "~1.3.0"
 

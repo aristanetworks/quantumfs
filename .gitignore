@@ -17,3 +17,4 @@
 /wsdbhealthcheck
 libqfs.*
 libqfs32.*
+/Gopkg.toml
