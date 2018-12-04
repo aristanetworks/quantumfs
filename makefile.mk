@@ -5,6 +5,7 @@
 FEATURES=
 
 COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthcheck
+COMMANDS+=wsdbservice
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
@@ -32,7 +33,7 @@ RPM_RELEASE := 1
 
 .PHONY: all clean check-dep-installed fetch update vet lockcheck cppstyle $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) $(COMMANDS_STATIC)
 
-all: lockcheck cppstyle vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) wsdbservice qfsclient
+all: lockcheck cppstyle vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) qfsclient
 
 clean:
 	rm -f $(COMMANDS) $(COMMANDS386) $(COMMANDS_STATIC) $(LIBRARIES)
@@ -110,9 +111,6 @@ $(COMMANDS_STATIC): encoding/metadata.capnp.go
 
 $(COMMANDS386): encoding/metadata.capnp.go
 	GOARCH=386 go build -tags "$(FEATURES)" -gcflags '-e' -o $@ -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$(subst -386,,$@)
-
-wsdbservice:
-	go build -tags "$(FEATURES)" -gcflags '-e' -o cmd/wsdbservice/wsdbservice -ldflags "-X main.version=$(version) -extldflags -static" github.com/aristanetworks/quantumfs/cmd/wsdbservice
 
 # Disable the golang test cache with '-count 1' because not all of these tests are
 # entirely deterministic and we want to get test coverage of timing differences.
