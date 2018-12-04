@@ -143,7 +143,7 @@ FPM := fpm -f -s dir -t rpm $(RPM_COMMON_CONTACT) $(RPM_COMMON_VERSION)
 RPM_BASENAME_QUPLOAD := QuantumFS-qupload
 RPM_FILE_QUPLOAD := $(RPM_BASENAME_QUPLOAD)-$(RPM_VERSION)-$(RPM_RELEASE)
 quploadRPM: check-fpm $(COMMANDS)
-	$(FPM) -n $(RPM_BASENAME_QUPLOAD) \
+	$(FPM) -n QuantumFS-upload \
 		--description='A tool to upload directory hierarchy into datastore' \
 		--no-depends \
 		./qupload=/usr/bin/qupload
@@ -186,26 +186,19 @@ healthCheckRpm: check-fpm $(COMMANDS)
 # Default to x86_64 location; we'll override when building via mock
 RPM_LIBDIR ?= /usr/lib64
 
-RPM_BASENAME_CLIENT := QuantumFS-client
-RPM_BASENAME_CLIENT_DEVEL := QuantumFS-client-devel
-RPM_FILE_PREFIX_CLIENT := $(RPM_BASENAME_CLIENT)-$(RPM_VERSION)-$(RPM_RELEASE)
-RPM_FILE_PREFIX_CLIENT_DEVEL := $(RPM_BASENAME_CLIENT_DEVEL)-$(RPM_VERSION)-$(RPM_RELEASE)
-
-RPM_FILES_TOOLSV2_I686 += $(RPM_FILE_PREFIX_CLIENT).i686.rpm $(RPM_FILE_PREFIX_CLIENT_DEVEL).i686.rpm
-RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_PREFIX_CLIENT).x86_64.rpm $(RPM_FILE_PREFIX_CLIENT_DEVEL).x86_64.rpm
-RPM_FILES_TOOLSV2_X86_64 += $(RPM_FILE_QUPLOAD).x86_64.rpm
+RPM_VER_SUFFIX := $(RPM_VERSION)-$(RPM_RELEASE)
 
 clientRPM: check-fpm qfsclient
-	$(FPM) -n $(RPM_BASENAME_CLIENT) \
+	$(FPM) -n QuantumFS-client \
 		--description='QuantumFS client API' \
 		--depends jansson \
 		--depends openssl \
 		--depends libstdc++ \
 		QFSClient/libqfsclient.so=$(RPM_LIBDIR)/libqfsclient.so \
 		libqfs.so=$(RPM_LIBDIR)/libqfs.so
-	$(FPM) -n $(RPM_BASENAME_CLIENT_DEVEL) \
+	$(FPM) -n QuantumFS-client-devel \
 		--description='Development files for QuantumFS client API' \
-		--depends $(RPM_BASENAME_CLIENT) \
+		--depends QuantumFS-client \
 		QFSClient/qfs_client.h=/usr/include/qfs_client.h \
 		libqfs.h=/usr/include/libqfs.h
 
@@ -224,24 +217,14 @@ clientRPM32: check-fpm libqfs32.so
 			mock -r fedora-18-i386 --copyin ./libqfs32.so /quantumfs/libqfs.so ; \
 			mock -r fedora-18-i386 --copyin ./libqfs32.h /quantumfs/libqfs.h ; \
 			mock -r fedora-18-i386 --shell "export PATH=$$PATH:/usr/local/bin && cd /quantumfs && make clientRPM RPM_LIBDIR=/usr/lib" ; \
-			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT).i686.rpm . ; \
-			mock -r fedora-18-i386 --copyout /quantumfs/$(RPM_FILE_PREFIX_CLIENT_DEVEL).i686.rpm . ; \
+			mock -r fedora-18-i386 --copyout /quantumfs/QuantumFS-client-$(RPM_VER_SUFFIX).i686.rpm . ; \
+			mock -r fedora-18-i386 --copyout /quantumfs/QuantumFS-client-devel-$(RPM_VER_SUFFIX).i686.rpm . ; \
 			mock -r fedora-18-i386 --clean ; \
 		) 9>$$MOCKLOCK ; \
 	}
 
-rpm: $(COMMANDS) quantumfsRPM qfsRPM qfsRPMi686 quploadRPM clientRPM clientRPM32 healthCheckRpm
+rpms: $(COMMANDS) quantumfsRPM qfsRPM qfsRPMi686 quploadRPM clientRPM clientRPM32 healthCheckRpm
 
-push-rpms: $(RPM_FILES_TOOLSV2_I686) $(RPM_FILES_TOOLSV2_X86_64)
-	a4 scp $(RPM_FILES_TOOLSV2_I686) dist:/dist/release/ToolsV2/repo/i386/RPMS
-	a4 ssh dist /usr/bin/createrepo --update /dist/release/ToolsV2/repo/i386/RPMS
-	a4 scp $(RPM_FILES_TOOLSV2_X86_64) dist:/dist/release/ToolsV2/repo/x86_64/RPMS
-	a4 ssh dist /usr/bin/createrepo --update /dist/release/ToolsV2/repo/x86_64/RPMS
-	@echo
-	@echo "If you're refreshing existing RPMs, then on machines which use this repo you should:"
-	@echo "   sudo yum clean all"
-	@echo "   sudo yum makecache"
-
-.PHONY: check-fpm rpm-ver qfsRPM quploadRPM clientRPM clientRPM32 rpm push-rpms
+.PHONY: check-fpm rpm-ver qfsRPM quploadRPM clientRPM clientRPM32 rpms
 
 include QFSClient/Makefile
