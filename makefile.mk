@@ -114,12 +114,6 @@ $(COMMANDS386): encoding/metadata.capnp.go
 wsdbservice:
 	go build -tags "$(FEATURES)" -gcflags '-e' -o cmd/wsdbservice/wsdbservice -ldflags "-X main.version=$(version) -extldflags -static" github.com/aristanetworks/quantumfs/cmd/wsdbservice
 
-dockerWsdb: wsdbservice
-	cd cmd/wsdbservice; docker build -t registry.docker.sjc.aristanetworks.com:5000/qubit-tools/wsdbservice:$(version) .
-
-uploadDocker: dockerWsdb
-	cd cmd/wsdbservice; docker push registry.docker.sjc.aristanetworks.com:5000/qubit-tools/wsdbservice:$(version)
-
 # Disable the golang test cache with '-count 1' because not all of these tests are
 # entirely deterministic and we want to get test coverage of timing differences.
 $(PKGS_TO_TEST): encoding/metadata.capnp.go backends/grpc/rpc/rpc.pb.go
