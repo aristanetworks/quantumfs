@@ -31,8 +31,6 @@ version := $(shell git describe --dirty --abbrev=8 --match "v[0-9]*" 2>/dev/null
 RPM_VERSION := $(shell echo "$(version)" | sed -e "s/^v//" -e "s/-/_/g")
 RPM_RELEASE := 1
 
-.PHONY: all clean check-dep-installed fetch update vet lockcheck cppstyle $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) $(COMMANDS_STATIC)
-
 all: lockcheck cppstyle vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) qfsclient
 
 clean:
@@ -225,6 +223,9 @@ clientRPM32: check-fpm libqfs32.so
 
 rpms: $(COMMANDS) quantumfsRPM qfsRPM qfsRPMi686 quploadRPM clientRPM clientRPM32 healthCheckRpm
 
+.PHONY: all clean check-dep-installed fetch update vet lockcheck cppstyle check-fpm
 .PHONY: check-fpm rpm-ver qfsRPM quploadRPM clientRPM clientRPM32 rpms
+.PHONY: $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) $(COMMANDS_STATIC)
+
 
 include QFSClient/Makefile
