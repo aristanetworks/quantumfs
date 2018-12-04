@@ -101,8 +101,7 @@ libqfs.so: libqfs/wrapper/libqfs.go
 
 $(COMMANDS): encoding/metadata.capnp.go
 	go build -tags "$(FEATURES)" -gcflags '-e' -ldflags "-X main.version=$(version)" github.com/aristanetworks/quantumfs/cmd/$@
-	mkdir -p $(GOPATH)/bin
-	cp -r $(GOPATH)/src/github.com/aristanetworks/quantumfs/$@ $(GOPATH)/bin/$@
+	go install github.com/aristanetworks/quantumfs/cmd/$@
 	sudo -E go test github.com/aristanetworks/quantumfs/cmd/$@
 
 $(COMMANDS_STATIC): encoding/metadata.capnp.go
