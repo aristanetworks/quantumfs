@@ -115,11 +115,6 @@ $(COMMANDS386): encoding/metadata.capnp.go
 $(PKGS_TO_TEST): encoding/metadata.capnp.go backends/grpc/rpc/rpc.pb.go
 	sudo -E go test -tags "$(FEATURES)" $(QFS_GO_TEST_ARGS) -gcflags '-e' -count 1 github.com/aristanetworks/$@
 
-rpm-ver:
-	@echo "version='$(version)'"
-	@echo "RPM version='$(RPM_VERSION)'"
-	@echo "RPM release='$(RPM_RELEASE)'"
-
 check-fpm:
 	fpm --help &> /dev/null || \
 	(echo "Installing fpm" && \
@@ -224,7 +219,7 @@ clientRPM32: check-fpm libqfs32.so
 rpms: $(COMMANDS) quantumfsRPM qfsRPM qfsRPMi686 quploadRPM clientRPM clientRPM32 healthCheckRpm
 
 .PHONY: all clean check-dep-installed fetch update vet lockcheck cppstyle check-fpm
-.PHONY: check-fpm rpm-ver qfsRPM quploadRPM clientRPM clientRPM32 rpms
+.PHONY: check-fpm qfsRPM quploadRPM clientRPM clientRPM32 rpms
 .PHONY: $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) $(COMMANDS_STATIC)
 
 
