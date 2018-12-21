@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aristanetworks/ether/blobstore"
+	"github.com/aristanetworks/quantumfs/backends/blobstore"
 	"github.com/gocql/gocql"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"

@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/aristanetworks/ether/qubit/wsdb"
+	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	mock "github.com/stretchr/testify/mock"
 )
 

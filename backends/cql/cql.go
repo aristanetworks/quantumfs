@@ -4,9 +4,8 @@
 package cql
 
 import (
+	"github.com/aristanetworks/quantumfs/backends/ether"
 	"time"
-
-	"github.com/aristanetworks/ether"
 )
 
 // APIStatsReporter reports statistics like latency, rate etc

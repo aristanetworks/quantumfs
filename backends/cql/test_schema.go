@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aristanetworks/ether/utils"
+	"github.com/aristanetworks/quantumfs/backends/cql/utils"
 	"github.com/gocql/gocql"
 )
 

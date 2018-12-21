@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/aristanetworks/ether/blobstore"
+	"github.com/aristanetworks/quantumfs/backends/blobstore"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/sync/errgroup"
 )

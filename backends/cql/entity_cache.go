@@ -5,13 +5,12 @@ package cql
 
 import (
 	"fmt"
+	"github.com/aristanetworks/quantumfs/backends/ether"
 	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/aristanetworks/ether"
 )
 
 // Refer to the workspace DB API documentation to see the list

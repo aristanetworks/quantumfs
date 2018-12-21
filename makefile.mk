@@ -10,6 +10,7 @@ COMMANDS_STATIC=quantumfsd-static qupload-static
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
 PKGS_TO_TEST+=quantumfs/backends/systemlocal
 PKGS_TO_TEST+=quantumfs/backends/processlocal quantumfs/walker
+PKGS_TO_TEST+=quantumfs/backends/cql
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/backends/grpc
 PKGS_TO_TEST+=quantumfs/backends/grpc/server quantumfs/qlogstats
@@ -74,7 +75,7 @@ update: check-dep-installed Gopkg.toml
 	@echo "Please review and commit any changes to Gopkg.tomlbase and Gopkg.lock"
 
 vet:
-	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./features -prune -o -path ./cmd -true -o -type d -print`
+	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./features -prune -o -path ./cmd -true -o -type d -print | grep -v "./backends/qubit$"`
 
 lockcheck:
 	./lockcheck.sh

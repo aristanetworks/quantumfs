@@ -17,9 +17,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/aristanetworks/ether"
-	"github.com/aristanetworks/ether/qubit/wsdb"
-	qwsdb "github.com/aristanetworks/ether/qubit/wsdb"
+	"github.com/aristanetworks/quantumfs/backends/ether"
+	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
+	qwsdb "github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	"github.com/stretchr/testify/suite"
 )
 

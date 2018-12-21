@@ -8,7 +8,7 @@ package cql
 import (
 	"testing"
 
-	qwsdb "github.com/aristanetworks/ether/qubit/wsdb"
+	qwsdb "github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	"github.com/stretchr/testify/suite"
 )
 

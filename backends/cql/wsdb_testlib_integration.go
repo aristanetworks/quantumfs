@@ -11,7 +11,7 @@ import (
 	"bytes"
 	"time"
 
-	"github.com/aristanetworks/ether/qubit/wsdb"
+	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	"github.com/stretchr/testify/require"
 )
 

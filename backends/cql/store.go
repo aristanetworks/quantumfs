@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/aristanetworks/ether/utils"
+	"github.com/aristanetworks/quantumfs/backends/cql/utils"
 )
 
 var scyllaUsername = "ether"

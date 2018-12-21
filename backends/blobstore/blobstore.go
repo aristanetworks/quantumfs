@@ -13,7 +13,7 @@ package blobstore
 import (
 	"fmt"
 
-	"github.com/aristanetworks/ether"
+	"github.com/aristanetworks/quantumfs/backends/ether"
 )
 
 // BSErrorCode are integer codes for error responses from ether/blobstore package

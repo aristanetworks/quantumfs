@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aristanetworks/ether"
+	"github.com/aristanetworks/quantumfs/backends/ether"
 )
 
 const testKey = "Hello"

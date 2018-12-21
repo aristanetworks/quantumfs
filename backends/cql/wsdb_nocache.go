@@ -15,8 +15,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/aristanetworks/ether"
-	"github.com/aristanetworks/ether/qubit/wsdb"
+	"github.com/aristanetworks/quantumfs/backends/ether"
+	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	"github.com/gocql/gocql"
 )
 

@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aristanetworks/ether"
-	"github.com/aristanetworks/ether/qubit/wsdb"
-	"github.com/aristanetworks/ether/utils/stats"
-	"github.com/aristanetworks/ether/utils/stats/inmem"
+	"github.com/aristanetworks/quantumfs/backends/cql/utils/stats"
+	"github.com/aristanetworks/quantumfs/backends/cql/utils/stats/inmem"
+	"github.com/aristanetworks/quantumfs/backends/ether"
+	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 )
 
 // In this implementation of workspace DB API,

@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aristanetworks/ether"
+	"github.com/aristanetworks/quantumfs/backends/ether"
 )
 
 // ObjectKey is key used to access object in the cluster-wide

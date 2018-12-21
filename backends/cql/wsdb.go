@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aristanetworks/ether/qubit/wsdb"
+	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 )
 
 // The workspace DB API endpoint is instantiated here.

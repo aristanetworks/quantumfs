@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aristanetworks/ether"
-	"github.com/aristanetworks/ether/blobstore"
-	"github.com/aristanetworks/ether/utils/stats"
-	"github.com/aristanetworks/ether/utils/stats/inmem"
+	"github.com/aristanetworks/quantumfs/backends/blobstore"
+	"github.com/aristanetworks/quantumfs/backends/cql/utils/stats"
+	"github.com/aristanetworks/quantumfs/backends/cql/utils/stats/inmem"
+	"github.com/aristanetworks/quantumfs/backends/ether"
 	"github.com/gocql/gocql"
 )
 
