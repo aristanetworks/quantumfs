@@ -208,7 +208,8 @@ func schemaCheckV3(store *cqlStore, cfg *Config, keySpace, tableName string) err
 	var actualPermsList []string
 	if err := store.session.Query(checkPermsQuery).Scan(&actualPermsList); err != nil {
 		// skip the permission check if the system_auth table does not exist
-		if strings.Contains(err.Error(), "system_auth does not exist") {
+		if strings.Contains(err.Error(), "system_auth does not exist") ||
+			strings.Contains(err.Error(), "unconfigured table permissions") {
 			return nil
 		}
 		return fmt.Errorf("v3: permission check failed: %s", err.Error())

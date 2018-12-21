@@ -4,6 +4,8 @@
     "nodes":[ "0.0.0.0"],
     "keyspace":"dkr_etherintegtest",
     "conntimeoutsec":300,
+    "username":"usrEtherIntegTest",
+    "password":"usrEtherIntegTest",
     "checkschemaretries":20
     },
     "blobstore":
