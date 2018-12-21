@@ -24,3 +24,14 @@
 
 
  qwalker/daemon/point.go should eventualy..... use quantumfs/timeseriesdb.go
+
+ add gocql to tomlbase
+
+ qfs+scylla smoke test
+ branch
+ add file
+ modify file
+ restart qfs and check that files are there ..
+
+
+limitation of wsdb+cql
