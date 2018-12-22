@@ -41,7 +41,7 @@ func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 	suite.cache = cwsdb.cache
 
 	err = nwsdb.CreateWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName, NullSpaceName,
-		wsdb.WorkspaceNonceInvalid, []byte(nil))
+		WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{
@@ -100,7 +100,7 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteImmutableSet() {
 
 func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
 	_, _, err := suite.common.db.BranchWorkspace(integTestEtherCtx, NullSpaceName,
-		qwsdb.NullSpaceName, NullSpaceName,
+		NullSpaceName, NullSpaceName,
 		"ts1", "ns1", "ws1")
 	suite.Require().NoError(err,
 		"Error branching null workspace: %v", err)
@@ -258,7 +258,7 @@ func listEqual(l1 []string, l2 []string) bool {
 func countListChecker(c *testCtx, db WorkspaceDB, w *wsdata) error {
 	var err error
 	var l []string
-	var m map[string]wsdb.WorkspaceNonce
+	var m map[string]WorkspaceNonce
 	var count int
 
 	apiCount := 6
