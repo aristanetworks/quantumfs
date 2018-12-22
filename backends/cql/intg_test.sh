@@ -18,4 +18,3 @@ TESTID=`echo $$$$`
 ETHER_CQL_CONFIG="${CFG_DIR}/dkr_EtherIntegTest"  \
 CFNAME_PREFIX="intg${TESTID}" \
 go test -v  -timeout 200m -p 1 -tags integration -run Integ github.com/aristanetworks/quantumfs/backends/cql
-go test -v  -timeout 200m  -tags integration -run Integ github.com/aristanetworks/quantumfs/backends/cql
