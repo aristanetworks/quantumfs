@@ -10,10 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
 	"github.com/aristanetworks/quantumfs/backends/cql/utils/stats"
 	"github.com/aristanetworks/quantumfs/backends/cql/utils/stats/inmem"
-	"github.com/aristanetworks/quantumfs/backends/ether"
 	"github.com/gocql/gocql"
 )
 
@@ -25,7 +23,7 @@ import (
 // will be automatically cleaned up the store.
 const TimeToLive = "cql.TTL"
 
-// cqlBlobStore implements both blobstore.BlobStore interface
+// cqlBlobStore implements both BlobStore interface
 // CqlStore interface.
 type cqlBlobStore struct {
 	store    *cqlStore
@@ -36,16 +34,16 @@ type cqlBlobStore struct {
 	getStats    stats.OpStats
 }
 
-func newCqlBS(cluster Cluster, cfg *Config) (blobstore.BlobStore, error) {
+func newCqlBS(cluster Cluster, cfg *Config) (BlobStore, error) {
 	store, err := initCqlStore(cluster)
 	if err != nil {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
+		return nil, NewError(ErrOperationFailed,
 			"error in initializing cql store %s", err.Error())
 	}
 
 	bsName, _ := prefixToTblNames(os.Getenv("CFNAME_PREFIX"))
 	if err := isTablePresent(&store, cfg, cfg.Cluster.KeySpace, bsName); err != nil {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "%s", err.Error())
+		return nil, NewError(ErrOperationFailed, "%s", err.Error())
 	}
 
 	cbs := &cqlBlobStore{
@@ -58,11 +56,11 @@ func newCqlBS(cluster Cluster, cfg *Config) (blobstore.BlobStore, error) {
 	return cbs, nil
 }
 
-// NewCqlBlobStore initializes a blobstore.BlobStore to be used with a CQL cluster.
-func NewCqlBlobStore(confName string) (blobstore.BlobStore, error) {
+// NewCqlBlobStore initializes a BlobStore to be used with a CQL cluster.
+func NewCqlBlobStore(confName string) (BlobStore, error) {
 	cfg, err := readCqlConfig(confName)
 	if err != nil {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
+		return nil, NewError(ErrOperationFailed,
 			"error in reading cql config file %s", err.Error())
 	}
 
@@ -80,18 +78,18 @@ const GoCqlInsertLog = "GoCql::Insert"
 // KeyTTLLog can be used in external tool for log parsing
 const KeyTTLLog = "Key: %s TTL: %s"
 
-// Insert is the CQL implementation of blobstore.Insert()
-func (b *cqlBlobStore) Insert(c ether.Ctx, key []byte, value []byte,
+// Insert is the CQL implementation of Insert()
+func (b *cqlBlobStore) Insert(c Ctx, key []byte, value []byte,
 	metadata map[string]string) error {
 	keyHex := hex.EncodeToString(key)
 	if metadata == nil {
-		return blobstore.NewError(blobstore.ErrBadArguments,
+		return NewError(ErrBadArguments,
 			"metadata is nil")
 	}
 
 	ttl, keyExists := metadata[TimeToLive]
 	if !keyExists {
-		return blobstore.NewError(blobstore.ErrBadArguments,
+		return NewError(ErrBadArguments,
 			"%s not found in metadata %v",
 			TimeToLive, metadata)
 	}
@@ -115,7 +113,7 @@ USING TTL %s`, b.keyspace, b.cfName, ttl)
 		err = query.Exec()
 	}()
 	if err != nil {
-		return blobstore.NewError(blobstore.ErrOperationFailed,
+		return NewError(ErrOperationFailed,
 			"error in Insert[%s] %s", keyHex, err.Error())
 	}
 	return nil
@@ -130,8 +128,8 @@ const GoCqlGetLog = "GoCql::Get"
 // KeyLog can be used in external tool for log parsing
 const KeyLog = "Key: %s"
 
-// Get is the CQL implementation of blobstore.Get()
-func (b *cqlBlobStore) Get(c ether.Ctx, key []byte) ([]byte, map[string]string, error) {
+// Get is the CQL implementation of Get()
+func (b *cqlBlobStore) Get(c Ctx, key []byte) ([]byte, map[string]string, error) {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn(GetLog, KeyLog, keyHex).Out()
 
@@ -154,10 +152,10 @@ WHERE key = ?`, b.keyspace, b.cfName)
 	}()
 	if err != nil {
 		if err == gocql.ErrNotFound {
-			return nil, nil, blobstore.NewError(blobstore.ErrKeyNotFound, "error Get[%s] %s",
+			return nil, nil, NewError(ErrKeyNotFound, "error Get[%s] %s",
 				keyHex, err.Error())
 		}
-		return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in Get[%s] %s",
+		return nil, nil, NewError(ErrOperationFailed, "error in Get[%s] %s",
 			keyHex, err.Error())
 	}
 
@@ -170,11 +168,11 @@ WHERE key = ?`, b.keyspace, b.cfName)
 // DeleteLog can be used in external tool for log parsing
 const DeleteLog = "Cql::Delete"
 
-// Delete is the CQL implementation of blobstore.Delete()
-func (b *cqlBlobStore) Delete(c ether.Ctx, key []byte) error {
+// Delete is the CQL implementation of Delete()
+func (b *cqlBlobStore) Delete(c Ctx, key []byte) error {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn(DeleteLog, KeyLog, keyHex).Out()
-	return blobstore.NewError(blobstore.ErrOperationFailed,
+	return NewError(ErrOperationFailed,
 		"Delete operation is not implemented")
 }
 
@@ -184,9 +182,9 @@ const MetadataLog = "Cql::Metadata"
 // GoCqlMetadataLog can be used in external tool for log parsing
 const GoCqlMetadataLog = "GoCql::Metadata"
 
-// Metadata is the CQL implementation of blobstore.Metadata()
+// Metadata is the CQL implementation of Metadata()
 // Note: retreiving this information does not have performance overhead
-func (b *cqlBlobStore) Metadata(c ether.Ctx, key []byte) (map[string]string, error) {
+func (b *cqlBlobStore) Metadata(c Ctx, key []byte) (map[string]string, error) {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn(MetadataLog, KeyLog, keyHex).Out()
 	var ttl int
@@ -209,10 +207,10 @@ WHERE key = ?`, b.keyspace, b.cfName)
 	}()
 	if err != nil {
 		if err == gocql.ErrNotFound {
-			return nil, blobstore.NewError(blobstore.ErrKeyNotFound,
+			return nil, NewError(ErrKeyNotFound,
 				"error Metadata[%s] %s", keyHex, err.Error())
 		}
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
+		return nil, NewError(ErrOperationFailed,
 			"error in Metadata[%s] %s", keyHex, err.Error())
 	}
 	mdata := make(map[string]string)
@@ -224,11 +222,11 @@ WHERE key = ?`, b.keyspace, b.cfName)
 // UpdateLog can be used in external tool for log parsing
 const UpdateLog = "Cql::Update"
 
-// Update is the CQL implementation of blobstore.Update()
-func (b *cqlBlobStore) Update(c ether.Ctx, key []byte, metadata map[string]string) error {
+// Update is the CQL implementation of Update()
+func (b *cqlBlobStore) Update(c Ctx, key []byte, metadata map[string]string) error {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn(UpdateLog, KeyLog, keyHex).Out()
-	return blobstore.NewError(blobstore.ErrOperationFailed,
+	return NewError(ErrOperationFailed,
 		"Update operation is not implemented")
 }
 
@@ -254,7 +252,7 @@ const GoGetExtKeyInfoLog = "GoCql::GetExtKeyInfoLog"
 // Note: This API is intended to be used for debugging purposes.
 //       Since this API may be slow in collecting extended information
 //       use it with caution.
-func (b *cqlBlobStore) GetExtKeyInfo(c ether.Ctx,
+func (b *cqlBlobStore) GetExtKeyInfo(c Ctx,
 	key []byte) (ExtKeyInfo, error) {
 
 	keyHex := hex.EncodeToString(key)
@@ -275,12 +273,12 @@ WHERE key = ?`, b.keyspace, b.cfName)
 	if err != nil {
 		if err == gocql.ErrNotFound {
 			return ExtKeyInfo{},
-				blobstore.NewError(blobstore.ErrKeyNotFound,
+				NewError(ErrKeyNotFound,
 					"error ExtKeyInfo[%s] %s", keyHex,
 					err.Error())
 		}
 		return ExtKeyInfo{},
-			blobstore.NewError(blobstore.ErrOperationFailed,
+			NewError(ErrOperationFailed,
 				"error in ExtKeyInfo[%s] %s", keyHex, err.Error())
 	}
 

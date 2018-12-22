@@ -2,14 +2,12 @@
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // Package wsdb is the interface to the Workspace Name database.
-package wsdb
+package cql
 
 import (
 	"encoding/hex"
 	"fmt"
 	"time"
-
-	"github.com/aristanetworks/quantumfs/backends/ether"
 )
 
 // ObjectKey is key used to access object in the cluster-wide
@@ -39,23 +37,30 @@ const (
 	// ErrReserved should not be used
 	ErrReserved ErrCode = iota
 	// ErrFatal means API has encountered a fatal error
-	ErrFatal = iota
+	ErrFatal ErrCode = iota
 	// ErrWorkspaceExists means that the workspace already exists
-	ErrWorkspaceExists = iota
+	ErrWorkspaceExists ErrCode = iota
 	// ErrWorkspaceNotFound means that the workspace doesn't exist
-	ErrWorkspaceNotFound = iota
+	ErrWorkspaceNotFound ErrCode = iota
 
 	// ErrWorkspaceOutOfDate means the operation was based on
 	// out of date information. This error occurs only when
 	// concurrent updates to same workspace is supported
 	// from different cluster nodes
-	ErrWorkspaceOutOfDate = iota
+	ErrWorkspaceOutOfDate ErrCode = iota
 
 	// ErrLocked means that typespace or namespace or workspace
 	// is locked for mutable operations like Branch or Advance.
 	// Example: a Locked typespace implies that it cannot be
 	// use as a destination typespace in Branch operation.
-	ErrLocked = iota
+	ErrLocked ErrCode = iota
+
+	// BS Errors copied from blobstoreInt.go
+	ErrOperationFailed       ErrCode = iota // The specific operation failed
+	ErrBlobStoreDown         ErrCode = iota // The blobstore could not be reached
+	ErrBlobStoreInconsistent ErrCode = iota // The blobstore has an internal error
+	ErrBadArguments          ErrCode = iota // The passed arguments are incorrect
+	ErrKeyNotFound           ErrCode = iota // The key and associated value was not found
 )
 
 // WorkspaceNonceInvalid is an invalid nonce
@@ -133,16 +138,16 @@ type WorkspaceDB interface {
 
 	// These methods need to be instant, but not necessarily completely up to
 	// date
-	NumTypespaces(c ether.Ctx) (int, error)
-	TypespaceList(c ether.Ctx) ([]string, error)
-	NumNamespaces(c ether.Ctx, typespace string) (int, error)
-	NamespaceList(c ether.Ctx, typespace string) ([]string, error)
-	NumWorkspaces(c ether.Ctx, typespace string, namespace string) (int, error)
-	WorkspaceList(c ether.Ctx, typespace string,
+	NumTypespaces(c Ctx) (int, error)
+	TypespaceList(c Ctx) ([]string, error)
+	NumNamespaces(c Ctx, typespace string) (int, error)
+	NamespaceList(c Ctx, typespace string) ([]string, error)
+	NumWorkspaces(c Ctx, typespace string, namespace string) (int, error)
+	WorkspaceList(c Ctx, typespace string,
 		namespace string) (map[string]WorkspaceNonce, error)
 
 	// These methods need to be up to date
-	Workspace(c ether.Ctx, typespace string, namespace string,
+	Workspace(c Ctx, typespace string, namespace string,
 		workspace string) (ObjectKey, WorkspaceNonce, error)
 
 	// These methods need to be atomic, but may retry internally
@@ -154,7 +159,7 @@ type WorkspaceDB interface {
 	//
 	// Possible errors are:
 	//  ErrWorkspaceExists
-	CreateWorkspace(c ether.Ctx, typespace string, namespace string,
+	CreateWorkspace(c Ctx, typespace string, namespace string,
 		workspace string, nonce WorkspaceNonce, wsKey ObjectKey) error
 
 	// BranchWorkspace branches srcTypespace/srcNamespace/srcWorkspace to create
@@ -164,17 +169,17 @@ type WorkspaceDB interface {
 	// Possible errors are:
 	//  ErrWorkspaceExists
 	//  ErrWorkspaceNotFound
-	BranchWorkspace(c ether.Ctx, srcTypespace string, srcNamespace string,
+	BranchWorkspace(c Ctx, srcTypespace string, srcNamespace string,
 		srcWorkspace string, dstTypespace string,
 		dstNamespace string, dstWorkspace string) (WorkspaceNonce, WorkspaceNonce, error)
 
 	// DeleteWorkspace deletes the workspace
-	DeleteWorkspace(c ether.Ctx, typespace string, namespace string,
+	DeleteWorkspace(c Ctx, typespace string, namespace string,
 		workspace string) error
 
 	// WorkspaceLastWriteTime returns the time when the workspace DB entry
 	// was created or when the rootID was advanced. The time returned is in UTC.
-	WorkspaceLastWriteTime(c ether.Ctx, typespace string, namespace string,
+	WorkspaceLastWriteTime(c Ctx, typespace string, namespace string,
 		workspace string) (time.Time, error)
 
 	// AdvanceWorkspace changes the workspace rootID. If the
@@ -189,12 +194,12 @@ type WorkspaceDB interface {
 	//  ErrWorkspaceNotFound
 	//  ErrWorkspaceOutOfDate: The workspace rootID was changed
 	//  	remotely so the local instance is out of date
-	AdvanceWorkspace(c ether.Ctx, typespace string, namespace string, workspace string,
+	AdvanceWorkspace(c Ctx, typespace string, namespace string, workspace string,
 		nonce WorkspaceNonce, currentRootID ObjectKey, newRootID ObjectKey) (ObjectKey, WorkspaceNonce, error)
 
-	SetWorkspaceImmutable(c ether.Ctx, typespace string, namespace string,
+	SetWorkspaceImmutable(c Ctx, typespace string, namespace string,
 		workspace string) error
 
-	WorkspaceIsImmutable(c ether.Ctx, typespace string, namespace string,
+	WorkspaceIsImmutable(c Ctx, typespace string, namespace string,
 		workspace string) (bool, error)
 }

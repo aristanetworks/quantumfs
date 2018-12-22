@@ -8,7 +8,6 @@ package cql
 import (
 	"testing"
 
-	qwsdb "github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -28,14 +27,14 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	err = DoTestSchemaOp(confFile, SchemaCreate)
 	suite.Require().NoError(err, "DoTestSchemaOp SchemaCreate returned an error")
 
-	var wsdb qwsdb.WorkspaceDB
+	var wsdb WorkspaceDB
 	cluster := NewRealCluster(&cfg.Cluster)
 	wsdb, err = newNoCacheWsdb(cluster, cfg)
 	suite.Require().NoError(err, "Error during configuration read")
 
-	err = wsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName,
-		qwsdb.NullSpaceName, qwsdb.NullSpaceName,
-		qwsdb.WorkspaceNonceInvalid, []byte(nil))
+	err = wsdb.CreateWorkspace(integTestEtherCtx, NullSpaceName,
+		NullSpaceName, NullSpaceName,
+		WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{

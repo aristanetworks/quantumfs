@@ -17,9 +17,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/aristanetworks/quantumfs/backends/ether"
-	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
-	qwsdb "github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -43,7 +40,7 @@ func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 
 	suite.cache = cwsdb.cache
 
-	err = nwsdb.CreateWorkspace(integTestEtherCtx, qwsdb.NullSpaceName, qwsdb.NullSpaceName, qwsdb.NullSpaceName,
+	err = nwsdb.CreateWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName, NullSpaceName,
 		wsdb.WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
@@ -102,8 +99,8 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteImmutableSet() {
 }
 
 func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
-	_, _, err := suite.common.db.BranchWorkspace(integTestEtherCtx, qwsdb.NullSpaceName,
-		qwsdb.NullSpaceName, qwsdb.NullSpaceName,
+	_, _, err := suite.common.db.BranchWorkspace(integTestEtherCtx, NullSpaceName,
+		qwsdb.NullSpaceName, NullSpaceName,
 		"ts1", "ns1", "ws1")
 	suite.Require().NoError(err,
 		"Error branching null workspace: %v", err)
@@ -129,7 +126,7 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
 
 type testCtx struct {
 	context.Context
-	ectx *ether.StdCtx
+	ectx *StdCtx
 }
 
 // TestCacheListCountMixer uses multiple goroutines to randomly issue
@@ -154,14 +151,14 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheListCountMixer() {
 	testGroup, testMainCtx := errgroup.WithContext(testTimeCtx)
 	tctx := &testCtx{
 		Context: testMainCtx,
-		ectx:    &ether.StdCtx{RequestID: baseReqId},
+		ectx:    &StdCtx{RequestID: baseReqId},
 	}
 
 	fmt.Printf("Starting CacheListCountMixer test for %v\n", testDuration)
 
 	for i := 1; i <= 10; i++ {
 		newTctx := *tctx
-		newTctx.ectx = &ether.StdCtx{RequestID: baseReqId + uint64(i)}
+		newTctx.ectx = &StdCtx{RequestID: baseReqId + uint64(i)}
 		testGroup.Go(func() error {
 			return countListChecker(&newTctx, suite.common.db, testData)
 		})
@@ -169,7 +166,7 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheListCountMixer() {
 
 	testGroup.Go(func() error {
 		expCtx := *tctx
-		expCtx.ectx = &ether.StdCtx{RequestID: baseReqId - uint64(1)}
+		expCtx.ectx = &StdCtx{RequestID: baseReqId - uint64(1)}
 		return expirator(&expCtx, suite.cache, testData)
 	})
 
@@ -223,16 +220,16 @@ func getWorkspaceTestData(numTs, numNsPerTs, numWsPerNs int) *wsdata {
 	return w
 }
 
-func loadWorkspaceData(c ether.Ctx, db wsdb.WorkspaceDB, w *wsdata) error {
+func loadWorkspaceData(c Ctx, db WorkspaceDB, w *wsdata) error {
 	for _, ws := range w.l {
 		parts := strings.Split(ws, "/")
 		nonceStr := fmt.Sprintf("%s %d", parts[3], 0)
-		nonce, err := wsdb.StringToNonce(nonceStr)
+		nonce, err := StringToNonce(nonceStr)
 		if err != nil {
 			return err
 		}
 		err = db.CreateWorkspace(c, parts[0], parts[1], parts[2],
-			nonce, wsdb.ObjectKey{})
+			nonce, ObjectKey{})
 		if err != nil {
 			return err
 		}
@@ -241,7 +238,7 @@ func loadWorkspaceData(c ether.Ctx, db wsdb.WorkspaceDB, w *wsdata) error {
 	return nil
 }
 
-func emptyCache(c ether.Ctx, ec *entityCache, w *wsdata) {
+func emptyCache(c Ctx, ec *entityCache, w *wsdata) {
 	for _, ws := range w.l {
 		parts := strings.Split(ws, "/")
 		// deleting the typespace removes all cache entities
@@ -258,7 +255,7 @@ func listEqual(l1 []string, l2 []string) bool {
 	return reflect.DeepEqual(l1, l2)
 }
 
-func countListChecker(c *testCtx, db wsdb.WorkspaceDB, w *wsdata) error {
+func countListChecker(c *testCtx, db WorkspaceDB, w *wsdata) error {
 	var err error
 	var l []string
 	var m map[string]wsdb.WorkspaceNonce
@@ -310,7 +307,7 @@ func countListChecker(c *testCtx, db wsdb.WorkspaceDB, w *wsdata) error {
 			}
 			wslist := make([]string, 0)
 			for w, n := range m {
-				if n == wsdb.WorkspaceNonceInvalid {
+				if n == WorkspaceNonceInvalid {
 					return fmt.Errorf("Found 0 nonce for Workspace(%s/%s/%s)",
 						ts, ns, w)
 				}

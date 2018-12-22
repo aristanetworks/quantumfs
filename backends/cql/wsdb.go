@@ -6,8 +6,6 @@ package cql
 import (
 	"fmt"
 	"time"
-
-	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 )
 
 // The workspace DB API endpoint is instantiated here.
@@ -17,14 +15,14 @@ import (
 
 // NewUncachedWorkspaceDB creates an uncached
 // workspace DB API endpoint.
-func NewUncachedWorkspaceDB(confName string) wsdb.WorkspaceDB {
+func NewUncachedWorkspaceDB(confName string) WorkspaceDB {
 	cfg, err := readCqlConfig(confName)
 	if err != nil {
 		fmt.Println("Error reading CQL config: ", err)
 		panic(err.Error())
 	}
 	cluster := NewRealCluster(&cfg.Cluster)
-	var wsdb wsdb.WorkspaceDB
+	var wsdb WorkspaceDB
 	if wsdb, err = newNoCacheWsdb(cluster, cfg); err != nil {
 		panic(fmt.Sprintf("Error %q during NewNoCacheWsdb", err))
 	}
@@ -35,7 +33,7 @@ func NewUncachedWorkspaceDB(confName string) wsdb.WorkspaceDB {
 // This endpoint caches objects like
 // typespaces, namespaces, workspaces etc. The cache
 // can be tuned using WSDB section in config file.
-func NewWorkspaceDB(confName string) wsdb.WorkspaceDB {
+func NewWorkspaceDB(confName string) WorkspaceDB {
 	cfg, err := readCqlConfig(confName)
 	if err != nil {
 		fmt.Println("Error reading CQL config: ", err)
@@ -49,8 +47,8 @@ func NewWorkspaceDB(confName string) wsdb.WorkspaceDB {
 // GetUniqueNonce provides a unique nonce
 var GetUniqueNonce = getTimeBasedNonce
 
-func getTimeBasedNonce() wsdb.WorkspaceNonce {
-	return wsdb.WorkspaceNonce{
+func getTimeBasedNonce() WorkspaceNonce {
+	return WorkspaceNonce{
 		Id:          time.Now().UnixNano(),
 		PublishTime: time.Now().UnixNano(),
 	}

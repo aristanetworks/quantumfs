@@ -12,8 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aristanetworks/quantumds/backends/ether"
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
+	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -37,7 +36,7 @@ const testKey2BadMetadata = `{"blobstoreMetadata":{"ctime":1,"mtime":1,"size":9}
 var testKey2Metadata = map[string]string{"D@rth": "Vad3r"}
 
 var envReady = false
-var bls blobstore.BlobStore
+var bls cql.BlobStore
 
 func checkSetup(t *testing.T) {
 	if !envReady {
@@ -57,7 +56,7 @@ func TestEnvSetup(t *testing.T) {
 	envReady = true
 }
 
-var testEtherCtx = ether.DefaultCtx
+var testEtherCtx = cql.DefaultCtx
 
 func TestNewFilesystemStore(t *testing.T) {
 
@@ -170,9 +169,9 @@ func TestGet(t *testing.T) {
 	// Verify return value for a non existent key
 	value, metadata, err = bls.Get(testEtherCtx, []byte(unknownKey))
 	require.Error(t, err, "Get returned success")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*cql.Error)
 	require.Equal(t, true, ok, fmt.Sprintf("Get incorrect error type %T", err))
-	assert.Equal(t, blobstore.ErrKeyNotFound, verr.Code,
+	assert.Equal(t, cql.ErrKeyNotFound, verr.Code,
 		"Get returned incorrect error %s", verr)
 	assert.Nil(t, value, "value was not Nil when error is ErrKeyNotFound")
 	assert.Nil(t, metadata, "value was not Nil when error is ErrKeyNotFound")
@@ -190,9 +189,9 @@ func TestGet(t *testing.T) {
 	os.Truncate(dataFile, int64(len(testValue2)-1))
 	value, metadata, err = bls.Get(testEtherCtx, []byte(testKey2))
 	require.Error(t, err, "Get returned incorrect error")
-	verr, ok = err.(*blobstore.Error)
+	verr, ok = err.(*cql.Error)
 	require.Equal(t, true, ok, fmt.Sprintf("Get incorrect error type %T", err))
-	assert.Equal(t, blobstore.ErrOperationFailed, verr.Code, "Get returned incorrect error code")
+	assert.Equal(t, cql.ErrOperationFailed, verr.Code, "Get returned incorrect error code")
 	assert.Nil(t, value, "value was not Nil when error is ErrOperationFailed")
 	assert.Nil(t, metadata, "value was not Nil when error is ErrOperationFailed")
 
@@ -200,9 +199,9 @@ func TestGet(t *testing.T) {
 	os.Remove(dataFile)
 	value, metadata, err = bls.Get(testEtherCtx, []byte(testKey2))
 	require.Error(t, err, "Get returned incorrect error")
-	verr, ok = err.(*blobstore.Error)
+	verr, ok = err.(*cql.Error)
 	require.Equal(t, true, ok, fmt.Sprintf("Get incorrect error type %T", err))
-	assert.Equal(t, blobstore.ErrOperationFailed, verr.Code, "Get returned incorrect error code")
+	assert.Equal(t, cql.ErrOperationFailed, verr.Code, "Get returned incorrect error code")
 	assert.Nil(t, value, "value was not Nil when error is ErrOperationFailed")
 	assert.Nil(t, metadata, "value was not Nil when error is ErrOperationFailed")
 
@@ -220,9 +219,9 @@ func TestGet(t *testing.T) {
 	f.Close()
 	value, metadata, err = bls.Get(testEtherCtx, []byte(testKey2))
 	require.Error(t, err, "Get returned incorrect error")
-	verr, ok = err.(*blobstore.Error)
+	verr, ok = err.(*cql.Error)
 	require.Equal(t, true, ok, fmt.Sprintf("Get incorrect error type %T", err))
-	assert.Equal(t, blobstore.ErrOperationFailed, verr.Code, "Get returned incorrect error code")
+	assert.Equal(t, cql.ErrOperationFailed, verr.Code, "Get returned incorrect error code")
 	assert.Nil(t, value, "value was not Nil when error is ErrOperationFailed")
 	assert.Nil(t, metadata, "value was not Nil when error is ErrOperationFailed")
 }
@@ -245,10 +244,10 @@ func TestMetadata(t *testing.T) {
 	// verify metadata with unknownKey
 	metadata, err = bls.Metadata(testEtherCtx, []byte(unknownKey))
 	require.Error(t, err, "Metadata returned success")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*cql.Error)
 	require.Equal(t, true, ok,
 		fmt.Sprintf("Metadata returned incorrect error type %T", err))
-	assert.Equal(t, blobstore.ErrKeyNotFound, verr.Code,
+	assert.Equal(t, cql.ErrKeyNotFound, verr.Code,
 		"Metadata returned incorrect error %s", verr)
 	assert.Nil(t, metadata, "value was not Nil when error is ErrKeyNotFound")
 }
@@ -300,10 +299,10 @@ func TestUpdate(t *testing.T) {
 	// verify update with unknownKey
 	err = bls.Update(testEtherCtx, []byte(unknownKey), nil)
 	require.Error(t, err, "Update did not return an error for non existent key")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*cql.Error)
 	require.Equal(t, true, ok,
 		fmt.Sprintf("Update returned incorrect error type %T", err))
-	assert.Equal(t, blobstore.ErrKeyNotFound, verr.Code,
+	assert.Equal(t, cql.ErrKeyNotFound, verr.Code,
 		"Update returned incorrect error %s", verr)
 }
 
@@ -313,9 +312,9 @@ func TestDelete(t *testing.T) {
 
 	err := bls.Delete(testEtherCtx, []byte(unknownKey))
 	require.Error(t, err, "Delete did not return an error for non existent key")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*cql.Error)
 	require.Equal(t, true, ok, fmt.Sprintf("Delete incorrect error type %T", err))
-	assert.Equal(t, blobstore.ErrKeyNotFound, verr.Code,
+	assert.Equal(t, cql.ErrKeyNotFound, verr.Code,
 		"Delete returned incorrect error %s", verr)
 
 	err = bls.Delete(testEtherCtx, []byte(testKey))

@@ -11,9 +11,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends"
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	qubit "github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
 	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 )
@@ -32,8 +30,8 @@ var co commonOpts
 // state usable by all commands
 type commonState struct {
 	ttlCfg *qubitutils.TTLConfig
-	cqlds  blobstore.BlobStore
-	cqldb  qubit.WorkspaceDB
+	cqlds  cql.BlobStore
+	cqldb  cql.WorkspaceDB
 	qfsds  quantumfs.DataStore
 	qfsdb  quantumfs.WorkspaceDB
 	ctx    *Ctx

@@ -6,8 +6,6 @@ package cql
 import (
 	"fmt"
 	"os"
-
-	"github.com/aristanetworks/quantumfs/backends/ether"
 )
 
 const testKey = "Hello"
@@ -17,8 +15,8 @@ const testKey2 = "D@rth"
 const testValue2 = "Vad3r"
 
 var testKey2Metadata = map[string]string{}
-var unitTestEtherCtx = ether.DefaultCtx
-var integTestEtherCtx = ether.DefaultCtx
+var unitTestEtherCtx = DefaultCtx
+var integTestEtherCtx = DefaultCtx
 
 var tstUsername = scyllaUsername
 var tstKeyspace = "ether"

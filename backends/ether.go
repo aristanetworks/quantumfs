@@ -14,11 +14,9 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	"github.com/aristanetworks/quantumfs/backends/ether"
+	ether "github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/backends/filesystem"
-	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
@@ -166,7 +164,7 @@ func newEtherCqlStore(path string) quantumfs.DataStore {
 // will move outside of the adapter into Ether and then this type
 // can be turned back into an exported type
 type EtherBlobStoreTranslator struct {
-	Blobstore      blobstore.BlobStore
+	Blobstore      cql.BlobStore
 	ApplyTTLPolicy bool
 
 	// The TTL cache uses a FIFO eviction policy in an attempt to keep the TTLs
@@ -184,7 +182,7 @@ type EtherBlobStoreTranslator struct {
 // TTL will be set using Insert under following scenarios:
 //  a) key exists and current TTL < refreshTTLTimeSecs
 //  b) key doesn't exist
-func refreshTTL(c *quantumfs.Ctx, b blobstore.BlobStore,
+func refreshTTL(c *quantumfs.Ctx, b cql.BlobStore,
 	keyExist bool, key []byte, metadata map[string]string,
 	buf []byte) error {
 
@@ -318,7 +316,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 	metadata, err := ebt.Blobstore.Metadata((*dsApiCtx)(c), kv)
 
 	switch {
-	case err != nil && err.(*blobstore.Error).Code == blobstore.ErrKeyNotFound:
+	case err != nil && err.(*cql.Error).Code == cql.ErrKeyNotFound:
 		err = refreshTTL(c, ebt.Blobstore, false, kv, nil, buf.Get())
 		if err != nil {
 			return err
@@ -336,7 +334,7 @@ func (ebt *EtherBlobStoreTranslator) Set(c *quantumfs.Ctx, key quantumfs.ObjectK
 		ebt.cacheTtl(c, ks)
 		return nil
 
-	case err != nil && err.(*blobstore.Error).Code != blobstore.ErrKeyNotFound:
+	case err != nil && err.(*cql.Error).Code != cql.ErrKeyNotFound:
 		// if metadata error other than ErrKeyNotFound then fail
 		// the Set since we haven't been able to ascertain TTL state
 		// so we can't overwrite it
@@ -369,28 +367,28 @@ func (ebt *EtherBlobStoreTranslator) Freshen(c *quantumfs.Ctx,
 }
 
 type etherWsdbTranslator struct {
-	wsdb wsdb.WorkspaceDB
+	wsdb cql.WorkspaceDB
 	lock utils.DeferableRwMutex
 }
 
-// convert wsdb.Error to quantumfs.WorkspaceDbErr
+// convert Error to quantumfs.WorkspaceDbErr
 func convertWsdbError(e error) error {
-	wE, ok := e.(*wsdb.Error)
+	wE, ok := e.(*cql.Error)
 	if !ok {
 		panic("BUG: Errors from wsdb APIs must be of *wsdb.Error type")
 	}
 
 	var errCode quantumfs.WsdbErrCode
 	switch wE.Code {
-	case wsdb.ErrWorkspaceExists:
+	case cql.ErrWorkspaceExists:
 		errCode = quantumfs.WSDB_WORKSPACE_EXISTS
-	case wsdb.ErrWorkspaceNotFound:
+	case cql.ErrWorkspaceNotFound:
 		errCode = quantumfs.WSDB_WORKSPACE_NOT_FOUND
-	case wsdb.ErrFatal:
+	case cql.ErrFatal:
 		errCode = quantumfs.WSDB_FATAL_DB_ERROR
-	case wsdb.ErrWorkspaceOutOfDate:
+	case cql.ErrWorkspaceOutOfDate:
 		errCode = quantumfs.WSDB_OUT_OF_DATE
-	case wsdb.ErrLocked:
+	case cql.ErrLocked:
 		errCode = quantumfs.WSDB_LOCKED
 	default:
 		panic(fmt.Sprintf("Bug: Unsupported error %s", e.Error()))
@@ -411,7 +409,7 @@ func newEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {
 	// initializing the backends, this can be solved.
 	err := eWsdb.wsdb.CreateWorkspace(ether.DefaultCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, wsdb.WorkspaceNonceInvalid,
+		quantumfs.NullSpaceName, cql.WorkspaceNonceInvalid,
 		quantumfs.EmptyWorkspaceKey.Value())
 	if err != nil {
 		panic(fmt.Sprintf("Failed wsdb setup: %s", err.Error()))
@@ -610,7 +608,7 @@ func (w *etherWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace strin
 		"%s/%s/%s %s -> %s", typespace, namespace, workspace,
 		currentRootId.String(), newRootId.String())
 
-	wsdbNonce := wsdb.WorkspaceNonce{
+	wsdbNonce := cql.WorkspaceNonce{
 		Id:          int64(nonce.Id),
 		PublishTime: int64(nonce.PublishTime),
 	}

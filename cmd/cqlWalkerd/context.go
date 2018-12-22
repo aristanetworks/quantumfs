@@ -13,10 +13,7 @@ import (
 	influxlib "github.com/aristanetworks/influxlib/go"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends"
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	"github.com/aristanetworks/quantumfs/backends/ether"
-	etherWsdb "github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
 	walkerutils "github.com/aristanetworks/quantumfs/cmd/qutils2"
 	"github.com/aristanetworks/quantumfs/qlog"
@@ -32,9 +29,9 @@ type Ctx struct {
 	influx          *influxlib.InfluxDBConnection
 	qctx            *quantumfs.Ctx
 	wsdb            quantumfs.WorkspaceDB
-	cqlws           etherWsdb.WorkspaceDB
+	cqlws           cql.WorkspaceDB
 	ds              quantumfs.DataStore
-	cqlds           blobstore.BlobStore
+	cqlds           cql.BlobStore
 	ttlCfg          *qubitutils.TTLConfig
 	etherConfig     string
 	wsdbConfig      string
@@ -51,7 +48,7 @@ type Ctx struct {
 }
 
 func wsLastWriteTime(c *Ctx, ts, ns, ws string) (time.Time, error) {
-	return c.cqlws.WorkspaceLastWriteTime(ether.DefaultCtx, ts, ns, ws)
+	return c.cqlws.WorkspaceLastWriteTime(cql.DefaultCtx, ts, ns, ws)
 }
 
 func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,

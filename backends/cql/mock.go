@@ -12,7 +12,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -392,7 +391,7 @@ WHERE typespace=? AND namespace=? AND workspace=?`,
 
 func mockWsdbKeyGet(sess *MockSession, typespace string,
 	namespace string, workspace string, key []byte,
-	nonce wsdb.WorkspaceNonce, err error) {
+	nonce WorkspaceNonce, err error) {
 
 	query := new(MockQuery)
 	qScanFunc := newMockQueryScanByteSlice(err, key, nonce)
@@ -408,7 +407,7 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`,
 
 func mockWsdbKeyPut(sess *MockSession, typespace string,
 	namespace string, workspace string, key []byte,
-	nonce wsdb.WorkspaceNonce, err error) {
+	nonce WorkspaceNonce, err error) {
 
 	query := new(MockQuery)
 	stmt := `
@@ -459,7 +458,7 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`
 }
 
 func newMockQueryScanByteSlice(err error,
-	val []byte, nonce wsdb.WorkspaceNonce) func(dest ...interface{}) error {
+	val []byte, nonce WorkspaceNonce) func(dest ...interface{}) error {
 
 	return func(dest ...interface{}) error {
 
@@ -651,14 +650,14 @@ func mockWsdbCacheWorkspaceFetchErr(sess *MockSession, err error) {
 func mockBranchWorkspace(sess *MockSession, srcTypespace string,
 	srcNamespace string, srcWorkspace string,
 	dstTypespace string, dstNamespace string, dstWorkspace string,
-	srcKey []byte, nonce wsdb.WorkspaceNonce, dstErr error) {
+	srcKey []byte, nonce WorkspaceNonce, dstErr error) {
 
 	mockWsdbKeyGet(sess, srcTypespace, srcNamespace, srcWorkspace,
 		srcKey, nonce, nil)
 	mockWsdbKeyGet(sess, dstTypespace, dstNamespace, dstWorkspace,
 		nil, nonce, dstErr)
 	mockWsdbKeyPut(sess, dstTypespace, dstNamespace, dstWorkspace,
-		srcKey, wsdb.WorkspaceNonceInvalid, nil)
+		srcKey, WorkspaceNonceInvalid, nil)
 }
 
 func mockSchemaOk(sess *MockSession, keyspace, tableName string, err error) {

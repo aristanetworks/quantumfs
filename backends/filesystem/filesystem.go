@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
+	blobstore "github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/backends/cql/utils"
 )
 
