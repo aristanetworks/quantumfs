@@ -2,7 +2,7 @@
 # run 'make fetch' to ensure that all the necessary dependencies are available.
 #
 # See the files in the features directory for details.
-FEATURES=ether
+FEATURES=
 
 COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthcheck
 COMMANDS=cqlWalker cqlWalkerd

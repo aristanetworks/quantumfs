@@ -1,43 +1,41 @@
-// +build ether
-
 // Copyright (c) 2018 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 package main
 
 import (
+	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/qlogstats"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 )
 
 func init() {
 	ses := []qlogstats.StatExtractor{
-		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheHit,
+		qlogstats.NewExtPointStats(backends.EtherTtlCacheHit,
 			"ether_setcache_hit"),
-		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheMiss,
+		qlogstats.NewExtPointStats(backends.EtherTtlCacheMiss,
 			"ether_setcache_miss"),
-		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheEvict,
+		qlogstats.NewExtPointStats(backends.EtherTtlCacheEvict,
 			"ether_setcache_evict"),
 
 		// Data store latency
-		newQfsExtPair(thirdparty_backends.EtherGetLog,
-			thirdparty_backends.KeyLog),
-		newQfsExtPair(thirdparty_backends.EtherSetLog,
-			thirdparty_backends.KeyLog),
+		newQfsExtPair(backends.EtherGetLog,
+			backends.KeyLog),
+		newQfsExtPair(backends.EtherSetLog,
+			backends.KeyLog),
 
 		// Workspace DB latency
-		newQfsExtPair(thirdparty_backends.EtherTypespaceLog, ""),
-		newQfsExtPair(thirdparty_backends.EtherNamespaceLog,
-			thirdparty_backends.EtherNamespaceDebugLog),
-		newQfsExtPair(thirdparty_backends.EtherWorkspaceListLog,
-			thirdparty_backends.EtherWorkspaceListDebugLog),
-		newQfsExtPair(thirdparty_backends.EtherWorkspaceLog,
-			thirdparty_backends.EtherWorkspaceDebugLog),
-		newQfsExtPair(thirdparty_backends.EtherBranchLog,
-			thirdparty_backends.EtherBranchDebugLog),
-		newQfsExtPair(thirdparty_backends.EtherAdvanceLog,
-			thirdparty_backends.EtherAdvanceDebugLog),
+		newQfsExtPair(backends.EtherTypespaceLog, ""),
+		newQfsExtPair(backends.EtherNamespaceLog,
+			backends.EtherNamespaceDebugLog),
+		newQfsExtPair(backends.EtherWorkspaceListLog,
+			backends.EtherWorkspaceListDebugLog),
+		newQfsExtPair(backends.EtherWorkspaceLog,
+			backends.EtherWorkspaceDebugLog),
+		newQfsExtPair(backends.EtherBranchLog,
+			backends.EtherBranchDebugLog),
+		newQfsExtPair(backends.EtherAdvanceLog,
+			backends.EtherAdvanceDebugLog),
 
 		// Ether.CQL internal statistics
 		newQfsExtPair(cql.DeleteLog, cql.KeyLog),
