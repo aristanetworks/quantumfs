@@ -63,13 +63,15 @@ func writeCqlConfig(fileName string, config *Config) error {
 
 	file, err := os.Create(fileName)
 	if err != nil {
-		return fmt.Errorf("error writing cql config file %q: %v", fileName, err)
+		return fmt.Errorf("error writing cql config file %q: %v", fileName,
+			err)
 	}
 
 	err = json.NewEncoder(file).Encode(config)
 	defer file.Close()
 	if err != nil {
-		return fmt.Errorf("error encoding cql config file %q: %v", fileName, err)
+		return fmt.Errorf("error encoding cql config file %q: %v", fileName,
+			err)
 	}
 
 	return nil
@@ -80,13 +82,15 @@ func readCqlConfig(fileName string) (*Config, error) {
 
 	file, err := os.Open(fileName)
 	if err != nil {
-		return nil, fmt.Errorf("error opening cql config file %q: %v", fileName, err)
+		return nil, fmt.Errorf("error opening cql config file %q: %v",
+			fileName, err)
 	}
 
 	err = json.NewDecoder(file).Decode(&config)
 	if err != nil {
 		file.Close()
-		return nil, fmt.Errorf("error decoding cql config file %q: %v", fileName, err)
+		return nil, fmt.Errorf("error decoding cql config file %q: %v",
+			fileName, err)
 	}
 
 	file.Close()
@@ -101,15 +105,19 @@ func isTablePresent(store *cqlStore, cfg *Config, keySpace, tableName string) er
 	for retry := 0; retry <= cfg.Cluster.CheckSchemaRetries; retry++ {
 		if err = schemaOk(store, cfg, keySpace, tableName); err != nil {
 			fmt.Fprintf(os.Stderr, "schemaCheck error: %v\n", err)
-			if retriesLeft := cfg.Cluster.CheckSchemaRetries - retry; retriesLeft > 0 {
-				fmt.Printf("schemaCheck will be retried after %s\n", schemaCheckSleep)
+			if retriesLeft := cfg.Cluster.CheckSchemaRetries -
+				retry; retriesLeft > 0 {
+
+				fmt.Printf("schemaCheck will be retried after %s\n",
+					schemaCheckSleep)
 				time.Sleep(schemaCheckSleep)
 			}
 			continue
 		}
 		return nil
 	}
-	return fmt.Errorf("schemaCheck on %s.%s failed. Error: %s", cfg.Cluster.KeySpace, tableName, err)
+	return fmt.Errorf("schemaCheck on %s.%s failed. Error: %s",
+		cfg.Cluster.KeySpace, tableName, err)
 }
 
 // checks in different Cassandra/Scylla system table versions
@@ -132,9 +140,9 @@ func schemaOk(store *cqlStore, cfg *Config, keySpace, tableName string) error {
 	// The schema check query on system tables may end up on any host
 	// (token-aware selection of host cannot be used for this query,
 	// since system tables are local, round-robin host selection is used by
-	// GoCQL driver). It is possible that there are multiple versions of Cassandra/Scylla
-	// active in the cluster at any time (eg: in the middle of a rolling
-	// upgrade). Since a session represents connectivity to multiple
+	// GoCQL driver). It is possible that there are multiple versions of
+	// Cassandra/Scylla active in the cluster at any time (eg: in the middle of
+	// a rolling upgrade). Since a session represents connectivity to multiple
 	// hosts there is no notion of cassandra version of a session.
 	// Hence we need to check starting from the least supported version.
 	var err error
@@ -148,9 +156,9 @@ func schemaOk(store *cqlStore, cfg *Config, keySpace, tableName string) error {
 	return err
 }
 
-// Instead of having a single schema check for different versions of Cassandra/Scylla
-// system table format, we use separate routines even though some of the code is common.
-// This keeps addition of more newer versions clean.
+// Instead of having a single schema check for different versions of
+// Cassandra/Scylla system table format, we use separate routines even though some
+// of the code is common. This keeps addition of more newer versions clean.
 
 // schemaCheckV2 supports cassandraV2 system table schema
 func schemaCheckV2(store *cqlStore, cfg *Config, keySpace, tableName string) error {
@@ -158,10 +166,11 @@ func schemaCheckV2(store *cqlStore, cfg *Config, keySpace, tableName string) err
 	checkTableQuery := fmt.Sprintf("SELECT count(*) FROM system.schema_columns "+
 		"WHERE keyspace_name='%s' AND columnfamily_name='%s'",
 		strings.ToLower(keySpace), strings.ToLower(tableName))
-	checkPermsQuery := fmt.Sprintf("SELECT permissions FROM system_auth.permissions "+
-		"WHERE username='%s' AND resource='data/%s'",
-		cfg.Cluster.Username, // username is case-sensitive
-		strings.ToLower(keySpace))
+	checkPermsQuery :=
+		fmt.Sprintf("SELECT permissions FROM system_auth.permissions "+
+			"WHERE username='%s' AND resource='data/%s'",
+			cfg.Cluster.Username, // username is case-sensitive
+			strings.ToLower(keySpace))
 
 	var countCols int
 	if err := store.session.Query(checkTableQuery).Scan(&countCols); err != nil {
@@ -173,7 +182,9 @@ func schemaCheckV2(store *cqlStore, cfg *Config, keySpace, tableName string) err
 	}
 
 	var actualPermsList []string
-	if err := store.session.Query(checkPermsQuery).Scan(&actualPermsList); err != nil {
+	if err := store.session.Query(checkPermsQuery).
+		Scan(&actualPermsList); err != nil {
+
 		// skip the permission check if the system_auth table does not exist
 		if strings.Contains(err.Error(), "system_auth does not exist") {
 			return nil
@@ -191,10 +202,11 @@ func schemaCheckV3(store *cqlStore, cfg *Config, keySpace, tableName string) err
 	checkTableQuery := fmt.Sprintf("SELECT count(*) FROM system_schema.columns "+
 		"WHERE keyspace_name='%s' AND table_name='%s'",
 		strings.ToLower(keySpace), strings.ToLower(tableName))
-	checkPermsQuery := fmt.Sprintf("SELECT permissions FROM system_auth.permissions "+
-		"WHERE username='%s' AND resource='data/%s'",
-		cfg.Cluster.Username, // username is case-sensitive
-		strings.ToLower(keySpace))
+	checkPermsQuery :=
+		fmt.Sprintf("SELECT permissions FROM system_auth.permissions "+
+			"WHERE username='%s' AND resource='data/%s'",
+			cfg.Cluster.Username, // username is case-sensitive
+			strings.ToLower(keySpace))
 
 	var countCols int
 	if err := store.session.Query(checkTableQuery).Scan(&countCols); err != nil {
@@ -206,10 +218,12 @@ func schemaCheckV3(store *cqlStore, cfg *Config, keySpace, tableName string) err
 	}
 
 	var actualPermsList []string
-	if err := store.session.Query(checkPermsQuery).Scan(&actualPermsList); err != nil {
+	if err := store.session.Query(checkPermsQuery).
+		Scan(&actualPermsList); err != nil {
 		// skip the permission check if the system_auth table does not exist
 		if strings.Contains(err.Error(), "system_auth does not exist") ||
-			strings.Contains(err.Error(), "unconfigured table permissions") {
+			strings.Contains(err.Error(),
+				"unconfigured table permissions") {
 			return nil
 		}
 		return fmt.Errorf("v3: permission check failed: %s", err.Error())

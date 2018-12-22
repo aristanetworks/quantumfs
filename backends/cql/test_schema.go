@@ -59,7 +59,7 @@ func DoTableOp(sess *gocql.Session, op SchemaOp,
 			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s",
 				keyspace, bsName),
 			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s",
-				sdbKeySpace(keyspace), wsdbName),
+				wsdbKeySpace(keyspace), wsdbName),
 		}
 	}
 

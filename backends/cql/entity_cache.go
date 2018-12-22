@@ -559,9 +559,12 @@ func newEntityGroup(parent *entityGroup, parentEntity string,
 type refreshAction int
 
 const (
-	refreshPerform refreshAction = iota // caller must perform refresh
-	refreshWait                  = iota // caller must wait for refresh to be done
-	refreshIgnore                = iota // refresh not needed and no waiting
+	// caller must perform refresh
+	refreshPerform refreshAction = iota
+	// caller must wait for refresh to be done
+	refreshWait = iota
+	// refresh not needed and no waiting
+	refreshIgnore = iota
 )
 
 func (g *entityGroup) refreshNeeded(c Ctx) (action refreshAction) {

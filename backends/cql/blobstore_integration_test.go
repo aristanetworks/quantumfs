@@ -168,7 +168,8 @@ func (s *storeIntegrationTests) TestMetadataOK() {
 func (s *storeIntegrationTests) TestMetadataUnknownKey() {
 	metadata, err := s.bls.Metadata(integTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata didn't return error")
-	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
+	s.Require().Nil(metadata,
+		"metadata was not Nil when error is ErrKeyNotFound")
 	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok,
 		fmt.Sprintf("Error from Metadata is of type %T", err))
