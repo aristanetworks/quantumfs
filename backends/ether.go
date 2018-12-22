@@ -13,11 +13,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aristanetworks/ether/filesystem"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends/blobstore"
 	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/backends/ether"
+	"github.com/aristanetworks/quantumfs/backends/filesystem"
 	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
