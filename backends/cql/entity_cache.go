@@ -69,7 +69,8 @@ import (
 */
 
 // arg is registered and interpreted by the consumer of entityCache
-type fetchEntities func(c Ctx, arg interface{}, entityPath ...string) (map[string]bool, error)
+type fetchEntities func(c Ctx, arg interface{},
+	entityPath ...string) (map[string]bool, error)
 
 // entityCache maintains global cache state (eg: lock etc)
 type entityCache struct {
@@ -410,15 +411,17 @@ func (ec *entityCache) getEntityCountListGroup(c Ctx,
 				defer ec.rwMutex.RLock()
 
 				// fetch data from CQL without locking cache
-				fetchList, err := ec.callFetch(c, entityPath[:pathIdx]...)
+				fetchList, err := ec.callFetch(c,
+					entityPath[:pathIdx]...)
 				if err != nil {
 					c.Elog("Ether cache refresh (%s) failed: %s",
-						strings.Join(entityPath[:pathIdx], "/"), err.Error())
+						strings.Join(entityPath[:pathIdx],
+							"/"), err.Error())
 				}
-				// update the group under write lock unless the fetched
-				// data has been invalidated by a local insert/delete
-				// the error from fetcher is passed into refresh
-				// so that proper clean ups can be done
+				// update the group under write lock unless the
+				// fetched data has been invalidated by a local
+				// insert/delete the error from fetcher is passed
+				// into refresh so that proper clean ups can be done
 				return group.refresh(c, fetchList, err)
 			}()
 
@@ -428,23 +431,23 @@ func (ec *entityCache) getEntityCountListGroup(c Ctx,
 			// in between the release of write lock in group.refresh()
 			// and acquire of read lock, there can be many local inserts
 			// or deletes that may happen. Since each local update also
-			// maintains cache local coherency, we'll see all local updates
-			// correctly.
+			// maintains cache local coherency, we'll see all local
+			// updates correctly.
 			//
 			// Possible states include:
 			// - current group has got detached from parent
 			//   detachment can be from immediate parent, an
 			//   ancestor detachment, child detachement
 			//     return count zero and empty list
-			//     ancestor and child detachment scenarios can happen only
-			//     when maxEntityPath in List/Count > 1
+			//     ancestor and child detachment scenarios can happen
+			//     only when maxEntityPath in List/Count > 1
 			// - next entity in the entity path has got deleted
 			//     return zero count and empty list
 			// - expiryDuration time has elapsed since the merge and so
 			//   we might be looking at stale remote information
 			//     this is no different than remote information getting
-			//     in DB as soon as we completed running fetcher. We just use
-			//     the cache information we have.
+			//     in DB as soon as we completed running fetcher. We
+			// just use the cache information we have.
 
 		case refreshWait:
 			// refresh is needed and there are no entities
@@ -572,19 +575,22 @@ func (g *entityGroup) refreshNeeded(c Ctx) (action refreshAction) {
 			g.entityCount, g.expiresAt.Format(time.RFC3339Nano),
 			time.Now().Format(time.RFC3339Nano), g.detached)
 
-		// pick a winning caller (out of multiple read-locked) to refresh the group
-		// Its normal to have multiple refreshes for different entityGroups to be
-		// active at the same time. In rare scenarios, its possible to have multiple refreshes
-		// active for same component (but different entityGroup structs) in an entityPath.
-		// For example - while workspaces for namespace1 is being refreshed, its possible
-		// to delete all workspaces for namespace1 and then create workspaces again under
-		// namespace1. In that scenario, two different entityGroup structs for workspaces within
+		// pick a winning caller (out of multiple read-locked) to refresh
+		// the group. Its normal to have multiple refreshes for different
+		// entityGroups to be active at the same time. In rare scenarios,
+		// its possible to have multiple refreshes active for same component
+		// (but different entityGroup structs) in an entityPath.
+		// For example - while workspaces for namespace1 is being refreshed,
+		// its possible to delete all workspaces for namespace1 and then
+		// create workspaces again under namespace1. In that scenario, two
+		// different entityGroup structs for workspaces within
 		// namespace1 are active at the same time (one of them is detached).
 		swapped := atomic.CompareAndSwapUint32(&g.refreshScheduled, 0, 1)
 		if swapped {
-			// only 1 caller will see swapped = true so can modify without write lock
-			// upgrade
-			// possible writers: read-Locked-CAS-winner or write-Locked refresh
+			// only 1 caller will see swapped = true so can modify
+			// without write lock upgrade
+			// possible writers: read-Locked-CAS-winner or write-Locked
+			// refresh
 			g.fetchErr = nil
 			g.fetchInProgress = true
 			return refreshPerform
@@ -671,8 +677,8 @@ func (g *entityGroup) mergeLocalUpdates(c Ctx, fetchData map[string]bool) {
 	// in fetchData
 	for en := range g.concLocalInserts {
 		if _, ok := g.concLocalDeletes[en]; ok {
-			panic(fmt.Sprintf("Entity %q present in both insert and delete logs",
-				en))
+			panic(fmt.Sprintf("Entity %q present in both insert "+
+				" and delete logs", en))
 		}
 		mergedInserts = true
 		fetchData[en] = true
@@ -745,9 +751,12 @@ func (g *entityGroup) refresh(c Ctx, fetchData map[string]bool,
 	g.fetchErr = ferr
 
 	// refreshScheduled must be reset after depositing the fetch error
-	if swapped := atomic.CompareAndSwapUint32(&g.refreshScheduled, 1, 0); !swapped {
+	if swapped := atomic.CompareAndSwapUint32(&g.refreshScheduled,
+		1, 0); !swapped {
+
 		g.fetchErr = fmt.Errorf("BUG: Concurrent refreshes scheduled")
-		panic("BUG: EntityGroup can only have 1 refresh scheduled at any time")
+		panic("BUG: EntityGroup can only have 1 refresh scheduled at any " +
+			"time")
 	}
 
 	if ferr != nil {

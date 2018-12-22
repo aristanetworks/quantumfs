@@ -29,8 +29,9 @@ func EtherConfFile() (string, error) {
 	if etherConfFile == "" {
 		etherEnv := os.Getenv("ETHER_CQL_CONFIG")
 		if etherEnv == "" {
-			return "", fmt.Errorf("Env varibale ETHER_CQL_CONFIG should be set to a config" +
-				" file name in directory ether/cluster_configs")
+			return "", fmt.Errorf("Env varibale ETHER_CQL_CONFIG " +
+				"should be set to a config " +
+				"file name in directory ether/cluster_configs")
 		}
 		etherConfFile = etherEnv
 	}

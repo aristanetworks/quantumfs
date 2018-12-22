@@ -2,8 +2,8 @@
 // Arista Networks, Inc. Confidential and Proprietary.
 
 // NOTE: This file was initially generated using mockery tool but to support
-// certain usecases (look for comments with MANUAL tag) the generated code has been modified.
-// Additionally this file now includes helper mock routines
+// certain usecases (look for comments with MANUAL tag) the generated code has
+// been modified. Additionally this file now includes helper mock routines
 
 package cql
 
@@ -395,7 +395,8 @@ func mockWsdbKeyGet(sess *MockSession, typespace string,
 
 	query := new(MockQuery)
 	qScanFunc := newMockQueryScanByteSlice(err, key, nonce)
-	query.On("Scan", mock.AnythingOfType("*[]uint8"), mock.AnythingOfType("*int64"),
+	query.On("Scan", mock.AnythingOfType("*[]uint8"),
+		mock.AnythingOfType("*int64"),
 		mock.AnythingOfType("*int64")).Return(qScanFunc)
 
 	sess.On("Query", `
@@ -545,7 +546,8 @@ func setupMockWsdbCacheCqlFetch2Args(sess *MockSession, iter *MockIter,
 	iter.On("Close").Return(err)
 	iter.SetRows(rows)
 	iterateRows := newMockIterScan(fetchPause, iter)
-	iter.On("Scan", mock.AnythingOfType("*string"), mock.AnythingOfType("*int64"),
+	iter.On("Scan", mock.AnythingOfType("*string"),
+		mock.AnythingOfType("*int64"),
 		mock.AnythingOfType("*int64")).Return(iterateRows)
 
 	fetchQuery := new(MockQuery)
@@ -661,8 +663,10 @@ func mockBranchWorkspace(sess *MockSession, srcTypespace string,
 }
 
 func mockSchemaOk(sess *MockSession, keyspace, tableName string, err error) {
-	mockSchemaCheckV2(sess, keyspace, tableName, 1, []string{"SELECT", "MODIFY"}, nil)
-	mockSchemaCheckV3(sess, keyspace, tableName, 1, []string{"SELECT", "MODIFY"}, nil)
+	mockSchemaCheckV2(sess, keyspace, tableName, 1,
+		[]string{"SELECT", "MODIFY"}, nil)
+	mockSchemaCheckV3(sess, keyspace, tableName, 1,
+		[]string{"SELECT", "MODIFY"}, nil)
 }
 
 func mockSchemaCheckV2(sess *MockSession, keyspace, tableName string,
@@ -692,16 +696,18 @@ func mockSchemaCheckV2Perms(sess *MockSession, keyspace,
 	tableName string, perms []string, err error) {
 
 	mockquery := &MockQuery{}
-	checkPermsQuery := fmt.Sprintf("SELECT permissions FROM system_auth.permissions "+
-		"WHERE username='%s' AND resource='data/%s'",
-		strings.ToLower(tstUsername),
-		strings.ToLower(keyspace))
+	checkPermsQuery :=
+		fmt.Sprintf("SELECT permissions FROM system_auth.permissions "+
+			"WHERE username='%s' AND resource='data/%s'",
+			strings.ToLower(tstUsername),
+			strings.ToLower(keyspace))
 	sess.On("Query", checkPermsQuery).Return(mockquery)
 	if err != nil {
 		mockquery.On("Scan", mock.AnythingOfType("*[]string")).Return(err)
 	} else {
 		scanFunc := newMockQueryScanList(err, []interface{}{perms})
-		mockquery.On("Scan", mock.AnythingOfType("*[]string")).Return(scanFunc)
+		mockquery.On("Scan",
+			mock.AnythingOfType("*[]string")).Return(scanFunc)
 	}
 }
 

@@ -78,7 +78,8 @@ func (s *storeIntegrationTests) TestInsertParallel() {
 		Wg.Go(func() error {
 
 			return s.bls.Insert(integTestEtherCtx,
-				[]byte(testKey+strconv.Itoa(countl)), []byte(testValue),
+				[]byte(testKey+strconv.Itoa(countl)),
+				[]byte(testValue),
 				map[string]string{TimeToLive: "0"})
 		})
 	}
@@ -90,7 +91,8 @@ func (s *storeIntegrationTests) TestInsertParallel() {
 		value, _, err := s.bls.Get(integTestEtherCtx,
 			[]byte(testKey+strconv.Itoa(count)))
 		s.Require().NoError(err, "Insert returned an error")
-		s.Require().Equal(testValue, string(value), "Get returned in correct value")
+		s.Require().Equal(testValue, string(value),
+			"Get returned in correct value")
 	}
 }
 
@@ -112,7 +114,8 @@ func (s *storeIntegrationTests) TestGet() {
 func (s *storeIntegrationTests) TestGetUnknownKey() {
 	value, metadata, err := s.bls.Get(integTestEtherCtx, []byte(unknownKey))
 	s.Require().Nil(value, "value was not Nil when error is ErrKeyNotFound")
-	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
+	s.Require().Nil(metadata,
+		"metadata was not Nil when error is ErrKeyNotFound")
 	s.Require().Error(err, "Get returned incorrect error")
 	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
@@ -167,8 +170,10 @@ func (s *storeIntegrationTests) TestMetadataUnknownKey() {
 	s.Require().Error(err, "Metadata didn't return error")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
 	verr, ok := err.(*Error)
-	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T", err))
-	s.Require().Equal(ErrKeyNotFound, verr.Code, "Invalid Error Code from Metadata")
+	s.Require().Equal(true, ok,
+		fmt.Sprintf("Error from Metadata is of type %T", err))
+	s.Require().Equal(ErrKeyNotFound, verr.Code,
+		"Invalid Error Code from Metadata")
 }
 
 func TestStoreInteg(t *testing.T) {
