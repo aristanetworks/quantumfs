@@ -24,8 +24,8 @@ func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 	kv := key.Value()
 	ks := key.String()
 
-	// Check to see if the key is present in either the globalSkipMap or the localSkipMap.
-	// localSkipMap is just specific to this workspaces's walk.
+	// Check to see if the key is present in either the globalSkipMap or the
+	// localSkipMap. localSkipMap is just specific to this workspaces's walk.
 	if globalSkipMap != nil && globalSkipMap.Check(ks) {
 		return walker.ErrSkipHierarchy
 	}
@@ -75,7 +75,8 @@ func GetTTLForKey(c *walker.Ctx, cqlds cql.BlobStore,
 
 	metadata, err := cqlds.Metadata(ToECtx(c), key.Value())
 	if err != nil {
-		return 0, fmt.Errorf("Metadata failed on path:%v key %v: %v", path, key.String(), err)
+		return 0, fmt.Errorf("Metadata failed on path:%v key %v: %v",
+			path, key.String(), err)
 	}
 	ttl, ok := metadata[cql.TimeToLive]
 	if !ok {

@@ -42,7 +42,8 @@ var cs commonState
 func setupCommonState() error {
 	var err error
 	if co.config == "" {
-		return cmdproc.NewPreCmdExitErr("configuration file must be specified")
+		return cmdproc.NewPreCmdExitErr("configuration file must be " +
+			"specified")
 	}
 
 	cs.ttlCfg, err = qubitutils.LoadTTLConfig(co.config)
@@ -53,7 +54,8 @@ func setupCommonState() error {
 	cs.qfsds, err = backends.ConnectDatastore("ether.cql",
 		co.config)
 	if err != nil {
-		return cmdproc.NewPreCmdExitErr("Connection to DataStore failed: %s", err)
+		return cmdproc.NewPreCmdExitErr("Connection to DataStore failed: %s",
+			err)
 	}
 	v, ok := cs.qfsds.(*backends.EtherBlobStoreTranslator)
 	if !ok {
@@ -64,7 +66,8 @@ func setupCommonState() error {
 
 	cs.qfsdb, err = backends.ConnectWorkspaceDB("ether.cql", co.config)
 	if err != nil {
-		return cmdproc.NewPreCmdExitErr("Connection to workspaceDB failed: %s", err)
+		return cmdproc.NewPreCmdExitErr("Connection to workspaceDB "+
+			"failed: %s", err)
 	}
 	cs.cqldb = cql.NewUncachedWorkspaceDB(co.config)
 
@@ -76,7 +79,8 @@ func main() {
 	setupTemplates()
 
 	walkFlags = flag.NewFlagSet("Walker cmd", flag.ExitOnError)
-	walkFlags.StringVar(&co.config, "cfg", "", "datastore and workspaceDB config file")
+	walkFlags.StringVar(&co.config, "cfg", "",
+		"datastore and workspaceDB config file")
 	walkFlags.BoolVar(&co.progress, "progress", false, "show progress")
 
 	walkFlags.Usage = cmdproc.Usage

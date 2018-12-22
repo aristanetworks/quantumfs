@@ -33,7 +33,8 @@ func (s Semaphore) P() {
 	select {
 	case s <- 1:
 	case <-timer.C:
-		panic(fmt.Sprintf("Timeout in Semaphore.P() after %v of waiting", semTimeout))
+		panic(fmt.Sprintf("Timeout in Semaphore.P() after %v of waiting",
+			semTimeout))
 	}
 }
 
@@ -45,7 +46,8 @@ func (s Semaphore) V() {
 	select {
 	case <-s:
 	case <-timer.C:
-		panic(fmt.Sprintf("Timeout in Semaphore.V() after %v of waiting", semTimeout))
+		panic(fmt.Sprintf("Timeout in Semaphore.V() after %v of waiting",
+			semTimeout))
 	}
 }
 
@@ -103,8 +105,9 @@ func StartBytesXferredProgressBar(totalSize uint64, show bool,
 			select {
 			case written := <-pbar.CC:
 				current += uint64(written)
-				// 0 is the zero value for int64 and also a valid number of
-				// bytes written by fileCopy (eg: source file has no content)
+				// 0 is the zero value for int64 and also a valid
+				// number of bytes written by fileCopy
+				// (eg: source file has no content)
 				// hence use an exit marker
 				if written == exitCCMarker {
 					return
@@ -136,15 +139,18 @@ func showProgress(totalSize uint64, current uint64, start time.Time,
 
 	now := time.Now()
 	if uint64(now.Sub(start).Seconds()) > 0 {
-		speed = HumanizeBytes(current/uint64(now.Sub(start).Seconds())) + "/s"
+		speed = HumanizeBytes(current/uint64(now.Sub(start).Seconds())) +
+			":/s"
 	}
 	// log.Printf is thread-safe but it doesn't handle \r
 	if totalSize == 0 {
-		fmt.Printf("\r[Started] %10s [Copied] %10s [Done] NA [Speed] %10s [Duration] %10s",
+		fmt.Printf("\r[Started] %10s [Copied] %10s [Done] NA [Speed] %10s "+
+			"[Duration] %10s",
 			start.Format(time.Kitchen), HumanizeBytes(current),
 			speed, time.Since(start))
 	} else {
-		fmt.Printf("\r[Started] %10s [Copied] %10s [Done] %3d%% [Speed] %10s [Duration] %10s",
+		fmt.Printf("\r[Started] %10s [Copied] %10s [Done] %3d%% "+
+			"[Speed] %10s [Duration] %10s",
 			start.Format(time.Kitchen), HumanizeBytes(current),
 			(current*100)/totalSize, speed, time.Since(start))
 
@@ -189,7 +195,8 @@ func CreateTestDirContents() (string, string, error) {
 			err = os.MkdirAll(filepath.Join(testSrcDir, p), os.ModePerm)
 		} else {
 			bytes := []byte(fileContent[rand.Intn(len(fileContent))])
-			err = ioutil.WriteFile(filepath.Join(testSrcDir, p), bytes, os.ModePerm)
+			err = ioutil.WriteFile(filepath.Join(testSrcDir, p), bytes,
+				os.ModePerm)
 		}
 		if err != nil {
 			return "", "", err
@@ -204,7 +211,8 @@ func GetFiles(srcRoot string) ([]string, error) {
 
 	var files []string
 
-	err := filepath.Walk(srcRoot, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(srcRoot, func(path string, info os.FileInfo,
+		err error) error {
 		if err != nil {
 			return err
 		}
@@ -223,7 +231,8 @@ func GetSubDirs(srcRoot string) ([]string, error) {
 
 	var dirs []string
 
-	err := filepath.Walk(srcRoot, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(srcRoot, func(path string, info os.FileInfo,
+		err error) error {
 		if err != nil {
 			return err
 		}

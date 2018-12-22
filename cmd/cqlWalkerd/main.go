@@ -79,31 +79,44 @@ func main() {
 	logdir := walkFlags.String("logdir", "", "dir for logging")
 	influxServer := walkFlags.String("influxServer", "", "influxdb server's IP")
 	influxPort := walkFlags.Uint("influxPort", 0, "influxdb server's port")
-	influxDBName := walkFlags.String("influxDBName", "", "database to use in influxdb")
+	influxDBName := walkFlags.String("influxDBName", "",
+		"database to use in influxdb")
 	numWalkers := walkFlags.Int("numWalkers", maxNumWalkers,
 		"Number of parallel walks in the daemon")
-	useSkipMap := walkFlags.Bool("skipSeenKeys", false, "Skip keys seen in earlier walks")
-	name := walkFlags.String("name", "", "walker instance name, used when multiple instances are deployed")
-	prefix := walkFlags.String("wsPrefixMatch", "", "all workspace names with this prefix are handled. Others"+
-		" are skipped. The negWsPrefixMatch option reverses the check")
-	negPrefixMatch := walkFlags.Bool("negWsPrefixMatch", false, "negate the prefix match checking. All workspaces"+
-		" with names not matching the prefix are handled.")
-	lastWriteDuration := walkFlags.String("skipWsWrittenWithin", "", "CAUTION: Since this option causes certain"+
-		" workspaces to be skipped, use this option carefully. For example, using it with transient workspaces"+
-		" is ok. This option causes walker daemon to skip walking workspaces which were written"+
-		" within the given duration. The duration string is in Golang duration format. If the duration is empty"+
-		" then the duration check is not used.")
+	useSkipMap := walkFlags.Bool("skipSeenKeys", false,
+		"Skip keys seen in earlier walks")
+	name := walkFlags.String("name", "",
+		"walker instance name, used when multiple instances are deployed")
+	prefix := walkFlags.String("wsPrefixMatch", "",
+		"all workspace names with this prefix are handled. Others"+
+			" are skipped. The negWsPrefixMatch option reverses"+
+			" the check")
+	negPrefixMatch := walkFlags.Bool("negWsPrefixMatch", false,
+		"negate the prefix match checking. All workspaces"+
+			" with names not matching the prefix are handled.")
+	lastWriteDuration := walkFlags.String("skipWsWrittenWithin", "",
+		"CAUTION: Since this option causes certain "+
+			"workspaces to be skipped, use this option carefully. "+
+			"For example, using it with transient workspaces "+
+			"is ok. This option causes walker daemon to skip "+
+			"walking workspaces which were written "+
+			"within the given duration. The duration string is "+
+			"in Golang duration format. If the duration is empty "+
+			"then the duration check is not used.")
 
 	walkFlags.Usage = func() {
 		fmt.Println("qubit-walkerd version", version)
-		fmt.Println("usage: qubit-walkerd -name <name> -etherCfg <etherCfg> [-wsdbCfg <wsdb service name>] [-logdir dir]")
-		fmt.Println("                [-influxServer serverIP -influxPort port" +
+		fmt.Println("usage: qubit-walkerd -name <name> -etherCfg " +
+			"<etherCfg> [-wsdbCfg <wsdb service name>] [-logdir dir]")
+		fmt.Println("                [-influxServer serverIP " +
+			"-influxPort port" +
 			" -influxDBName dbname] [-numWalkers num] [-skipSeenKeys]" +
 			" [-wsPrefixMatch prefix] [-negWsPrefixMatch]" +
 			" [-skipWsWrittenWithin duration]")
 		fmt.Println()
 		fmt.Println("This daemon periodically walks all the workspaces,")
-		fmt.Println("updates the TTL of each block as per the config file and")
+		fmt.Println("updates the TTL of each block as per the config " +
+			"file and")
 		fmt.Println("uploads the statistics to influx.")
 		fmt.Println()
 		walkFlags.PrintDefaults()
@@ -136,8 +149,9 @@ func main() {
 		os.Exit(exitBadConfig)
 	}
 
-	c := getWalkerDaemonContext(*name, *influxServer, uint16(*influxPort), *influxDBName,
-		*etherCfg, *wsdbCfg, *logdir, *numWalkers, matcher, *lastWriteDuration)
+	c := getWalkerDaemonContext(*name, *influxServer, uint16(*influxPort),
+		*influxDBName, *etherCfg, *wsdbCfg, *logdir, *numWalkers, matcher,
+		*lastWriteDuration)
 
 	// Start heart beat messaging.
 	timer := time.Tick(heartBeatInterval)
@@ -309,20 +323,23 @@ func walkFullWSDB(c *Ctx, workChan chan *workerData) error {
 			for _, ws := range wsList {
 				wsFullPath := fmt.Sprintf("%s/%s/%s", ts, ns, ws)
 				if !c.wsNameMatcher(wsFullPath) {
-					c.vlog("skipped walk of ws %s due to ws name match rule",
-						wsFullPath)
+					c.vlog("skipped walk of ws %s due to ws "+
+						"name match rule", wsFullPath)
 					continue
 				}
 
 				if skipWsWrittenWithin(c, ts, ns, ws) {
-					c.vlog("skipped walk of ws %s since ws was written within last %s",
+					c.vlog("skipped walk of ws %s since "+
+						"ws was written within last %s",
 						wsFullPath, c.lwDuration)
 					continue
 				}
 
-				if err := queueWorkspace(c, workChan, ts, ns, ws); err != nil {
-					c.elog("Error from queueWorkspace (%s/%s/%s): %s",
-						ts, ns, ws, err.Error())
+				if err := queueWorkspace(c, workChan, ts, ns,
+					ws); err != nil {
+					c.elog("Error from queueWorkspace "+
+						"(%s/%s/%s): %s", ts, ns, ws,
+						err.Error())
 					return err
 				}
 			}
@@ -396,7 +413,8 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 		// workspace.
 		if werr, ok := err.(quantumfs.WorkspaceDbErr); ok &&
 			werr.Code == quantumfs.WSDB_WORKSPACE_NOT_FOUND {
-			c.wlog("%s/%s/%s not found, might have been pruned", ts, ns, ws)
+			c.wlog("%s/%s/%s not found, might have been pruned",
+				ts, ns, ws)
 			return nil
 		}
 		c.elog("Get rootID for %s/%s/%s, err(%s)", ts, ns, ws,
@@ -411,7 +429,7 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 		rootID: rootID.String(),
 	}
 
-	// Use a local SkipMap to hold keys we visit during a single workspace's walk.
+	// Use a local SkipMap to hold keys we visit during a single workspace's walk
 	// If the walk fails we do not merge these keys with the the global SkipMap.
 	var localSkipMap *walkerutils.SkipMap
 	if c.skipMap != nil {
@@ -420,7 +438,8 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 
 	// Every call to Walk() needs a walkFunc
 	walkFunc := func(cw *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType, err error) error {
+		key quantumfs.ObjectKey, size uint64,
+		objType quantumfs.ObjectType, err error) error {
 
 		return walkerutils.RefreshTTL(cw, path, key, size, objType, c.cqlds,
 			c.ttlCfg.TTLNew, c.ttlCfg.SkipMapResetAfter_ms/1000,
@@ -441,7 +460,8 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 			_, localSkipMapLen := localSkipMap.Len()
 			c.skipMap.Merge(localSkipMap)
 			_, afterSkipMapLen := c.skipMap.Len()
-			c.vlog("Merging localSkipMap(len=%d) with globalSkipMap(len=%d) "+
+			c.vlog("Merging localSkipMap(len=%d) with "+
+				"globalSkipMap(len=%d) "+
 				"-> globalSkipMap(len=%d)",
 				localSkipMapLen, beforeSkipMapLen, afterSkipMapLen)
 		}

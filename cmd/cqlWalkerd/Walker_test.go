@@ -174,7 +174,8 @@ func TestRefreshTTLCache_WalkNonOptimal(t *testing.T) {
 
 		test.WaitFor("Walker to refresh workspace again", func() bool {
 			walksNow := test.CountLogStrings(
-				fmt.Sprintf("Success: TTL refresh for %s", workspace))
+				fmt.Sprintf("Success: TTL refresh for %s",
+					workspace))
 			return walksNow > walks
 		})
 
@@ -193,11 +194,13 @@ func TestRefreshTTLCache_WalkNonOptimal(t *testing.T) {
 		walks = test.CountLogStrings(
 			fmt.Sprintf("Success: TTL refresh for %s", workspace))
 
-		test.WaitFor("Walker to refresh workspace after setTTL", func() bool {
-			walksNow := test.CountLogStrings(
-				fmt.Sprintf("Success: TTL refresh for %s", workspace))
-			return walksNow > walks
-		})
+		test.WaitFor("Walker to refresh workspace after setTTL",
+			func() bool {
+				walksNow := test.CountLogStrings(
+					fmt.Sprintf("Success: TTL refresh for %s",
+						workspace))
+				return walksNow > walks
+			})
 
 		ttl = test.getTTL(c, file)
 		test.Assert(ttl == c.ttlCfg.TTLNew,
@@ -348,7 +351,8 @@ func TestSkipWsWrittenSince(t *testing.T) {
 		c := test.testCtx()
 		workspaces, files, oldTTLs := test.setupWsFilesTTLs(c, 3)
 		dummyErrFmt := "dummy error: %s"
-		c.wsLastWriteTime = func(c *Ctx, ts, ns, ws string) (time.Time, error) {
+		c.wsLastWriteTime = func(c *Ctx, ts, ns,
+			ws string) (time.Time, error) {
 			wsFullPath := fmt.Sprintf("%s/%s/%s", ts, ns, ws)
 			switch wsFullPath {
 			case workspaces[1]:

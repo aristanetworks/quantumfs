@@ -43,7 +43,8 @@ func printList(args []string) error {
 		}
 		nsl, err := cs.qfsdb.NamespaceList(&cs.ctx.Ctx, ts)
 		if err != nil {
-			fmt.Printf("Listing Namespaces for TS:%s failed: %s\n", ts, err)
+			fmt.Printf("Listing Namespaces for TS:%s failed: %s\n", ts,
+				err)
 			continue
 		}
 		for _, ns := range nsl {
@@ -56,16 +57,25 @@ func printList(args []string) error {
 			for ws, nonce := range wsMap {
 				var rootID quantumfs.ObjectKey
 				wsname := ts + "/" + ns + "/" + ws
-				if rootID, _, err = qubitutils.GetWorkspaceRootID(&cs.ctx.Ctx, cs.qfsdb, wsname); err != nil {
-					return cmdproc.NewBadCmdExitErr("RootId not found for %v err: %v", wsname, err)
+				if rootID, _, err = qubitutils.GetWorkspaceRootID(
+					&cs.ctx.Ctx, cs.qfsdb, wsname); err != nil {
+					return cmdproc.NewBadCmdExitErr("RootId "+
+						"not found for %v err: %v",
+						wsname, err)
 				}
 
 				var lastWrite time.Time
-				if lastWrite, err = cs.cqldb.WorkspaceLastWriteTime(cs.ctx, ts, ns, ws); err != nil {
-					return cmdproc.NewBadCmdExitErr("Cannot find lastWriteTime for %s: %v", wsname, err)
+				if lastWrite, err =
+					cs.cqldb.WorkspaceLastWriteTime(cs.ctx, ts,
+						ns, ws); err != nil {
+					return cmdproc.NewBadCmdExitErr("Cannot "+
+						"find lastWriteTime for %s: %v",
+						wsname, err)
 				}
 				fmt.Println()
-				fmt.Printf("[%s] %v : %s : %d\n", lastWrite.Local().Format(time.UnixDate), rootID.String(), wsname, nonce)
+				fmt.Printf("[%s] %v : %s : %d\n",
+					lastWrite.Local().Format(time.UnixDate),
+					rootID.String(), wsname, nonce)
 			}
 		}
 	}

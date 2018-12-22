@@ -25,7 +25,7 @@ func registerDuCmd() {
 workspace
 	name of the workspace
 path
-	absolute path from root of the workspace	
+	absolute path from root of the workspace
 `
 	cmd.Run = handleDiskUsage
 
@@ -41,7 +41,9 @@ func handleDiskUsage(args []string) error {
 	searchPath := args[1]
 	searchPath = filepath.Clean("/" + searchPath)
 
-	filter := func(path string) bool { return !strings.HasPrefix(path, searchPath) }
+	filter := func(path string) bool {
+		return !strings.HasPrefix(path, searchPath)
+	}
 
 	tracker, sizer := getTrackerHandler(filter)
 	showRootIDStatus := false

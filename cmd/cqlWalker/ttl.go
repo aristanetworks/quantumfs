@@ -27,7 +27,8 @@ func registerTTLCmd() {
 	var cmd cmdproc.CommandInfo
 	cmd.Name = "ttl"
 	cmd.Usage = "workspace"
-	cmd.Short = "update all blocks in workspace with TTL values from configuration"
+	cmd.Short = "update all blocks in workspace with TTL values from " +
+		"configuration"
 	cmd.Details = `
 workspace
 	name of the workspace
@@ -45,7 +46,8 @@ func handleTTL(args []string) error {
 	wsname := args[0]
 
 	walkFunc := func(c *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType, err error) error {
+		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType,
+		err error) error {
 
 		return walkutils.RefreshTTL(c, path, key, size, objType,
 			cs.cqlds, cs.ttlCfg.TTLNew,
@@ -92,7 +94,8 @@ func handleForceTTL(args []string) error {
 
 	// Internal Walker for TTL.
 	walkFunc := func(c *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType, err error) error {
+		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType,
+		err error) error {
 
 		return walkutils.RefreshTTL(c, path, key, size, objType,
 			cs.cqlds, newTTL, newTTL, nil, nil)
@@ -151,7 +154,8 @@ func handleTTLHistogram(args []string) error {
 
 		metadata, err := cs.cqlds.Metadata(walkutils.ToECtx(c), key.Value())
 		if err != nil {
-			return fmt.Errorf("path:%v key %v: %v", path, key.String(), err)
+			return fmt.Errorf("path:%v key %v: %v", path, key.String(),
+				err)
 		}
 		ttl, ok := metadata[cql.TimeToLive]
 		if !ok {
