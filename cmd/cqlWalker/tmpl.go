@@ -6,7 +6,7 @@ package main
 import (
 	"text/template"
 
-	"github.com/aristanetworks/qubit/tools/utils/cmdproc"
+	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 )
 
 var usageTemplate = `qubit-walkercmd is a tool that walks a workspace and runs command on keys found.

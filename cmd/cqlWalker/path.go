@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
-	"github.com/aristanetworks/qubit/tools/utils/cmdproc"
 )
 
 func init() {
@@ -52,7 +52,7 @@ func printPath2Key(args []string) error {
 	var listLock utils.DeferableMutex
 	keyList := make([]quantumfs.ObjectKey, 0, 10)
 	finder := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, objType quantumfs.ObjectType) error {
+		size uint64, objType quantumfs.ObjectType, err error) error {
 
 		if strings.Compare(path, searchPath) == 0 {
 			defer listLock.Lock().Unlock()

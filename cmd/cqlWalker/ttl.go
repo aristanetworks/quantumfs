@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aristanetworks/ether/cql"
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends/cql"
+	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
+	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
+	walkutils "github.com/aristanetworks/quantumfs/cmd/qutils2"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
-	walkutils "github.com/aristanetworks/qubit/tools/qwalker/utils"
-	qubitutils "github.com/aristanetworks/qubit/tools/utils"
-	"github.com/aristanetworks/qubit/tools/utils/cmdproc"
 )
 
 func init() {
@@ -45,7 +45,7 @@ func handleTTL(args []string) error {
 	wsname := args[0]
 
 	walkFunc := func(c *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType) error {
+		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType, err error) error {
 
 		return walkutils.RefreshTTL(c, path, key, size, objType,
 			cs.cqlds, cs.ttlCfg.TTLNew,
@@ -92,7 +92,7 @@ func handleForceTTL(args []string) error {
 
 	// Internal Walker for TTL.
 	walkFunc := func(c *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType) error {
+		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType, err error) error {
 
 		return walkutils.RefreshTTL(c, path, key, size, objType,
 			cs.cqlds, newTTL, newTTL, nil, nil)
@@ -130,7 +130,7 @@ func handleTTLHistogram(args []string) error {
 	var maplock utils.DeferableMutex
 	hist := qubitutils.NewHistogram()
 	bucketer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, objType quantumfs.ObjectType) error {
+		size uint64, objType quantumfs.ObjectType, err error) error {
 
 		if walker.SkipKey(c, key) {
 			return nil

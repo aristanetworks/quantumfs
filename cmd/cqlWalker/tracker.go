@@ -11,7 +11,7 @@ import "fmt"
 
 import (
 	"github.com/aristanetworks/quantumfs"
-	qubitutils "github.com/aristanetworks/qubit/tools/utils"
+	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
 )
 
 // a set of paths

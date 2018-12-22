@@ -15,11 +15,11 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/aristanetworks/quantumfs"
+	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
+	walkerutils "github.com/aristanetworks/quantumfs/cmd/qutils2"
 	"github.com/aristanetworks/quantumfs/qlog"
 	qutils "github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
-	"github.com/aristanetworks/qubit/tools/qwalker/utils"
-	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
 // Various exit reasons, will be returned to the shell as an exit code
@@ -159,7 +159,7 @@ func walkFullWSDBLoop(c *Ctx, backOffLoop bool, useSkipMap bool) {
 	var skipMapPeriod time.Duration
 	var nextMapReset time.Time
 	if useSkipMap {
-		c.skipMap = utils.NewSkipMap(ttlCfg.SkipMapMaxLen)
+		c.skipMap = walkerutils.NewSkipMap(ttlCfg.SkipMapMaxLen)
 		skipMapPeriod = time.Duration(ttlCfg.SkipMapResetAfter_ms) *
 			time.Millisecond
 		nextMapReset = time.Now().Add(skipMapPeriod)
@@ -413,16 +413,16 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 
 	// Use a local SkipMap to hold keys we visit during a single workspace's walk.
 	// If the walk fails we do not merge these keys with the the global SkipMap.
-	var localSkipMap *utils.SkipMap
+	var localSkipMap *walkerutils.SkipMap
 	if c.skipMap != nil {
-		localSkipMap = utils.NewSkipMap(oldC.ttlCfg.SkipMapMaxLen)
+		localSkipMap = walkerutils.NewSkipMap(oldC.ttlCfg.SkipMapMaxLen)
 	}
 
 	// Every call to Walk() needs a walkFunc
 	walkFunc := func(cw *walker.Ctx, path string,
-		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType) error {
+		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType, err error) error {
 
-		return utils.RefreshTTL(cw, path, key, size, objType, c.cqlds,
+		return walkerutils.RefreshTTL(cw, path, key, size, objType, c.cqlds,
 			c.ttlCfg.TTLNew, c.ttlCfg.SkipMapResetAfter_ms/1000,
 			c.skipMap, localSkipMap)
 	}

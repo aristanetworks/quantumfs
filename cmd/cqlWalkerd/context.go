@@ -10,16 +10,16 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/aristanetworks/ether"
-	"github.com/aristanetworks/ether/blobstore"
-	"github.com/aristanetworks/ether/cql"
-	etherWsdb "github.com/aristanetworks/ether/qubit/wsdb"
 	influxlib "github.com/aristanetworks/influxlib/go"
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends"
+	"github.com/aristanetworks/quantumfs/backends/blobstore"
+	"github.com/aristanetworks/quantumfs/backends/cql"
+	"github.com/aristanetworks/quantumfs/backends/ether"
+	etherWsdb "github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
+	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
+	walkerutils "github.com/aristanetworks/quantumfs/cmd/qutils2"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
-	"github.com/aristanetworks/qubit/tools/qwalker/utils"
-	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
 var requestID uint64
@@ -44,7 +44,7 @@ type Ctx struct {
 	iteration       uint
 	keyspace        string
 	aliveCount      int64
-	skipMap         *utils.SkipMap
+	skipMap         *walkerutils.SkipMap
 	wsNameMatcher   func(s string) bool
 	wsLastWriteTime func(c *Ctx, ts, ns, ws string) (time.Time, error)
 	lwDuration      time.Duration
@@ -94,7 +94,7 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 	}
 
 	// Connect to ether backed quantumfs DataStore
-	quantumfsDS, err := thirdparty_backends.ConnectDatastore("ether.cql", etherCfgFile)
+	quantumfsDS, err := backends.ConnectDatastore("ether.cql", etherCfgFile)
 	if err != nil {
 		fmt.Printf("Connection to DataStore failed")
 		os.Exit(exitBadConfig)
@@ -103,7 +103,7 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 	// Extract blobstore from quantumfs DataStore
 	// since we specifically use ether.cql datastore, it must implement
 	// the following interfaces
-	b, ok := quantumfsDS.(*thirdparty_backends.EtherBlobStoreTranslator)
+	b, ok := quantumfsDS.(*backends.EtherBlobStoreTranslator)
 	if !ok {
 		fmt.Printf("Found unsupported datastore adapter\n")
 		os.Exit(exitBadConfig)
@@ -124,14 +124,14 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 	// if a wsdbCfgStr was provided use that to connect to 'grpc' backend.
 	var quantumfsWSDB quantumfs.WorkspaceDB
 	if wsdbCfgStr != "" {
-		quantumfsWSDB, err = thirdparty_backends.ConnectWorkspaceDB("grpc", wsdbCfgStr)
+		quantumfsWSDB, err = backends.ConnectWorkspaceDB("grpc", wsdbCfgStr)
 		if err != nil {
 			fmt.Printf("Connection to workspaceDB failed err: %v\n", err)
 			os.Exit(exitBadConfig)
 		}
 
 	} else {
-		quantumfsWSDB, err = thirdparty_backends.ConnectWorkspaceDB("ether.cql", etherCfgFile)
+		quantumfsWSDB, err = backends.ConnectWorkspaceDB("ether.cql", etherCfgFile)
 		if err != nil {
 			fmt.Printf("Connection to workspaceDB failed err: %v\n", err)
 			os.Exit(exitBadConfig)

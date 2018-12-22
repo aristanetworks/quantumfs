@@ -6,8 +6,8 @@ package main
 import (
 	"fmt"
 
-	qubitutils "github.com/aristanetworks/qubit/tools/utils"
-	"github.com/aristanetworks/qubit/tools/utils/cmdproc"
+	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
+	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 )
 
 func init() {

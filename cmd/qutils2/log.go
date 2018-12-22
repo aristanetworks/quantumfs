@@ -4,8 +4,8 @@
 package utils
 
 import (
-	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends/ether"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/walker"
 )

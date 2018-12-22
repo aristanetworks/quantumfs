@@ -6,7 +6,7 @@
 package main
 
 import (
-	"github.com/aristanetworks/ether/cql"
+	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/qlogstats"
 	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 )

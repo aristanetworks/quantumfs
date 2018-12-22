@@ -10,12 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aristanetworks/ether"
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends/ether"
+	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
-	qubitutils "github.com/aristanetworks/qubit/tools/utils"
 )
 
 // Ctx implements both quantumfs.Ctx and ether.Ctx
@@ -114,11 +114,11 @@ func walkHelper(c *Ctx,
 		start := time.Now()
 		var keysWalked uint64
 		wrapper = func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-			size uint64, objType quantumfs.ObjectType) error {
+			size uint64, objType quantumfs.ObjectType, err error) error {
 
 			atomic.AddUint64(&keysWalked, 1)
 			defer showProgress(progress, start, keysWalked)
-			return handler(c, path, key, size, objType)
+			return handler(c, path, key, size, objType, nil)
 		}
 
 		// add a newline to separate the progress information
@@ -141,7 +141,7 @@ func getTrackerHandler(filter func(path string) bool) (*tracker, walker.WalkFunc
 	tracker := newTracker()
 	var mapLock utils.DeferableMutex
 	handler := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-		size uint64, objType quantumfs.ObjectType) error {
+		size uint64, objType quantumfs.ObjectType, err error) error {
 
 		defer mapLock.Lock().Unlock()
 		if filter != nil && filter(path) {

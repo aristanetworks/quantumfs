@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/aristanetworks/ether/blobstore"
-	"github.com/aristanetworks/ether/cql"
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends/blobstore"
+	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/walker"
 )
 
@@ -28,11 +28,11 @@ func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 	// Check to see if the key is present in either the globalSkipMap or the localSkipMap.
 	// localSkipMap is just specific to this workspaces's walk.
 	if globalSkipMap != nil && globalSkipMap.Check(ks) {
-		return walker.SkipEntry
+		return walker.ErrSkipHierarchy
 	}
 
 	if localSkipMap != nil && localSkipMap.Check(ks) {
-		return walker.SkipEntry
+		return walker.ErrSkipHierarchy
 	}
 
 	if globalSkipMap == nil {

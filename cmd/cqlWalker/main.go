@@ -9,13 +9,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/aristanetworks/ether/blobstore"
-	"github.com/aristanetworks/ether/cql"
-	qubit "github.com/aristanetworks/ether/qubit/wsdb"
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
-	qubitutils "github.com/aristanetworks/qubit/tools/utils"
-	"github.com/aristanetworks/qubit/tools/utils/cmdproc"
+	"github.com/aristanetworks/quantumfs/backends"
+	"github.com/aristanetworks/quantumfs/backends/blobstore"
+	"github.com/aristanetworks/quantumfs/backends/cql"
+	qubit "github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
+	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
+	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 )
 
 var walkFlags *flag.FlagSet
@@ -52,19 +52,19 @@ func setupCommonState() error {
 		return cmdproc.NewPreCmdExitErr("Failed to load TTL values: %s", err)
 	}
 
-	cs.qfsds, err = thirdparty_backends.ConnectDatastore("ether.cql",
+	cs.qfsds, err = backends.ConnectDatastore("ether.cql",
 		co.config)
 	if err != nil {
 		return cmdproc.NewPreCmdExitErr("Connection to DataStore failed: %s", err)
 	}
-	v, ok := cs.qfsds.(*thirdparty_backends.EtherBlobStoreTranslator)
+	v, ok := cs.qfsds.(*backends.EtherBlobStoreTranslator)
 	if !ok {
 		return cmdproc.NewPreCmdExitErr("Non-ether datastore found")
 	}
 	v.ApplyTTLPolicy = false
 	cs.cqlds = v.Blobstore
 
-	cs.qfsdb, err = thirdparty_backends.ConnectWorkspaceDB("ether.cql", co.config)
+	cs.qfsdb, err = backends.ConnectWorkspaceDB("ether.cql", co.config)
 	if err != nil {
 		return cmdproc.NewPreCmdExitErr("Connection to workspaceDB failed: %s", err)
 	}

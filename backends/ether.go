@@ -1,5 +1,3 @@
-// +build ether
-
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
@@ -15,12 +13,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aristanetworks/backends/blobstore"
-	"github.com/aristanetworks/backends/cql"
-	"github.com/aristanetworks/backends/ether"
-	"github.com/aristanetworks/backends/qubit/wsdb"
 	"github.com/aristanetworks/ether/filesystem"
 	"github.com/aristanetworks/quantumfs"
+	"github.com/aristanetworks/quantumfs/backends/blobstore"
+	"github.com/aristanetworks/quantumfs/backends/cql"
+	"github.com/aristanetworks/quantumfs/backends/ether"
+	"github.com/aristanetworks/quantumfs/backends/qubit/wsdb"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
