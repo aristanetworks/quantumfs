@@ -11,12 +11,11 @@ import (
 	"os"
 
 	blobstore "github.com/aristanetworks/quantumfs/backends/cql"
-	"github.com/aristanetworks/quantumfs/backends/cql/utils"
 )
 
 type fileStore struct {
 	root string
-	sem  utils.Semaphore
+	sem  blobstore.Semaphore
 }
 
 // AllMetadata is the blobstore metadata for a block of data
@@ -47,6 +46,6 @@ func NewFilesystemStore(path string) (blobstore.BlobStore, error) {
 	}
 
 	store.root = path
-	store.sem = make(utils.Semaphore, 100)
+	store.sem = make(blobstore.Semaphore, 100)
 	return &store, nil
 }

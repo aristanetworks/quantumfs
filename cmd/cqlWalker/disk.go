@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aristanetworks/quantumfs/utils/qutils"
+	"github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
 )
 
 func init() {
@@ -50,6 +50,6 @@ func handleDiskUsage(args []string) error {
 		showRootIDStatus, sizer); err != nil {
 		return NewBadCmdExitErr("%s", err)
 	}
-	fmt.Println("Total Size = ", qutils.HumanizeBytes(tracker.totalSize()))
+	fmt.Println("Total Size = ", utils.HumanizeBytes(tracker.totalSize()))
 	return nil
 }

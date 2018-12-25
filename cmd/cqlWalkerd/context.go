@@ -14,8 +14,8 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
+	"github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
 	"github.com/aristanetworks/quantumfs/qlog"
-	"github.com/aristanetworks/quantumfs/utils/qutils"
 )
 
 var requestID uint64
@@ -31,7 +31,7 @@ type Ctx struct {
 	cqlws           cql.WorkspaceDB
 	ds              quantumfs.DataStore
 	cqlds           cql.BlobStore
-	ttlCfg          *qutils.TTLConfig
+	ttlCfg          *utils.TTLConfig
 	etherConfig     string
 	wsdbConfig      string
 	numSuccess      uint32
@@ -40,7 +40,7 @@ type Ctx struct {
 	iteration       uint
 	keyspace        string
 	aliveCount      int64
-	skipMap         *qutils.SkipMap
+	skipMap         *utils.SkipMap
 	wsNameMatcher   func(s string) bool
 	wsLastWriteTime func(c *Ctx, ts, ns, ws string) (time.Time, error)
 	lwDuration      time.Duration
@@ -138,7 +138,7 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 	}
 
 	// Load TTL Config values
-	ttlConfig, err := qutils.LoadTTLConfig(etherCfgFile)
+	ttlConfig, err := utils.LoadTTLConfig(etherCfgFile)
 	if err != nil {
 		fmt.Printf("Failed to load TTL: %s\n", err.Error())
 		os.Exit(exitBadConfig)

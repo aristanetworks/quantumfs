@@ -10,8 +10,8 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends/cql"
+	cqlutils "github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/aristanetworks/quantumfs/utils/qutils"
 	"github.com/aristanetworks/quantumfs/walker"
 )
 
@@ -47,7 +47,7 @@ func handleTTL(args []string) error {
 		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType,
 		err error) error {
 
-		return qutils.RefreshTTL(c, path, key, size, objType,
+		return cqlutils.RefreshTTL(c, path, key, size, objType,
 			cs.cqlds, cs.ttlCfg.TTLNew,
 			cs.ttlCfg.SkipMapResetAfter_ms/1000,
 			nil, nil)
@@ -95,7 +95,7 @@ func handleForceTTL(args []string) error {
 		key quantumfs.ObjectKey, size uint64, objType quantumfs.ObjectType,
 		err error) error {
 
-		return qutils.RefreshTTL(c, path, key, size, objType,
+		return cqlutils.RefreshTTL(c, path, key, size, objType,
 			cs.cqlds, newTTL, newTTL, nil, nil)
 	}
 
@@ -129,7 +129,7 @@ func handleTTLHistogram(args []string) error {
 
 	keymap := make(map[string]bool)
 	var maplock utils.DeferableMutex
-	hist := qutils.NewHistogram()
+	hist := cqlutils.NewHistogram()
 	bucketer := func(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 		size uint64, objType quantumfs.ObjectType, err error) error {
 
@@ -150,7 +150,7 @@ func handleTTLHistogram(args []string) error {
 			return nil
 		}
 
-		metadata, err := cs.cqlds.Metadata(qutils.ToECtx(c), key.Value())
+		metadata, err := cs.cqlds.Metadata(cqlutils.ToECtx(c), key.Value())
 		if err != nil {
 			return fmt.Errorf("path:%v key %v: %v", path, key.String(),
 				err)

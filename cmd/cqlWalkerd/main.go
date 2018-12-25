@@ -15,9 +15,9 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/aristanetworks/quantumfs"
+	cqlutils "github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
-	"github.com/aristanetworks/quantumfs/utils/qutils"
 	"github.com/aristanetworks/quantumfs/walker"
 )
 
@@ -172,7 +172,7 @@ func walkFullWSDBLoop(c *Ctx, backOffLoop bool, useSkipMap bool) {
 	var skipMapPeriod time.Duration
 	var nextMapReset time.Time
 	if useSkipMap {
-		c.skipMap = qutils.NewSkipMap(ttlCfg.SkipMapMaxLen)
+		c.skipMap = cqlutils.NewSkipMap(ttlCfg.SkipMapMaxLen)
 		skipMapPeriod = time.Duration(ttlCfg.SkipMapResetAfter_ms) *
 			time.Millisecond
 		nextMapReset = time.Now().Add(skipMapPeriod)
@@ -403,7 +403,7 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 	c := oldC.newRequestID() // So that each walk has its own ID in the qlog.
 
 	start := time.Now()
-	if rootID, _, err = qutils.GetWorkspaceRootID(c.qctx, c.wsdb,
+	if rootID, _, err = cqlutils.GetWorkspaceRootID(c.qctx, c.wsdb,
 		wsname); err != nil {
 		// walker daemon is asynchronous to pruner daemon and so
 		// it is possible that pruner daemon removed the workspace
@@ -430,9 +430,9 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 
 	// Use a local SkipMap to hold keys we visit during a single workspace's walk
 	// If the walk fails we do not merge these keys with the the global SkipMap.
-	var localSkipMap *qutils.SkipMap
+	var localSkipMap *cqlutils.SkipMap
 	if c.skipMap != nil {
-		localSkipMap = qutils.NewSkipMap(oldC.ttlCfg.SkipMapMaxLen)
+		localSkipMap = cqlutils.NewSkipMap(oldC.ttlCfg.SkipMapMaxLen)
 	}
 
 	// Every call to Walk() needs a walkFunc
@@ -440,7 +440,7 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 		key quantumfs.ObjectKey, size uint64,
 		objType quantumfs.ObjectType, err error) error {
 
-		return qutils.RefreshTTL(cw, path, key, size, objType, c.cqlds,
+		return cqlutils.RefreshTTL(cw, path, key, size, objType, c.cqlds,
 			c.ttlCfg.TTLNew, c.ttlCfg.SkipMapResetAfter_ms/1000,
 			c.skipMap, localSkipMap)
 	}

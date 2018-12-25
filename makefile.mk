@@ -76,7 +76,7 @@ update: check-dep-installed Gopkg.toml
 	@echo "Please review and commit any changes to Gopkg.tomlbase and Gopkg.lock"
 
 vet:
-	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./features -prune -o -path ./cmd -true -o -type d -print | grep -v "cql/scripts" | grep -v cql/cluster | grep -v cql/utils `
+	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./features -prune -o -path ./cmd -true -o -type d -print | grep -v "cql/scripts" | grep -v cql/cluster `
 
 lockcheck:
 	./lockcheck.sh

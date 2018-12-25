@@ -6,7 +6,7 @@ package main
 import (
 	"fmt"
 
-	qubitutils "github.com/aristanetworks/quantumfs/utils/qutils"
+	"github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
 )
 
 func init() {
@@ -62,9 +62,9 @@ func handleKeyCount(args []string) error {
 		return NewBadCmdExitErr("%s", err)
 	}
 	fmt.Println("Unique Keys = ", tracker.uniqueKeys())
-	fmt.Println("Unique Size = ", qubitutils.HumanizeBytes(tracker.uniqueSize()))
+	fmt.Println("Unique Size = ", utils.HumanizeBytes(tracker.uniqueSize()))
 	fmt.Println("Total Keys = ", tracker.totalKeys())
-	fmt.Println("Total Size = ", qubitutils.HumanizeBytes(tracker.totalSize()))
+	fmt.Println("Total Size = ", utils.HumanizeBytes(tracker.totalSize()))
 	if wsoption != "" {
 		wsopts[wsoption](tracker)
 	}
@@ -130,7 +130,7 @@ func handleKeyDiffCount(args []string) error {
 	fmt.Printf("==========\t\t==========\n")
 	diffKeys, diffSize := tracker1.trackerKeyDiff(tracker2)
 	fmt.Printf("%v\t\t%v in %v\n",
-		len(diffKeys), qubitutils.HumanizeBytes(diffSize), wsname1)
+		len(diffKeys), utils.HumanizeBytes(diffSize), wsname1)
 
 	if wsoption != "" {
 		wsopts[wsoption](tracker1, diffKeys)
@@ -138,7 +138,7 @@ func handleKeyDiffCount(args []string) error {
 
 	diffKeys, diffSize = tracker2.trackerKeyDiff(tracker1)
 	fmt.Printf("%v\t\t%v in %v\n",
-		len(diffKeys), qubitutils.HumanizeBytes(diffSize), wsname2)
+		len(diffKeys), utils.HumanizeBytes(diffSize), wsname2)
 
 	if wsoption != "" {
 		wsopts[wsoption](tracker2, diffKeys)

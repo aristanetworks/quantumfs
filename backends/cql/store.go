@@ -6,8 +6,6 @@ package cql
 import (
 	"fmt"
 	"sync"
-
-	"github.com/aristanetworks/quantumfs/backends/cql/utils"
 )
 
 var scyllaUsername = "ether"
@@ -58,7 +56,7 @@ type cqlStoreGlobal struct {
 	initMutex sync.RWMutex
 	cluster   Cluster
 	session   Session
-	sem       utils.Semaphore
+	sem       Semaphore
 }
 
 var globalCqlStore cqlStoreGlobal
@@ -67,7 +65,7 @@ type cqlStore struct {
 	cluster Cluster
 	session Session
 
-	sem *utils.Semaphore
+	sem *Semaphore
 }
 
 // Note: This routine is called by Init/New APIs
@@ -90,7 +88,7 @@ func initCqlStore(cluster Cluster) (cqlStore, error) {
 		// from ScyllaDB. Timeouts are unavoidable since its possible
 		// to generate much faster rate of traffic than Scylla can handle.
 		// The number 100, has been emperically determined.
-		globalCqlStore.sem = make(utils.Semaphore, 100)
+		globalCqlStore.sem = make(Semaphore, 100)
 		globalCqlStore.cluster = cluster
 		globalCqlStore.session = session
 	}
