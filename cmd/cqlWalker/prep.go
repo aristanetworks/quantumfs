@@ -14,7 +14,7 @@ import (
 	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
-	qubitutils "github.com/aristanetworks/quantumfs/utils/qutils"
+	"github.com/aristanetworks/quantumfs/utils/qutils"
 	"github.com/aristanetworks/quantumfs/walker"
 )
 
@@ -90,7 +90,7 @@ func walkHelper(c *Ctx,
 	// fails then assume it is a name
 	rootID, err = quantumfs.FromString(ws)
 	if err != nil {
-		if rootID, _, err = qubitutils.GetWorkspaceRootID(&c.Ctx,
+		if rootID, _, err = qutils.GetWorkspaceRootID(&c.Ctx,
 			qfsdb, ws); err != nil {
 			return
 		}

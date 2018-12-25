@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
-	qubitutils "github.com/aristanetworks/quantumfs/utils/qutils"
+	"github.com/aristanetworks/quantumfs/utils/qutils"
 )
 
 func init() {
@@ -56,7 +56,7 @@ func printList(args []string) error {
 			for ws, nonce := range wsMap {
 				var rootID quantumfs.ObjectKey
 				wsname := ts + "/" + ns + "/" + ws
-				if rootID, _, err = qubitutils.GetWorkspaceRootID(
+				if rootID, _, err = qutils.GetWorkspaceRootID(
 					&cs.ctx.Ctx, cs.qfsdb, wsname); err != nil {
 					return NewBadCmdExitErr("RootId "+
 						"not found for %v err: %v",

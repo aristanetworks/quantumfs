@@ -12,7 +12,7 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	qubitutils "github.com/aristanetworks/quantumfs/utils/qutils"
+	"github.com/aristanetworks/quantumfs/utils/qutils"
 )
 
 var walkFlags *flag.FlagSet
@@ -28,7 +28,7 @@ var co commonOpts
 
 // state usable by all commands
 type commonState struct {
-	ttlCfg *qubitutils.TTLConfig
+	ttlCfg *qutils.TTLConfig
 	cqlds  cql.BlobStore
 	cqldb  cql.WorkspaceDB
 	qfsds  quantumfs.DataStore
@@ -45,7 +45,7 @@ func setupCommonState() error {
 			"specified")
 	}
 
-	cs.ttlCfg, err = qubitutils.LoadTTLConfig(co.config)
+	cs.ttlCfg, err = qutils.LoadTTLConfig(co.config)
 	if err != nil {
 		return NewPreCmdExitErr("Failed to load TTL values: %s", err)
 	}
