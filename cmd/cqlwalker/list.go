@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
+	"github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 )
 
 func init() {

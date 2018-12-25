@@ -16,7 +16,7 @@ import (
 
 	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	"github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
+	"github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/walker"
 )

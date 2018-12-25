@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/aristanetworks/quantumfs"
-	cqlutils "github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
+	cqlutils "github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
+	"github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 )
 
 func init() {

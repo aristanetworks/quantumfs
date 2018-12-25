@@ -6,7 +6,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
+	"github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 )
 
 func init() {

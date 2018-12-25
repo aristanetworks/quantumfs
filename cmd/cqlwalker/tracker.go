@@ -11,7 +11,7 @@ import "fmt"
 
 import (
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/cmd/cqlWalker/utils"
+	"github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 )
 
 // a set of paths
