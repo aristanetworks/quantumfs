@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
-	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 )
 
 func init() {
@@ -17,7 +16,7 @@ func init() {
 }
 
 func registerDuCmd() {
-	var cmd cmdproc.CommandInfo
+	var cmd CommandInfo
 	cmd.Name = "du"
 	cmd.Usage = "workspace path"
 	cmd.Short = "shows the disk usage of path in a workspace"
@@ -29,12 +28,12 @@ path
 `
 	cmd.Run = handleDiskUsage
 
-	cmdproc.RegisterCommand(cmd)
+	RegisterCommand(cmd)
 }
 
 func handleDiskUsage(args []string) error {
 	if len(args) != 2 {
-		return cmdproc.NewBadArgExitErr("incorrect arguments")
+		return NewBadArgExitErr("incorrect arguments")
 	}
 
 	wsname := args[0]
@@ -49,7 +48,7 @@ func handleDiskUsage(args []string) error {
 	showRootIDStatus := false
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
 		showRootIDStatus, sizer); err != nil {
-		return cmdproc.NewBadCmdExitErr("%s", err)
+		return NewBadCmdExitErr("%s", err)
 	}
 	fmt.Println("Total Size = ", qubitutils.HumanizeBytes(tracker.totalSize()))
 	return nil

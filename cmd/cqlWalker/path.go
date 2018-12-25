@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
 )
@@ -25,7 +24,7 @@ func init() {
 // One way to fix it would be to not pursure paths where we know
 // there is no possibility of finding the searchPath.
 func registerPathCmd() {
-	var cmd cmdproc.CommandInfo
+	var cmd CommandInfo
 	cmd.Name = "path2key"
 	cmd.Usage = "workspace path"
 	cmd.Short = "print key for path in workspace"
@@ -37,12 +36,12 @@ path
 `
 	cmd.Run = printPath2Key
 
-	cmdproc.RegisterCommand(cmd)
+	RegisterCommand(cmd)
 }
 
 func printPath2Key(args []string) error {
 	if len(args) != 2 {
-		return cmdproc.NewBadArgExitErr("incorrect arguments")
+		return NewBadArgExitErr("incorrect arguments")
 	}
 
 	wsname := args[0]
@@ -64,7 +63,7 @@ func printPath2Key(args []string) error {
 	showRootIDStatus := false
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
 		showRootIDStatus, finder); err != nil {
-		return cmdproc.NewBadCmdExitErr("%s", err)
+		return NewBadCmdExitErr("%s", err)
 	}
 	if len(keyList) == 0 {
 		fmt.Println("Key not found for path ", searchPath)

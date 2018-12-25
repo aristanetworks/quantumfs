@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
-	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 )
 
 func init() {
@@ -16,7 +15,7 @@ func init() {
 }
 
 func registerKeyCountCmd() {
-	var cmd cmdproc.CommandInfo
+	var cmd CommandInfo
 	cmd.Name = "keycount"
 	cmd.Usage = "workspace [dedupe | sizehist]"
 	cmd.Short = "shows keycount information along with dedupe or size " +
@@ -31,7 +30,7 @@ sizehist
 `
 	cmd.Run = handleKeyCount
 
-	cmdproc.RegisterCommand(cmd)
+	RegisterCommand(cmd)
 }
 
 func handleKeyCount(args []string) error {
@@ -48,11 +47,11 @@ func handleKeyCount(args []string) error {
 		wsname = args[0]
 		wsoption = args[1]
 	default:
-		return cmdproc.NewBadArgExitErr("incorrect arguments")
+		return NewBadArgExitErr("incorrect arguments")
 	}
 	if wsoption != "" {
 		if _, exist := wsopts[wsoption]; !exist {
-			return cmdproc.NewBadArgExitErr("unsupported argument")
+			return NewBadArgExitErr("unsupported argument")
 		}
 	}
 
@@ -60,7 +59,7 @@ func handleKeyCount(args []string) error {
 	showRootIDStatus := false
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
 		showRootIDStatus, keyCounter); err != nil {
-		return cmdproc.NewBadCmdExitErr("%s", err)
+		return NewBadCmdExitErr("%s", err)
 	}
 	fmt.Println("Unique Keys = ", tracker.uniqueKeys())
 	fmt.Println("Unique Size = ", qubitutils.HumanizeBytes(tracker.uniqueSize()))
@@ -73,7 +72,7 @@ func handleKeyCount(args []string) error {
 }
 
 func registerKeyDiffCountCmd() {
-	var cmd cmdproc.CommandInfo
+	var cmd CommandInfo
 	cmd.Name = "keydiffcount"
 	cmd.Usage = "workspace1 workspace2 [keys]"
 	cmd.Short = "compares two workspaces in terms of keycounts and " +
@@ -86,7 +85,7 @@ keys
 `
 	cmd.Run = handleKeyDiffCount
 
-	cmdproc.RegisterCommand(cmd)
+	RegisterCommand(cmd)
 }
 
 func handleKeyDiffCount(args []string) error {
@@ -107,12 +106,12 @@ func handleKeyDiffCount(args []string) error {
 		wsname2 = args[1]
 		wsoption = args[2]
 	default:
-		return cmdproc.NewBadArgExitErr("incorrect arguments")
+		return NewBadArgExitErr("incorrect arguments")
 	}
 
 	if wsoption != "" {
 		if _, exist := wsopts[wsoption]; !exist {
-			return cmdproc.NewBadArgExitErr("unsupported argument")
+			return NewBadArgExitErr("unsupported argument")
 		}
 	}
 
@@ -120,12 +119,12 @@ func handleKeyDiffCount(args []string) error {
 	showRootIDStatus := false
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname1, co.progress,
 		showRootIDStatus, keyCounter1); err != nil {
-		return cmdproc.NewBadCmdExitErr("%s", err)
+		return NewBadCmdExitErr("%s", err)
 	}
 	tracker2, keyCounter2 := getTrackerHandler(nil)
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname2,
 		co.progress, showRootIDStatus, keyCounter2); err != nil {
-		return cmdproc.NewBadCmdExitErr("%s", err)
+		return NewBadCmdExitErr("%s", err)
 	}
 	fmt.Printf("UniqueKeys\t\tUniqueSize\n")
 	fmt.Printf("==========\t\t==========\n")

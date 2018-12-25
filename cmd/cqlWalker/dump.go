@@ -11,7 +11,6 @@ import (
 	"os"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 	"github.com/aristanetworks/quantumfs/utils/simplebuffer"
 )
 
@@ -20,7 +19,7 @@ func init() {
 }
 
 func registerPrintBlockCmd() {
-	var cmd cmdproc.CommandInfo
+	var cmd CommandInfo
 	cmd.Name = "printBlock"
 	cmd.Usage = "key"
 	cmd.Short = "print the block pointed by key"
@@ -29,26 +28,26 @@ key
 	key to the block
 `
 	cmd.Run = printBlockCmd
-	cmdproc.RegisterCommand(cmd)
+	RegisterCommand(cmd)
 }
 
 func printBlockCmd(args []string) error {
 	if len(args) != 1 {
-		return cmdproc.NewBadArgExitErr("incorrect arguments")
+		return NewBadArgExitErr("incorrect arguments")
 	}
 	keyStr := args[0]
 	key, err := quantumfs.FromString(keyStr)
 	if err != nil {
-		return cmdproc.NewBadCmdExitErr("%s", err)
+		return NewBadCmdExitErr("%s", err)
 	}
 
 	buf := simplebuffer.New(nil, key)
 	if err := cs.qfsds.Get(&cs.ctx.Ctx, key, buf); err != nil {
-		return cmdproc.NewBadCmdExitErr("%s", err)
+		return NewBadCmdExitErr("%s", err)
 	}
 
 	if buf.Size() == 0 {
-		return cmdproc.NewBadCmdExitErr("key exists but no block data")
+		return NewBadCmdExitErr("key exists but no block data")
 	}
 
 	switch key.Type() {

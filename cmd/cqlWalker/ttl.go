@@ -11,7 +11,6 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends/cql"
 	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
-	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 	walkutils "github.com/aristanetworks/quantumfs/cmd/qutils2"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
@@ -24,7 +23,7 @@ func init() {
 }
 
 func registerTTLCmd() {
-	var cmd cmdproc.CommandInfo
+	var cmd CommandInfo
 	cmd.Name = "ttl"
 	cmd.Usage = "workspace"
 	cmd.Short = "update all blocks in workspace with TTL values from " +
@@ -35,12 +34,12 @@ workspace
 `
 	cmd.Run = handleTTL
 
-	cmdproc.RegisterCommand(cmd)
+	RegisterCommand(cmd)
 }
 
 func handleTTL(args []string) error {
 	if len(args) != 1 {
-		return cmdproc.NewBadArgExitErr("incorrect arguments")
+		return NewBadArgExitErr("incorrect arguments")
 	}
 
 	wsname := args[0]
@@ -58,13 +57,13 @@ func handleTTL(args []string) error {
 	showRootIDStatus := true
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname,
 		co.progress, showRootIDStatus, walkFunc); err != nil {
-		return cmdproc.NewBadCmdExitErr("%s", err)
+		return NewBadCmdExitErr("%s", err)
 	}
 	return nil
 }
 
 func registerForceTTLCmd() {
-	var cmd cmdproc.CommandInfo
+	var cmd CommandInfo
 	cmd.Name = "forceTTL"
 	cmd.Usage = "workspace new_ttl_hours"
 	cmd.Short = "update all blocks in workspace with lower TTL to given TTL"
@@ -76,19 +75,19 @@ new_ttl_hours
 `
 	cmd.Run = handleForceTTL
 
-	cmdproc.RegisterCommand(cmd)
+	RegisterCommand(cmd)
 }
 
 func handleForceTTL(args []string) error {
 	if len(args) != 2 {
-		return cmdproc.NewBadArgExitErr("incorrect arguments")
+		return NewBadArgExitErr("incorrect arguments")
 	}
 	wsname := args[0]
 
 	var err error
 	var newTTL int64
 	if newTTL, err = strconv.ParseInt(args[1], 10, 64); err != nil {
-		return cmdproc.NewBadArgExitErr("TTL value is not a valid integer")
+		return NewBadArgExitErr("TTL value is not a valid integer")
 	}
 	newTTL = newTTL * 3600 // Hours to seconds
 
@@ -104,13 +103,13 @@ func handleForceTTL(args []string) error {
 	showRootIDStatus := true
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname, co.progress,
 		showRootIDStatus, walkFunc); err != nil {
-		return cmdproc.NewBadCmdExitErr("%s", err)
+		return NewBadCmdExitErr("%s", err)
 	}
 	return nil
 }
 
 func registerTTLHistogramCmd() {
-	var cmd cmdproc.CommandInfo
+	var cmd CommandInfo
 	cmd.Name = "ttlHistogram"
 	cmd.Usage = "workspace"
 	cmd.Short = "show a histogram of TTL values of blocks within a workspace"
@@ -120,12 +119,12 @@ workspace
 `
 	cmd.Run = handleTTLHistogram
 
-	cmdproc.RegisterCommand(cmd)
+	RegisterCommand(cmd)
 }
 
 func handleTTLHistogram(args []string) error {
 	if len(args) != 1 {
-		return cmdproc.NewBadArgExitErr("incorrect arguments")
+		return NewBadArgExitErr("incorrect arguments")
 	}
 	wsname := args[0]
 
@@ -177,7 +176,7 @@ func handleTTLHistogram(args []string) error {
 	showRootIDStatus := true
 	if err := walkHelper(cs.ctx, cs.qfsds, cs.qfsdb, wsname,
 		co.progress, showRootIDStatus, bucketer); err != nil {
-		return cmdproc.NewBadCmdExitErr("%s", err)
+		return NewBadCmdExitErr("%s", err)
 	}
 	fmt.Printf("Days(s)   %5s\n", "Count")
 	hist.Print()
