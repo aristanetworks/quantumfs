@@ -15,10 +15,10 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/aristanetworks/quantumfs"
-	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
-	walkerutils "github.com/aristanetworks/quantumfs/cmd/qutils2"
 	"github.com/aristanetworks/quantumfs/qlog"
 	qutils "github.com/aristanetworks/quantumfs/utils"
+	qubitutils "github.com/aristanetworks/quantumfs/utils/qutils"
+	walkerutils "github.com/aristanetworks/quantumfs/utils/qutils2"
 	"github.com/aristanetworks/quantumfs/walker"
 )
 

@@ -12,7 +12,7 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
+	qubitutils "github.com/aristanetworks/quantumfs/utils/qutils"
 )
 
 var walkFlags *flag.FlagSet

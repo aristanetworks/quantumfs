@@ -14,9 +14,9 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
-	walkerutils "github.com/aristanetworks/quantumfs/cmd/qutils2"
 	"github.com/aristanetworks/quantumfs/qlog"
+	qubitutils "github.com/aristanetworks/quantumfs/utils/qutils"
+	walkerutils "github.com/aristanetworks/quantumfs/utils/qutils2"
 )
 
 var requestID uint64

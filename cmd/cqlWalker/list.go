@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
-	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
+	qubitutils "github.com/aristanetworks/quantumfs/utils/qutils"
 )
 
 func init() {

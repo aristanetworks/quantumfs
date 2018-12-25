@@ -10,9 +10,9 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
-	walkutils "github.com/aristanetworks/quantumfs/cmd/qutils2"
 	"github.com/aristanetworks/quantumfs/utils"
+	qubitutils "github.com/aristanetworks/quantumfs/utils/qutils"
+	walkutils "github.com/aristanetworks/quantumfs/utils/qutils2"
 	"github.com/aristanetworks/quantumfs/walker"
 )
 

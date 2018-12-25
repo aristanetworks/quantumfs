@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
+	qubitutils "github.com/aristanetworks/quantumfs/utils/qutils"
 )
 
 func init() {
