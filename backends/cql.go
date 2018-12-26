@@ -28,6 +28,8 @@ func init() {
 	registerWorkspaceDB("ether.cql", newEtherWorkspaceDB)
 }
 
+// TODO(sid) once quantumfs has it's own implementation of filesystem backend
+// ether.filesystem and all its references will be removed from the code.
 // TODO(krishna) TTL configuration is specific to CQL blobstore.
 // However due to current blobstore APIs managing store specific
 // metadata in common APIs, TTL metadata is being applied to all
