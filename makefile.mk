@@ -16,6 +16,7 @@ PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/backends/grpc
 PKGS_TO_TEST+=quantumfs/backends/grpc/server quantumfs/qlogstats
 PKGS_TO_TEST+=quantumfs/cmd/qupload
+PKGS_TO_TEST+=quantumfs/cmd/cqlwalkerd
 LIBRARIES=libqfs.so libqfs.h libqfs32.so libqfs32.h
 
 # It's common practice to use a 'v' prefix on tags, but the prefix should be
