@@ -19,21 +19,21 @@ var unitTestCqlCtx = DefaultCtx
 var integTestCqlCtx = DefaultCtx
 
 var tstUsername = scyllaUsername
-var tstKeyspace = "ether"
-var etherConfFile string
+var tstKeyspace = "cql"
+var cqlConfFile string
 
-// CqlConfFile returns the full path to the ether's configuration file
+// CqlConfFile returns the full path to the cql's configuration file
 // based on environment variable ETHER_CQL_CONFIG.
 func CqlConfFile() (string, error) {
 
-	if etherConfFile == "" {
-		etherEnv := os.Getenv("ETHER_CQL_CONFIG")
-		if etherEnv == "" {
+	if cqlConfFile == "" {
+		cqlEnv := os.Getenv("ETHER_CQL_CONFIG")
+		if cqlEnv == "" {
 			return "", fmt.Errorf("Env varibale ETHER_CQL_CONFIG " +
 				"should be set to a config " +
-				"file name in directory ether/cluster_configs")
+				"file name in directory cql/cluster_configs")
 		}
-		etherConfFile = etherEnv
+		cqlConfFile = cqlEnv
 	}
-	return etherConfFile, nil
+	return cqlConfFile, nil
 }

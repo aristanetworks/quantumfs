@@ -28,7 +28,7 @@ type wsdbCacheIntegTestSuite struct {
 
 func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 	confFile, err := CqlConfFile()
-	suite.Require().NoError(err, "error in getting ether configuration file")
+	suite.Require().NoError(err, "error in getting cql configuration file")
 	err = SetupIntegTestKeyspace(confFile)
 	suite.Require().NoError(err, "SetupIntegTestKeyspace returned an error")
 	err = DoTestSchemaOp(confFile, SchemaCreate)
@@ -395,7 +395,7 @@ func ignoreDeadlineExceeded(c *testCtx) error {
 
 func (suite *wsdbCacheIntegTestSuite) TearDownTest() {
 	confFile, err := CqlConfFile()
-	suite.Require().NoError(err, "error in getting ether configuration file")
+	suite.Require().NoError(err, "error in getting cql configuration file")
 	_ = DoTestSchemaOp(confFile, SchemaDelete)
 	resetCqlStore()
 }

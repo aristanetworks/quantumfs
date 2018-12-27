@@ -34,7 +34,7 @@ func (suite *wsdbCacheTestSuite) SetupTest() {
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
 
-	mockSchemaOk(mockSession, "etherwsdb", "workspacedb", nil)
+	mockSchemaOk(mockSession, "cqlwsdb", "workspacedb", nil)
 
 	mockCfg := setupMockConfig()
 	noCacheWsdb, err := newNoCacheWsdb(mockCluster, mockCfg)
@@ -59,7 +59,7 @@ func (suite *wsdbCacheTestSuite) TestWsdbConfigDefault() {
 	config.Cluster.Nodes = []string{"node1", "node2"}
 	// no wsdb configuration
 
-	file, err := ioutil.TempFile(os.TempDir(), "ether")
+	file, err := ioutil.TempFile(os.TempDir(), "cql")
 	suite.Require().NoError(err, "Tempfile creation failed")
 	name := file.Name()
 	file.Close()

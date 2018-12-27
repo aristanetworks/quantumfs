@@ -8,8 +8,8 @@ import (
 	"sync"
 )
 
-var scyllaUsername = "ether"
-var scyllaPassword = "ether"
+var scyllaUsername = "cql"
+var scyllaPassword = "cql"
 
 // Config struct holds the info needed to connect to a cql cluster
 // and knobs for the different APIs

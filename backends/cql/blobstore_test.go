@@ -33,7 +33,7 @@ func (s *storeTests) SetupTest() {
 	mocksession := &MockSession{}
 	mocksession.On("Close").Return()
 	mockcc.On("CreateSession").Return(mocksession, nil)
-	mockSchemaOk(mocksession, "ether", "blobStore", nil)
+	mockSchemaOk(mocksession, "cql", "blobStore", nil)
 
 	mockCfg := &Config{
 		Cluster: ClusterConfig{
@@ -373,11 +373,11 @@ func (s *storeTests) TestSchemaCheckNoAppSchemaV2() {
 	mockcc.On("CreateSession").Return(mocksession, nil)
 	// mock a scenario where the blobstore table does
 	// not exist yet (race)
-	mockSchemaCheckV2Schema(mocksession, "ether", "blobstore", 0, nil)
+	mockSchemaCheckV2Schema(mocksession, "cql", "blobstore", 0, nil)
 	// since app schema doesn't exist in v2 system tables,
 	// v3 system tables should not be checked
 	v3err := errors.New("v3 system tables checked")
-	mockSchemaCheckV3Schema(mocksession, "ether", "blobstore", 0, v3err)
+	mockSchemaCheckV3Schema(mocksession, "cql", "blobstore", 0, v3err)
 
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when no blobstore table")
@@ -395,12 +395,12 @@ func (s *storeTests) TestSchemaCheckBadPermsV2() {
 
 	// mock a scenario where the blobstore table does
 	// not have proper perms (race)
-	mockSchemaCheckV2Schema(mocksession, "ether", "blobstore", 1, nil)
-	mockSchemaCheckV2Perms(mocksession, "ether", "blobstore", nil, nil)
+	mockSchemaCheckV2Schema(mocksession, "cql", "blobstore", 1, nil)
+	mockSchemaCheckV2Perms(mocksession, "cql", "blobstore", nil, nil)
 	// since app perms are bad in v2 system tables,
 	// v3 system tables should not be checked
 	v3err := errors.New("v3 system tables checked")
-	mockSchemaCheckV3Schema(mocksession, "ether", "blobstore", 0, v3err)
+	mockSchemaCheckV3Schema(mocksession, "cql", "blobstore", 0, v3err)
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when no perms")
 	s.Contains(err.Error(), unexpectedAppPermsErr.Error())
@@ -418,9 +418,9 @@ func (s *storeTests) TestSchemaCheckNoAppSchemaV3() {
 	// mock a scenario where the blobstore table does
 	// not exist yet (race)
 	// force the check to move to next version
-	mockSchemaCheckV2Schema(mocksession, "ether", "blobstore", 0,
+	mockSchemaCheckV2Schema(mocksession, "cql", "blobstore", 0,
 		errors.New("v2 system tables not found"))
-	mockSchemaCheckV3Schema(mocksession, "ether", "blobstore", 0, nil)
+	mockSchemaCheckV3Schema(mocksession, "cql", "blobstore", 0, nil)
 
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when no blobstore table")
@@ -438,10 +438,10 @@ func (s *storeTests) TestSchemaCheckBadPermsV3() {
 
 	// mock a scenario where the blobstore table does
 	// not have proper perms (race)
-	mockSchemaCheckV2Schema(mocksession, "ether", "blobstore", 0,
+	mockSchemaCheckV2Schema(mocksession, "cql", "blobstore", 0,
 		errors.New("v2 system tables not found"))
-	mockSchemaCheckV3Schema(mocksession, "ether", "blobstore", 1, nil)
-	mockSchemaCheckV3Perms(mocksession, "ether", "blobstore", nil, nil)
+	mockSchemaCheckV3Schema(mocksession, "cql", "blobstore", 1, nil)
+	mockSchemaCheckV3Perms(mocksession, "cql", "blobstore", nil, nil)
 
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when no perms")
