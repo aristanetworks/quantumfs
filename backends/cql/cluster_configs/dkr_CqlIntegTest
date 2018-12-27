@@ -2,10 +2,10 @@
     "cluster":
     {
     "nodes":[ "0.0.0.0"],
-    "keyspace":"dkr_etherintegtest",
+    "keyspace":"dkr_cqlintegtest",
     "conntimeoutsec":300,
-    "username":"usrEtherIntegTest",
-    "password":"usrEtherIntegTest",
+    "username":"usrCqlIntegTest",
+    "password":"usrCqlIntegTest",
     "checkschemaretries":20
     },
     "blobstore":
