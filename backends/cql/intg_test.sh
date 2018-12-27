@@ -14,3 +14,7 @@ CFNAME_PREFIX="intg${TESTID}" \
 go test -v  -timeout 200m -p 1 -tags integration  -run Integ github.com/aristanetworks/quantumfs/backends/cql
 
 
+# // Smoke
+# sudo  ./quantumfsd -datastore cql -datastoreconf $QFS_CONFIG -workspaceDB cql -workspaceDBconf $QFS_CONFIG
+
+
