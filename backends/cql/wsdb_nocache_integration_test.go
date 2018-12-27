@@ -17,7 +17,7 @@ type wsdbNoCacheIntegTestSuite struct {
 }
 
 func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
-	confFile, err := EtherConfFile()
+	confFile, err := CqlConfFile()
 	suite.Require().NoError(err, "error in getting ether configuration file")
 	var cfg *Config
 	cfg, err = readCqlConfig(confFile)
@@ -32,7 +32,7 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	wsdb, err = newNoCacheWsdb(cluster, cfg)
 	suite.Require().NoError(err, "Error during configuration read")
 
-	err = wsdb.CreateWorkspace(integTestEtherCtx, NullSpaceName,
+	err = wsdb.CreateWorkspace(integTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName,
 		WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
@@ -92,7 +92,7 @@ func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegDeleteImmutableSet() {
 }
 
 func (suite *wsdbNoCacheIntegTestSuite) TearDownTest() {
-	confFile, err := EtherConfFile()
+	confFile, err := CqlConfFile()
 	suite.Require().NoError(err, "error in getting ether configuration file")
 	_ = DoTestSchemaOp(confFile, SchemaDelete)
 	resetCqlStore()

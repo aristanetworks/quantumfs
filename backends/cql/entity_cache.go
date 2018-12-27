@@ -414,7 +414,7 @@ func (ec *entityCache) getEntityCountListGroup(c Ctx,
 				fetchList, err := ec.callFetch(c,
 					entityPath[:pathIdx]...)
 				if err != nil {
-					c.Elog("Ether cache refresh (%s) failed: %s",
+					c.Elog("Cql cache refresh (%s) failed: %s",
 						strings.Join(entityPath[:pathIdx],
 							"/"), err.Error())
 				}

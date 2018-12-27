@@ -3,7 +3,7 @@
 
 package cql
 
-// Ctx represents client context for Ether API calls.
+// Ctx represents client context for Cql API calls.
 // Since clients implement this interface, they can use custom loggers,
 // log format, context information(eg: RequestID etc).
 type Ctx interface {

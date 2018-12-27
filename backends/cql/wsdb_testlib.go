@@ -56,30 +56,30 @@ func (s *wsdbCommonUnitTest) TestEmptyDB() {
 	mockWsdbKeyGet(s.mockSess, NullSpaceName, NullSpaceName,
 		NullSpaceName, []byte(nil), WorkspaceNonceInvalid, nil)
 	// cached APIs
-	tsCount, err1 := s.wsdb.NumTypespaces(unitTestEtherCtx)
+	tsCount, err1 := s.wsdb.NumTypespaces(unitTestCqlCtx)
 	s.req.NoError(err1, "NumTypespaces failed: %s", err1)
 	s.req.Equal(1, tsCount, "Empty DB has incorrect count of typespaces")
 
-	tsList, err2 := s.wsdb.TypespaceList(unitTestEtherCtx)
+	tsList, err2 := s.wsdb.TypespaceList(unitTestCqlCtx)
 	s.req.NoError(err2, "TypespaceList failed: %s", err2)
 	s.req.Equal([]string{NullSpaceName}, tsList,
 		"Empty DB has incorrect list of typespaces")
 
-	nsCount, err1 := s.wsdb.NumNamespaces(unitTestEtherCtx, NullSpaceName)
+	nsCount, err1 := s.wsdb.NumNamespaces(unitTestCqlCtx, NullSpaceName)
 	s.req.NoError(err1, "NumNamespace failed: %s", err1)
 	s.req.Equal(1, nsCount, "Empty DB has incorrect count of namespaces")
 
-	nsList, err2 := s.wsdb.NamespaceList(unitTestEtherCtx, NullSpaceName)
+	nsList, err2 := s.wsdb.NamespaceList(unitTestCqlCtx, NullSpaceName)
 	s.req.NoError(err2, "NamespaceList failed: %s", err2)
 	s.req.Equal([]string{NullSpaceName}, nsList,
 		"Empty DB has incorrect list of namespaces")
 
-	wsCount, err3 := s.wsdb.NumWorkspaces(unitTestEtherCtx, NullSpaceName,
+	wsCount, err3 := s.wsdb.NumWorkspaces(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName)
 	s.req.NoError(err3, "NumWorkspaces failed: %s", err3)
 	s.req.Equal(1, wsCount, "Empty DB has incorrect count of workspaces")
 
-	wsList, err4 := s.wsdb.WorkspaceList(unitTestEtherCtx, NullSpaceName,
+	wsList, err4 := s.wsdb.WorkspaceList(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName)
 	s.req.NoError(err4, "WorkspaceList failed: %s", err4)
 	s.req.Equal(1, len(wsList),
@@ -91,7 +91,7 @@ func (s *wsdbCommonUnitTest) TestEmptyDB() {
 	mockWsdbKeyGet(s.mockSess, NullSpaceName, NullSpaceName,
 		NullSpaceName, []byte(nil), WorkspaceNonceInvalid, nil)
 
-	key, nonce, err5 := s.wsdb.Workspace(unitTestEtherCtx, NullSpaceName,
+	key, nonce, err5 := s.wsdb.Workspace(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName)
 	s.req.NoError(err5, "Workspace failed: %s", err5)
 	s.req.True(bytes.Equal(key, []byte(nil)), NullSpaceName+
@@ -107,7 +107,7 @@ func (s *wsdbCommonUnitTest) TestBranching() {
 	mockWsdbKeyGet(s.mockSess, "notype", "notthere", "a",
 		nil, WorkspaceNonceInvalid, gocql.ErrNotFound)
 
-	_, _, err := s.wsdb.BranchWorkspace(unitTestEtherCtx, "notype", "notthere",
+	_, _, err := s.wsdb.BranchWorkspace(unitTestCqlCtx, "notype", "notthere",
 		"a", "sometype", "somewhere", "else")
 	s.req.Error(err, "Succeeded branching invalid namespace")
 	s.req.IsType(&Error{}, err, "Invalid error type %T", err)
@@ -118,7 +118,7 @@ func (s *wsdbCommonUnitTest) TestBranching() {
 		NullSpaceName, "some", "test", "a", []byte(nil), mockNonceA,
 		gocql.ErrNotFound)
 
-	nonceA, _, err := s.wsdb.BranchWorkspace(unitTestEtherCtx, NullSpaceName,
+	nonceA, _, err := s.wsdb.BranchWorkspace(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName, "some", "test", "a")
 	s.req.NoError(err, "Error branching "+NullSpaceName+" workspace: %v",
 		err)
@@ -134,7 +134,7 @@ func (s *wsdbCommonUnitTest) TestBranching() {
 	mockWsdbKeyGet(s.mockSess, "some1", "test1", "a1", []byte(nil),
 		WorkspaceNonceInvalid, nil)
 
-	_, _, err = s.wsdb.BranchWorkspace(unitTestEtherCtx, NullSpaceName,
+	_, _, err = s.wsdb.BranchWorkspace(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName, "some1", "test1", "a1")
 	s.req.Error(err, "Succeeded branching to existing workspace")
 
@@ -143,7 +143,7 @@ func (s *wsdbCommonUnitTest) TestBranching() {
 	mockBranchWorkspace(s.mockSess, "some2", "test2", "a2",
 		"some3", "test3", "b3", []byte(nil), mockNonceA2, gocql.ErrNotFound)
 
-	nonceA2, _, err := s.wsdb.BranchWorkspace(unitTestEtherCtx, "some2",
+	nonceA2, _, err := s.wsdb.BranchWorkspace(unitTestCqlCtx, "some2",
 		"test2", "a2", "some3", "test3", "b3")
 	s.req.NoError(err, "Error rebranching workspace: %v", err)
 	s.req.Equal(mockNonceA2, nonceA2, "Nonce mismatch for some2/test2/a2")
@@ -157,7 +157,7 @@ func (s *wsdbCommonUnitTest) TestAdvanceOk() {
 	mockWsdbKeyPut(s.mockSess, "some", "test", "a", []byte{1, 2, 3},
 		WorkspaceNonceInvalid, nil)
 
-	newRootID, _, err := s.wsdb.AdvanceWorkspace(unitTestEtherCtx, "some",
+	newRootID, _, err := s.wsdb.AdvanceWorkspace(unitTestCqlCtx, "some",
 		"test", "a", WorkspaceNonceInvalid, []byte(nil), []byte{1, 2, 3})
 
 	s.req.NoError(err, "Error when advancing root: %v", err)
@@ -174,7 +174,7 @@ func (s *wsdbCommonUnitTest) TestAdvanceOutOfDateKey() {
 		WorkspaceNonceInvalid, nil)
 
 	newKey := []byte{1, 2, 3}
-	_, _, err := s.wsdb.AdvanceWorkspace(unitTestEtherCtx, "some", "test", "a",
+	_, _, err := s.wsdb.AdvanceWorkspace(unitTestCqlCtx, "some", "test", "a",
 		WorkspaceNonceInvalid, newKey, newKey)
 
 	s.req.Error(err, "Succeeded advancing out-of-date (key) workspace")
@@ -191,7 +191,7 @@ func (s *wsdbCommonUnitTest) TestAdvanceOutOfDateNonce() {
 		WorkspaceNonceInvalid, nil)
 
 	newKey := []byte{1, 2, 3}
-	_, _, err := s.wsdb.AdvanceWorkspace(unitTestEtherCtx, "some", "test", "a",
+	_, _, err := s.wsdb.AdvanceWorkspace(unitTestCqlCtx, "some", "test", "a",
 		WorkspaceNonce{Id: 2, PublishTime: 0}, []byte(nil), newKey)
 
 	s.req.Error(err, "Succeeded advancing out-of-date (nonce) workspace")
@@ -205,7 +205,7 @@ func (s *wsdbCommonUnitTest) TestAdvanceNotExist() {
 	mockWsdbKeyGet(s.mockSess, "some", "test", "a",
 		nil, WorkspaceNonceInvalid, gocql.ErrNotFound)
 
-	_, _, err := s.wsdb.AdvanceWorkspace(unitTestEtherCtx, "some", "test", "a",
+	_, _, err := s.wsdb.AdvanceWorkspace(unitTestCqlCtx, "some", "test", "a",
 		WorkspaceNonceInvalid, []byte(nil), []byte(nil))
 
 	s.req.Error(err, "Succeeded advancing non-existant workspace")
@@ -215,11 +215,11 @@ func (s *wsdbCommonUnitTest) TestAdvanceNotExist() {
 
 func (s *wsdbCommonUnitTest) TestLockedBranchWorkspace() {
 
-	_, _, err := s.wsdb.BranchWorkspace(unitTestEtherCtx, NullSpaceName,
+	_, _, err := s.wsdb.BranchWorkspace(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName, NullSpaceName, "ns1", "ws1")
 	s.req.Error(err, "Succeeded in branching to "+NullSpaceName+"/ns1/ws1")
 
-	_, _, err = s.wsdb.BranchWorkspace(unitTestEtherCtx, NullSpaceName,
+	_, _, err = s.wsdb.BranchWorkspace(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName, NullSpaceName, NullSpaceName,
 		NullSpaceName)
 	s.req.Error(err, "Succeeded in branching to the null workspace")
@@ -227,26 +227,26 @@ func (s *wsdbCommonUnitTest) TestLockedBranchWorkspace() {
 	mockBranchWorkspace(s.mockSess, NullSpaceName, NullSpaceName,
 		NullSpaceName, "ts1", NullSpaceName, "ws1", []byte(nil),
 		WorkspaceNonceInvalid, gocql.ErrNotFound)
-	_, _, err = s.wsdb.BranchWorkspace(unitTestEtherCtx, NullSpaceName,
+	_, _, err = s.wsdb.BranchWorkspace(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName, "ts1", NullSpaceName, "ws1")
 	s.req.NoError(err, "Failed in branching to ts1/"+NullSpaceName+"/ws1")
 
 	mockBranchWorkspace(s.mockSess, NullSpaceName, NullSpaceName,
 		NullSpaceName, "ts1", "ns1", NullSpaceName, []byte(nil),
 		WorkspaceNonceInvalid, gocql.ErrNotFound)
-	_, _, err = s.wsdb.BranchWorkspace(unitTestEtherCtx, NullSpaceName,
+	_, _, err = s.wsdb.BranchWorkspace(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName, "ts1", "ns1", NullSpaceName)
 	s.req.NoError(err, "Failed in branching to ts1/ns1/"+NullSpaceName)
 }
 
 func (s *wsdbCommonUnitTest) TestLockedAdvanceWorkspace() {
 
-	_, _, err := s.wsdb.AdvanceWorkspace(unitTestEtherCtx, NullSpaceName,
+	_, _, err := s.wsdb.AdvanceWorkspace(unitTestCqlCtx, NullSpaceName,
 		"ns1", "ws1", WorkspaceNonceInvalid, []byte{1, 2, 3},
 		[]byte{4, 5, 6})
 	s.req.Error(err, "Succeeded in advancing "+NullSpaceName+"/ns1/ws1")
 
-	_, _, err = s.wsdb.AdvanceWorkspace(unitTestEtherCtx, NullSpaceName,
+	_, _, err = s.wsdb.AdvanceWorkspace(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3},
 		[]byte{4, 5, 6})
 	s.req.Error(err, "Succeeded in advancing the null workspace")
@@ -255,7 +255,7 @@ func (s *wsdbCommonUnitTest) TestLockedAdvanceWorkspace() {
 		3}, WorkspaceNonceInvalid, nil)
 	mockWsdbKeyPut(s.mockSess, "ts1", NullSpaceName, "ws1", []byte{4, 5,
 		6}, WorkspaceNonceInvalid, nil)
-	_, _, err = s.wsdb.AdvanceWorkspace(unitTestEtherCtx, "ts1", NullSpaceName,
+	_, _, err = s.wsdb.AdvanceWorkspace(unitTestCqlCtx, "ts1", NullSpaceName,
 		"ws1", WorkspaceNonceInvalid, []byte{1, 2, 3}, []byte{4, 5, 6})
 	s.req.NoError(err, "Failed in advancing ts1/"+NullSpaceName+"/ws1")
 
@@ -263,7 +263,7 @@ func (s *wsdbCommonUnitTest) TestLockedAdvanceWorkspace() {
 		3}, WorkspaceNonceInvalid, nil)
 	mockWsdbKeyPut(s.mockSess, "ts1", "ns1", NullSpaceName, []byte{4, 5,
 		6}, WorkspaceNonceInvalid, nil)
-	_, _, err = s.wsdb.AdvanceWorkspace(unitTestEtherCtx, "ts1", "ns1",
+	_, _, err = s.wsdb.AdvanceWorkspace(unitTestCqlCtx, "ts1", "ns1",
 		NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3},
 		[]byte{4, 5, 6})
 	s.req.NoError(err, "Failed in advancing ts1/ns1/"+NullSpaceName)
@@ -275,12 +275,12 @@ func (s *wsdbCommonUnitTest) TestInitialAdvanceWorkspace() {
 		NullSpaceName, nil, WorkspaceNonceInvalid, nil)
 	mockWsdbKeyPut(s.mockSess, NullSpaceName, NullSpaceName,
 		NullSpaceName, []byte{1, 2, 3}, WorkspaceNonceInvalid, nil)
-	_, _, err := s.wsdb.AdvanceWorkspace(unitTestEtherCtx, NullSpaceName,
+	_, _, err := s.wsdb.AdvanceWorkspace(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName, WorkspaceNonceInvalid, nil,
 		[]byte{1, 2, 3})
 	s.req.NoError(err, "Failed in initial advance of the null workspace")
 
-	_, _, err = s.wsdb.AdvanceWorkspace(unitTestEtherCtx, NullSpaceName,
+	_, _, err = s.wsdb.AdvanceWorkspace(unitTestCqlCtx, NullSpaceName,
 		NullSpaceName, NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3},
 		[]byte{4, 5, 6})
 	s.req.Error(err,
@@ -288,13 +288,13 @@ func (s *wsdbCommonUnitTest) TestInitialAdvanceWorkspace() {
 }
 
 func (s *wsdbCommonUnitTest) TestDeleteNullTypespace() {
-	err := s.wsdb.DeleteWorkspace(unitTestEtherCtx, NullSpaceName, "ns1", "ws1")
+	err := s.wsdb.DeleteWorkspace(unitTestCqlCtx, NullSpaceName, "ns1", "ws1")
 	s.req.Error(err, "Succeeded in deleting null workspace")
 }
 
 func (s *wsdbCommonUnitTest) TestDeleteWorkspaceOK() {
 	mockWsdbKeyDel(s.mockSess, "ts1", "ns1", "ws1", nil)
-	err := s.wsdb.DeleteWorkspace(unitTestEtherCtx, "ts1", "ns1", "ws1")
+	err := s.wsdb.DeleteWorkspace(unitTestCqlCtx, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Failed in deleting ts1/ns1/ws1 workspace")
 }
 
@@ -302,7 +302,7 @@ func (s *wsdbCommonUnitTest) TestWorkspaceLastWriteTime() {
 	microSecs := int64(4237423784)
 	mockWsdbWorkspaceLastWriteTime(s.mockSess,
 		"ts1", "ns1", "ws1", microSecs, nil)
-	ts, err := s.wsdb.WorkspaceLastWriteTime(unitTestEtherCtx,
+	ts, err := s.wsdb.WorkspaceLastWriteTime(unitTestCqlCtx,
 		"ts1", "ns1", "ws1")
 	s.req.NoError(err,
 		"Failed in getting last write time for ts1/ns1/ws1 workspace")
@@ -316,7 +316,7 @@ func (s *wsdbCommonUnitTest) TestCreateWorkspaceNoKey() {
 		NullSpaceName, nil, WorkspaceNonceInvalid, gocql.ErrNotFound)
 	mockWsdbKeyPut(s.mockSess, NullSpaceName, NullSpaceName,
 		NullSpaceName, []byte{1, 2, 3}, WorkspaceNonceInvalid, nil)
-	err := s.wsdb.CreateWorkspace(unitTestEtherCtx, NullSpaceName, NullSpaceName,
+	err := s.wsdb.CreateWorkspace(unitTestCqlCtx, NullSpaceName, NullSpaceName,
 		NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3})
 	s.req.NoError(err, "Failed in creating workspace")
 }
@@ -327,7 +327,7 @@ func (s *wsdbCommonUnitTest) TestCreateWorkspaceDiffKey() {
 	mockWsdbKeyPut(s.mockSess, NullSpaceName, NullSpaceName,
 		NullSpaceName, []byte{1, 2, 3}, WorkspaceNonceInvalid, nil)
 
-	err := s.wsdb.CreateWorkspace(unitTestEtherCtx, NullSpaceName, NullSpaceName,
+	err := s.wsdb.CreateWorkspace(unitTestCqlCtx, NullSpaceName, NullSpaceName,
 		NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3})
 	s.req.Error(err,
 		"Succeeded in creating workspace even though different key exists")
@@ -339,7 +339,7 @@ func (s *wsdbCommonUnitTest) TestCreateWorkspaceSameKey() {
 	mockWsdbKeyPut(s.mockSess, NullSpaceName, NullSpaceName,
 		NullSpaceName, []byte{1, 2, 3}, WorkspaceNonceInvalid, nil)
 
-	err := s.wsdb.CreateWorkspace(unitTestEtherCtx, NullSpaceName, NullSpaceName,
+	err := s.wsdb.CreateWorkspace(unitTestCqlCtx, NullSpaceName, NullSpaceName,
 		NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3})
 	s.req.NoError(err, "Failed in creating workspace")
 }
@@ -348,7 +348,7 @@ func (s *wsdbCommonUnitTest) TestSetWorkspaceImmutable() {
 	mockWsdbKeyGet(s.mockSess, "some", "test", "a", []byte{1, 2, 3},
 		WorkspaceNonceInvalid, nil)
 	mockWsdbImmutablePut(s.mockSess, "some", "test", "a", true, nil)
-	err := s.wsdb.SetWorkspaceImmutable(unitTestEtherCtx, "some", "test", "a")
+	err := s.wsdb.SetWorkspaceImmutable(unitTestCqlCtx, "some", "test", "a")
 	s.req.NoError(err, "Error while setting Immutable for some/test/a workspace")
 }
 
@@ -357,7 +357,7 @@ func (s *wsdbCommonUnitTest) TestSetWorkspaceImmutableError() {
 		WorkspaceNonceInvalid, nil)
 	mockWsdbImmutablePut(s.mockSess, "some", "test", "a", true,
 		fmt.Errorf("some gocql error"))
-	err := s.wsdb.SetWorkspaceImmutable(unitTestEtherCtx, "some", "test", "a")
+	err := s.wsdb.SetWorkspaceImmutable(unitTestCqlCtx, "some", "test", "a")
 	s.req.Error(err, "Success while setting Immutable for some/test/a workspace")
 	s.req.IsType(&Error{},
 		err, "Invalid error type %T", err)
@@ -365,7 +365,7 @@ func (s *wsdbCommonUnitTest) TestSetWorkspaceImmutableError() {
 
 func (s *wsdbCommonUnitTest) TestWorkspaceIsImmutable() {
 	mockWsdbImmutableGet(s.mockSess, "some", "test", "a", true, nil)
-	immutable, err := s.wsdb.WorkspaceIsImmutable(unitTestEtherCtx,
+	immutable, err := s.wsdb.WorkspaceIsImmutable(unitTestCqlCtx,
 		"some", "test", "a")
 	s.req.NoError(err, "Error while getting Immutable for some/test/a workspace")
 	s.req.Equal(true, immutable, "Immutable for some/test/a should be true")
@@ -373,7 +373,7 @@ func (s *wsdbCommonUnitTest) TestWorkspaceIsImmutable() {
 	mockWsdbKeyGet(s.mockSess, "some", "test", "b", []byte{1, 2, 3},
 		WorkspaceNonceInvalid, nil)
 	mockWsdbImmutableGet(s.mockSess, "some", "test", "b", false, nil)
-	immutable, err = s.wsdb.WorkspaceIsImmutable(unitTestEtherCtx,
+	immutable, err = s.wsdb.WorkspaceIsImmutable(unitTestCqlCtx,
 		"some", "test", "b")
 	s.req.NoError(err, "Error while getting Immutable for some/test/b workspace")
 	s.req.Equal(false, immutable, "Immutable for some/test/b should be false")
@@ -382,7 +382,7 @@ func (s *wsdbCommonUnitTest) TestWorkspaceIsImmutable() {
 func (s *wsdbCommonUnitTest) TestWorkspaceIsImmutableError() {
 	mockWsdbImmutableGet(s.mockSess, "some", "test", "a", true,
 		fmt.Errorf("gocql error"))
-	_, err := s.wsdb.WorkspaceIsImmutable(unitTestEtherCtx, "some", "test", "a")
+	_, err := s.wsdb.WorkspaceIsImmutable(unitTestCqlCtx, "some", "test", "a")
 	s.req.Error(err, "Success while getting Immutable for some/test/a workspace")
 	s.req.IsType(&Error{},
 		err, "Invalid error type %T", err)
@@ -392,10 +392,10 @@ func (s *wsdbCommonUnitTest) TestDeleteImmutableSet() {
 	mockWsdbKeyGet(s.mockSess, "some", "test", "a", []byte{1, 2, 3},
 		WorkspaceNonceInvalid, nil)
 	mockWsdbImmutablePut(s.mockSess, "some", "test", "a", true, nil)
-	err := s.wsdb.SetWorkspaceImmutable(unitTestEtherCtx, "some", "test", "a")
+	err := s.wsdb.SetWorkspaceImmutable(unitTestCqlCtx, "some", "test", "a")
 	s.req.NoError(err, "Error while setting Immutable for some/test/a workspace")
 
 	mockWsdbKeyDel(s.mockSess, "some", "test", "a", nil)
-	err = s.wsdb.DeleteWorkspace(unitTestEtherCtx, "some", "test", "a")
+	err = s.wsdb.DeleteWorkspace(unitTestCqlCtx, "some", "test", "a")
 	s.req.NoError(err, "Failed in deleting some/test/a workspace")
 }

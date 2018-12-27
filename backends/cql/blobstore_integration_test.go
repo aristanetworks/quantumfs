@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 // The set of tests in this file are for integration testing
-// of ether with scyllabd and gocql library.
+// of cql package against scyllabd and gocql library.
 
 // +build integration
 
@@ -30,8 +30,8 @@ func checkSetupInteg(s *storeIntegrationTests) {
 }
 
 func (s *storeIntegrationTests) SetupSuite() {
-	confFile, err := EtherConfFile()
-	s.Require().NoError(err, "error in getting ether configuration file")
+	confFile, err := CqlConfFile()
+	s.Require().NoError(err, "error in getting cql configuration file")
 
 	err = SetupIntegTestKeyspace(confFile)
 	s.Require().NoError(err, "SetupIntegTestKeyspace returned an error")
@@ -49,8 +49,8 @@ func (s *storeIntegrationTests) SetupTest() {
 }
 
 func (s *storeIntegrationTests) TestSchemaCheckFailed() {
-	confFile, err := EtherConfFile()
-	s.Require().NoError(err, "error in getting ether configuration file")
+	confFile, err := CqlConfFile()
+	s.Require().NoError(err, "error in getting cql configuration file")
 
 	// setup a dummy CFNAME_PREFIX so that the session
 	// establishment fails since no such table exists
@@ -64,7 +64,7 @@ func (s *storeIntegrationTests) TestSchemaCheckFailed() {
 }
 
 func (s *storeIntegrationTests) TestInsert() {
-	err := s.bls.Insert(integTestEtherCtx, []byte(testKey), []byte(testValue),
+	err := s.bls.Insert(integTestCqlCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 	s.Require().NoError(err, "Insert returned an error")
 }
@@ -77,7 +77,7 @@ func (s *storeIntegrationTests) TestInsertParallel() {
 		countl := count
 		Wg.Go(func() error {
 
-			return s.bls.Insert(integTestEtherCtx,
+			return s.bls.Insert(integTestCqlCtx,
 				[]byte(testKey+strconv.Itoa(countl)),
 				[]byte(testValue),
 				map[string]string{TimeToLive: "0"})
@@ -88,7 +88,7 @@ func (s *storeIntegrationTests) TestInsertParallel() {
 
 	// Check
 	for count := 0; count < 2; count++ {
-		value, _, err := s.bls.Get(integTestEtherCtx,
+		value, _, err := s.bls.Get(integTestCqlCtx,
 			[]byte(testKey+strconv.Itoa(count)))
 		s.Require().NoError(err, "Insert returned an error")
 		s.Require().Equal(testValue, string(value),
@@ -97,11 +97,11 @@ func (s *storeIntegrationTests) TestInsertParallel() {
 }
 
 func (s *storeIntegrationTests) TestGet() {
-	err := s.bls.Insert(integTestEtherCtx, []byte(testKey), []byte(testValue),
+	err := s.bls.Insert(integTestCqlCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 	s.Require().NoError(err, "Insert returned an error")
 
-	value, metadata, err := s.bls.Get(integTestEtherCtx, []byte(testKey))
+	value, metadata, err := s.bls.Get(integTestCqlCtx, []byte(testKey))
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().Equal(testValue, string(value), "Get returned incorrect value")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
@@ -112,7 +112,7 @@ func (s *storeIntegrationTests) TestGet() {
 }
 
 func (s *storeIntegrationTests) TestGetUnknownKey() {
-	value, metadata, err := s.bls.Get(integTestEtherCtx, []byte(unknownKey))
+	value, metadata, err := s.bls.Get(integTestCqlCtx, []byte(unknownKey))
 	s.Require().Nil(value, "value was not Nil when error is ErrKeyNotFound")
 	s.Require().Nil(metadata,
 		"metadata was not Nil when error is ErrKeyNotFound")
@@ -123,11 +123,11 @@ func (s *storeIntegrationTests) TestGetUnknownKey() {
 }
 
 func (s *storeIntegrationTests) TestGetNonZeroTTL() {
-	err := s.bls.Insert(integTestEtherCtx, []byte(testKey), []byte(testValue),
+	err := s.bls.Insert(integTestCqlCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "1234"})
 	s.Require().NoError(err, "Insert returned an error")
 
-	value, metadata, err := s.bls.Get(integTestEtherCtx, []byte(testKey))
+	value, metadata, err := s.bls.Get(integTestCqlCtx, []byte(testKey))
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().Equal(testValue, string(value), "Get returned incorrect value")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
@@ -145,11 +145,11 @@ func (s *storeIntegrationTests) TestGetNonZeroTTL() {
 }
 
 func (s *storeIntegrationTests) TestMetadataOK() {
-	err := s.bls.Insert(integTestEtherCtx, []byte(testKey), []byte(testValue),
+	err := s.bls.Insert(integTestCqlCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "1234"})
 	s.Require().NoError(err, "Insert returned an error")
 
-	metadata, err := s.bls.Metadata(integTestEtherCtx, []byte(testKey))
+	metadata, err := s.bls.Metadata(integTestCqlCtx, []byte(testKey))
 	s.Require().NoError(err, "Metadata returned an error")
 	s.Require().NotNil(metadata, "Metadata returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -166,7 +166,7 @@ func (s *storeIntegrationTests) TestMetadataOK() {
 }
 
 func (s *storeIntegrationTests) TestMetadataUnknownKey() {
-	metadata, err := s.bls.Metadata(integTestEtherCtx, []byte(unknownKey))
+	metadata, err := s.bls.Metadata(integTestCqlCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata didn't return error")
 	s.Require().Nil(metadata,
 		"metadata was not Nil when error is ErrKeyNotFound")
@@ -188,8 +188,8 @@ func (s *storeIntegrationTests) TearDownTest() {
 // The TearDownSuite method will be run after Suite is done
 func (s *storeIntegrationTests) TearDownSuite() {
 
-	confFile, err := EtherConfFile()
-	s.Require().NoError(err, "error in getting ether configuration file")
+	confFile, err := CqlConfFile()
+	s.Require().NoError(err, "error in getting cql configuration file")
 
 	resetCqlStore()
 	_ = DoTestSchemaOp(confFile, SchemaDelete)

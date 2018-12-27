@@ -15,16 +15,16 @@ const testKey2 = "D@rth"
 const testValue2 = "Vad3r"
 
 var testKey2Metadata = map[string]string{}
-var unitTestEtherCtx = DefaultCtx
-var integTestEtherCtx = DefaultCtx
+var unitTestCqlCtx = DefaultCtx
+var integTestCqlCtx = DefaultCtx
 
 var tstUsername = scyllaUsername
 var tstKeyspace = "ether"
 var etherConfFile string
 
-// EtherConfFile returns the full path to the ether's configuration file
+// CqlConfFile returns the full path to the ether's configuration file
 // based on environment variable ETHER_CQL_CONFIG.
-func EtherConfFile() (string, error) {
+func CqlConfFile() (string, error) {
 
 	if etherConfFile == "" {
 		etherEnv := os.Getenv("ETHER_CQL_CONFIG")

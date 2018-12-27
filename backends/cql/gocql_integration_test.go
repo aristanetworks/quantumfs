@@ -18,11 +18,11 @@ import (
 // The benchmarks here are used primarily to spot deviations
 // in performance of GoCQL APIs when used with our cluster
 // configuration and schemas. Intentionally, the write and
-// read routines do not use Ether code but instead use GoCQL
+// read routines do not use Cql code but instead use GoCQL
 // APIs directly.
 
-// These benchmarks do not reflect typical Ether usage and
-// hence do not use the results to advertize Ether performance.
+// These benchmarks do not reflect typical Cql usage and
+// hence do not use the results to advertize Cql performance.
 // These benchmarks can also help during performance investigations
 // where GoCQL baseline performance information is needed.
 
@@ -274,7 +274,7 @@ func benchBlob512BCachedReads(b *testing.B, cluster *gocql.ClusterConfig, ttl in
 }
 
 func BenchmarkGoCQL(b *testing.B) {
-	confFile, err := EtherConfFile()
+	confFile, err := CqlConfFile()
 	if err != nil {
 		b.Fatalf("Getting ether configuration failed: %s", err)
 	}
