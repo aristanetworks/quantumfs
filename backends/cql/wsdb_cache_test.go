@@ -1063,7 +1063,7 @@ func (suite *wsdbCacheTestSuite) TestCacheIgnoreField() {
 	func() {
 		mq := new(MockQuery)
 		stmt := `
-INSERT INTO ether.workspacedb
+INSERT INTO cql.workspacedb
 (typespace, namespace, workspace, key, ignore)
 VALUES (?,?,?,?,?,?)`
 
@@ -1077,7 +1077,7 @@ VALUES (?,?,?,?,?,?)`
 	// trigger mock
 	nonce := GetUniqueNonce()
 	query := suite.common.mockSess.Query(`
-INSERT INTO ether.workspacedb
+INSERT INTO cql.workspacedb
 (typespace, namespace, workspace, key, ignore)
 VALUES (?,?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), nonce.Id, nonce.PublishTime)
 

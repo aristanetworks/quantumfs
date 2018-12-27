@@ -23,13 +23,13 @@ var tstKeyspace = "cql"
 var cqlConfFile string
 
 // CqlConfFile returns the full path to the cql's configuration file
-// based on environment variable ETHER_CQL_CONFIG.
+// based on environment variable CQL_CONFIG.
 func CqlConfFile() (string, error) {
 
 	if cqlConfFile == "" {
-		cqlEnv := os.Getenv("ETHER_CQL_CONFIG")
+		cqlEnv := os.Getenv("CQL_CONFIG")
 		if cqlEnv == "" {
-			return "", fmt.Errorf("Env varibale ETHER_CQL_CONFIG " +
+			return "", fmt.Errorf("Env varibale CQL_CONFIG " +
 				"should be set to a config " +
 				"file name in directory cql/cluster_configs")
 		}

@@ -276,12 +276,12 @@ func benchBlob512BCachedReads(b *testing.B, cluster *gocql.ClusterConfig, ttl in
 func BenchmarkGoCQL(b *testing.B) {
 	confFile, err := CqlConfFile()
 	if err != nil {
-		b.Fatalf("Getting ether configuration failed: %s", err)
+		b.Fatalf("Getting cql configuration failed: %s", err)
 	}
 
 	cfg, err1 := readCqlConfig(confFile)
 	if err1 != nil {
-		b.Fatalf("Reading ether config file failed: %s", err1)
+		b.Fatalf("Reading cql config file failed: %s", err1)
 	}
 	gcpKeyspace = cfg.Cluster.KeySpace
 	cluster := setupCluster(&cfg.Cluster)
