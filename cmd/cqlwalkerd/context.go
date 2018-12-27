@@ -31,7 +31,7 @@ type Ctx struct {
 	ds              quantumfs.DataStore
 	cqlds           cql.BlobStore
 	ttlCfg          *utils.TTLConfig
-	etherConfig     string
+	cqlConfig       string
 	wsdbConfig      string
 	numSuccess      uint32
 	numError        uint32
@@ -62,7 +62,7 @@ func loadTimeSeriesDB(db, dbConf string) quantumfs.TimeSeriesDB {
 
 func getWalkerDaemonContext(name string, timeSeriesDB string,
 	timeSeriesDBConf string,
-	etherCfgFile string, wsdbCfgStr string,
+	cqlCfgFile string, wsdbCfgStr string,
 	logdir string, numwalkers int,
 	matcher func(s string) bool,
 	lastWriteDuration string) *Ctx {
@@ -80,17 +80,17 @@ func getWalkerDaemonContext(name string, timeSeriesDB string,
 		}
 	}
 
-	// Connect to ether backed quantumfs DataStore
-	quantumfsDS, err := backends.ConnectDatastore("ether.cql", etherCfgFile)
+	// Connect to cql backed quantumfs DataStore
+	quantumfsDS, err := backends.ConnectDatastore("cql", cqlCfgFile)
 	if err != nil {
 		fmt.Printf("Connection to DataStore failed")
 		os.Exit(exitBadConfig)
 	}
 
 	// Extract blobstore from quantumfs DataStore
-	// since we specifically use ether.cql datastore, it must implement
+	// since we specifically use cql datastore, it must implement
 	// the following interfaces
-	b, ok := quantumfsDS.(*backends.EtherBlobStoreTranslator)
+	b, ok := quantumfsDS.(*backends.CqlBlobStoreTranslator)
 	if !ok {
 		fmt.Printf("Found unsupported datastore adapter\n")
 		os.Exit(exitBadConfig)
@@ -104,7 +104,7 @@ func getWalkerDaemonContext(name string, timeSeriesDB string,
 		os.Exit(exitBadConfig)
 	}
 
-	etherWsdb := cql.NewUncachedWorkspaceDB(etherCfgFile)
+	cqlWsdb := cql.NewUncachedWorkspaceDB(cqlCfgFile)
 
 	keyspace := c.Keyspace()
 
@@ -118,8 +118,8 @@ func getWalkerDaemonContext(name string, timeSeriesDB string,
 		}
 
 	} else {
-		quantumfsWSDB, err = backends.ConnectWorkspaceDB("ether.cql",
-			etherCfgFile)
+		quantumfsWSDB, err = backends.ConnectWorkspaceDB("cql",
+			cqlCfgFile)
 		if err != nil {
 			fmt.Printf("Connection to workspaceDB failed err: %v\n", err)
 			os.Exit(exitBadConfig)
@@ -127,7 +127,7 @@ func getWalkerDaemonContext(name string, timeSeriesDB string,
 	}
 
 	// Load TTL Config values
-	ttlConfig, err := utils.LoadTTLConfig(etherCfgFile)
+	ttlConfig, err := utils.LoadTTLConfig(cqlCfgFile)
 	if err != nil {
 		fmt.Printf("Failed to load TTL: %s\n", err.Error())
 		os.Exit(exitBadConfig)
@@ -153,11 +153,11 @@ func getWalkerDaemonContext(name string, timeSeriesDB string,
 		tsdb:            tsdb,
 		qctx:            newQCtx(log, id),
 		wsdb:            quantumfsWSDB,
-		cqlws:           etherWsdb,
+		cqlws:           cqlWsdb,
 		ds:              quantumfsDS,
 		cqlds:           cqlDS,
 		ttlCfg:          ttlConfig,
-		etherConfig:     etherCfgFile,
+		cqlConfig:       cqlCfgFile,
 		wsdbConfig:      wsdbCfgStr,
 		numWalkers:      numwalkers,
 		keyspace:        keyspace,

@@ -275,11 +275,11 @@ func (th *TestHelper) StartDefaultQuantumFs(startChan chan struct{}) {
 	th.startQuantumFs(config, startChan, false)
 }
 
-func (th *TestHelper) etherFilesystemConfig() QuantumFsConfig {
+func (th *TestHelper) cqlFilesystemConfig() QuantumFsConfig {
 	mountPath := th.TempDir + "/mnt"
 
-	datastorePath := th.TempDir + "/ether"
-	datastore, err := backends.ConnectDatastore("ether.filesystem",
+	datastorePath := th.TempDir + "/cql"
+	datastore, err := backends.ConnectDatastore("cql.filesystem",
 		datastorePath)
 	th.AssertNoErr(err)
 
@@ -296,8 +296,8 @@ func (th *TestHelper) etherFilesystemConfig() QuantumFsConfig {
 	return config
 }
 
-func (th *TestHelper) StartEtherFileQuantumFs(startChan chan struct{}) {
-	th.startQuantumFs(th.etherFilesystemConfig(), startChan, false)
+func (th *TestHelper) StartCqlFileQuantumFs(startChan chan struct{}) {
+	th.startQuantumFs(th.cqlFilesystemConfig(), startChan, false)
 }
 
 func (th *TestHelper) StartQuantumFsWithWsdb(wsdb quantumfs.WorkspaceDB,
@@ -624,7 +624,7 @@ func (th *TestHelper) CreateTestDirs() {
 	th.Log("Using mountpath %s", mountPath)
 
 	utils.MkdirAll(th.TempDir+"/mnt2", 0777)
-	utils.MkdirAll(th.TempDir+"/ether", 0777)
+	utils.MkdirAll(th.TempDir+"/cql", 0777)
 }
 
 func (th *TestHelper) HardlinkKeyExists(workspace string,

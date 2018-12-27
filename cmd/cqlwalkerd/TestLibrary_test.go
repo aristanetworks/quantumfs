@@ -44,7 +44,7 @@ func runTestCommon(t *testing.T, test walkerTest) {
 	defer th.EndTest()
 
 	startChan := make(chan struct{}, 0)
-	th.StartEtherFileQuantumFs(startChan)
+	th.StartCqlFileQuantumFs(startChan)
 	th.RunDaemonTestCommonEpilog(testName, th.testHelperUpcast(test),
 		startChan, th.AbortFuse)
 }
