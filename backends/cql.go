@@ -250,7 +250,7 @@ func (ebt *CqlBlobStoreTranslator) cacheTtl(c *quantumfs.Ctx, key string) {
 const CqlGetLog = "CqlBlobStoreTranslator::Get"
 const KeyLog = "key %s"
 
-// Get adpats quantumfs.DataStore's Get API to cql.BlobStore.Get
+// Get adapts quantumfs.DataStore's Get API to cql.BlobStore.Get
 func (ebt *CqlBlobStoreTranslator) Get(c *quantumfs.Ctx,
 	key quantumfs.ObjectKey, buf quantumfs.Buffer) error {
 
