@@ -5,6 +5,7 @@
 FEATURES=
 
 COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthcheck
+COMMANDS+=cqlWalkerd cqlWalker
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
@@ -14,7 +15,7 @@ PKGS_TO_TEST+=quantumfs/backends/cql
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/backends/grpc
 PKGS_TO_TEST+=quantumfs/backends/grpc/server quantumfs/qlogstats
-PKGS_TO_TEST+=quantumfs/cmd/qupload
+PKGS_TO_TEST+=quantumfs/cmd/qupload quantumfs/cmd/cqlWalkerd
 LIBRARIES=libqfs.so libqfs.h libqfs32.so libqfs32.h
 
 # It's common practice to use a 'v' prefix on tags, but the prefix should be
