@@ -2,10 +2,9 @@
 # run 'make fetch' to ensure that all the necessary dependencies are available.
 #
 # See the files in the features directory for details.
-FEATURES=ether
+FEATURES=
 
 COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthcheck
-COMMANDS=cqlWalker cqlWalkerd
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
@@ -76,7 +75,7 @@ update: check-dep-installed Gopkg.toml
 	@echo "Please review and commit any changes to Gopkg.tomlbase and Gopkg.lock"
 
 vet:
-	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./features -prune -o -path ./cmd -true -o -type d -print | grep -v "cql/scripts" | grep -v cql/cluster `
+	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./features -prune -o -path ./cmd -true -o -type d -print | grep -v "cql/scripts" | grep -v cql/cluster | grep -v cqlWalker`
 
 lockcheck:
 	./lockcheck.sh

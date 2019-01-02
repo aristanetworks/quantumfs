@@ -1,3 +1,5 @@
+// +build ether
+
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 package main
@@ -461,8 +463,7 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 			c.skipMap.Merge(localSkipMap)
 			_, afterSkipMapLen := c.skipMap.Len()
 			c.vlog("Merging localSkipMap(len=%d) with "+
-				"globalSkipMap(len=%d) "+
-				"-> globalSkipMap(len=%d)",
+				"globalSkipMap(len=%d) -> globalSkipMap(len=%d)",
 				localSkipMapLen, beforeSkipMapLen, afterSkipMapLen)
 		}
 		c.vlog("%s TTL refresh for %s/%s/%s (%s)", successPrefix, ts, ns, ws,
