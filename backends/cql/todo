@@ -1,0 +1,37 @@
+ walker daemon -> cmd/cqlwalkerd
+ walker cmd -> cmd/cqlwalker
+
+ cluster config for dkr
+ - in docu 1 detailed and 1 bare minimal
+
+ sdchema files: put schema file backends/cql/schema/..
+ descrive how to use to documentation
+
+ script for docker based testing
+ .. think of good place either ./testScripts or _scripts
+
+ line size
+ 
+ decimate reference to ether
+ 
+ consider removing/reducing blobstore and ether.wsdb
+
+ cql/utils should go to cql or qfs/utils
+
+ remove ether from features
+
+ remove ether build tag
+
+
+ qwalker/daemon/point.go should eventualy..... use quantumfs/timeseriesdb.go
+
+ add gocql to tomlbase
+
+ qfs+scylla smoke test
+ branch
+ add file
+ modify file
+ restart qfs and check that files are there ..
+
+
+limitation of wsdb+cql
