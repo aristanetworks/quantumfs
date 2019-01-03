@@ -90,7 +90,7 @@ func getWalkerDaemonContext(name string, timeSeriesDB string,
 	// Extract blobstore from quantumfs DataStore
 	// since we specifically use cql datastore, it must implement
 	// the following interfaces
-	b, ok := quantumfsDS.(*backends.CqlBlobStoreTranslator)
+	b, ok := quantumfsDS.(*cql.CqlBlobStoreTranslator)
 	if !ok {
 		fmt.Printf("Found unsupported datastore adapter\n")
 		os.Exit(exitBadConfig)

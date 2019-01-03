@@ -127,9 +127,6 @@ const GetLog = "Cql::Get"
 // GoCqlGetLog can be used in external tool for log parsing
 const GoCqlGetLog = "GoCql::Get"
 
-// KeyLog can be used in external tool for log parsing
-const KeyLog = "Key: %s"
-
 // Get is the CQL implementation of Get()
 func (b *cqlBlobStore) Get(c Ctx, key []byte) ([]byte, map[string]string, error) {
 	keyHex := hex.EncodeToString(key)

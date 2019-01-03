@@ -55,7 +55,7 @@ func setupCommonState() error {
 		return NewPreCmdExitErr("Connection to DataStore failed: %s",
 			err)
 	}
-	v, ok := cs.qfsds.(*backends.CqlBlobStoreTranslator)
+	v, ok := cs.qfsds.(*cql.CqlBlobStoreTranslator)
 	if !ok {
 		return NewPreCmdExitErr("Non-cql datastore found")
 	}
