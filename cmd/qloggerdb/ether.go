@@ -8,36 +8,35 @@ package main
 import (
 	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/qlogstats"
-	"github.com/aristanetworks/quantumfs/thirdparty_backends"
 )
 
 func init() {
 	ses := []qlogstats.StatExtractor{
-		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheHit,
+		qlogstats.NewExtPointStats(cql.EtherTtlCacheHit,
 			"ether_setcache_hit"),
-		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheMiss,
+		qlogstats.NewExtPointStats(cql.EtherTtlCacheMiss,
 			"ether_setcache_miss"),
-		qlogstats.NewExtPointStats(thirdparty_backends.EtherTtlCacheEvict,
+		qlogstats.NewExtPointStats(cql.EtherTtlCacheEvict,
 			"ether_setcache_evict"),
 
 		// Data store latency
-		newQfsExtPair(thirdparty_backends.EtherGetLog,
-			thirdparty_backends.KeyLog),
-		newQfsExtPair(thirdparty_backends.EtherSetLog,
-			thirdparty_backends.KeyLog),
+		newQfsExtPair(cql.EtherGetLog,
+			cql.KeyLog),
+		newQfsExtPair(cql.EtherSetLog,
+			cql.KeyLog),
 
 		// Workspace DB latency
-		newQfsExtPair(thirdparty_backends.EtherTypespaceLog, ""),
-		newQfsExtPair(thirdparty_backends.EtherNamespaceLog,
-			thirdparty_backends.EtherNamespaceDebugLog),
-		newQfsExtPair(thirdparty_backends.EtherWorkspaceListLog,
-			thirdparty_backends.EtherWorkspaceListDebugLog),
-		newQfsExtPair(thirdparty_backends.EtherWorkspaceLog,
-			thirdparty_backends.EtherWorkspaceDebugLog),
-		newQfsExtPair(thirdparty_backends.EtherBranchLog,
-			thirdparty_backends.EtherBranchDebugLog),
-		newQfsExtPair(thirdparty_backends.EtherAdvanceLog,
-			thirdparty_backends.EtherAdvanceDebugLog),
+		newQfsExtPair(cql.EtherTypespaceLog, ""),
+		newQfsExtPair(cql.EtherNamespaceLog,
+			cql.EtherNamespaceDebugLog),
+		newQfsExtPair(cql.EtherWorkspaceListLog,
+			cql.EtherWorkspaceListDebugLog),
+		newQfsExtPair(cql.EtherWorkspaceLog,
+			cql.EtherWorkspaceDebugLog),
+		newQfsExtPair(cql.EtherBranchLog,
+			cql.EtherBranchDebugLog),
+		newQfsExtPair(cql.EtherAdvanceLog,
+			cql.EtherAdvanceDebugLog),
 
 		// Ether.CQL internal statistics
 		newQfsExtPair(cql.DeleteLog, cql.KeyLog),
