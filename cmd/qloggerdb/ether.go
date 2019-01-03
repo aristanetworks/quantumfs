@@ -4,38 +4,37 @@
 package main
 
 import (
-	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/qlogstats"
 )
 
 func init() {
 	ses := []qlogstats.StatExtractor{
-		qlogstats.NewExtPointStats(backends.EtherTtlCacheHit,
+		qlogstats.NewExtPointStats(cql.EtherTtlCacheHit,
 			"ether_setcache_hit"),
-		qlogstats.NewExtPointStats(backends.EtherTtlCacheMiss,
+		qlogstats.NewExtPointStats(cql.EtherTtlCacheMiss,
 			"ether_setcache_miss"),
-		qlogstats.NewExtPointStats(backends.EtherTtlCacheEvict,
+		qlogstats.NewExtPointStats(cql.EtherTtlCacheEvict,
 			"ether_setcache_evict"),
 
 		// Data store latency
-		newQfsExtPair(backends.EtherGetLog,
-			backends.KeyLog),
-		newQfsExtPair(backends.EtherSetLog,
-			backends.KeyLog),
+		newQfsExtPair(cql.EtherGetLog,
+			cql.KeyLog),
+		newQfsExtPair(cql.EtherSetLog,
+			cql.KeyLog),
 
 		// Workspace DB latency
-		newQfsExtPair(backends.EtherTypespaceLog, ""),
-		newQfsExtPair(backends.EtherNamespaceLog,
-			backends.EtherNamespaceDebugLog),
-		newQfsExtPair(backends.EtherWorkspaceListLog,
-			backends.EtherWorkspaceListDebugLog),
-		newQfsExtPair(backends.EtherWorkspaceLog,
-			backends.EtherWorkspaceDebugLog),
-		newQfsExtPair(backends.EtherBranchLog,
-			backends.EtherBranchDebugLog),
-		newQfsExtPair(backends.EtherAdvanceLog,
-			backends.EtherAdvanceDebugLog),
+		newQfsExtPair(cql.EtherTypespaceLog, ""),
+		newQfsExtPair(cql.EtherNamespaceLog,
+			cql.EtherNamespaceDebugLog),
+		newQfsExtPair(cql.EtherWorkspaceListLog,
+			cql.EtherWorkspaceListDebugLog),
+		newQfsExtPair(cql.EtherWorkspaceLog,
+			cql.EtherWorkspaceDebugLog),
+		newQfsExtPair(cql.EtherBranchLog,
+			cql.EtherBranchDebugLog),
+		newQfsExtPair(cql.EtherAdvanceLog,
+			cql.EtherAdvanceDebugLog),
 
 		// Ether.CQL internal statistics
 		newQfsExtPair(cql.DeleteLog, cql.KeyLog),
