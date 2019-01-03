@@ -56,7 +56,7 @@ func setupCommonState() error {
 		return NewPreCmdExitErr("Connection to DataStore failed: %s",
 			err)
 	}
-	v, ok := cs.qfsds.(*backends.EtherBlobStoreTranslator)
+	v, ok := cs.qfsds.(*cql.EtherBlobStoreTranslator)
 	if !ok {
 		return NewPreCmdExitErr("Non-ether datastore found")
 	}

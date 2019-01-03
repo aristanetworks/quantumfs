@@ -1,5 +1,3 @@
-// +build foo
-
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
@@ -14,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 	"github.com/aristanetworks/quantumfs/testutils"
@@ -23,7 +20,7 @@ import (
 
 func (t *testHelper) testCtx() *Ctx {
 	datastore := t.GetDataStore()
-	translator := datastore.(*backends.EtherBlobStoreTranslator)
+	translator := datastore.(*cql.EtherBlobStoreTranslator)
 
 	return &Ctx{
 		qctx:  t.QfsCtx(),

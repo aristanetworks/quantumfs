@@ -460,8 +460,7 @@ func runWalker(oldC *Ctx, ts string, ns string, ws string) error {
 			c.skipMap.Merge(localSkipMap)
 			_, afterSkipMapLen := c.skipMap.Len()
 			c.vlog("Merging localSkipMap(len=%d) with "+
-				"globalSkipMap(len=%d) "+
-				"-> globalSkipMap(len=%d)",
+				"globalSkipMap(len=%d) -> globalSkipMap(len=%d)",
 				localSkipMapLen, beforeSkipMapLen, afterSkipMapLen)
 		}
 		c.vlog("%s TTL refresh for %s/%s/%s (%s)", successPrefix, ts, ns, ws,

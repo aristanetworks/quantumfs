@@ -101,7 +101,7 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 	// Extract blobstore from quantumfs DataStore
 	// since we specifically use ether.cql datastore, it must implement
 	// the following interfaces
-	b, ok := quantumfsDS.(*backends.EtherBlobStoreTranslator)
+	b, ok := quantumfsDS.(*cql.EtherBlobStoreTranslator)
 	if !ok {
 		fmt.Printf("Found unsupported datastore adapter\n")
 		os.Exit(exitBadConfig)
