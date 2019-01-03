@@ -14,4 +14,5 @@ func init() {
 	registerDatastore("ether.filesystem", filesystem.NewEtherFilesystemStore)
 	registerDatastore("ether.cql", cql.NewEtherCqlStore)
 	registerWorkspaceDB("ether.cql", cql.NewEtherWorkspaceDB)
+
 }
