@@ -59,7 +59,8 @@ func (ods *OnDiskSet) InsertElem(key string) (bool, error) {
 			if n == 0 {
 				return fmt.Errorf("Too small buffer to store count")
 			} else if n < 0 {
-				return fmt.Errorf("value larger than 64 bits, overflow")
+				return fmt.Errorf("value larger than 64 bits, " +
+					"overflow")
 			} else {
 				count++
 			}
@@ -70,7 +71,8 @@ func (ods *OnDiskSet) InsertElem(key string) (bool, error) {
 		countByteArray = make([]byte, binary.MaxVarintLen64)
 		n = binary.PutUvarint(countByteArray, count)
 		if n < 1 {
-			return fmt.Errorf("less than 1 byte written to buffer for count")
+			return fmt.Errorf("less than 1 byte written to buffer for " +
+				"count")
 		}
 		err := bucket.Put([]byte(key), countByteArray)
 		return err
@@ -97,9 +99,11 @@ func (ods *OnDiskSet) CountElem(key string) (uint64, error) {
 		if countByteArray != nil {
 			count, n = binary.Uvarint(countByteArray)
 			if n == 0 {
-				return fmt.Errorf("Too small bugger to store countByteArray")
+				return fmt.Errorf("Too small bugger to store " +
+					"countByteArray")
 			} else if n < 0 {
-				return fmt.Errorf("value larger than 64 bits, overflow")
+				return fmt.Errorf("value larger than 64 bits, " +
+					"overflow")
 			} else {
 				return nil
 			}

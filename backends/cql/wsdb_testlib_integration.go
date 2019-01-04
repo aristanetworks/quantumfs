@@ -39,25 +39,30 @@ func (s *wsdbCommonIntegTest) TestIntegEmptyDB() {
 	s.req.Equal([]string{NullSpaceName}, nsList,
 		"Empty DB has incorrect list of namespaces")
 
-	wsCount, err5 := s.db.NumWorkspaces(integTestEtherCtx, NullSpaceName, NullSpaceName)
+	wsCount, err5 := s.db.NumWorkspaces(integTestEtherCtx, NullSpaceName,
+		NullSpaceName)
 	s.req.NoError(err5, "NumWorkspaces failed %s", err5)
 	s.req.Equal(1, wsCount, "Empty DB has incorrect count of workspaces")
 
-	wsList, err6 := s.db.WorkspaceList(integTestEtherCtx, NullSpaceName, NullSpaceName)
+	wsList, err6 := s.db.WorkspaceList(integTestEtherCtx, NullSpaceName,
+		NullSpaceName)
 	s.req.NoError(err6, "WorkspaceList failed %s", err6)
 	s.req.Equal(1, len(wsList),
 		"Empty DB has incorrect number of workspaces")
 	s.req.Contains(wsList, NullSpaceName,
 		"Empty DB has incorrect list of workspaces")
-	s.req.Equal(wsList[NullSpaceName], WorkspaceNonceInvalid, "Incorect Nonce value for _/_/_")
+	s.req.Equal(wsList[NullSpaceName], WorkspaceNonceInvalid,
+		"Incorect Nonce value for _/_/_")
 }
 
 func (s *wsdbCommonIntegTest) TestIntegBranching() {
 
-	nonceNull, nonceWS1, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
+	nonceNull, nonceWS1, err := s.db.BranchWorkspace(integTestEtherCtx,
+		NullSpaceName, NullSpaceName,
 		NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
-	s.req.NotEqual(nonceNull, nonceWS1, "Same nonce for src and dst after branching workspace")
+	s.req.NotEqual(nonceNull, nonceWS1,
+		"Same nonce for src and dst after branching workspace")
 
 	tsCount, err1 := s.db.NumTypespaces(integTestEtherCtx)
 	s.req.NoError(err1, "NumTypespaces failed %s", err1)
@@ -99,26 +104,30 @@ func (s *wsdbCommonIntegTest) TestIntegAdvanceOk() {
 	emptyKey := []byte(nil)
 	newKey := []byte{1, 2, 3}
 
-	_, nonce, e := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
-		NullSpaceName, "ts1", "ns1", "ws1")
+	_, nonce, e := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName,
+		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(e, "Error branching null workspace: %v", e)
 
-	key, nonceBefore, err1 := s.db.Workspace(integTestEtherCtx, "ts1", "ns1", "ws1")
+	key, nonceBefore, err1 := s.db.Workspace(integTestEtherCtx,
+		"ts1", "ns1", "ws1")
 	s.req.NoError(err1, "Workspace failed %s", err1)
 	s.req.True(bytes.Equal(key, emptyKey), "Current RootID isn't empty")
 
-	newRootID, _, err := s.db.AdvanceWorkspace(integTestEtherCtx, "ts1", "ns1", "ws1", nonce, emptyKey,
-		newKey)
+	newRootID, _, err := s.db.AdvanceWorkspace(integTestEtherCtx, "ts1", "ns1",
+		"ws1", nonce, emptyKey, newKey)
 	s.req.NoError(err, "Error in advancing workspace EmptyDirKey: %v", err)
 	s.req.True(bytes.Equal(newRootID, newKey), "New RootID isn't EmptyDirKey")
 
-	key, nonceAfter, err1 := s.db.Workspace(integTestEtherCtx, "ts1", "ns1", "ws1")
+	key, nonceAfter, err1 := s.db.Workspace(integTestEtherCtx, "ts1", "ns1",
+		"ws1")
 	s.req.NoError(err1, "Workspace failed %s", err1)
 	s.req.True(bytes.Equal(key, newRootID), "Current RootID isn't empty")
 
-	s.req.Equal(nonceBefore, nonceAfter, "nonce changed after advance for ts1/ns1/ws1")
+	s.req.Equal(nonceBefore, nonceAfter,
+		"nonce changed after advance for ts1/ns1/ws1")
 
-	newRootID, _, err = s.db.AdvanceWorkspace(integTestEtherCtx, "ts1", "ns1", "ws1", nonce, newKey, emptyKey)
+	newRootID, _, err = s.db.AdvanceWorkspace(integTestEtherCtx, "ts1",
+		"ns1", "ws1", nonce, newKey, emptyKey)
 	s.req.NoError(err, "Error in advancing workspace to EmptyWorkspaceKey: %v",
 		err)
 	s.req.True(bytes.Equal(newRootID, emptyKey),
@@ -137,11 +146,13 @@ func (s *wsdbCommonIntegTest) TestIntegDeleteWorkspaceOK() {
 
 func (s *wsdbCommonIntegTest) TestIntegWorkspaceLastWriteTime() {
 	currentTime := time.Now().UTC()
-	_, _, e := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
-		NullSpaceName, "ts1", "ns1", "ws1")
+	_, _, e := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName,
+		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(e, "Error branching null workspace: %v", e)
-	ts, err := s.db.WorkspaceLastWriteTime(integTestEtherCtx, "ts1", "ns1", "ws1")
-	s.req.NoError(err, "Failed in getting last write time for ts1/ns1/ws1 workspace")
+	ts, err := s.db.WorkspaceLastWriteTime(integTestEtherCtx,
+		"ts1", "ns1", "ws1")
+	s.req.NoError(err,
+		"Failed in getting last write time for ts1/ns1/ws1 workspace")
 
 	// Check if the 2 time stamps are close to each other.
 	s.req.True(ts.Unix()-currentTime.Unix() < 5,
@@ -150,15 +161,15 @@ func (s *wsdbCommonIntegTest) TestIntegWorkspaceLastWriteTime() {
 
 func (s *wsdbCommonIntegTest) TestIntegWorkspaceReCreateWithNewNonce() {
 
-	_, nonceBefore, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
-		NullSpaceName, "ts1", "ns1", "ws1")
+	_, nonceBefore, err := s.db.BranchWorkspace(integTestEtherCtx,
+		NullSpaceName, NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	err = s.db.DeleteWorkspace(integTestEtherCtx, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Failed in deleting ts1/ns1/ws1 workspace")
 
-	_, nonceAfter, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
-		NullSpaceName, "ts1", "ns1", "ws1")
+	_, nonceAfter, err := s.db.BranchWorkspace(integTestEtherCtx,
+		NullSpaceName, NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	s.req.NotEqual(nonceBefore, nonceAfter,
@@ -169,12 +180,12 @@ func (s *wsdbCommonIntegTest) TestIntegWorkspaceReCreateWithNewNonce() {
 // Has the correct nonces when the map has multiple keys.
 func (s *wsdbCommonIntegTest) TestIntegWorkspaceNonce() {
 
-	_, nonceWS1, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
-		NullSpaceName, "ts1", "ns1", "ws1")
+	_, nonceWS1, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName,
+		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
-	_, nonceWS2, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
-		NullSpaceName, "ts1", "ns1", "ws2")
+	_, nonceWS2, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName,
+		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws2")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	wsList, err6 := s.db.WorkspaceList(integTestEtherCtx, "ts1", "ns1")
@@ -192,8 +203,8 @@ func (s *wsdbCommonIntegTest) TestIntegWorkspaceNonce() {
 }
 
 func (s *wsdbCommonIntegTest) TestIntegSetWorkspaceImmutable() {
-	_, _, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
-		NullSpaceName, "ts1", "ns1", "ws1")
+	_, _, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName,
+		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	err = s.db.SetWorkspaceImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
@@ -206,18 +217,20 @@ func (s *wsdbCommonIntegTest) TestIntegSetWorkspaceImmutableError() {
 }
 
 func (s *wsdbCommonIntegTest) TestIntegWorkspaceIsImmutable() {
-	_, _, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
-		NullSpaceName, "ts1", "ns1", "ws1")
+	_, _, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName,
+		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
-	immutable, err := s.db.WorkspaceIsImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
+	immutable, err := s.db.WorkspaceIsImmutable(integTestEtherCtx,
+		"ts1", "ns1", "ws1")
 	s.req.NoError(err, "Success in WorkspaceIsImmutable for ts1/ns1/ws1")
 	s.req.Equal(false, immutable, "immutable should be false for ts1/ns1/ws1")
 
 	err = s.db.SetWorkspaceImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error in SetWorkspaceImmtable for ts1/ns1/ws1: %v", err)
 
-	immutable, err = s.db.WorkspaceIsImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")
+	immutable, err = s.db.WorkspaceIsImmutable(integTestEtherCtx,
+		"ts1", "ns1", "ws1")
 	s.req.NoError(err, "Success in WorkspaceIsImmutable for ts1/ns1/ws1")
 	s.req.Equal(true, immutable, "immutable should be true for ts1/ns1/ws1")
 }
@@ -228,8 +241,8 @@ func (s *wsdbCommonIntegTest) TestIntegWorkspaceIsImmutableError() {
 }
 
 func (s *wsdbCommonIntegTest) TestIntegDeleteImmutableSet() {
-	_, _, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
-		NullSpaceName, "ts1", "ns1", "ws1")
+	_, _, err := s.db.BranchWorkspace(integTestEtherCtx, NullSpaceName,
+		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	err = s.db.SetWorkspaceImmutable(integTestEtherCtx, "ts1", "ns1", "ws1")

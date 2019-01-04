@@ -58,9 +58,9 @@ const (
 	// BS Errors copied from blobstoreInt.go
 	ErrOperationFailed       ErrCode = iota // The specific operation failed
 	ErrBlobStoreDown         ErrCode = iota // The blobstore could not be reached
-	ErrBlobStoreInconsistent ErrCode = iota // The blobstore has an internal error
+	ErrBlobStoreInconsistent ErrCode = iota // The blobstore has an internal err
 	ErrBadArguments          ErrCode = iota // The passed arguments are incorrect
-	ErrKeyNotFound           ErrCode = iota // The key and associated value was not found
+	ErrKeyNotFound           ErrCode = iota // The key and value was not found
 )
 
 // WorkspaceNonceInvalid is an invalid nonce
@@ -104,7 +104,8 @@ func (nonce *WorkspaceNonce) String() string {
 	return fmt.Sprintf("%d %d", nonce.Id, nonce.PublishTime)
 }
 
-// SameIncarnation returns true if nonce and other are the same incarnation of a workspace
+// SameIncarnation returns true if nonce and other are the same incarnation of
+// a workspace
 func (nonce *WorkspaceNonce) SameIncarnation(other *WorkspaceNonce) bool {
 	return nonce.Id == other.Id
 }
@@ -171,7 +172,8 @@ type WorkspaceDB interface {
 	//  ErrWorkspaceNotFound
 	BranchWorkspace(c Ctx, srcTypespace string, srcNamespace string,
 		srcWorkspace string, dstTypespace string,
-		dstNamespace string, dstWorkspace string) (WorkspaceNonce, WorkspaceNonce, error)
+		dstNamespace string, dstWorkspace string) (WorkspaceNonce,
+		WorkspaceNonce, error)
 
 	// DeleteWorkspace deletes the workspace
 	DeleteWorkspace(c Ctx, typespace string, namespace string,
@@ -195,7 +197,8 @@ type WorkspaceDB interface {
 	//  ErrWorkspaceOutOfDate: The workspace rootID was changed
 	//  	remotely so the local instance is out of date
 	AdvanceWorkspace(c Ctx, typespace string, namespace string, workspace string,
-		nonce WorkspaceNonce, currentRootID ObjectKey, newRootID ObjectKey) (ObjectKey, WorkspaceNonce, error)
+		nonce WorkspaceNonce, currentRootID ObjectKey,
+		newRootID ObjectKey) (ObjectKey, WorkspaceNonce, error)
 
 	SetWorkspaceImmutable(c Ctx, typespace string, namespace string,
 		workspace string) error

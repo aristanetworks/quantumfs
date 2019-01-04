@@ -113,8 +113,8 @@ func benchWsdbCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
 		var key []byte
 
 		for pb.Next() {
-			err := db.Query(rQryStr).Scan(&typespace, &namespace, &workspace, &key,
-				&nonce, &publishtime, &immutable)
+			err := db.Query(rQryStr).Scan(&typespace, &namespace,
+				&workspace, &key, &nonce, &publishtime, &immutable)
 			if err != nil {
 				b.Fatal(err)
 				return
@@ -183,7 +183,8 @@ func benchBlobCachedReads(b *testing.B, cluster *gocql.ClusterConfig,
 			if ttl < 0 {
 				err = db.Query(rQryStr, []byte(key)).Scan(&value)
 			} else {
-				err = db.Query(rQryStr, []byte(key)).Scan(&value, &curTTL)
+				err = db.Query(rQryStr,
+					[]byte(key)).Scan(&value, &curTTL)
 			}
 			if err != nil {
 				b.Fatal(err)
@@ -325,7 +326,8 @@ func BenchmarkGoCQL(b *testing.B) {
 		// setup and teardown of schema for each kind of
 		// benchmark to enable a clean state
 		if err = DoTestSchemaOp(confFile, SchemaCreate); err != nil {
-			b.Fatalf("DoTestSchemaOp SchemaCreate returned an error: %s", err)
+			b.Fatalf("DoTestSchemaOp SchemaCreate returned an error: %s",
+				err)
 		}
 
 		b.Run(fmt.Sprintf("%s", subBmark.name),

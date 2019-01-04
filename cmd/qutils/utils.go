@@ -83,13 +83,15 @@ func LoadTTLConfig(path string) (*TTLConfig, error) {
 
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("error in opening cql config file: %v\n(%v)", path, err)
+		return nil, fmt.Errorf("error in opening cql config file: %v\n(%v)",
+			path, err)
 	}
 	defer f.Close()
 
 	err = json.NewDecoder(f).Decode(&c)
 	if err != nil {
-		return nil, fmt.Errorf("error in decoding cql config file: %v\n(%v)", path, err)
+		return nil, fmt.Errorf("error in decoding cql config file: %v\n(%v)",
+			path, err)
 	}
 
 	var tc TTLConfig
@@ -98,7 +100,8 @@ func LoadTTLConfig(path string) (*TTLConfig, error) {
 	tc.TTLNew = int64(c.A.TTLRefreshValue.Duration.Seconds())
 
 	if tc.SkipMapResetAfter_ms == 0 || tc.TTLNew == 0 {
-		return nil, fmt.Errorf("ttlrefreshvalue and ttlrefreshtime must be non-zero")
+		return nil, fmt.Errorf("ttlrefreshvalue and ttlrefreshtime must " +
+			"be non-zero")
 	}
 
 	// we can add more checks here later on eg: min of 1 day etc

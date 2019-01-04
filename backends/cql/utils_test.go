@@ -70,7 +70,8 @@ func (s *setupTests) TestValidConfig() {
 	config2, err = readCqlConfig(name)
 	s.Require().NoError(err, "CQL config file read failed")
 
-	s.Require().Equal(config, *config2, "The config read was not the same as the config written")
+	s.Require().Equal(config, *config2,
+		"The config read was not the same as the config written")
 }
 
 func (s *setupTests) TestInvalidConfigFilePath() {

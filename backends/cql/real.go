@@ -26,7 +26,9 @@ func NewRealCluster(clusterCfg *ClusterConfig) Cluster {
 		nodes, err = net.LookupHost(clusterCfg.ClusterName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr,
-				"** WARNING: LookupHost failed for %s . Using node IPs from config **\n", clusterCfg.ClusterName)
+				"** WARNING: LookupHost failed for %s. "+
+					" Using node IPs from config **\n",
+				clusterCfg.ClusterName)
 			nodes = clusterCfg.Nodes
 		}
 	}
@@ -72,7 +74,9 @@ func NewRealCluster(clusterCfg *ClusterConfig) Cluster {
 		clusterCfg.CheckSchemaRetries = 2
 	}
 
-	c.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: clusterCfg.QueryNumRetries}
+	c.RetryPolicy = &gocql.SimpleRetryPolicy{
+		NumRetries: clusterCfg.QueryNumRetries,
+	}
 
 	if clusterCfg.ConnTimeoutSec == 0 {
 		clusterCfg.ConnTimeoutSec = 3

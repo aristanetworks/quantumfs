@@ -21,7 +21,8 @@ func registerKeyCountCmd() {
 	var cmd cmdproc.CommandInfo
 	cmd.Name = "keycount"
 	cmd.Usage = "workspace [dedupe | sizehist]"
-	cmd.Short = "shows keycount information along with dedupe or size histogram for a workspace"
+	cmd.Short = "shows keycount information along with dedupe or size " +
+		"histogram for a workspace"
 	cmd.Details = `
 workspace
 	name of the workspace
@@ -77,7 +78,8 @@ func registerKeyDiffCountCmd() {
 	var cmd cmdproc.CommandInfo
 	cmd.Name = "keydiffcount"
 	cmd.Usage = "workspace1 workspace2 [keys]"
-	cmd.Short = "compares two workspaces in terms of keycounts and optionally shows unique keys"
+	cmd.Short = "compares two workspaces in terms of keycounts and " +
+		"optionally shows unique keys"
 	cmd.Details = `
 workspace1 workspace2
 	name of the workspaces

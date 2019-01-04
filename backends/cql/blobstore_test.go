@@ -89,7 +89,8 @@ func (s *storeTests) TestNewCqlStoreAvoidCreateSession() {
 	// a re-init should pass and return mocksession
 	store, err = initCqlStore(mockcc)
 	s.Require().NoError(err, "re-initCqlStore should have passed")
-	s.Require().Equal(store.session, mocksession, "mocksession should be returned")
+	s.Require().Equal(store.session, mocksession,
+		"mocksession should be returned")
 }
 
 func (s *storeTests) TestNewCqlStoreReInitPass() {
@@ -148,7 +149,8 @@ USING TTL %s`, s.bls.keyspace, "0")
 	s.Require().Error(err, "Insert returned incorrect ErrorCode")
 
 	verr, ok := err.(*Error)
-	s.Require().Equal(true, ok, fmt.Sprintf("Error from Insert is of type %T", err))
+	s.Require().Equal(true, ok, fmt.Sprintf("Error from Insert is of type %T",
+		err))
 	s.Require().Equal(ErrOperationFailed, verr.Code,
 		"Invalid Error Code from Insert")
 }
@@ -191,7 +193,8 @@ WHERE key = ?`, s.bls.keyspace)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
 	s.Require().Equal(ErrKeyNotFound, verr.Code, "Invalid Error Code from get")
 	s.Require().Nil(value, "value was not Nil when error is ErrKeyNotFound")
-	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
+	s.Require().Nil(metadata,
+		"metadata was not Nil when error is ErrKeyNotFound")
 }
 
 func (s *storeTests) TestGetFailureGeneric() {
@@ -214,7 +217,8 @@ WHERE key = ?`, s.bls.keyspace)
 	s.Require().Equal(ErrOperationFailed, verr.Code,
 		"Invalid Error Code from Get")
 	s.Require().Nil(value, "value was not Nil when error is ErrUnavailable")
-	s.Require().Nil(metadata, "metadata was not Nil when error is ErrUnavailable")
+	s.Require().Nil(metadata,
+		"metadata was not Nil when error is ErrUnavailable")
 }
 
 func (s *storeTests) TestGetNonZeroTTL() {
@@ -282,10 +286,12 @@ WHERE key = ?`, s.bls.keyspace)
 	metadata, err := s.bls.Metadata(unitTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata returned nil error on failure")
 	verr, ok := err.(*Error)
-	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T", err))
+	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T",
+		err))
 	s.Require().Equal(ErrKeyNotFound, verr.Code,
 		"Invalid Error Code from Metadata")
-	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
+	s.Require().Nil(metadata,
+		"metadata was not Nil when error is ErrKeyNotFound")
 }
 
 func (s *storeTests) TestMetadataFailGeneric() {
@@ -296,15 +302,18 @@ FROM %s.blobStore
 WHERE key = ?`, s.bls.keyspace)
 	mocksession.On("Query", qstr, []byte(unknownKey)).Return(mockquery)
 	mocksession.On("Close").Return()
-	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(gocql.ErrUnavailable)
+	mockquery.On("Scan", mock.AnythingOfType("*int")).
+		Return(gocql.ErrUnavailable)
 
 	metadata, err := s.bls.Metadata(unitTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata returned nil error on failure")
 	verr, ok := err.(*Error)
-	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T", err))
+	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T",
+		err))
 	s.Require().Equal(ErrOperationFailed, verr.Code,
 		"Invalid Error Code from Metadata")
-	s.Require().Nil(metadata, "metadata was not Nil when error is ErrUnavailable")
+	s.Require().Nil(metadata,
+		"metadata was not Nil when error is ErrUnavailable")
 }
 
 func (s *storeTests) TestGetExtKeyInfoOK() {
@@ -348,7 +357,8 @@ WHERE key = ?`, s.bls.keyspace)
 	_, err := s.bls.GetExtKeyInfo(unitTestEtherCtx, []byte(testKey))
 	s.Require().Error(err, "GetExtKeyInfo did not return error")
 	verr, ok := err.(*Error)
-	s.Require().Equal(true, ok, fmt.Sprintf("Error from GetExtKeyInfo is of type %T", err))
+	s.Require().Equal(true, ok,
+		fmt.Sprintf("Error from GetExtKeyInfo is of type %T", err))
 	s.Require().Equal(ErrKeyNotFound, verr.Code,
 		"Invalid Error Code %d from GetExtKeyInfo", verr.Code)
 }

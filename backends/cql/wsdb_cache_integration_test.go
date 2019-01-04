@@ -40,8 +40,8 @@ func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 
 	suite.cache = cwsdb.cache
 
-	err = nwsdb.CreateWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName, NullSpaceName,
-		WorkspaceNonceInvalid, []byte(nil))
+	err = nwsdb.CreateWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
+		NullSpaceName, WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{
@@ -99,11 +99,9 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteImmutableSet() {
 }
 
 func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
-	_, _, err := suite.common.db.BranchWorkspace(integTestEtherCtx, NullSpaceName,
-		NullSpaceName, NullSpaceName,
-		"ts1", "ns1", "ws1")
-	suite.Require().NoError(err,
-		"Error branching null workspace: %v", err)
+	_, _, err := suite.common.db.BranchWorkspace(integTestEtherCtx,
+		NullSpaceName, NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
+	suite.Require().NoError(err, "Error branching null workspace: %v", err)
 
 	count, err1 := suite.common.db.NumTypespaces(integTestEtherCtx)
 	suite.Require().NoError(err1,
@@ -112,9 +110,9 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
 		"Unexpected count of typespaces. Exp: 2 Actual: %d",
 		count)
 
-	delErr := suite.common.db.DeleteWorkspace(integTestEtherCtx, "ts1", "ns1", "ws1")
-	suite.Require().NoError(delErr,
-		"Error DeleteWorkspace: %v", delErr)
+	delErr := suite.common.db.DeleteWorkspace(integTestEtherCtx,
+		"ts1", "ns1", "ws1")
+	suite.Require().NoError(delErr, "Error DeleteWorkspace: %v", delErr)
 
 	count, err1 = suite.common.db.NumTypespaces(integTestEtherCtx)
 	suite.Require().NoError(err1,
@@ -276,11 +274,13 @@ func countListChecker(c *testCtx, db WorkspaceDB, w *wsdata) error {
 				return err
 			}
 			if len(l) == 0 {
-				return fmt.Errorf("Found empty list for TypespaceList")
+				return fmt.Errorf("Found empty list for " +
+					"TypespaceList")
 			}
 			if !listEqual(w.m[allTypespaces], l) {
 				return fmt.Errorf("Mismatched list of Typespaces: "+
-					"expected: %v actual: %v", w.m[allTypespaces], l)
+					"expected: %v actual: %v",
+					w.m[allTypespaces], l)
 			}
 			testLog(c, "TypespaceList %s", l)
 		case 1:
@@ -289,11 +289,13 @@ func countListChecker(c *testCtx, db WorkspaceDB, w *wsdata) error {
 				return err
 			}
 			if len(l) == 0 {
-				return fmt.Errorf("Found empty list for NamespaceList(%s)", ts)
+				return fmt.Errorf("Found empty list for "+
+					"NamespaceList(%s)", ts)
 			}
 			if !listEqual(w.m[ts], l) {
-				return fmt.Errorf("Mistmatch list of Namespaces(%s): "+
-					"expected: %v actual: %v", ts, w.m[ts], l)
+				return fmt.Errorf("Mistmatch list of "+
+					"Namespaces(%s): expected: %v actual: %v",
+					ts, w.m[ts], l)
 			}
 			testLog(c, "NamespaceList(%s) %s", ts, l)
 		case 2:
@@ -302,21 +304,22 @@ func countListChecker(c *testCtx, db WorkspaceDB, w *wsdata) error {
 				return err
 			}
 			if len(m) == 0 {
-				return fmt.Errorf("Found empty map for WorkspaceList(%s/%s)",
-					ts, ns)
+				return fmt.Errorf("Found empty map for "+
+					"WorkspaceList(%s/%s)", ts, ns)
 			}
 			wslist := make([]string, 0)
 			for w, n := range m {
 				if n == WorkspaceNonceInvalid {
-					return fmt.Errorf("Found 0 nonce for Workspace(%s/%s/%s)",
-						ts, ns, w)
+					return fmt.Errorf("Found 0 nonce for "+
+						"Workspace(%s/%s/%s)", ts, ns, w)
 				}
 				wslist = append(wslist, w)
 			}
 			key := ts + "/" + ns
 			if !listEqual(w.m[key], wslist) {
-				return fmt.Errorf("Mismatch list of Workspaces(%s): "+
-					"expected: %v actual: %v", key, w.m[key], wslist)
+				return fmt.Errorf("Mismatch list of "+
+					"Workspaces(%s): expected: %v actual: %v",
+					key, w.m[key], wslist)
 			}
 			testLog(c, "WorkspaceList(%s/%s) %v", ts, ns, m)
 		case 3:
@@ -325,7 +328,8 @@ func countListChecker(c *testCtx, db WorkspaceDB, w *wsdata) error {
 				return err
 			}
 			if count == 0 {
-				return fmt.Errorf("Found zero count for NumTypespaces")
+				return fmt.Errorf("Found zero count for " +
+					"NumTypespaces")
 			}
 			testLog(c, "NumTypespaces %d", count)
 		case 4:
@@ -334,7 +338,8 @@ func countListChecker(c *testCtx, db WorkspaceDB, w *wsdata) error {
 				return err
 			}
 			if count == 0 {
-				return fmt.Errorf("Found zero count for NumNamespaces(%s)", ts)
+				return fmt.Errorf("Found zero count for "+
+					"NumNamespaces(%s)", ts)
 			}
 			testLog(c, "NumNamespaces(%s) %d", ts, count)
 		case 5:
@@ -343,8 +348,8 @@ func countListChecker(c *testCtx, db WorkspaceDB, w *wsdata) error {
 				return err
 			}
 			if count == 0 {
-				return fmt.Errorf("Found zero count for NumWorkspaces(%s/%s)",
-					ts, ns)
+				return fmt.Errorf("Found zero count for "+
+					"NumWorkspaces(%s/%s)", ts, ns)
 			}
 			testLog(c, "NumWorkspaces(%s/%s) %d", ts, ns, count)
 		}

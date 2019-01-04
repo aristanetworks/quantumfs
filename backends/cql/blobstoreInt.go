@@ -1,9 +1,9 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// Package blobstore provides an interface for a key-value store where the key is typically
-// content hash. A backend data store (eg: filesystem, CQL based store etc) can implement the
-// blobstore interface. It assumes that a given key refers to an
+// Package blobstore provides an interface for a key-value store where the key is
+// typically content hash. A backend data store (eg: filesystem, CQL based store etc)
+// can implement the blobstore interface. It assumes that a given key refers to an
 // unique value and clients do not provide multiple values for the same key. It also
 // stores meta data for the blobs which are passed back and forth as a map of name
 // and value pairs. The blobstore makes no assumptions about the data and metadata
@@ -12,34 +12,36 @@ package cql
 
 import ()
 
+/*
 // BSErrorCode are integer codes for error responses from cql/blobstore package
 type BSErrorCode int
 
-// // Different error code exported by blobstore package
-// const (
-// 	ErrReserved              BSErrorCode = iota // Reserved since 0
-// 	ErrOperationFailed       BSErrorCode = iota // The specific operation failed
-// 	ErrBlobStoreDown         BSErrorCode = iota // The blobstore could not be reached
-// 	ErrBlobStoreInconsistent BSErrorCode = iota // The blobstore has an internal error
-// 	ErrBadArguments          BSErrorCode = iota // The passed arguments are incorrect
-// 	ErrKeyNotFound           BSErrorCode = iota // The key and associated value was not found
-// )
+// Different error code exported by blobstore package
+const (
+	ErrReserved              BSErrorCode = iota // Reserved since 0
+	ErrOperationFailed       BSErrorCode = iota // The specific operation failed
+	ErrBlobStoreDown         BSErrorCode = iota // bs could not be reached
+	ErrBlobStoreInconsistent BSErrorCode = iota // bs has an internal error
+	ErrBadArguments          BSErrorCode = iota // arguments are incorrect
+	ErrKeyNotFound           BSErrorCode = iota // key and value was not found
+)
 
-// Error implements error interface and encapsulates the error returned by cql/blobstore
-// package's APIs
-// type Error struct {
-// 	Code ErrorCode // This can be used as a sentinal value
-// 	Msg  string      // This is for human eyes only
-// }
+// Error implements error interface and encapsulates the error returned by
+// cql/blobstore package's APIs
+type Error struct {
+	Code ErrorCode // This can be used as a sentinal value
+	Msg  string    // This is for human eyes only
+}
 
-// func (err Error) Error() string {
-// 	return fmt.Sprintf("blobstore.Error %d (%s)", err.Code, err.Msg)
-// }
+func (err Error) Error() string {
+	return fmt.Sprintf("blobstore.Error %d (%s)", err.Code, err.Msg)
+}
 
-// // NewError returns a new error
-// func NewError(code ErrorCode, msg string, a ...interface{}) error {
-// 	return &Error{Code: code, Msg: fmt.Sprintf(msg, a...)}
-// }
+// NewError returns a new error
+func NewError(code ErrorCode, msg string, a ...interface{}) error {
+	return &Error{Code: code, Msg: fmt.Sprintf(msg, a...)}
+}
+*/
 
 // BlobStore interface
 type BlobStore interface {

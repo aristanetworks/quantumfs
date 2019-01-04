@@ -75,7 +75,7 @@ func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegSetWorkspaceImmutable() 
 	suite.common.TestIntegSetWorkspaceImmutable()
 }
 
-func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegSetWorkspaceImmutableError() {
+func (suite *wsdbNoCacheIntegTestSuite) TestNoCacheIntegSetWorkspaceImmutableErr() {
 	suite.common.TestIntegSetWorkspaceImmutableError()
 }
 

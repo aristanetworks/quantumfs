@@ -42,20 +42,24 @@ func DoTableOp(sess *gocql.Session, op SchemaOp,
 		ddls = []string{
 			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s"+
 				" ( key blob PRIMARY KEY, value blob )"+
-				" WITH compaction = { 'class': 'LeveledCompactionStrategy' };",
+				" WITH compaction = "+
+				" { 'class': 'LeveledCompactionStrategy' };",
 				keyspace, bsName),
 			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s"+
 				" ( typespace text, namespace text,"+
 				" workspace text, key blob, nonce bigint,"+
 				" publishtime bigint, immutable boolean,"+
 				" PRIMARY KEY ( typespace, namespace, workspace ))"+
-				" WITH compaction = { 'class': 'LeveledCompactionStrategy' };",
+				" WITH compaction = "+
+				"{ 'class': 'LeveledCompactionStrategy' };",
 				wsdbKeySpace(keyspace), wsdbName),
 		}
 	} else {
 		ddls = []string{
-			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s", keyspace, bsName),
-			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s", wsdbKeySpace(keyspace), wsdbName),
+			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s",
+				keyspace, bsName),
+			fmt.Sprintf("DROP TABLE IF EXISTS %s.%s",
+				wsdbKeySpace(keyspace), wsdbName),
 		}
 	}
 
@@ -92,7 +96,8 @@ func DoTestSchemaOp(confFile string, op SchemaOp) error {
 	realc := c.(*RealCluster)
 	sess, serr := realc.cluster.CreateSession()
 	if serr != nil {
-		return fmt.Errorf("error in creating session in DoTestSchemaOp: %s", serr.Error())
+		return fmt.Errorf("error in creating session in DoTestSchemaOp: %s",
+			serr.Error())
 	}
 	defer sess.Close()
 
@@ -114,30 +119,37 @@ func SetupIntegTestKeyspace(confFile string) error {
 	realc := c.(*RealCluster)
 	sess, serr := realc.cluster.CreateSession()
 	if serr != nil {
-		return fmt.Errorf("error in creating session in DoTestSchemaOp: %s", serr.Error())
+		return fmt.Errorf("error in creating session in DoTestSchemaOp: %s",
+			serr.Error())
 	}
 	defer sess.Close()
 
-	queryStr := fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = "+
-		"{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }", cfg.Cluster.KeySpace)
+	queryStr :=
+		fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = "+
+			"{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }",
+			cfg.Cluster.KeySpace)
 
 	query := sess.Query(queryStr)
 	err = utils.ExecWithRetry(query, schemaRetries)
 
 	if err != nil {
-		return fmt.Errorf("error in creating keyspace %s: %s", cfg.Cluster.KeySpace, err.Error())
+		return fmt.Errorf("error in creating keyspace %s: %s",
+			cfg.Cluster.KeySpace, err.Error())
 	}
 
 	// workspacedb keyspace
 	keyspace := wsdbKeySpace(cfg.Cluster.KeySpace)
-	queryStr = fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = "+
-		"{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }", keyspace)
+	queryStr =
+		fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = "+
+			"{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }",
+			keyspace)
 
 	query = sess.Query(queryStr)
 	err = utils.ExecWithRetry(query, schemaRetries)
 
 	if err != nil {
-		return fmt.Errorf("error in creating keyspace %s: %s", keyspace, err.Error())
+		return fmt.Errorf("error in creating keyspace %s: %s",
+			keyspace, err.Error())
 	}
 
 	return nil

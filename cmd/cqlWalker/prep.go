@@ -101,8 +101,8 @@ func walkHelper(c *Ctx,
 	if rootIDStatus {
 		defer func() {
 			if err != nil {
-				err = fmt.Errorf("Walk failed at rootID: %s error: %v",
-					rootID.String(), err)
+				err = fmt.Errorf("Walk failed at rootID: %s "+
+					"error: %v", rootID.String(), err)
 			} else {
 				fmt.Printf("Walk success at rootID: %s\n",
 					rootID.String())

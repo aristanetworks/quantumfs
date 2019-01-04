@@ -36,7 +36,8 @@ func SSHConnect(user string, ip string, port int, auth ssh.AuthMethod,
 	sshConfig := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{auth},
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		HostKeyCallback: func(hostname string, remote net.Addr,
+			key ssh.PublicKey) error {
 			return nil
 		},
 		Timeout: timeout,

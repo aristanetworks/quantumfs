@@ -54,14 +54,14 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 	if err != nil {
 		c.elog("InfluxDB %s=%s %s/%s/%s (%s) iteration=%d "+
 			"walkSuccess=%v walkErrMsg=(%q) InfluxErr:%s\n",
-			measurement, dur.String(), w.ts, w.ns, w.ws, w.rootID, c.iteration,
-			pass, walkErr, err.Error())
+			measurement, dur.String(), w.ts, w.ns, w.ws, w.rootID,
+			c.iteration, pass, walkErr, err.Error())
 		return
 	}
 	c.vlog("%s InfluxDB %s=%s "+"%s/%s/%s (%s) iteration=%d walkSuccess=%v "+
 		"walkErrMsg=%s \n",
-		successPrefix, measurement, dur.String(), w.ts, w.ns, w.ws, w.rootID, c.iteration,
-		pass, walkErr)
+		successPrefix, measurement, dur.String(), w.ts, w.ns, w.ws, w.rootID,
+		c.iteration, pass, walkErr)
 }
 
 // AddPointWalkerIteration is a measurement point writer
@@ -91,12 +91,13 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration) {
 	if err != nil {
 		c.elog("InfluxDB %s=%s iteration=%d numSuccess=%d numError=%d "+
 			"InfluxErr: %s\n",
-			measurement, dur.String(), c.iteration, c.numSuccess, c.numError,
-			err.Error())
+			measurement, dur.String(), c.iteration, c.numSuccess,
+			c.numError, err.Error())
 		return
 	}
 	c.vlog("%s InfluxDB %s=%s iteration=%d numSuccess=%d numError=%d\n",
-		successPrefix, measurement, dur.String(), c.iteration, c.numSuccess, c.numError)
+		successPrefix, measurement, dur.String(), c.iteration, c.numSuccess,
+		c.numError)
 }
 
 // Write point to indicate that walker is alive.
@@ -131,14 +132,15 @@ func AddPointWalkerHeartBeat(c *Ctx) {
 
 	err := c.WriteStatPoint(measurement, tags, fields)
 	if err != nil {
-		c.elog("InfluxDB %s aliveCount=%d iteration=%d numSuccess=%d numError=%d "+
-			"skipMapLen=%d skipLRULen=%d InfluxErr=%s\n",
-			successPrefix, measurement, c.aliveCount, c.iteration, c.numSuccess, c.numError,
-			skipMapLen, skipLRULen, err.Error())
+		c.elog("InfluxDB %s aliveCount=%d iteration=%d numSuccess=%d "+
+			"numError=%d skipMapLen=%d skipLRULen=%d InfluxErr=%s\n",
+			successPrefix, measurement, c.aliveCount, c.iteration,
+			c.numSuccess, c.numError, skipMapLen, skipLRULen,
+			err.Error())
 		return
 	}
-	c.vlog("%s InfluxDB %s aliveCount=%d iteration=%d numSuccess=%d numError=%d "+
-		"skipMapLen=%d skipLRULen=%d\n",
-		successPrefix, measurement, c.aliveCount, c.iteration, c.numSuccess, c.numError,
-		skipMapLen, skipLRULen)
+	c.vlog("%s InfluxDB %s aliveCount=%d iteration=%d numSuccess=%d "+
+		"numError=%d skipMapLen=%d skipLRULen=%d\n",
+		successPrefix, measurement, c.aliveCount, c.iteration, c.numSuccess,
+		c.numError, skipMapLen, skipLRULen)
 }

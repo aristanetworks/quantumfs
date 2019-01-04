@@ -11,7 +11,8 @@ import (
 	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 )
 
-var usageTemplate = `qubit-walkercmd is a tool that walks a workspace and runs command on keys found.
+var usageTemplate = `
+qubit-walkercmd is a tool that walks a workspace and runs command on keys found.
 
 Version: {{.CommonUsageInfo.Version}}
 
@@ -29,7 +30,9 @@ Use "qubit-walkercmd help [command]" for more information about a command.
 
 `
 
-var helpTemplate = `usage: qubit-walkercmd {{.CommonUsageInfo.Usage}} {{.CommandHelpInfo.Name}} {{.CommandHelpInfo.Usage}}
+var helpTemplate = `
+usage: qubit-walkercmd {{.CommonUsageInfo.Usage}} {{.CommandHelpInfo.Name}} 
+                       {{.CommandHelpInfo.Usage}}
 
 {{.CommandHelpInfo.Short}}
 
@@ -63,7 +66,8 @@ func setupTemplates() {
 		ExplainExitCodes: nil, // no utility specific explanation
 	}
 
-	usageTmpl := template.Must(template.New("usageTemplate").Parse(usageTemplate))
+	usageTmpl := template.Must(template.New("usageTemplate").
+		Parse(usageTemplate))
 	helpTmpl := template.Must(template.New("helpTemplate").Parse(helpTemplate))
 
 	cmdproc.RegisterTemplateInfo(commonInfo, usageTmpl, helpTmpl)

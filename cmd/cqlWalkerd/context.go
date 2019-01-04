@@ -65,7 +65,8 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 	if influxServer == "" {
 		influx, err = influxlib.Connect(nil)
 		if err != nil {
-			fmt.Printf("Unable to connect to default influxDB err:%v\n", err)
+			fmt.Printf("Unable to connect to default influxDB err:%v\n",
+				err)
 			os.Exit(exitMiscError)
 		}
 	} else {
@@ -76,7 +77,8 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 
 		influx, err = influxlib.Connect(influxConfig)
 		if err != nil {
-			fmt.Printf("Unable to connect to influxDB at addr %v:%v and db:%v err:%v\n",
+			fmt.Printf("Unable to connect to influxDB at addr "+
+				"%v:%v and db:%v err:%v\n",
 				influxServer, influxPort, influxDBName, err)
 			os.Exit(exitBadConfig)
 		}
@@ -130,7 +132,8 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 		}
 
 	} else {
-		quantumfsWSDB, err = backends.ConnectWorkspaceDB("ether.cql", etherCfgFile)
+		quantumfsWSDB, err = backends.ConnectWorkspaceDB("ether.cql",
+			etherCfgFile)
 		if err != nil {
 			fmt.Printf("Connection to workspaceDB failed err: %v\n", err)
 			os.Exit(exitBadConfig)
