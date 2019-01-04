@@ -132,7 +132,6 @@ $(PKGS_TO_TEST): encoding/metadata.capnp.go backends/grpc/rpc/rpc.pb.go
 $(TEST_PKGS_TO_COMPILE):
 	sudo -E go test -c -tags longrunningtests -gcflags '-e' github.com/aristanetworks/$@ -o longrunningcql.test
 
-
 check-fpm:
 	fpm --help &> /dev/null || \
 	(echo "Installing fpm" && \
