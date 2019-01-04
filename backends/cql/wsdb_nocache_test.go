@@ -24,7 +24,7 @@ func (suite *wsdbNoCacheTestSuite) SetupTest() {
 	mockSession := new(MockSession)
 	mockSession.On("Close").Return(nil)
 	mockCluster.On("CreateSession").Return(mockSession, nil)
-	mockSchemaOk(mockSession, "etherwsdb", "workspacedb", nil)
+	mockSchemaOk(mockSession, "cqlwsdb", "workspacedb", nil)
 
 	mockCfg := setupMockConfig()
 	wsdb, err := newNoCacheWsdb(mockCluster, mockCfg)

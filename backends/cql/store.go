@@ -8,8 +8,8 @@ import (
 	"sync"
 )
 
-var scyllaUsername = "ether"
-var scyllaPassword = "ether"
+var scyllaUsername = "cql"
+var scyllaPassword = "cql"
 
 // Config struct holds the info needed to connect to a cql cluster
 // and knobs for the different APIs
@@ -69,7 +69,7 @@ type cqlStore struct {
 }
 
 // Note: This routine is called by Init/New APIs
-//       in Ether and only one global initialization is done.
+//       in Cql and only one global initialization is done.
 
 // TBD: Need more investigation to see which parts of the
 //      config can be dynamically updated

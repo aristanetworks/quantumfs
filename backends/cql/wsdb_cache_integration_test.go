@@ -27,8 +27,8 @@ type wsdbCacheIntegTestSuite struct {
 }
 
 func (suite *wsdbCacheIntegTestSuite) SetupTest() {
-	confFile, err := EtherConfFile()
-	suite.Require().NoError(err, "error in getting ether configuration file")
+	confFile, err := CqlConfFile()
+	suite.Require().NoError(err, "error in getting cql configuration file")
 	err = SetupIntegTestKeyspace(confFile)
 	suite.Require().NoError(err, "SetupIntegTestKeyspace returned an error")
 	err = DoTestSchemaOp(confFile, SchemaCreate)
@@ -40,7 +40,7 @@ func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 
 	suite.cache = cwsdb.cache
 
-	err = nwsdb.CreateWorkspace(integTestEtherCtx, NullSpaceName, NullSpaceName,
+	err = nwsdb.CreateWorkspace(integTestCqlCtx, NullSpaceName, NullSpaceName,
 		NullSpaceName, WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
@@ -99,22 +99,22 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteImmutableSet() {
 }
 
 func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
-	_, _, err := suite.common.db.BranchWorkspace(integTestEtherCtx,
+	_, _, err := suite.common.db.BranchWorkspace(integTestCqlCtx,
 		NullSpaceName, NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err, "Error branching null workspace: %v", err)
 
-	count, err1 := suite.common.db.NumTypespaces(integTestEtherCtx)
+	count, err1 := suite.common.db.NumTypespaces(integTestCqlCtx)
 	suite.Require().NoError(err1,
 		"Error NumTypespaces: %v", err1)
 	suite.Require().Equal(2, count,
 		"Unexpected count of typespaces. Exp: 2 Actual: %d",
 		count)
 
-	delErr := suite.common.db.DeleteWorkspace(integTestEtherCtx,
+	delErr := suite.common.db.DeleteWorkspace(integTestCqlCtx,
 		"ts1", "ns1", "ws1")
 	suite.Require().NoError(delErr, "Error DeleteWorkspace: %v", delErr)
 
-	count, err1 = suite.common.db.NumTypespaces(integTestEtherCtx)
+	count, err1 = suite.common.db.NumTypespaces(integTestCqlCtx)
 	suite.Require().NoError(err1,
 		"Error NumTypespaces: %v", err1)
 	suite.Require().Equal(1, count,
@@ -137,10 +137,10 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheListCountMixer() {
 	testData := getWorkspaceTestData(5, 5, 5)
 
 	testDuration := 2 * time.Minute
-	err := loadWorkspaceData(integTestEtherCtx, suite.common.db, testData)
+	err := loadWorkspaceData(integTestCqlCtx, suite.common.db, testData)
 	suite.Require().NoError(err, "Error %s during loadWorkspaceData", err)
 
-	emptyCache(integTestEtherCtx, suite.cache, testData)
+	emptyCache(integTestCqlCtx, suite.cache, testData)
 
 	testTimeCtx, cancel := context.WithTimeout(context.Background(),
 		testDuration)
@@ -394,8 +394,8 @@ func ignoreDeadlineExceeded(c *testCtx) error {
 }
 
 func (suite *wsdbCacheIntegTestSuite) TearDownTest() {
-	confFile, err := EtherConfFile()
-	suite.Require().NoError(err, "error in getting ether configuration file")
+	confFile, err := CqlConfFile()
+	suite.Require().NoError(err, "error in getting cql configuration file")
 	_ = DoTestSchemaOp(confFile, SchemaDelete)
 	resetCqlStore()
 }

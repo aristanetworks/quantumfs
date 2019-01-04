@@ -20,7 +20,7 @@ import (
 
 func (t *testHelper) testCtx() *Ctx {
 	datastore := t.GetDataStore()
-	translator := datastore.(*cql.EtherBlobStoreTranslator)
+	translator := datastore.(*cql.CqlBlobStoreTranslator)
 
 	return &Ctx{
 		qctx:  t.QfsCtx(),

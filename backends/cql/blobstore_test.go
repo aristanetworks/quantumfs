@@ -33,7 +33,7 @@ func (s *storeTests) SetupTest() {
 	mocksession := &MockSession{}
 	mocksession.On("Close").Return()
 	mockcc.On("CreateSession").Return(mocksession, nil)
-	mockSchemaOk(mocksession, "ether", "blobStore", nil)
+	mockSchemaOk(mocksession, "cql", "blobStore", nil)
 
 	mockCfg := &Config{
 		Cluster: ClusterConfig{
@@ -123,7 +123,7 @@ USING TTL %s`, s.bls.keyspace, "0")
 
 	mockquery.On("Exec").Return(nil)
 	mocksession.On("Close").Return()
-	err := s.bls.Insert(unitTestEtherCtx, []byte(testKey), []byte(testValue),
+	err := s.bls.Insert(unitTestCqlCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 
 	s.Require().NoError(err, "Insert returned an error")
@@ -144,7 +144,7 @@ USING TTL %s`, s.bls.keyspace, "0")
 	errVal := errors.New("Some random error")
 	mockquery.On("Exec").Return(errVal)
 
-	err := s.bls.Insert(unitTestEtherCtx, []byte(testKey), []byte(testValue),
+	err := s.bls.Insert(unitTestCqlCtx, []byte(testKey), []byte(testValue),
 		map[string]string{TimeToLive: "0"})
 	s.Require().Error(err, "Insert returned incorrect ErrorCode")
 
@@ -167,7 +167,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*[]uint8"),
 		mock.AnythingOfType("*int")).Return(nil)
 
-	_, metadata, err := s.bls.Get(unitTestEtherCtx, []byte(testKey))
+	_, metadata, err := s.bls.Get(unitTestCqlCtx, []byte(testKey))
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -187,7 +187,7 @@ WHERE key = ?`, s.bls.keyspace)
 		mock.AnythingOfType("*int")).Return(gocql.ErrNotFound)
 
 	// Verify return value for a non existent key
-	value, metadata, err := s.bls.Get(unitTestEtherCtx, []byte(unknownKey))
+	value, metadata, err := s.bls.Get(unitTestCqlCtx, []byte(unknownKey))
 	s.Require().Error(err, "Get returned nil error on failure")
 	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
@@ -210,7 +210,7 @@ WHERE key = ?`, s.bls.keyspace)
 		mock.AnythingOfType("*int")).Return(gocql.ErrUnavailable)
 
 	// Verify return value for a non existent key
-	value, metadata, err := s.bls.Get(unitTestEtherCtx, []byte(unknownKey))
+	value, metadata, err := s.bls.Get(unitTestCqlCtx, []byte(unknownKey))
 	s.Require().Error(err, "Get returned nil error on failure")
 	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
@@ -238,7 +238,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*[]uint8"),
 		mock.AnythingOfType("*int")).Return(readMockTTL)
 
-	_, metadata, err := s.bls.Get(unitTestEtherCtx, []byte(testKey))
+	_, metadata, err := s.bls.Get(unitTestCqlCtx, []byte(testKey))
 	s.Require().NoError(err, "Get returned an error")
 	s.Require().NotNil(metadata, "Get returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -263,7 +263,7 @@ WHERE key = ?`, s.bls.keyspace)
 	}
 	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(readMockTTL)
 
-	metadata, err := s.bls.Metadata(unitTestEtherCtx, []byte(testKey))
+	metadata, err := s.bls.Metadata(unitTestCqlCtx, []byte(testKey))
 	s.Require().NoError(err, "Metadata returned an error")
 	s.Require().NotNil(metadata, "Metadata returned incorrect metadata")
 	s.Require().Contains(metadata, TimeToLive,
@@ -283,7 +283,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*int")).Return(gocql.ErrNotFound)
 
 	// Verify return value for a non existent key
-	metadata, err := s.bls.Metadata(unitTestEtherCtx, []byte(unknownKey))
+	metadata, err := s.bls.Metadata(unitTestCqlCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata returned nil error on failure")
 	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T",
@@ -305,7 +305,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*int")).
 		Return(gocql.ErrUnavailable)
 
-	metadata, err := s.bls.Metadata(unitTestEtherCtx, []byte(unknownKey))
+	metadata, err := s.bls.Metadata(unitTestCqlCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata returned nil error on failure")
 	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T",
@@ -337,7 +337,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*int"),
 		mock.AnythingOfType("*int64")).Return(readMockData)
 
-	info, err := s.bls.GetExtKeyInfo(unitTestEtherCtx, []byte(testKey))
+	info, err := s.bls.GetExtKeyInfo(unitTestCqlCtx, []byte(testKey))
 	s.Require().NoError(err, "GetExtKeyInfo returned error %s on failure", err)
 	s.Require().Equal(ttl, info.TTL, "TTL mismatch")
 	s.Require().Equal(secs, info.WriteTime.Unix(), "WriteTime mismatch")
@@ -354,7 +354,7 @@ WHERE key = ?`, s.bls.keyspace)
 	mockquery.On("Scan", mock.AnythingOfType("*int"),
 		mock.AnythingOfType("*int64")).Return(gocql.ErrNotFound)
 
-	_, err := s.bls.GetExtKeyInfo(unitTestEtherCtx, []byte(testKey))
+	_, err := s.bls.GetExtKeyInfo(unitTestCqlCtx, []byte(testKey))
 	s.Require().Error(err, "GetExtKeyInfo did not return error")
 	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok,
@@ -373,11 +373,11 @@ func (s *storeTests) TestSchemaCheckNoAppSchemaV2() {
 	mockcc.On("CreateSession").Return(mocksession, nil)
 	// mock a scenario where the blobstore table does
 	// not exist yet (race)
-	mockSchemaCheckV2Schema(mocksession, "ether", "blobstore", 0, nil)
+	mockSchemaCheckV2Schema(mocksession, "cql", "blobstore", 0, nil)
 	// since app schema doesn't exist in v2 system tables,
 	// v3 system tables should not be checked
 	v3err := errors.New("v3 system tables checked")
-	mockSchemaCheckV3Schema(mocksession, "ether", "blobstore", 0, v3err)
+	mockSchemaCheckV3Schema(mocksession, "cql", "blobstore", 0, v3err)
 
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when no blobstore table")
@@ -395,12 +395,12 @@ func (s *storeTests) TestSchemaCheckBadPermsV2() {
 
 	// mock a scenario where the blobstore table does
 	// not have proper perms (race)
-	mockSchemaCheckV2Schema(mocksession, "ether", "blobstore", 1, nil)
-	mockSchemaCheckV2Perms(mocksession, "ether", "blobstore", nil, nil)
+	mockSchemaCheckV2Schema(mocksession, "cql", "blobstore", 1, nil)
+	mockSchemaCheckV2Perms(mocksession, "cql", "blobstore", nil, nil)
 	// since app perms are bad in v2 system tables,
 	// v3 system tables should not be checked
 	v3err := errors.New("v3 system tables checked")
-	mockSchemaCheckV3Schema(mocksession, "ether", "blobstore", 0, v3err)
+	mockSchemaCheckV3Schema(mocksession, "cql", "blobstore", 0, v3err)
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when no perms")
 	s.Contains(err.Error(), unexpectedAppPermsErr.Error())
@@ -418,9 +418,9 @@ func (s *storeTests) TestSchemaCheckNoAppSchemaV3() {
 	// mock a scenario where the blobstore table does
 	// not exist yet (race)
 	// force the check to move to next version
-	mockSchemaCheckV2Schema(mocksession, "ether", "blobstore", 0,
+	mockSchemaCheckV2Schema(mocksession, "cql", "blobstore", 0,
 		errors.New("v2 system tables not found"))
-	mockSchemaCheckV3Schema(mocksession, "ether", "blobstore", 0, nil)
+	mockSchemaCheckV3Schema(mocksession, "cql", "blobstore", 0, nil)
 
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when no blobstore table")
@@ -438,10 +438,10 @@ func (s *storeTests) TestSchemaCheckBadPermsV3() {
 
 	// mock a scenario where the blobstore table does
 	// not have proper perms (race)
-	mockSchemaCheckV2Schema(mocksession, "ether", "blobstore", 0,
+	mockSchemaCheckV2Schema(mocksession, "cql", "blobstore", 0,
 		errors.New("v2 system tables not found"))
-	mockSchemaCheckV3Schema(mocksession, "ether", "blobstore", 1, nil)
-	mockSchemaCheckV3Perms(mocksession, "ether", "blobstore", nil, nil)
+	mockSchemaCheckV3Schema(mocksession, "cql", "blobstore", 1, nil)
+	mockSchemaCheckV3Perms(mocksession, "cql", "blobstore", nil, nil)
 
 	_, err := newCqlBS(mockcc, s.cfg)
 	s.Require().Error(err, "newCqlBS passed even when no perms")

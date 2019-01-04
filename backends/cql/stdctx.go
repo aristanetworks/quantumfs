@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-// StdCtx is the default Ctx provided by Ether library.
-// Ether clients can either have custom implementation of Ctx or
+// StdCtx is the default Ctx provided by cql package.
+// Cql clients can either have custom implementation of Ctx or
 // use StdCtx. It logs to standard out based on the logging level.
 type StdCtx struct {
 	RequestID uint64
 }
 
-// DefaultCtx is a StdCtx usable by Ether clients which need one StdCtx
+// DefaultCtx is a StdCtx usable by Cql clients which need one StdCtx
 var DefaultCtx = &StdCtx{RequestID: 0}
 
 // LogLevel represents a log level for use by StdCtx

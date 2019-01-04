@@ -72,7 +72,7 @@ func main() {
 
 	walkFlags = flag.NewFlagSet("Walker daemon", flag.ExitOnError)
 
-	etherCfg := walkFlags.String("etherCfg", "",
+	cqlCfg := walkFlags.String("cqlCfg", "",
 		"datastore and workspacedb config file")
 	wsdbCfg := walkFlags.String("wsdbCfg", "", "workspacedb config")
 	logdir := walkFlags.String("logdir", "", "dir for logging")
@@ -105,8 +105,8 @@ func main() {
 
 	walkFlags.Usage = func() {
 		fmt.Println("qubit-walkerd version", version)
-		fmt.Println("usage: qubit-walkerd -name <name> -etherCfg " +
-			"<etherCfg> [-wsdbCfg <wsdb service name>] [-logdir dir]")
+		fmt.Println("usage: qubit-walkerd -name <name> -cqlCfg " +
+			"<cqlCfg> [-wsdbCfg <wsdb service name>] [-logdir dir]")
 		fmt.Println("                [-numWalkers num] [-skipSeenKeys]" +
 			" [-wsPrefixMatch prefix] [-negWsPrefixMatch]" +
 			" [-skipWsWrittenWithin duration]")
@@ -133,13 +133,13 @@ func main() {
 
 	matcher := getPrefixMatcher(*prefix, *negPrefixMatch)
 
-	if *etherCfg == "" {
+	if *cqlCfg == "" {
 		walkFlags.Usage()
 		os.Exit(exitBadConfig)
 	}
 
 	c := getWalkerDaemonContext(*name, *timeSeriesDB, *timeSeriesDBConf,
-		*etherCfg, *wsdbCfg, *logdir, *numWalkers, matcher,
+		*cqlCfg, *wsdbCfg, *logdir, *numWalkers, matcher,
 		*lastWriteDuration)
 
 	// Start heart beat messaging.

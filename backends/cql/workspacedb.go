@@ -11,7 +11,7 @@ import (
 )
 
 // ObjectKey is key used to access object in the cluster-wide
-// object store using Ether's BlobStore API
+// object store using Cql's BlobStore API
 type ObjectKey []byte
 
 // WorkspaceNonce is a number used to distinguish between workspaces of the same
@@ -156,7 +156,7 @@ type WorkspaceDB interface {
 	// CreateWorkspace creates typespace/namespace/workspace workspace
 	// with the key as wsKey. There are no checks to see if the workspace
 	// already exists. To be used from only inside init functions of clients of
-	// etherWorkspaceDB.
+	// cqlWorkspaceDB.
 	//
 	// Possible errors are:
 	//  ErrWorkspaceExists

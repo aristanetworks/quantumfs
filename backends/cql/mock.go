@@ -341,7 +341,7 @@ func mockDbTypespaceGet(sess *MockSession, typespace string, err error) {
 
 	sess.On("Query", `
 SELECT typespace
-FROM etherwsdb.workspacedb
+FROM cqlwsdb.workspacedb
 WHERE typespace = ? LIMIT 1`, typespace).Return(query)
 }
 
@@ -354,7 +354,7 @@ func mockDbNamespaceGet(sess *MockSession, typespace string,
 
 	sess.On("Query", `
 SELECT namespace
-FROM etherwsdb.workspacedb
+FROM cqlwsdb.workspacedb
 WHERE typespace = ? AND namespace = ? LIMIT 1`, typespace, namespace).Return(query)
 }
 
@@ -364,7 +364,7 @@ func mockWsdbKeyDel(sess *MockSession, typespace string,
 	query := new(MockQuery)
 	stmt := `
 DELETE
-FROM etherwsdb.workspacedb
+FROM cqlwsdb.workspacedb
 WHERE typespace=? AND namespace=? AND workspace=?`
 	sess.On("Query", stmt,
 		typespace, namespace, workspace).Return(query)
@@ -384,7 +384,7 @@ func mockWsdbWorkspaceLastWriteTime(sess *MockSession, typespace string,
 
 	sess.On("Query", `
 SELECT WRITETIME(key)
-FROM etherwsdb.workspacedb
+FROM cqlwsdb.workspacedb
 WHERE typespace=? AND namespace=? AND workspace=?`,
 		typespace, namespace, workspace).Return(query)
 }
@@ -401,7 +401,7 @@ func mockWsdbKeyGet(sess *MockSession, typespace string,
 
 	sess.On("Query", `
 SELECT key, nonce, publishtime
-FROM etherwsdb.workspacedb
+FROM cqlwsdb.workspacedb
 WHERE typespace = ? AND namespace = ? AND workspace = ?`,
 		typespace, namespace, workspace).Return(query)
 }
@@ -412,7 +412,7 @@ func mockWsdbKeyPut(sess *MockSession, typespace string,
 
 	query := new(MockQuery)
 	stmt := `
-INSERT INTO etherwsdb.workspacedb
+INSERT INTO cqlwsdb.workspacedb
 (typespace, namespace, workspace, key, nonce, publishtime)
 VALUES (?,?,?,?,?,?)`
 
@@ -435,7 +435,7 @@ func mockWsdbImmutableGet(sess *MockSession, typespace string,
 
 	sess.On("Query", `
 SELECT immutable
-FROM etherwsdb.workspacedb
+FROM cqlwsdb.workspacedb
 WHERE typespace = ? AND namespace = ? AND workspace = ?`,
 		typespace, namespace, workspace).Return(query)
 }
@@ -445,7 +445,7 @@ func mockWsdbImmutablePut(sess *MockSession, typespace string,
 
 	query := new(MockQuery)
 	stmt := `
-UPDATE etherwsdb.workspacedb
+UPDATE cqlwsdb.workspacedb
 SET immutable = ?
 WHERE typespace = ? AND namespace = ? AND workspace = ?`
 
@@ -589,22 +589,22 @@ func mockWsdbCacheTypespaceFetchPanic(sess *MockSession) {
 
 	sess.On("Query", `
 SELECT distinct typespace
-FROM etherwsdb.workspacedb`).Return(fetchQuery)
+FROM cqlwsdb.workspacedb`).Return(fetchQuery)
 
 }
 
 const cacheTypespaceFetchQuery = `
 SELECT distinct typespace
-FROM etherwsdb.workspacedb`
+FROM cqlwsdb.workspacedb`
 
 const cacheNamespaceFetchQuery = `
 SELECT namespace
-FROM etherwsdb.workspacedb
+FROM cqlwsdb.workspacedb
 WHERE typespace = ?`
 
 const cacheWorkspaceFetchQuery = `
 SELECT workspace, nonce, publishtime
-FROM etherwsdb.workspacedb
+FROM cqlwsdb.workspacedb
 WHERE typespace = ? AND namespace = ?`
 
 func mockWsdbCacheTypespaceFetch(sess *MockSession,

@@ -139,7 +139,7 @@ func isTypespaceLocked(typespace string) bool {
 	return typespace == NullSpaceName
 }
 
-// CreateWorkspace is exclusively used in the ether adapter to create a
+// CreateWorkspace is exclusively used in the cql adapter to create a
 // _/_/_ workspace.
 func (nc *noCacheWsdb) CreateWorkspace(c Ctx, typespace string, namespace string,
 	workspace string, nonce WorkspaceNonce, wsKey ObjectKey) error {

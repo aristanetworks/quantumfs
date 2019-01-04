@@ -29,6 +29,6 @@ trap cleanup EXIT
 
 # Start the QuantumFS daemon.
 quantumfsd \
-  -datastore ether.cql -datastoreconf $QFSCONFIG \
+  -datastore cql -datastoreconf $QFSCONFIG \
   -workspaceDB grpc -workspaceDBconf $WSDB_ADDR
 

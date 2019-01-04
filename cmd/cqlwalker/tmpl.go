@@ -43,7 +43,7 @@ var commonUsage = `-cfg config [-progress]`
 var commonShort = `Common options are:
 
 -cfg config
-	configuration to access Ether CQL keyspace
+	configuration to access CQL keyspace
 -progress
 	show progress during the workspace walk
 `

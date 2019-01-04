@@ -28,9 +28,9 @@ func (dc *ECtx) Vlog(fmtStr string, args ...interface{}) {
 	(*walker.Ctx)(dc).Qctx.Vlog(qlog.LogDatastore, fmtStr, args...)
 }
 
-type etherFuncOut quantumfs.ExitFuncLog
+type cqlFuncOut quantumfs.ExitFuncLog
 
-func (e etherFuncOut) Out() {
+func (e cqlFuncOut) Out() {
 	(quantumfs.ExitFuncLog)(e).Out()
 }
 
@@ -39,7 +39,7 @@ func (dc *ECtx) FuncIn(funcName string, fmtStr string,
 
 	el := (*walker.Ctx)(dc).Qctx.FuncIn(qlog.LogDatastore, funcName,
 		fmtStr, args...)
-	return (etherFuncOut)(el)
+	return (cqlFuncOut)(el)
 }
 
 func (dc *ECtx) FuncInName(funcName string) cql.FuncOut {

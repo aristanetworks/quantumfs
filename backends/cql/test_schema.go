@@ -167,10 +167,10 @@ func execWithRetry(q *gocql.Query, retries int) error {
 	}
 
 	if err != nil {
-		fmt.Printf("ETHER: Failed after %d attempts query: %q\n", i, q)
+		fmt.Printf("CQL: Failed after %d attempts query: %q\n", i, q)
 	} else {
 		if i > 0 {
-			fmt.Printf("ETHER: Took %d attempts query: %q\n", i+1, q)
+			fmt.Printf("CQL: Took %d attempts query: %q\n", i+1, q)
 		}
 	}
 	return err

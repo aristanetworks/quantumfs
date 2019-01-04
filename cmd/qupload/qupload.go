@@ -104,8 +104,8 @@ usage: qupload -datastore   <dsname>   -datastoreconf <dsconf>
                [ -progress ]
                [ -wsforce ]
 Exmaples:
-1) qupload -datastore ether.cql -datastoreconf etherconf
-           -workspaceDB ether.cql -workspaceDBconf etherconf
+1) qupload -datastore cql -datastoreconf cqlconf
+           -workspaceDB cql -workspaceDBconf cqlconf
            -workspace build/eos-trunk/11223344
            -basedir /var/Abuild/66778899 -exclude excludeFile
 Above command will upload the contents of /var/Abuild/66778899 directory
@@ -113,8 +113,8 @@ to the QFS workspace build/eos-trunk/11223344. The files and directories
 specified by excludeFile are excluded from upload. See below for details about
 the exclude file format.
 
-2) qupload -datastore ether.cql -datastoreconf etherconf
-           -workspaceDB ether.cql -workspaceDBconf etherconf
+2) qupload -datastore cql -datastoreconf cqlconf
+           -workspaceDB cql -workspaceDBconf cqlconf
            -workspace build/eos-trunk/11223344
            -basedir /var/Abuild/66778899 src
 Above command will upload the contents of /var/Abuild/66778899/src directory
@@ -124,8 +124,8 @@ are included since an exclude file is not specified.
 The exclude file specifies paths that must be excluded from upload.
 It is possible to selectively include certain paths from excluded directories.
 
-3) qupload -datastore ether.cql -datastoreconf etherconf
-           -workspaceDB ether.cql -workspaceDBconf etherconf
+3) qupload -datastore cql -datastoreconf cqlconf
+           -workspaceDB cql -workspaceDBconf cqlconf
            -workspace build/eos-trunk/11223344
            -referencews build/eos-trunk/11223300
 Above command will create a new workspace build/eos-trunk/11223344

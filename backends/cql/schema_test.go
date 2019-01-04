@@ -58,7 +58,7 @@ func (s *setupTests) TestValidConfig() {
 	config.Cluster.Nodes = []string{"node1", "node2"}
 	config.WsDB.CacheTimeoutSecs = 99
 
-	file, err := ioutil.TempFile(os.TempDir(), "ether")
+	file, err := ioutil.TempFile(os.TempDir(), "cql")
 	s.Require().NoError(err, "Tempfile creation failed")
 	name := file.Name()
 	file.Close()
@@ -79,7 +79,7 @@ func (s *setupTests) TestInvalidConfigFilePath() {
 
 	config.Cluster.Nodes = []string{"node1", "node2"}
 
-	file, err := ioutil.TempFile(os.TempDir(), "ether")
+	file, err := ioutil.TempFile(os.TempDir(), "cql")
 	s.Require().NoError(err, "Tempfile creation failed")
 	name := file.Name()
 	file.Close()
@@ -100,7 +100,7 @@ func (s *setupTests) TestInvalidConfigFilePerms() {
 
 	config.Cluster.Nodes = []string{"node1", "node2"}
 
-	file, err := ioutil.TempFile(os.TempDir(), "ether")
+	file, err := ioutil.TempFile(os.TempDir(), "cql")
 	s.Require().NoError(err, "Tempfile creation failed")
 	name := file.Name()
 	file.Close()
@@ -124,7 +124,7 @@ func (s *setupTests) TestInvalidConfigFormat() {
 
 	config.Cluster.Nodes = []string{"node1", "node2"}
 
-	file, err := ioutil.TempFile(os.TempDir(), "ether")
+	file, err := ioutil.TempFile(os.TempDir(), "cql")
 	s.Require().NoError(err, "Tempfile creation failed")
 	name := file.Name()
 	file.Close()
