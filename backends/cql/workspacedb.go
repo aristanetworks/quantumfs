@@ -55,7 +55,6 @@ const (
 	// use as a destination typespace in Branch operation.
 	ErrLocked ErrCode = iota
 
-	// BS Errors copied from blobstoreInt.go
 	ErrOperationFailed       ErrCode = iota // The specific operation failed
 	ErrBlobStoreDown         ErrCode = iota // The blobstore could not be reached
 	ErrBlobStoreInconsistent ErrCode = iota // The blobstore has an internal err
@@ -139,16 +138,16 @@ type WorkspaceDB interface {
 
 	// These methods need to be instant, but not necessarily completely up to
 	// date
-	NumTypespaces(c Ctx) (int, error)
-	TypespaceList(c Ctx) ([]string, error)
-	NumNamespaces(c Ctx, typespace string) (int, error)
-	NamespaceList(c Ctx, typespace string) ([]string, error)
-	NumWorkspaces(c Ctx, typespace string, namespace string) (int, error)
-	WorkspaceList(c Ctx, typespace string,
+	NumTypespaces(c ctx) (int, error)
+	TypespaceList(c ctx) ([]string, error)
+	NumNamespaces(c ctx, typespace string) (int, error)
+	NamespaceList(c ctx, typespace string) ([]string, error)
+	NumWorkspaces(c ctx, typespace string, namespace string) (int, error)
+	WorkspaceList(c ctx, typespace string,
 		namespace string) (map[string]WorkspaceNonce, error)
 
 	// These methods need to be up to date
-	Workspace(c Ctx, typespace string, namespace string,
+	Workspace(c ctx, typespace string, namespace string,
 		workspace string) (ObjectKey, WorkspaceNonce, error)
 
 	// These methods need to be atomic, but may retry internally
@@ -160,7 +159,7 @@ type WorkspaceDB interface {
 	//
 	// Possible errors are:
 	//  ErrWorkspaceExists
-	CreateWorkspace(c Ctx, typespace string, namespace string,
+	CreateWorkspace(c ctx, typespace string, namespace string,
 		workspace string, nonce WorkspaceNonce, wsKey ObjectKey) error
 
 	// BranchWorkspace branches srcTypespace/srcNamespace/srcWorkspace to create
@@ -170,18 +169,18 @@ type WorkspaceDB interface {
 	// Possible errors are:
 	//  ErrWorkspaceExists
 	//  ErrWorkspaceNotFound
-	BranchWorkspace(c Ctx, srcTypespace string, srcNamespace string,
+	BranchWorkspace(c ctx, srcTypespace string, srcNamespace string,
 		srcWorkspace string, dstTypespace string,
 		dstNamespace string, dstWorkspace string) (WorkspaceNonce,
 		WorkspaceNonce, error)
 
 	// DeleteWorkspace deletes the workspace
-	DeleteWorkspace(c Ctx, typespace string, namespace string,
+	DeleteWorkspace(c ctx, typespace string, namespace string,
 		workspace string) error
 
 	// WorkspaceLastWriteTime returns the time when the workspace DB entry
 	// was created or when the rootID was advanced. The time returned is in UTC.
-	WorkspaceLastWriteTime(c Ctx, typespace string, namespace string,
+	WorkspaceLastWriteTime(c ctx, typespace string, namespace string,
 		workspace string) (time.Time, error)
 
 	// AdvanceWorkspace changes the workspace rootID. If the
@@ -196,13 +195,13 @@ type WorkspaceDB interface {
 	//  ErrWorkspaceNotFound
 	//  ErrWorkspaceOutOfDate: The workspace rootID was changed
 	//  remotely so the local instance is out of date
-	AdvanceWorkspace(c Ctx, typespace string, namespace string, workspace string,
+	AdvanceWorkspace(c ctx, typespace string, namespace string, workspace string,
 		nonce WorkspaceNonce, currentRootID ObjectKey,
 		newRootID ObjectKey) (ObjectKey, WorkspaceNonce, error)
 
-	SetWorkspaceImmutable(c Ctx, typespace string, namespace string,
+	SetWorkspaceImmutable(c ctx, typespace string, namespace string,
 		workspace string) error
 
-	WorkspaceIsImmutable(c Ctx, typespace string, namespace string,
+	WorkspaceIsImmutable(c ctx, typespace string, namespace string,
 		workspace string) (bool, error)
 }

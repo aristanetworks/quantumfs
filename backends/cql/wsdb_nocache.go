@@ -56,7 +56,7 @@ func newNoCacheWsdb(cluster Cluster, cfg *Config) (WorkspaceDB, error) {
 
 // --- workspace DB API implementation ---
 
-func (nc *noCacheWsdb) NumTypespaces(c Ctx) (int, error) {
+func (nc *noCacheWsdb) NumTypespaces(c ctx) (int, error) {
 	defer c.FuncInName("noCacheWsdb::NumTypespaces").Out()
 
 	count, _, err := nc.fetchDBTypespaces(c)
@@ -67,7 +67,7 @@ func (nc *noCacheWsdb) NumTypespaces(c Ctx) (int, error) {
 	return count, nil
 }
 
-func (nc *noCacheWsdb) TypespaceList(c Ctx) ([]string, error) {
+func (nc *noCacheWsdb) TypespaceList(c ctx) ([]string, error) {
 	defer c.FuncInName("noCacheWsdb::TypespaceList").Out()
 
 	_, list, err := nc.fetchDBTypespaces(c)
@@ -77,7 +77,7 @@ func (nc *noCacheWsdb) TypespaceList(c Ctx) ([]string, error) {
 	}
 	return list, nil
 }
-func (nc *noCacheWsdb) NumNamespaces(c Ctx, typespace string) (int, error) {
+func (nc *noCacheWsdb) NumNamespaces(c ctx, typespace string) (int, error) {
 	defer c.FuncIn("noCacheWsdb::NumNamespaces", "%s", typespace).Out()
 
 	count, _, err := nc.fetchDBNamespaces(c, typespace)
@@ -89,7 +89,7 @@ func (nc *noCacheWsdb) NumNamespaces(c Ctx, typespace string) (int, error) {
 	return count, nil
 }
 
-func (nc *noCacheWsdb) NamespaceList(c Ctx, typespace string) ([]string, error) {
+func (nc *noCacheWsdb) NamespaceList(c ctx, typespace string) ([]string, error) {
 	defer c.FuncIn("noCacheWsdb::NamespaceList", "%s", typespace).Out()
 
 	_, list, err := nc.fetchDBNamespaces(c, typespace)
@@ -101,7 +101,7 @@ func (nc *noCacheWsdb) NamespaceList(c Ctx, typespace string) ([]string, error) 
 	return list, nil
 }
 
-func (nc *noCacheWsdb) NumWorkspaces(c Ctx, typespace string,
+func (nc *noCacheWsdb) NumWorkspaces(c ctx, typespace string,
 	namespace string) (int, error) {
 
 	defer c.FuncIn("noCacheWsdb::NumWorkspaces", "%s/%s",
@@ -116,7 +116,7 @@ func (nc *noCacheWsdb) NumWorkspaces(c Ctx, typespace string,
 	return count, nil
 }
 
-func (nc *noCacheWsdb) WorkspaceList(c Ctx, typespace string,
+func (nc *noCacheWsdb) WorkspaceList(c ctx, typespace string,
 	namespace string) (map[string]WorkspaceNonce, error) {
 
 	defer c.FuncIn("noCacheWsdb::WorkspaceList", "%s/%s",
@@ -141,7 +141,7 @@ func isTypespaceLocked(typespace string) bool {
 
 // CreateWorkspace is exclusively used in the cql adapter to create a
 // _/_/_ workspace.
-func (nc *noCacheWsdb) CreateWorkspace(c Ctx, typespace string, namespace string,
+func (nc *noCacheWsdb) CreateWorkspace(c ctx, typespace string, namespace string,
 	workspace string, nonce WorkspaceNonce, wsKey ObjectKey) error {
 
 	keyHex := hex.EncodeToString(wsKey)
@@ -173,7 +173,7 @@ func (nc *noCacheWsdb) CreateWorkspace(c Ctx, typespace string, namespace string
 }
 
 // Add new Nonce here.
-func (nc *noCacheWsdb) BranchWorkspace(c Ctx, srcTypespace string,
+func (nc *noCacheWsdb) BranchWorkspace(c ctx, srcTypespace string,
 	srcNamespace string, srcWorkspace string,
 	dstTypespace string, dstNamespace string,
 	dstWorkspace string) (WorkspaceNonce, WorkspaceNonce, error) {
@@ -238,7 +238,7 @@ func (nc *noCacheWsdb) BranchWorkspace(c Ctx, srcTypespace string,
 	return srcNonce, dstNonce, nil
 }
 
-func (nc *noCacheWsdb) Workspace(c Ctx, typespace string, namespace string,
+func (nc *noCacheWsdb) Workspace(c ctx, typespace string, namespace string,
 	workspace string) (ObjectKey, WorkspaceNonce, error) {
 
 	defer c.FuncIn("noCacheWsdb::Workspace", "%s/%s/%s", typespace, namespace,
@@ -261,7 +261,7 @@ func (nc *noCacheWsdb) Workspace(c Ctx, typespace string, namespace string,
 	return key, nonce, nil
 }
 
-func (nc *noCacheWsdb) DeleteWorkspace(c Ctx, typespace string, namespace string,
+func (nc *noCacheWsdb) DeleteWorkspace(c ctx, typespace string, namespace string,
 	workspace string) error {
 
 	defer c.FuncIn("noCacheWsdb::DeleteWorkspace", "%s/%s/%s", typespace,
@@ -282,7 +282,7 @@ func (nc *noCacheWsdb) DeleteWorkspace(c Ctx, typespace string, namespace string
 	return nil
 }
 
-func (nc *noCacheWsdb) AdvanceWorkspace(c Ctx, typespace string,
+func (nc *noCacheWsdb) AdvanceWorkspace(c ctx, typespace string,
 	namespace string, workspace string, currentNonce WorkspaceNonce,
 	currentRootID ObjectKey,
 	newRootID ObjectKey) (ObjectKey, WorkspaceNonce, error) {
@@ -334,7 +334,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c Ctx, typespace string,
 	return newRootID, currentNonce, nil
 }
 
-func (nc *noCacheWsdb) WorkspaceLastWriteTime(c Ctx, typespace string,
+func (nc *noCacheWsdb) WorkspaceLastWriteTime(c ctx, typespace string,
 	namespace string, workspace string) (time.Time, error) {
 
 	defer c.FuncIn("noCacheWsdb::WorkspaceLastWriteTime", "%s/%s/%s", typespace,
@@ -354,7 +354,7 @@ func (nc *noCacheWsdb) WorkspaceLastWriteTime(c Ctx, typespace string,
 	return ts, nil
 }
 
-func (nc *noCacheWsdb) SetWorkspaceImmutable(c Ctx, typespace string,
+func (nc *noCacheWsdb) SetWorkspaceImmutable(c ctx, typespace string,
 	namespace string, workspace string) error {
 
 	defer c.FuncIn("noCacheWsdb::SetWorkspaceImmutable", "%s/%s/%s", typespace,
@@ -381,7 +381,7 @@ func (nc *noCacheWsdb) SetWorkspaceImmutable(c Ctx, typespace string,
 	return nil
 }
 
-func (nc *noCacheWsdb) WorkspaceIsImmutable(c Ctx, typespace string,
+func (nc *noCacheWsdb) WorkspaceIsImmutable(c ctx, typespace string,
 	namespace string, workspace string) (bool, error) {
 
 	defer c.FuncIn("noCacheWsdb::WorkspaceIsImmutable", "%s/%s/%s", typespace,
@@ -404,7 +404,7 @@ func (nc *noCacheWsdb) WorkspaceIsImmutable(c Ctx, typespace string,
 
 // --- helper routines ---
 
-func (nc *noCacheWsdb) wsdbTypespaceExists(c Ctx, typespace string) (bool, error) {
+func (nc *noCacheWsdb) wsdbTypespaceExists(c ctx, typespace string) (bool, error) {
 	defer c.FuncIn("noCacheWsdb::wsdbTypespaceExists", "%s", typespace).Out()
 
 	qryStr := fmt.Sprintf(`
@@ -429,7 +429,7 @@ WHERE typespace = ? LIMIT 1`, nc.keyspace, nc.cfName)
 
 }
 
-func (nc *noCacheWsdb) fetchDBTypespaces(c Ctx) (int, []string, error) {
+func (nc *noCacheWsdb) fetchDBTypespaces(c ctx) (int, []string, error) {
 	defer c.FuncInName("noCacheWsdb::fetchDBTypespaces").Out()
 
 	qryStr := fmt.Sprintf(`
@@ -452,7 +452,7 @@ FROM %s.%s`, nc.keyspace, nc.cfName)
 	return count, typespaceList, nil
 }
 
-func (nc *noCacheWsdb) wsdbNamespaceExists(c Ctx, typespace string,
+func (nc *noCacheWsdb) wsdbNamespaceExists(c ctx, typespace string,
 	namespace string) (bool, error) {
 
 	defer c.FuncIn("noCacheWsdb::wsdbNamespaceExists", "%s/%s", typespace,
@@ -479,7 +479,7 @@ WHERE typespace = ? AND namespace = ? LIMIT 1`, nc.keyspace, nc.cfName)
 	}
 }
 
-func (nc *noCacheWsdb) fetchDBNamespaces(c Ctx,
+func (nc *noCacheWsdb) fetchDBNamespaces(c ctx,
 	typespace string) (int, []string, error) {
 
 	defer c.FuncIn("noCacheWsdb::fetchDBNamespaces", "%s", typespace).Out()
@@ -509,7 +509,7 @@ WHERE typespace = ?`, nc.keyspace, nc.cfName)
 	return count, namespaceList, nil
 }
 
-func (nc *noCacheWsdb) fetchDBWorkspaces(c Ctx, typespace string,
+func (nc *noCacheWsdb) fetchDBWorkspaces(c ctx, typespace string,
 	namespace string) (int, map[string]WorkspaceNonce, error) {
 
 	defer c.FuncIn("noCacheWsdb::fetchDBWorkspaces", "%s/%s", typespace,
@@ -541,7 +541,7 @@ WHERE typespace = ? AND namespace = ?`, nc.keyspace, nc.cfName)
 	return count, workspaceList, nil
 }
 
-func (nc *noCacheWsdb) wsdbKeyGet(c Ctx, typespace string,
+func (nc *noCacheWsdb) wsdbKeyGet(c ctx, typespace string,
 	namespace string, workspace string) (key []byte, nonce WorkspaceNonce,
 	present bool, err error) {
 
@@ -574,7 +574,7 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace, nc.cfName
 	}
 }
 
-func (nc *noCacheWsdb) wsdbKeyDel(c Ctx, typespace string,
+func (nc *noCacheWsdb) wsdbKeyDel(c ctx, typespace string,
 	namespace string, workspace string) error {
 
 	defer c.FuncIn("noCacheWsdb::wsdbKeyDel", "%s/%s/%s", typespace,
@@ -591,7 +591,7 @@ WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace, nc.cfName)
 	return query.Exec()
 }
 
-func (nc *noCacheWsdb) wsdbKeyPut(c Ctx, typespace string,
+func (nc *noCacheWsdb) wsdbKeyPut(c ctx, typespace string,
 	namespace string, workspace string,
 	key []byte, nonce WorkspaceNonce) error {
 
@@ -610,7 +610,7 @@ VALUES (?,?,?,?,?,?)`, nc.keyspace, nc.cfName)
 	return query.Exec()
 }
 
-func (nc *noCacheWsdb) wsdbImmutableGet(c Ctx, typespace string,
+func (nc *noCacheWsdb) wsdbImmutableGet(c ctx, typespace string,
 	namespace string, workspace string) (immutable bool, present bool,
 	err error) {
 
@@ -636,7 +636,7 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace, nc.cfName
 	}
 	return immutable, true, nil
 }
-func (nc *noCacheWsdb) wsdbImmutablePut(c Ctx, typespace string,
+func (nc *noCacheWsdb) wsdbImmutablePut(c ctx, typespace string,
 	namespace string, workspace string, immutable bool) error {
 
 	defer c.FuncIn("noCacheWsdb::wsdbImmutablePut", "%s/%s/%s immutable: %t",
@@ -654,7 +654,7 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace, nc.cfName
 	return query.Exec()
 }
 
-func (nc *noCacheWsdb) wsdbKeyLastWriteTime(c Ctx, typespace string,
+func (nc *noCacheWsdb) wsdbKeyLastWriteTime(c ctx, typespace string,
 	namespace string, workspace string) (int64, error) {
 
 	defer c.FuncIn("noCacheWsdb::wsdbKeyLastWriteTime", "%s/%s/%s", typespace,

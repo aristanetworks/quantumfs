@@ -3,10 +3,10 @@
 
 package cql
 
-// Ctx represents client context for Cql API calls.
+// ctx represents client context for Cql API calls.
 // Since clients implement this interface, they can use custom loggers,
 // log format, context information(eg: RequestID etc).
-type Ctx interface {
+type ctx interface {
 	// Elog logs error message.
 	Elog(fmtStr string, args ...interface{})
 	// Wlog logs warning message.
