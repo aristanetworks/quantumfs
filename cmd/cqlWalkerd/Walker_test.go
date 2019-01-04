@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
 	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
 	walkerutils "github.com/aristanetworks/quantumfs/cmd/qutils2"
@@ -24,7 +23,7 @@ import (
 
 func (t *testHelper) testCtx() *Ctx {
 	datastore := t.GetDataStore()
-	translator := datastore.(*backends.EtherBlobStoreTranslator)
+	translator := datastore.(*cql.EtherBlobStoreTranslator)
 
 	return &Ctx{
 		qctx:  t.QfsCtx(),
