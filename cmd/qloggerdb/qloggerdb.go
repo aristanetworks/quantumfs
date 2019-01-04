@@ -176,7 +176,6 @@ func init() {
 	}
 
 	extractors = append(extractors, cql...)
-
 }
 
 func main() {
