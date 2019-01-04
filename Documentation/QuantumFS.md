@@ -143,3 +143,93 @@ is not a general purpose file system.
 
 QuantumFS is also not highly available on its own. QuantumFS is only as reliable
 as the WSDB and Datastore.
+
+# Important Terminology
+
+## Workspace
+
+A Workspace is a directory under which related work is performed. A developer is
+expected to have multiple workspaces at any one time, perhaps one per active
+branch. Within a Workspace QuantumFS provides a POSIX compatible filesystem with
+the caveats described above.
+
+## Workspace Name
+
+A Workspace Name is the name of the workspace, perhaps "branchA" or "releaseY".
+
+## Namespace
+
+A namespace contains an arbitrary number of Workspaces. Namespaces are an
+organizational structure.
+
+## Namespace Name
+
+A Namespace Name is the name of the Namespace, perhaps "developer1" or
+"productFoo".
+
+## Typespace
+
+A typespace contains an arbitrary number of Namespaces. Typespaces are an
+organizational structure.
+
+## Typespace Name
+
+A Typespace Name is the name of the Typespace, perhaps "users" or "releases".
+
+## Workspace Path
+
+A Workspace Path is the path from the root of QuantumFS to the root of a
+Workspace. This always has three elements:
+`TypespaceName/NamespaceName/WorkspaceName`.
+
+## Null Workspace
+
+The Null Workspace has the Workspace Path `_/_/_` and is empty. It exists by
+default and represents the "empty" workspace. It cannot be modified. It's
+primary use is as a source for branching other usable workspaces and to indicate
+no common base during merge operations.
+
+
+## Root ID
+
+A Root ID is the unique content hash of the Merkle tree representing a fully
+published Workspace instance. It is similar to a commit ID in a DVCS and
+uniquely identifies the root of the workspace filesystem inside the data store.
+
+## Workspace DB (WSDB)
+
+The Workspace Database is primarily used to map from Workspace Paths to Root
+IDs. It is also responsible for the synchronization of the same Workspace to
+multiple QuantumFS instances in the manner of a central clearing house.
+
+## Branch
+
+Workspace can be branched in much the same way that VCS branching is done. A
+source branch is first published locally, producing an up-to-date Root ID. This
+Root ID is then copied to a new name in the Workspace DB.
+
+## Merge
+
+In much the same way that VCS branches can be merged, so too can Workspaces.
+Both two-way and three-way merges are supported.
+
+The most common use-case for merging is to bring changes made to a Workspace on
+a remote instance into the same Workspace view on the local instance. In order
+to do this, the local instance first produces an up-to-date Root ID of the
+Workspace, then merges with the remote Root ID. Then the local instance will
+Refresh its instantiated view to state the new published state.
+
+## Refresh
+
+Any instance of QuantumFS has two concurrent views of a Workspace at any one
+time. The first is the published view which represents the data of the Workspace
+starting from the Root ID stored in the Workspace DB. The second is the
+instantiated view which represents the state of inodes which were/are actively
+in use.
+
+When the instantiated view changes are flushed, a new published view is created
+and the new Root ID published to the Workspace DB.
+
+When the published view changes, the instantiated view must be updated to ensure
+it accurately presents the state of the remotely modified filesystem to the
+local programs. This transition is plausibly consistent.
