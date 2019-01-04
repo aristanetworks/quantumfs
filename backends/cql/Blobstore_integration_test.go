@@ -1,9 +1,9 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
-// The set of tests in this file are for integration testing
-// of cql package against scyllabd and gocql library.
+// The set of tests in this file are for long running
+// tests of cql package against a live scylladb.
 
-// +build integration
+// +build longrunningtests
 
 package cql
 

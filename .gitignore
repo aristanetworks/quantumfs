@@ -20,3 +20,4 @@
 libqfs.*
 libqfs32.*
 /Gopkg.toml
+/longrunningcql.test
