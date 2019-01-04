@@ -9,8 +9,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
-	"github.com/aristanetworks/quantumfs/backends/ether"
+	ether "github.com/aristanetworks/quantumfs/backends/cql"
 )
 
 func openFile(fileName string) (*os.File, int64, error) {
@@ -87,9 +86,9 @@ func (b *fileStore) Get(c ether.Ctx, key []byte) ([]byte, map[string]string, err
 	blobstoreMetadata, metadata, err := retrieveMetadata(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil, blobstore.NewError(blobstore.ErrKeyNotFound, "key %s not found in Get", keyHex)
+			return nil, nil, ether.NewError(ether.ErrKeyNotFound, "key %s not found in Get", keyHex)
 		}
-		return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in retrieving metadata in Get %s", err.Error())
+		return nil, nil, ether.NewError(ether.ErrOperationFailed, "error in retrieving metadata in Get %s", err.Error())
 	}
 
 	dataSize := int64(blobstoreMetadata["size"].(float64))
@@ -97,16 +96,16 @@ func (b *fileStore) Get(c ether.Ctx, key []byte) ([]byte, map[string]string, err
 	if dataSize != 0 {
 		df, ds, err := openFile(filePath + ".data")
 		if err != nil {
-			return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in opening data file in Get %s", err.Error())
+			return nil, nil, ether.NewError(ether.ErrOperationFailed, "error in opening data file in Get %s", err.Error())
 		}
 		defer df.Close()
 
 		if ds != dataSize {
-			return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "incorrect size read in Get")
+			return nil, nil, ether.NewError(ether.ErrOperationFailed, "incorrect size read in Get")
 		}
 		value, err = getFile(df, dataSize)
 		if err != nil {
-			return nil, nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in reading data file in Get %s", err.Error())
+			return nil, nil, ether.NewError(ether.ErrOperationFailed, "error in reading data file in Get %s", err.Error())
 		}
 	}
 	return value, metadata, nil
@@ -120,9 +119,9 @@ func (b *fileStore) Metadata(c ether.Ctx, key []byte) (map[string]string, error)
 	_, metadata, err := retrieveMetadata(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, blobstore.NewError(blobstore.ErrKeyNotFound, "key %s not found during Metadata", keyHex)
+			return nil, ether.NewError(ether.ErrKeyNotFound, "key %s not found during Metadata", keyHex)
 		}
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "error in retrieving  metadata file in Metadata %s", err.Error())
+		return nil, ether.NewError(ether.ErrOperationFailed, "error in retrieving  metadata file in Metadata %s", err.Error())
 	}
 
 	return metadata, nil

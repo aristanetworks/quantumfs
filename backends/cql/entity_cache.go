@@ -5,7 +5,6 @@ package cql
 
 import (
 	"fmt"
-	"github.com/aristanetworks/quantumfs/backends/ether"
 	"runtime"
 	"strings"
 	"sync"
@@ -70,7 +69,7 @@ import (
 */
 
 // arg is registered and interpreted by the consumer of entityCache
-type fetchEntities func(c ether.Ctx, arg interface{}, entityPath ...string) (map[string]bool, error)
+type fetchEntities func(c Ctx, arg interface{}, entityPath ...string) (map[string]bool, error)
 
 // entityCache maintains global cache state (eg: lock etc)
 type entityCache struct {
@@ -124,7 +123,7 @@ func newEntityCache(levels int, cacheTimeout int,
 // InsertEntities(namespace, workspace) - Valid
 // InsertEntities() - Invalid
 // InsertEntities(workspace) - Invalid
-func (ec *entityCache) InsertEntities(c ether.Ctx, entityPath ...string) {
+func (ec *entityCache) InsertEntities(c Ctx, entityPath ...string) {
 	defer c.FuncIn("cache::InsertEntities", "%s",
 		strings.Join(entityPath, "/")).Out()
 
@@ -147,7 +146,7 @@ func (ec *entityCache) InsertEntities(c ether.Ctx, entityPath ...string) {
 // DeleteEntities(namespace, workspace) - Valid
 // DeleteEntities() - Invalid
 // DeleteEntities(workspace) - Invalid
-func (ec *entityCache) DeleteEntities(c ether.Ctx, entityPath ...string) {
+func (ec *entityCache) DeleteEntities(c Ctx, entityPath ...string) {
 	defer c.FuncIn("cache::DeleteEntities", "%s",
 		strings.Join(entityPath, "/")).Out()
 
@@ -169,7 +168,7 @@ func (ec *entityCache) DeleteEntities(c ether.Ctx, entityPath ...string) {
 // CountEntities() - Valid
 // CountEntities(namespace) - Valid
 // CountEntities(workspace) - Invalid
-func (ec *entityCache) CountEntities(c ether.Ctx, entityPath ...string) (int, error) {
+func (ec *entityCache) CountEntities(c Ctx, entityPath ...string) (int, error) {
 	defer c.FuncIn("cache::CountEntities", "%s",
 		strings.Join(entityPath, "/")).Out()
 
@@ -192,7 +191,7 @@ func (ec *entityCache) CountEntities(c ether.Ctx, entityPath ...string) (int, er
 }
 
 // same constraints on entityPath argument as CountEntities
-func (ec *entityCache) ListEntities(c ether.Ctx, entityPath ...string) ([]string, error) {
+func (ec *entityCache) ListEntities(c Ctx, entityPath ...string) ([]string, error) {
 	defer c.FuncIn("cache::ListEntities", "%s",
 		strings.Join(entityPath, "/")).Out()
 
@@ -216,7 +215,7 @@ func (ec *entityCache) ListEntities(c ether.Ctx, entityPath ...string) ([]string
 
 // used by unit tests to simulate different conditions
 // same constraints on entityPath argument as CountEntities
-func (ec *entityCache) enableCqlRefresh(c ether.Ctx, entityPath ...string) {
+func (ec *entityCache) enableCqlRefresh(c Ctx, entityPath ...string) {
 	defer c.FuncIn("cache::enableCqlRefresh", "%s",
 		strings.Join(entityPath, "/")).Out()
 
@@ -233,7 +232,7 @@ func (ec *entityCache) enableCqlRefresh(c ether.Ctx, entityPath ...string) {
 
 // used by unit tests to simulate different conditions
 // same constraints on entityPath argument as CountEntities
-func (ec *entityCache) disableCqlRefresh(c ether.Ctx, maxDelay time.Duration,
+func (ec *entityCache) disableCqlRefresh(c Ctx, maxDelay time.Duration,
 	entityPath ...string) {
 
 	defer c.FuncIn("cache::disableCqlRefresh", "delay: %s %s",
@@ -256,7 +255,7 @@ func (ec *entityCache) disableCqlRefresh(c ether.Ctx, maxDelay time.Duration,
 // returns the entityGroup for the last entity in entityPath
 // traversal of the entityPath starts in group argument
 // if any entity is absent then traversal stops and nil is returned
-func (ec *entityCache) getLastEntityGroup(c ether.Ctx, group *entityGroup,
+func (ec *entityCache) getLastEntityGroup(c Ctx, group *entityGroup,
 	entityPath ...string) *entityGroup {
 
 	defer c.FuncIn("cache::getLastEntityGroup", "%s",
@@ -277,7 +276,7 @@ func (ec *entityCache) getLastEntityGroup(c ether.Ctx, group *entityGroup,
 // first entity in entityPath starts in entityGroup
 // if entityGroup is ec.root then entityPath is complete entityPath
 // this routine will be invoked with at least one entity in entityPath
-func (ec *entityCache) checkDeleteEntity(c ether.Ctx, group *entityGroup, local bool,
+func (ec *entityCache) checkDeleteEntity(c Ctx, group *entityGroup, local bool,
 	entityPath ...string) {
 
 	defer c.FuncIn("cache::checkDeleteEntity", "%s local:%t",
@@ -346,7 +345,7 @@ func (ec *entityCache) checkDeleteEntity(c ether.Ctx, group *entityGroup, local 
 }
 
 // invoked under rwMutex write lock
-func (ec *entityCache) markChildEntityGroupsDetached(c ether.Ctx,
+func (ec *entityCache) markChildEntityGroupsDetached(c Ctx,
 	group *entityGroup) {
 
 	defer c.FuncIn("cache::markChildEntityGroupsDetached", "").Out()
@@ -362,7 +361,7 @@ func (ec *entityCache) markChildEntityGroupsDetached(c ether.Ctx,
 
 // since some callers could be blocking for refresh
 // any panics during fetch should be converted to errors
-func (ec *entityCache) callFetch(c ether.Ctx,
+func (ec *entityCache) callFetch(c Ctx,
 	entityPath ...string) (m map[string]bool, e error) {
 
 	defer func() {
@@ -384,7 +383,7 @@ func (ec *entityCache) callFetch(c ether.Ctx,
 // returns non-nil entityGroup whose list or count can be extracted
 // after doing a refresh if needed.
 // returns nil entityGroup if there are detachments in entityPath
-func (ec *entityCache) getEntityCountListGroup(c ether.Ctx,
+func (ec *entityCache) getEntityCountListGroup(c Ctx,
 	entityPath ...string) (*entityGroup, error) {
 
 	defer c.FuncIn("cache::getEntityCountListGroup", "%s",
@@ -562,7 +561,7 @@ const (
 	refreshIgnore                = iota // refresh not needed and no waiting
 )
 
-func (g *entityGroup) refreshNeeded(c ether.Ctx) (action refreshAction) {
+func (g *entityGroup) refreshNeeded(c Ctx) (action refreshAction) {
 	if g.cache.neverExpires {
 		return refreshIgnore
 	}
@@ -602,7 +601,7 @@ func (g *entityGroup) refreshNeeded(c ether.Ctx) (action refreshAction) {
 }
 
 // called under rwMutex held in write mode
-func (g *entityGroup) checkInsertEntity(c ether.Ctx, entity string, local bool) {
+func (g *entityGroup) checkInsertEntity(c Ctx, entity string, local bool) {
 	defer c.FuncIn("cache::checkInsertEntity",
 		"e:%s l:%t p:%s c:%d d:%t",
 		entity, local, g.parentEntity,
@@ -635,7 +634,7 @@ func (g *entityGroup) checkInsertEntity(c ether.Ctx, entity string, local bool) 
 }
 
 // called under rwMutex read lock
-func (g *entityGroup) getListCopy(c ether.Ctx) []string {
+func (g *entityGroup) getListCopy(c Ctx) []string {
 	defer c.FuncIn("cache::getListCopy", "p:%s c:%d d:%t",
 		g.parentEntity, g.entityCount,
 		g.detached).Out()
@@ -655,7 +654,7 @@ func (g *entityGroup) getListCopy(c ether.Ctx) []string {
 }
 
 // invoked under rwMutex write lock
-func (g *entityGroup) mergeLocalUpdates(c ether.Ctx, fetchData map[string]bool) {
+func (g *entityGroup) mergeLocalUpdates(c Ctx, fetchData map[string]bool) {
 	defer c.FuncIn("cache::mergeLocalUpdates", "p:%s c:%d "+
 		"d:%t lI:%d lD:%d", g.parentEntity, g.entityCount,
 		g.detached, len(g.concLocalInserts),
@@ -723,7 +722,7 @@ func (g *entityGroup) reapFetchError() error {
 // data has been invalidated by a local insert/delete. The
 // error from fetcher is passed into refresh so that proper clean up can be done.
 // No locks should be held when calling this function.
-func (g *entityGroup) refresh(c ether.Ctx, fetchData map[string]bool,
+func (g *entityGroup) refresh(c Ctx, fetchData map[string]bool,
 	ferr error) error {
 	defer c.FuncIn("cache::refresh", "p:%s c:%d d:%t",
 		g.parentEntity, g.entityCount,

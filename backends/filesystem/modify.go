@@ -11,8 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
-	"github.com/aristanetworks/quantumfs/backends/ether"
+	ether "github.com/aristanetworks/quantumfs/backends/cql"
 )
 
 func writeData(fileName string, data []byte) (err error) {
@@ -63,7 +62,7 @@ func (b *fileStore) Insert(c ether.Ctx, key []byte, value []byte, metadata map[s
 	dir, filePath := getDirAndFilePath(b, key)
 	err := os.MkdirAll(dir, 0777)
 	if err != nil {
-		return blobstore.NewError(blobstore.ErrOperationFailed, "error in MkdirAll in Insert %s", err.Error())
+		return ether.NewError(ether.ErrOperationFailed, "error in MkdirAll in Insert %s", err.Error())
 	}
 
 	b.sem.P()
@@ -71,7 +70,7 @@ func (b *fileStore) Insert(c ether.Ctx, key []byte, value []byte, metadata map[s
 
 	err = writeData(filePath+".data", value)
 	if err != nil {
-		return blobstore.NewError(blobstore.ErrOperationFailed, "error in writing data in Insert %s", err.Error())
+		return ether.NewError(ether.ErrOperationFailed, "error in writing data in Insert %s", err.Error())
 	}
 
 	blobstoreMetadata := make(map[string]interface{})
@@ -84,12 +83,12 @@ func (b *fileStore) Insert(c ether.Ctx, key []byte, value []byte, metadata map[s
 
 	jMetaData, err := json.Marshal(allMetadata)
 	if err != nil {
-		return blobstore.NewError(blobstore.ErrOperationFailed, "error in json marshalling of metadata in Insert %s", err.Error())
+		return ether.NewError(ether.ErrOperationFailed, "error in json marshalling of metadata in Insert %s", err.Error())
 	}
 
 	err = writeData(filePath+".mdata", jMetaData)
 	if err != nil {
-		return blobstore.NewError(blobstore.ErrOperationFailed, "error in writing metadata in Insert %s", err.Error())
+		return ether.NewError(ether.ErrOperationFailed, "error in writing metadata in Insert %s", err.Error())
 	}
 
 	return nil
@@ -103,14 +102,14 @@ func (b *fileStore) Delete(c ether.Ctx, key []byte) error {
 	err := os.Remove(filePath + ".mdata")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return blobstore.NewError(blobstore.ErrKeyNotFound, "key %s not found in Delete", keyHex)
+			return ether.NewError(ether.ErrKeyNotFound, "key %s not found in Delete", keyHex)
 		}
-		return blobstore.NewError(blobstore.ErrOperationFailed, "error in removing metadata in Delete %s", err.Error())
+		return ether.NewError(ether.ErrOperationFailed, "error in removing metadata in Delete %s", err.Error())
 	}
 
 	err = os.Remove(filePath + ".data")
 	if err != nil {
-		return blobstore.NewError(blobstore.ErrOperationFailed, "error in removing data in Delete %s", err.Error())
+		return ether.NewError(ether.ErrOperationFailed, "error in removing data in Delete %s", err.Error())
 	}
 	return nil
 }
@@ -125,9 +124,9 @@ func (b *fileStore) Update(c ether.Ctx, key []byte,
 	blobstoreMetadata, _, err := retrieveMetadata(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return blobstore.NewError(blobstore.ErrKeyNotFound, "key %s not found in Update", keyHex)
+			return ether.NewError(ether.ErrKeyNotFound, "key %s not found in Update", keyHex)
 		}
-		return blobstore.NewError(blobstore.ErrOperationFailed, "error in retrieve metadata in Update %s", err.Error())
+		return ether.NewError(ether.ErrOperationFailed, "error in retrieve metadata in Update %s", err.Error())
 	}
 	t := time.Now()
 	blobstoreMetadata["mtime"] = t.Unix()
@@ -136,7 +135,7 @@ func (b *fileStore) Update(c ether.Ctx, key []byte,
 	jMetaData, err := json.Marshal(allMetadata)
 	err = writeData(filePath+".mdata", jMetaData)
 	if err != nil {
-		return blobstore.NewError(blobstore.ErrOperationFailed, "error in writing metadata in Update %s", err.Error())
+		return ether.NewError(ether.ErrOperationFailed, "error in writing metadata in Update %s", err.Error())
 	}
 
 	return nil

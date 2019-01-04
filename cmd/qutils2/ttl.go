@@ -8,14 +8,13 @@ import (
 	"strconv"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
 	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/walker"
 )
 
 // RefreshTTL will update the TTL of the block pointed to by key.
 func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
-	size uint64, objType quantumfs.ObjectType, cqlds blobstore.BlobStore, newTTL int64,
+	size uint64, objType quantumfs.ObjectType, cqlds cql.BlobStore, newTTL int64,
 	ttlThreshold int64, globalSkipMap *SkipMap, localSkipMap *SkipMap) error {
 
 	if walker.SkipKey(c, key) {
@@ -71,7 +70,7 @@ func RefreshTTL(c *walker.Ctx, path string, key quantumfs.ObjectKey,
 }
 
 //GetTTLForKey return the the TTL of the block
-func GetTTLForKey(c *walker.Ctx, cqlds blobstore.BlobStore,
+func GetTTLForKey(c *walker.Ctx, cqlds cql.BlobStore,
 	key quantumfs.ObjectKey, path string) (int64, error) {
 
 	metadata, err := cqlds.Metadata(ToECtx(c), key.Value())

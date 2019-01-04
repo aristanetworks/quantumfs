@@ -1,7 +1,7 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package ether
+package cql
 
 // Ctx represents client context for Ether API calls.
 // Since clients implement this interface, they can use custom loggers,

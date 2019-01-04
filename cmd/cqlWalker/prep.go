@@ -13,14 +13,14 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/backends/ether"
+	"github.com/aristanetworks/quantumfs/backends/cql"
 	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/utils"
 	"github.com/aristanetworks/quantumfs/walker"
 )
 
-// Ctx implements both quantumfs.Ctx and ether.Ctx
+// Ctx implements both quantumfs.Ctx and cql.Ctx
 type Ctx struct {
 	quantumfs.Ctx
 }
@@ -42,14 +42,14 @@ func (c *Ctx) Vlog(fmtStr string, args ...interface{}) {
 }
 
 func (c *Ctx) FuncIn(funcName string, fmtStr string,
-	args ...interface{}) ether.FuncOut {
+	args ...interface{}) cql.FuncOut {
 
 	el := c.Ctx.FuncIn(qlog.LogWorkspaceDb, funcName,
 		fmtStr, args...)
-	return (ether.FuncOut)(el)
+	return (cql.FuncOut)(el)
 }
 
-func (c *Ctx) FuncInName(funcName string) ether.FuncOut {
+func (c *Ctx) FuncInName(funcName string) cql.FuncOut {
 	return c.FuncIn(funcName, "")
 }
 

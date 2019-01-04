@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
 	"github.com/gocql/gocql"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -148,9 +147,9 @@ USING TTL %s`, s.bls.keyspace, "0")
 		map[string]string{TimeToLive: "0"})
 	s.Require().Error(err, "Insert returned incorrect ErrorCode")
 
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Insert is of type %T", err))
-	s.Require().Equal(blobstore.ErrOperationFailed, verr.Code,
+	s.Require().Equal(ErrOperationFailed, verr.Code,
 		"Invalid Error Code from Insert")
 }
 
@@ -188,9 +187,9 @@ WHERE key = ?`, s.bls.keyspace)
 	// Verify return value for a non existent key
 	value, metadata, err := s.bls.Get(unitTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Get returned nil error on failure")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
-	s.Require().Equal(blobstore.ErrKeyNotFound, verr.Code, "Invalid Error Code from get")
+	s.Require().Equal(ErrKeyNotFound, verr.Code, "Invalid Error Code from get")
 	s.Require().Nil(value, "value was not Nil when error is ErrKeyNotFound")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
 }
@@ -210,9 +209,9 @@ WHERE key = ?`, s.bls.keyspace)
 	// Verify return value for a non existent key
 	value, metadata, err := s.bls.Get(unitTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Get returned nil error on failure")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
-	s.Require().Equal(blobstore.ErrOperationFailed, verr.Code,
+	s.Require().Equal(ErrOperationFailed, verr.Code,
 		"Invalid Error Code from Get")
 	s.Require().Nil(value, "value was not Nil when error is ErrUnavailable")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrUnavailable")
@@ -282,9 +281,9 @@ WHERE key = ?`, s.bls.keyspace)
 	// Verify return value for a non existent key
 	metadata, err := s.bls.Metadata(unitTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata returned nil error on failure")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T", err))
-	s.Require().Equal(blobstore.ErrKeyNotFound, verr.Code,
+	s.Require().Equal(ErrKeyNotFound, verr.Code,
 		"Invalid Error Code from Metadata")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
 }
@@ -301,9 +300,9 @@ WHERE key = ?`, s.bls.keyspace)
 
 	metadata, err := s.bls.Metadata(unitTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata returned nil error on failure")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T", err))
-	s.Require().Equal(blobstore.ErrOperationFailed, verr.Code,
+	s.Require().Equal(ErrOperationFailed, verr.Code,
 		"Invalid Error Code from Metadata")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrUnavailable")
 }
@@ -348,9 +347,9 @@ WHERE key = ?`, s.bls.keyspace)
 
 	_, err := s.bls.GetExtKeyInfo(unitTestEtherCtx, []byte(testKey))
 	s.Require().Error(err, "GetExtKeyInfo did not return error")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from GetExtKeyInfo is of type %T", err))
-	s.Require().Equal(blobstore.ErrKeyNotFound, verr.Code,
+	s.Require().Equal(ErrKeyNotFound, verr.Code,
 		"Invalid Error Code %d from GetExtKeyInfo", verr.Code)
 }
 

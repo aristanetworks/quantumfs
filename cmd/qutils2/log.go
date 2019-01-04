@@ -5,7 +5,7 @@ package utils
 
 import (
 	"github.com/aristanetworks/quantumfs"
-	"github.com/aristanetworks/quantumfs/backends/ether"
+	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/aristanetworks/quantumfs/qlog"
 	"github.com/aristanetworks/quantumfs/walker"
 )
@@ -35,14 +35,14 @@ func (e etherFuncOut) Out() {
 }
 
 func (dc *ECtx) FuncIn(funcName string, fmtStr string,
-	args ...interface{}) ether.FuncOut {
+	args ...interface{}) cql.FuncOut {
 
 	el := (*walker.Ctx)(dc).Qctx.FuncIn(qlog.LogDatastore, funcName,
 		fmtStr, args...)
 	return (etherFuncOut)(el)
 }
 
-func (dc *ECtx) FuncInName(funcName string) ether.FuncOut {
+func (dc *ECtx) FuncInName(funcName string) cql.FuncOut {
 	return dc.FuncIn(funcName, "")
 }
 

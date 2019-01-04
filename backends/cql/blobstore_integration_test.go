@@ -14,14 +14,13 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/aristanetworks/quantumfs/backends/blobstore"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/sync/errgroup"
 )
 
 type storeIntegrationTests struct {
 	suite.Suite
-	bls blobstore.BlobStore
+	bls BlobStore
 }
 
 func checkSetupInteg(s *storeIntegrationTests) {
@@ -115,9 +114,9 @@ func (s *storeIntegrationTests) TestGetUnknownKey() {
 	s.Require().Nil(value, "value was not Nil when error is ErrKeyNotFound")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
 	s.Require().Error(err, "Get returned incorrect error")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Get is of type %T", err))
-	s.Require().Equal(blobstore.ErrKeyNotFound, verr.Code, "Invalid Error Code from Get")
+	s.Require().Equal(ErrKeyNotFound, verr.Code, "Invalid Error Code from Get")
 }
 
 func (s *storeIntegrationTests) TestGetNonZeroTTL() {
@@ -167,9 +166,9 @@ func (s *storeIntegrationTests) TestMetadataUnknownKey() {
 	metadata, err := s.bls.Metadata(integTestEtherCtx, []byte(unknownKey))
 	s.Require().Error(err, "Metadata didn't return error")
 	s.Require().Nil(metadata, "metadata was not Nil when error is ErrKeyNotFound")
-	verr, ok := err.(*blobstore.Error)
+	verr, ok := err.(*Error)
 	s.Require().Equal(true, ok, fmt.Sprintf("Error from Metadata is of type %T", err))
-	s.Require().Equal(blobstore.ErrKeyNotFound, verr.Code, "Invalid Error Code from Metadata")
+	s.Require().Equal(ErrKeyNotFound, verr.Code, "Invalid Error Code from Metadata")
 }
 
 func TestStoreInteg(t *testing.T) {

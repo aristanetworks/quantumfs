@@ -4,7 +4,6 @@
 package cql
 
 import (
-	"github.com/aristanetworks/quantumfs/backends/ether"
 	"time"
 )
 
@@ -30,5 +29,5 @@ type CqlStore interface {
 	// Keyspace for the store
 	Keyspace() string
 	// Get extended information like TTL, WriteTime etc
-	GetExtKeyInfo(c ether.Ctx, key []byte) (ExtKeyInfo, error)
+	GetExtKeyInfo(c Ctx, key []byte) (ExtKeyInfo, error)
 }
