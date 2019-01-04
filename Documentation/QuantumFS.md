@@ -233,3 +233,21 @@ and the new Root ID published to the Workspace DB.
 When the published view changes, the instantiated view must be updated to ensure
 it accurately presents the state of the remotely modified filesystem to the
 local programs. This transition is plausibly consistent.
+
+## Object Key
+
+Objects in the DataStore are identified by Object Keys. These keys are a tuple
+of a high level category, such as "Metadata", and a content hash over the contents
+of the block. The category is intended as a hint to the Datastore(s) as to the
+relative cost and performance requirements of the different block types.
+
+Neither the key nor the block itself contains any information indicating how the
+block can or should be interpreted. That information is contained, explicitly or
+implicitly, in the data structure from which the key was acquired. For example,
+a Directory Entry contains both the Object Key to the top level block of an
+entry as well as information on how that block should be interpreted in the
+current context (Small File, Directory, etc.).
+
+It is possible for the same block to be referred to from two different contexts
+and interpreted differently. For example, the same data may be both a valid
+Extended Attribute index as well as a Small File within the filesystem.
