@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/backends/cql/utils/stats"
-	"github.com/aristanetworks/quantumfs/backends/cql/utils/stats/inmem"
+	"github.com/aristanetworks/quantumfs/backends/cql/stats"
+	"github.com/aristanetworks/quantumfs/backends/cql/stats/inmem"
 	"github.com/gocql/gocql"
 )
 

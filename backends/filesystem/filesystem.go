@@ -12,12 +12,11 @@ import (
 
 	"github.com/aristanetworks/quantumfs"
 	blobstore "github.com/aristanetworks/quantumfs/backends/cql"
-	"github.com/aristanetworks/quantumfs/backends/cql/utils"
 )
 
 type fileStore struct {
 	root string
-	sem  utils.Semaphore
+	sem  blobstore.Semaphore
 }
 
 // AllMetadata is the blobstore metadata for a block of data
@@ -72,6 +71,30 @@ func NewFilesystemStore(path string) (blobstore.BlobStore, error) {
 	}
 
 	store.root = path
-	store.sem = make(utils.Semaphore, 100)
+	store.sem = make(blobstore.Semaphore, 100)
 	return &store, nil
+}
+
+// TODO(krishna) TTL configuration is specific to CQL blobstore.
+// However due to current blobstore APIs managing store specific
+// metadata in common APIs, TTL metadata is being applied to all
+// blobstores managed by ether adapter.
+// APIs will be refactored to support store specific interfaces
+// for managing store specific metadata
+//
+// Currently, filesystem datastore doesn't accept a configuration file.
+// Hence refreshTTLTimeSecs = refreshTTLValueSecs =  defaultTTLValueSecs = 0
+// Hence the TTL metadata defaults to 0. In filesystem
+// datastore the TTL on the block doesn't count down and hence TTL is
+// actually never refreshed since TTL > refreshTTLTimeSecs (=0) always
+
+func NewEtherFilesystemStore(path string) quantumfs.DataStore {
+	bs, err := NewFilesystemStore(path)
+	if err != nil {
+		fmt.Printf("Failed to init ether.filesystem datastore: %s\n",
+			err.Error())
+		return nil
+	}
+	translator := blobstore.EtherBlobStoreTranslator{Blobstore: bs}
+	return &translator
 }

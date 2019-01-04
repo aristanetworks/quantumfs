@@ -8,8 +8,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs"
-	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
-	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
+	"github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 )
 
 func init() {
@@ -17,24 +16,24 @@ func init() {
 }
 
 func registerListCmd() {
-	var cmd cmdproc.CommandInfo
+	var cmd CommandInfo
 	cmd.Name = "list"
 	cmd.Usage = ""
 	cmd.Short = "list all workspaces"
 	cmd.Details = ""
 	cmd.Run = printList
 
-	cmdproc.RegisterCommand(cmd)
+	RegisterCommand(cmd)
 }
 
 func printList(args []string) error {
 	if len(args) != 0 {
-		return cmdproc.NewBadArgExitErr("incorrect arguments")
+		return NewBadArgExitErr("incorrect arguments")
 	}
 
 	tsl, err := cs.qfsdb.TypespaceList(&cs.ctx.Ctx)
 	if err != nil {
-		return cmdproc.NewBadCmdExitErr("Listing Typespaces failed: %s", err)
+		return NewBadCmdExitErr("Listing Typespaces failed: %s", err)
 	}
 	for _, ts := range tsl {
 		// Assuming we do not have _/X/Y
@@ -57,9 +56,9 @@ func printList(args []string) error {
 			for ws, nonce := range wsMap {
 				var rootID quantumfs.ObjectKey
 				wsname := ts + "/" + ns + "/" + ws
-				if rootID, _, err = qubitutils.GetWorkspaceRootID(
+				if rootID, _, err = utils.GetWorkspaceRootID(
 					&cs.ctx.Ctx, cs.qfsdb, wsname); err != nil {
-					return cmdproc.NewBadCmdExitErr("RootId "+
+					return NewBadCmdExitErr("RootId "+
 						"not found for %v err: %v",
 						wsname, err)
 				}
@@ -68,7 +67,7 @@ func printList(args []string) error {
 				if lastWrite, err =
 					cs.cqldb.WorkspaceLastWriteTime(cs.ctx, ts,
 						ns, ws); err != nil {
-					return cmdproc.NewBadCmdExitErr("Cannot "+
+					return NewBadCmdExitErr("Cannot "+
 						"find lastWriteTime for %s: %v",
 						wsname, err)
 				}

@@ -13,8 +13,7 @@ import (
 	"time"
 
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
-	walkerutils "github.com/aristanetworks/quantumfs/cmd/qutils2"
+	"github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 	"github.com/aristanetworks/quantumfs/testutils"
 	"github.com/aristanetworks/quantumfs/walker"
 )
@@ -28,7 +27,7 @@ func (t *testHelper) testCtx() *Ctx {
 		wsdb:  t.GetWorkspaceDB(),
 		ds:    datastore,
 		cqlds: translator.Blobstore,
-		ttlCfg: &qubitutils.TTLConfig{
+		ttlCfg: &utils.TTLConfig{
 			SkipMapResetAfter_ms: 500,
 			TTLNew:               600,
 		},
@@ -46,12 +45,12 @@ func (test *testHelper) setTTL(c *Ctx, filepath string, ttl int64) {
 		Qctx: c.qctx,
 	}
 
-	buf, _, err := c.cqlds.Get(walkerutils.ToECtx(&walkerCtx), fileId)
+	buf, _, err := c.cqlds.Get(utils.ToECtx(&walkerCtx), fileId)
 	test.AssertNoErr(err)
 
 	newmetadata := make(map[string]string)
 	newmetadata[cql.TimeToLive] = fmt.Sprintf("%d", ttl)
-	test.AssertNoErr(c.cqlds.Insert(walkerutils.ToECtx(&walkerCtx), fileId, buf,
+	test.AssertNoErr(c.cqlds.Insert(utils.ToECtx(&walkerCtx), fileId, buf,
 		newmetadata))
 }
 
@@ -63,7 +62,7 @@ func (test *testHelper) getTTL(c *Ctx, filepath string) int64 {
 	walkerCtx := walker.Ctx{
 		Qctx: c.qctx,
 	}
-	metadata, err := c.cqlds.Metadata(walkerutils.ToECtx(&walkerCtx), fileId)
+	metadata, err := c.cqlds.Metadata(utils.ToECtx(&walkerCtx), fileId)
 
 	test.AssertNoErr(err)
 	test.Assert(metadata != nil, "Metadata missing for file")
@@ -222,7 +221,7 @@ func TestMapMaxLen(t *testing.T) {
 
 		test.SyncAllWorkspaces()
 
-		c.skipMap = walkerutils.NewSkipMap(c.ttlCfg.SkipMapMaxLen)
+		c.skipMap = utils.NewSkipMap(c.ttlCfg.SkipMapMaxLen)
 		walkFullWSDBSetup(c)
 
 		cacheLen, mapLen := c.skipMap.Len()
@@ -327,7 +326,7 @@ func TestWriteStatPoints_Optimal(t *testing.T) {
 	runTest(t, func(test *testHelper) {
 
 		c := test.testCtx()
-		c.skipMap = walkerutils.NewSkipMap(5)
+		c.skipMap = utils.NewSkipMap(5)
 		w := wsDetails{
 			ts:     "t",
 			ns:     "n",

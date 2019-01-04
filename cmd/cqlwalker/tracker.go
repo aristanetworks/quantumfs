@@ -11,7 +11,7 @@ import "fmt"
 
 import (
 	"github.com/aristanetworks/quantumfs"
-	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
+	"github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 )
 
 // a set of paths
@@ -159,7 +159,7 @@ func (t *tracker) printSizeHistogram() {
 		32 * 1024, 64 * 1024, 128 * 1024,
 		256 * 1024, 512 * 1024, 1024 * 1024}
 	tooBig := uint64(0)
-	hist := qubitutils.NewHistogram()
+	hist := utils.NewHistogram()
 
 	badBlockSizes := make([]string, 0)
 	for key, info := range t.keys {
@@ -173,7 +173,7 @@ func (t *tracker) printSizeHistogram() {
 			continue
 		}
 		hist.Add(fmt.Sprintf("Bucket%2d [<= %s]", idx,
-			qubitutils.HumanizeBytes(uint64(buckets[idx]))),
+			utils.HumanizeBytes(uint64(buckets[idx]))),
 			info.count)
 	}
 

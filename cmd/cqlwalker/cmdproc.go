@@ -1,11 +1,11 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// Package cmdproc provides following facilities to a command line application
+// cmdproc provides following facilities to a command line application
 //  a) Template driven usage text
 //  b) Template driven command help text
 //  c) Register command handler with command specific usage and help text
-package cmdproc
+package main
 
 import (
 	"fmt"

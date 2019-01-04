@@ -6,8 +6,8 @@ package cql
 import (
 	"fmt"
 	"os"
+	"time"
 
-	"github.com/aristanetworks/quantumfs/backends/cql/utils"
 	"github.com/gocql/gocql"
 )
 
@@ -65,7 +65,7 @@ func DoTableOp(sess *gocql.Session, op SchemaOp,
 
 	for _, stmt := range ddls {
 		query := sess.Query(stmt)
-		err := utils.ExecWithRetry(query, schemaRetries)
+		err := execWithRetry(query, schemaRetries)
 		if err != nil {
 			return fmt.Errorf("error %q during %s", err.Error(), stmt)
 		}
@@ -130,7 +130,7 @@ func SetupIntegTestKeyspace(confFile string) error {
 			cfg.Cluster.KeySpace)
 
 	query := sess.Query(queryStr)
-	err = utils.ExecWithRetry(query, schemaRetries)
+	err = execWithRetry(query, schemaRetries)
 
 	if err != nil {
 		return fmt.Errorf("error in creating keyspace %s: %s",
@@ -145,7 +145,7 @@ func SetupIntegTestKeyspace(confFile string) error {
 			keyspace)
 
 	query = sess.Query(queryStr)
-	err = utils.ExecWithRetry(query, schemaRetries)
+	err = execWithRetry(query, schemaRetries)
 
 	if err != nil {
 		return fmt.Errorf("error in creating keyspace %s: %s",
@@ -153,4 +153,25 @@ func SetupIntegTestKeyspace(confFile string) error {
 	}
 
 	return nil
+}
+
+func execWithRetry(q *gocql.Query, retries int) error {
+	var err error
+	var i int
+	for i = 0; i < retries; i++ {
+		err = q.Exec()
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	if err != nil {
+		fmt.Printf("ETHER: Failed after %d attempts query: %q\n", i, q)
+	} else {
+		if i > 0 {
+			fmt.Printf("ETHER: Took %d attempts query: %q\n", i+1, q)
+		}
+	}
+	return err
 }

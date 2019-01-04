@@ -5,7 +5,7 @@
 FEATURES=
 
 COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthcheck
-COMMANDS+=cqlWalkerd cqlWalker
+COMMANDS+=cqlwalker cqlwalkerd
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
@@ -15,7 +15,7 @@ PKGS_TO_TEST+=quantumfs/backends/cql
 PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/backends/grpc
 PKGS_TO_TEST+=quantumfs/backends/grpc/server quantumfs/qlogstats
-PKGS_TO_TEST+=quantumfs/cmd/qupload quantumfs/cmd/cqlWalkerd
+PKGS_TO_TEST+=quantumfs/cmd/qupload quantumfs/cmd/cqlwalkerd
 LIBRARIES=libqfs.so libqfs.h libqfs32.so libqfs32.h
 
 # It's common practice to use a 'v' prefix on tags, but the prefix should be
@@ -76,7 +76,7 @@ update: check-dep-installed Gopkg.toml
 	@echo "Please review and commit any changes to Gopkg.tomlbase and Gopkg.lock"
 
 vet:
-	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./features -prune -o -path ./cmd -true -o -type d -print | grep -v "cql/scripts" | grep -v cql/cluster | grep -v cqlWalker`
+	go vet `find . -path ./vendor -prune -o -path ./.git -prune -o -path ./utils/dangerous -prune -o -path ./qfsclientc -prune -o -path ./QFSClient -prune -o -path ./QubitCluster -prune -o -path ./configs -prune -o -path ./_scripts -prune -o -path ./features -prune -o -path ./cmd -true -o -type d -print | grep -v "cql/scripts" | grep -v cql/cluster `
 
 lockcheck:
 	./lockcheck.sh

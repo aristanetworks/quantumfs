@@ -5,8 +5,6 @@ package main
 
 import (
 	"text/template"
-
-	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
 )
 
 var usageTemplate = `
@@ -56,7 +54,7 @@ var commonDetails = commonShort
 // utility specific template information is
 // registered with cmdproc
 func setupTemplates() {
-	commonInfo := cmdproc.CommonUsageInfo{
+	commonInfo := CommonUsageInfo{
 		Version:          version,
 		Usage:            commonUsage,
 		Short:            commonShort,
@@ -68,5 +66,5 @@ func setupTemplates() {
 		Parse(usageTemplate))
 	helpTmpl := template.Must(template.New("helpTemplate").Parse(helpTemplate))
 
-	cmdproc.RegisterTemplateInfo(commonInfo, usageTmpl, helpTmpl)
+	RegisterTemplateInfo(commonInfo, usageTmpl, helpTmpl)
 }

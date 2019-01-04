@@ -12,8 +12,7 @@ import (
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	qubitutils "github.com/aristanetworks/quantumfs/cmd/qutils"
-	"github.com/aristanetworks/quantumfs/cmd/qutils/cmdproc"
+	"github.com/aristanetworks/quantumfs/cmd/cqlwalker/utils"
 )
 
 var walkFlags *flag.FlagSet
@@ -29,7 +28,7 @@ var co commonOpts
 
 // state usable by all commands
 type commonState struct {
-	ttlCfg *qubitutils.TTLConfig
+	ttlCfg *utils.TTLConfig
 	cqlds  cql.BlobStore
 	cqldb  cql.WorkspaceDB
 	qfsds  quantumfs.DataStore
@@ -42,31 +41,31 @@ var cs commonState
 func setupCommonState() error {
 	var err error
 	if co.config == "" {
-		return cmdproc.NewPreCmdExitErr("configuration file must be " +
+		return NewPreCmdExitErr("configuration file must be " +
 			"specified")
 	}
 
-	cs.ttlCfg, err = qubitutils.LoadTTLConfig(co.config)
+	cs.ttlCfg, err = utils.LoadTTLConfig(co.config)
 	if err != nil {
-		return cmdproc.NewPreCmdExitErr("Failed to load TTL values: %s", err)
+		return NewPreCmdExitErr("Failed to load TTL values: %s", err)
 	}
 
 	cs.qfsds, err = backends.ConnectDatastore("ether.cql",
 		co.config)
 	if err != nil {
-		return cmdproc.NewPreCmdExitErr("Connection to DataStore failed: %s",
+		return NewPreCmdExitErr("Connection to DataStore failed: %s",
 			err)
 	}
 	v, ok := cs.qfsds.(*cql.EtherBlobStoreTranslator)
 	if !ok {
-		return cmdproc.NewPreCmdExitErr("Non-ether datastore found")
+		return NewPreCmdExitErr("Non-ether datastore found")
 	}
 	v.ApplyTTLPolicy = false
 	cs.cqlds = v.Blobstore
 
 	cs.qfsdb, err = backends.ConnectWorkspaceDB("ether.cql", co.config)
 	if err != nil {
-		return cmdproc.NewPreCmdExitErr("Connection to workspaceDB "+
+		return NewPreCmdExitErr("Connection to workspaceDB "+
 			"failed: %s", err)
 	}
 	cs.cqldb = cql.NewUncachedWorkspaceDB(co.config)
@@ -83,12 +82,12 @@ func main() {
 		"datastore and workspaceDB config file")
 	walkFlags.BoolVar(&co.progress, "progress", false, "show progress")
 
-	walkFlags.Usage = cmdproc.Usage
+	walkFlags.Usage = Usage
 	walkFlags.Parse(os.Args[1:])
 	args := walkFlags.Args()
 	start := time.Now()
 
-	cmdproc.ProcessCommands(setupCommonState, args)
+	ProcessCommands(setupCommonState, args)
 
 	commandTime := time.Since(start)
 	fmt.Printf("Duration: %v\n", commandTime)

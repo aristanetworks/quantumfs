@@ -10,7 +10,7 @@ import (
 	"time"
 
 	hist "github.com/VividCortex/gohistogram"
-	"github.com/aristanetworks/quantumfs/backends/cql/utils/stats"
+	"github.com/aristanetworks/quantumfs/backends/cql/stats"
 )
 
 type opStatsInMem struct {
