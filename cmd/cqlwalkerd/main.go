@@ -76,10 +76,10 @@ func main() {
 		"datastore and workspacedb config file")
 	wsdbCfg := walkFlags.String("wsdbCfg", "", "workspacedb config")
 	logdir := walkFlags.String("logdir", "", "dir for logging")
-	influxServer := walkFlags.String("influxServer", "", "influxdb server's IP")
-	influxPort := walkFlags.Uint("influxPort", 0, "influxdb server's port")
-	influxDBName := walkFlags.String("influxDBName", "",
-		"database to use in influxdb")
+	timeSeriesDB := walkFlags.String("timeSeriesDB", "processlocal",
+		"Name of database to use (processlocal, influxlib)")
+	timeSeriesDBConf := walkFlags.String("timeSeriesDBConf", "",
+		"Options to pass to database")
 	numWalkers := walkFlags.Int("numWalkers", maxNumWalkers,
 		"Number of parallel walks in the daemon")
 	useSkipMap := walkFlags.Bool("skipSeenKeys", false,
@@ -107,11 +107,10 @@ func main() {
 		fmt.Println("qubit-walkerd version", version)
 		fmt.Println("usage: qubit-walkerd -name <name> -etherCfg " +
 			"<etherCfg> [-wsdbCfg <wsdb service name>] [-logdir dir]")
-		fmt.Println("                [-influxServer serverIP " +
-			"-influxPort port" +
-			" -influxDBName dbname] [-numWalkers num] [-skipSeenKeys]" +
+		fmt.Println("                [-numWalkers num] [-skipSeenKeys]" +
 			" [-wsPrefixMatch prefix] [-negWsPrefixMatch]" +
 			" [-skipWsWrittenWithin duration]")
+		fmt.Println("                [-timeSeriesDB -timeSeriesDBConf]")
 		fmt.Println()
 		fmt.Println("This daemon periodically walks all the workspaces,")
 		fmt.Println("updates the TTL of each block as per the config " +
@@ -139,17 +138,8 @@ func main() {
 		os.Exit(exitBadConfig)
 	}
 
-	// If influxServer is specified ensure than
-	// ensure than influxDBName is also specified.
-	if *influxServer != "" && (*influxPort == 0 || *influxDBName == "") {
-		fmt.Println("When providing influxServer, influxPort ")
-		fmt.Println("and influxDBName needs to be provided as well.")
-		walkFlags.Usage()
-		os.Exit(exitBadConfig)
-	}
-
-	c := getWalkerDaemonContext(*name, *influxServer, uint16(*influxPort),
-		*influxDBName, *etherCfg, *wsdbCfg, *logdir, *numWalkers, matcher,
+	c := getWalkerDaemonContext(*name, *timeSeriesDB, *timeSeriesDBConf,
+		*etherCfg, *wsdbCfg, *logdir, *numWalkers, matcher,
 		*lastWriteDuration)
 
 	// Start heart beat messaging.

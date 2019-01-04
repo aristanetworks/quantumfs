@@ -10,7 +10,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	influxlib "github.com/aristanetworks/influxlib/go"
 	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/backends/cql"
@@ -25,7 +24,7 @@ type Ctx struct {
 	context.Context
 	name            string
 	host            string
-	influx          *influxlib.InfluxDBConnection
+	tsdb            quantumfs.TimeSeriesDB
 	qctx            *quantumfs.Ctx
 	wsdb            quantumfs.WorkspaceDB
 	cqlws           cql.WorkspaceDB
@@ -50,37 +49,27 @@ func wsLastWriteTime(c *Ctx, ts, ns, ws string) (time.Time, error) {
 	return c.cqlws.WorkspaceLastWriteTime(cql.DefaultCtx, ts, ns, ws)
 }
 
-func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
-	influxDBName string, etherCfgFile string, wsdbCfgStr string,
+func loadTimeSeriesDB(db, dbConf string) quantumfs.TimeSeriesDB {
+	tsdb, err := backends.ConnectTimeSeriesDB(db, dbConf)
+	if err != nil {
+		fmt.Printf("TimeSeriesDB load failed\n")
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	return tsdb
+}
+
+func getWalkerDaemonContext(name string, timeSeriesDB string,
+	timeSeriesDBConf string,
+	etherCfgFile string, wsdbCfgStr string,
 	logdir string, numwalkers int,
 	matcher func(s string) bool,
 	lastWriteDuration string) *Ctx {
 
-	// Connect to InfluxDB
-	var influx *influxlib.InfluxDBConnection
 	var err error
-	if influxServer == "" {
-		influx, err = influxlib.Connect(nil)
-		if err != nil {
-			fmt.Printf("Unable to connect to default influxDB err:%v\n",
-				err)
-			os.Exit(exitMiscError)
-		}
-	} else {
-		influxConfig := influxlib.DefaultConfig()
-		influxConfig.Hostname = influxServer
-		influxConfig.Port = influxPort
-		influxConfig.Database = influxDBName
 
-		influx, err = influxlib.Connect(influxConfig)
-		if err != nil {
-			fmt.Printf("Unable to connect to influxDB at addr "+
-				"%v:%v and db:%v err:%v\n",
-				influxServer, influxPort, influxDBName, err)
-			os.Exit(exitBadConfig)
-		}
-	}
-
+	tsdb := loadTimeSeriesDB(timeSeriesDB, timeSeriesDBConf)
 	lwDuration := time.Duration(0)
 	if lastWriteDuration != "" {
 		lwDuration, err = time.ParseDuration(lastWriteDuration)
@@ -161,7 +150,7 @@ func getWalkerDaemonContext(name string, influxServer string, influxPort uint16,
 	return &Ctx{
 		name:            name,
 		host:            host,
-		influx:          influx,
+		tsdb:            tsdb,
 		qctx:            newQCtx(log, id),
 		wsdb:            quantumfsWSDB,
 		cqlws:           etherWsdb,
@@ -201,11 +190,10 @@ func (c *Ctx) newRequestID() *Ctx {
 }
 
 func (c *Ctx) WriteStatPoint(measurement string,
-	tags map[string]string, fields map[string]interface{}) error {
+	tags []quantumfs.Tag, fields []quantumfs.Field) {
 
-	if c.influx == nil {
-		return nil
+	if c.tsdb == nil {
+		return
 	}
-	return c.influx.WritePoint(measurement, tags, fields)
-
+	c.tsdb.Store(measurement, tags, fields, time.Now())
 }

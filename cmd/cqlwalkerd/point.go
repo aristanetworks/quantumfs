@@ -6,6 +6,8 @@ package main
 import (
 	"strconv"
 	"time"
+
+	"github.com/aristanetworks/quantumfs"
 )
 
 type wsDetails struct {
@@ -20,6 +22,8 @@ type wsDetails struct {
 //         nameSpace - Namespace for the quantumfs workspace
 //         pass      - Walk failed or passed
 //         keyspace  - Keyspace of the WorkspaceDB
+//         host      - Hostname of the machine running the walker
+//         name      - Name given to the walker instance
 //
 // fields: workSpace   - Name of the workspace (text)
 //         walkTime    - Time it took to walk the workspace in
@@ -32,30 +36,24 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 	dur time.Duration, walkErr string) {
 
 	measurement := "walkerWorkspace"
-	tags := map[string]string{
-		"typeSpace": w.ts,
-		"nameSpace": w.ns,
-		"pass":      strconv.FormatBool(pass),
-		"keyspace":  c.keyspace,
-		"host":      c.host,
-		"name":      c.name,
-	}
-	fields := map[string]interface{}{
-		"workSpace": w.ws,
-		"walkTime":  uint(dur / time.Second),
-		"iteration": c.iteration,
-		"rootID":    w.rootID,
-		"errStr":    walkErr,
-	}
+	tags := make([]quantumfs.Tag, 0)
+	tags = append(tags, quantumfs.NewTag("typeSpace", w.ts))
+	tags = append(tags, quantumfs.NewTag("nameSpace", w.ns))
+	tags = append(tags, quantumfs.NewTag("pass", strconv.FormatBool(pass)))
+	tags = append(tags, quantumfs.NewTag("keyspace", c.keyspace))
+	tags = append(tags, quantumfs.NewTag("host", c.host))
+	tags = append(tags, quantumfs.NewTag("name", c.name))
 
-	err := c.WriteStatPoint(measurement, tags, fields)
-	if err != nil {
-		c.elog("InfluxDB %s=%s %s/%s/%s (%s) iteration=%d "+
-			"walkSuccess=%v walkErrMsg=(%q) InfluxErr:%s\n",
-			measurement, dur.String(), w.ts, w.ns, w.ws, w.rootID,
-			c.iteration, pass, walkErr, err.Error())
-		return
-	}
+	fields := make([]quantumfs.Field, 0)
+	fields = append(fields, quantumfs.NewFieldString("workSpace", w.ws))
+	fields = append(fields, quantumfs.NewFieldInt("walkTime",
+		int64(dur/time.Second)))
+	fields = append(fields, quantumfs.NewFieldInt("iteration",
+		int64(c.iteration)))
+	fields = append(fields, quantumfs.NewFieldString("rootID", w.rootID))
+	fields = append(fields, quantumfs.NewFieldString("errStr", walkErr))
+
+	c.WriteStatPoint(measurement, tags, fields)
 	c.vlog("%s InfluxDB %s=%s "+"%s/%s/%s (%s) iteration=%d walkSuccess=%v "+
 		"walkErrMsg=%s \n",
 		successPrefix, measurement, dur.String(), w.ts, w.ns, w.ws, w.rootID,
@@ -64,9 +62,11 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 
 // AddPointWalkerIteration is a measurement point writer
 //
-// tags:   keyspace    - Keyspace of the WorkspaceDB
+// tags:   keyspace     - Keyspace of the WorkspaceDB
+//         host         - Hostname of the machine running the walker
+//         name         - Name given to the walker instance
 //
-// fields: walkTime  - Time it took to walk all the workspace in
+// fields: walkTime     - Time it took to walk all the workspace in
 //                        seconds (uint)
 //         iteration    - The iteration number for this walk
 //         countSuccess - Num successful walks
@@ -74,25 +74,22 @@ func AddPointWalkerWorkspace(c *Ctx, w wsDetails, pass bool,
 //
 func AddPointWalkerIteration(c *Ctx, dur time.Duration) {
 	measurement := "walkerIteration"
-	tags := map[string]string{
-		"keyspace": c.keyspace,
-		"host":     c.host,
-		"name":     c.name,
-	}
-	fields := map[string]interface{}{
-		"walkTime":     uint(dur / time.Second),
-		"iteration":    c.iteration,
-		"countSuccess": c.numSuccess,
-		"countError":   c.numError,
-	}
-	err := c.WriteStatPoint(measurement, tags, fields)
-	if err != nil {
-		c.elog("InfluxDB %s=%s iteration=%d numSuccess=%d numError=%d "+
-			"InfluxErr: %s\n",
-			measurement, dur.String(), c.iteration, c.numSuccess,
-			c.numError, err.Error())
-		return
-	}
+	tags := make([]quantumfs.Tag, 0)
+	tags = append(tags, quantumfs.NewTag("keyspace", c.keyspace))
+	tags = append(tags, quantumfs.NewTag("host", c.host))
+	tags = append(tags, quantumfs.NewTag("name", c.name))
+
+	fields := make([]quantumfs.Field, 0)
+	fields = append(fields, quantumfs.NewFieldInt("walkTime",
+		int64(dur/time.Second)))
+	fields = append(fields, quantumfs.NewFieldInt("iteration",
+		int64(c.iteration)))
+	fields = append(fields, quantumfs.NewFieldInt("countSuccess",
+		int64(c.numSuccess)))
+	fields = append(fields, quantumfs.NewFieldInt("countError",
+		int64(c.numError)))
+
+	c.WriteStatPoint(measurement, tags, fields)
 	c.vlog("%s InfluxDB %s=%s iteration=%d numSuccess=%d numError=%d\n",
 		successPrefix, measurement, dur.String(), c.iteration, c.numSuccess,
 		c.numError)
@@ -100,7 +97,9 @@ func AddPointWalkerIteration(c *Ctx, dur time.Duration) {
 
 // Write point to indicate that walker is alive.
 //
-// tags:   keyspace    - Keyspace of the WorkspaceDB
+// tags:   keyspace   - Keyspace of the WorkspaceDB
+//         host       - Hostname of the machine running the walker
+//         name       - Name given to the walker instance
 //
 // fields: alive      - a monotonically increasing count.
 //         skipMapLen - Num keys in the skipMap
@@ -114,29 +113,25 @@ func AddPointWalkerHeartBeat(c *Ctx) {
 	}
 
 	measurement := "walkerHeartBeat"
-	tags := map[string]string{
-		"keyspace": c.keyspace,
-		"host":     c.host,
-		"name":     c.name,
-	}
-	fields := map[string]interface{}{
-		"alive":        c.aliveCount,
-		"iteration":    c.iteration,
-		"countSuccess": c.numSuccess,
-		"countError":   c.numError,
-		"skipMapLen":   skipMapLen,
-		"skipLRULen":   skipLRULen,
-	}
+	tags := make([]quantumfs.Tag, 0)
+	tags = append(tags, quantumfs.NewTag("keyspace", c.keyspace))
+	tags = append(tags, quantumfs.NewTag("host", c.host))
+	tags = append(tags, quantumfs.NewTag("name", c.name))
 
-	err := c.WriteStatPoint(measurement, tags, fields)
-	if err != nil {
-		c.elog("InfluxDB %s aliveCount=%d iteration=%d numSuccess=%d "+
-			"numError=%d skipMapLen=%d skipLRULen=%d InfluxErr=%s\n",
-			successPrefix, measurement, c.aliveCount, c.iteration,
-			c.numSuccess, c.numError, skipMapLen, skipLRULen,
-			err.Error())
-		return
-	}
+	fields := make([]quantumfs.Field, 0)
+	fields = append(fields, quantumfs.NewFieldInt("alive", c.aliveCount))
+	fields = append(fields, quantumfs.NewFieldInt("iteration",
+		int64(c.iteration)))
+	fields = append(fields, quantumfs.NewFieldInt("countSuccess",
+		int64(c.numSuccess)))
+	fields = append(fields, quantumfs.NewFieldInt("countError",
+		int64(c.numError)))
+	fields = append(fields, quantumfs.NewFieldInt("skipMapLen",
+		int64(skipMapLen)))
+	fields = append(fields, quantumfs.NewFieldInt("skipLRULen",
+		int64(skipLRULen)))
+
+	c.WriteStatPoint(measurement, tags, fields)
 	c.vlog("%s InfluxDB %s aliveCount=%d iteration=%d numSuccess=%d "+
 		"numError=%d skipMapLen=%d skipLRULen=%d\n",
 		successPrefix, measurement, c.aliveCount, c.iteration, c.numSuccess,
