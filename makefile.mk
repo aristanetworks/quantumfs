@@ -5,7 +5,7 @@
 FEATURES=
 
 COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthcheck
-COMMANDS=cqlwalker cqlwalkerd
+COMMANDS+=cqlwalker cqlwalkerd
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
 PKGS_TO_TEST=quantumfs quantumfs/daemon quantumfs/qlog
