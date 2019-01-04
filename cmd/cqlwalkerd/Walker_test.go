@@ -21,11 +21,13 @@ import (
 func (t *testHelper) testCtx() *Ctx {
 	datastore := t.GetDataStore()
 	translator := datastore.(*cql.CqlBlobStoreTranslator)
+	tsdb := loadTimeSeriesDB("processlocal", "")
 
 	return &Ctx{
 		qctx:  t.QfsCtx(),
 		wsdb:  t.GetWorkspaceDB(),
 		ds:    datastore,
+		tsdb:  tsdb,
 		cqlds: translator.Blobstore,
 		ttlCfg: &utils.TTLConfig{
 			SkipMapResetAfter_ms: 500,
