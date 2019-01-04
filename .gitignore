@@ -10,7 +10,7 @@
 /qupload
 /qwalker
 /emptykeys
-/cmd/wsdbservice/wsdbservice
+/wsdbservice
 /contentcheck
 /vendor
 /QuantumFS*.rpm
