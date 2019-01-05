@@ -37,7 +37,8 @@ Below the WSDB there is the Datastore. This can be any suitably fast and durable
 key-value store. Every file object (directory, regular file, extended attribute,
 etc.) is split into a number of blocks with a fixed, moderate maximum size.
 These blocks are stored in the datastore for persistence. Blocks are addressed
-by their contents and never modified after being written.
+by their contents and never modified after being written. The QuantumFS core
+views the Datastore as an infinite capacity key-value store.
 
 Finally, we have a number of servers. These servers are where QuantumFS is
 mounted as a filesystem for use. QuantumFS instances do not communicate directly
@@ -130,7 +131,8 @@ The minor implications are several and only the most important are listed here:
 
 2. The plausible eventual consistency model assumes humans are making the
    modifications. The resolutions may be unexpected for sequences of operations
-   which don't follow human behaviour.
+   which don't follow human behaviour. Tight coupling between multiple QuantumFS
+   instances is inefficient and may result in surprising filesystem results.
 
 3. QuantumFS tracks which files you touch. The accessed file list tracks, per
    instance per workspace, which files are read, modified, created or deleted.
