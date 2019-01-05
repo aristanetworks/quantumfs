@@ -1,7 +1,19 @@
 // Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// +build gocql
+// The benchmarks here are used primarily to spot deviations
+// in performance of GoCQL APIs when used with our cluster
+// configuration and schemas. Intentionally, the write and
+// read routines do not use Cql code but instead use GoCQL
+// APIs directly.
+
+// These benchmarks do not reflect typical Cql usage and
+// hence do not use the results to advertize Cql performance.
+// These benchmarks can also help during performance investigations
+// where GoCQL baseline performance information is needed.
+// These tests run against a live scylladb.
+
+// +build longrunningtests
 
 package cql
 
@@ -14,17 +26,6 @@ import (
 
 	"github.com/gocql/gocql"
 )
-
-// The benchmarks here are used primarily to spot deviations
-// in performance of GoCQL APIs when used with our cluster
-// configuration and schemas. Intentionally, the write and
-// read routines do not use Cql code but instead use GoCQL
-// APIs directly.
-
-// These benchmarks do not reflect typical Cql usage and
-// hence do not use the results to advertize Cql performance.
-// These benchmarks can also help during performance investigations
-// where GoCQL baseline performance information is needed.
 
 // globals
 // gcp prefix = Go CQL performance

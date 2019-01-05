@@ -16,6 +16,7 @@ PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/backends/grpc
 PKGS_TO_TEST+=quantumfs/backends/grpc/server quantumfs/qlogstats
 PKGS_TO_TEST+=quantumfs/cmd/qupload quantumfs/cmd/cqlwalkerd
+TEST_PKGS_TO_COMPILE=quantumfs/backends/cql
 LIBRARIES=libqfs.so libqfs.h libqfs32.so libqfs32.h
 
 # It's common practice to use a 'v' prefix on tags, but the prefix should be
@@ -32,7 +33,7 @@ version := $(shell git describe --dirty --abbrev=8 --match "v[0-9]*" 2>/dev/null
 RPM_VERSION := $(shell echo "$(version)" | sed -e "s/^v//" -e "s/-/_/g")
 RPM_RELEASE := 1
 
-all: lockcheck cppstyle vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) qfsclient
+all: lockcheck cppstyle vet $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) qfsclient $(TEST_PKGS_TO_COMPILE)
 
 clean:
 	rm -f $(COMMANDS) $(COMMANDS386) $(COMMANDS_STATIC) $(LIBRARIES)
@@ -127,6 +128,9 @@ $(COMMANDS386): encoding/metadata.capnp.go
 # entirely deterministic and we want to get test coverage of timing differences.
 $(PKGS_TO_TEST): encoding/metadata.capnp.go backends/grpc/rpc/rpc.pb.go
 	sudo -E go test -tags "$(FEATURES)" $(QFS_GO_TEST_ARGS) -gcflags '-e' -count 1 github.com/aristanetworks/$@
+
+$(TEST_PKGS_TO_COMPILE):
+	sudo -E go test -c -tags longrunningtests -gcflags '-e' github.com/aristanetworks/$@ -o longrunningcql.test
 
 check-fpm:
 	fpm --help &> /dev/null || \
@@ -233,7 +237,7 @@ rpms: $(COMMANDS) quantumfsRPM qfsRPM qfsRPMi686 quploadRPM clientRPM clientRPM3
 
 .PHONY: all clean check-dep-installed fetch update vet lockcheck cppstyle check-fpm
 .PHONY: check-fpm qfsRPM quploadRPM clientRPM clientRPM32 rpms
-.PHONY: $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) $(COMMANDS_STATIC)
+.PHONY: $(COMMANDS) $(COMMANDS386) $(PKGS_TO_TEST) $(COMMANDS_STATIC) $(TEST_PKGS_TO_COMPILE)
 
 
 include QFSClient/Makefile
