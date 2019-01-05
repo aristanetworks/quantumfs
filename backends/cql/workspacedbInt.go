@@ -55,7 +55,6 @@ const (
 	// use as a destination typespace in Branch operation.
 	ErrLocked ErrCode = iota
 
-	// BS Errors copied from blobstoreInt.go
 	ErrOperationFailed       ErrCode = iota // The specific operation failed
 	ErrBlobStoreDown         ErrCode = iota // The blobstore could not be reached
 	ErrBlobStoreInconsistent ErrCode = iota // The blobstore has an internal err
