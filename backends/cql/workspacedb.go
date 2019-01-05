@@ -195,7 +195,7 @@ type WorkspaceDB interface {
 	// Possible errors are:
 	//  ErrWorkspaceNotFound
 	//  ErrWorkspaceOutOfDate: The workspace rootID was changed
-	//  	remotely so the local instance is out of date
+	//  remotely so the local instance is out of date
 	AdvanceWorkspace(c Ctx, typespace string, namespace string, workspace string,
 		nonce WorkspaceNonce, currentRootID ObjectKey,
 		newRootID ObjectKey) (ObjectKey, WorkspaceNonce, error)
