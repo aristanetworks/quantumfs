@@ -4,7 +4,7 @@
 # See the files in the features directory for details.
 FEATURES=
 
-COMMANDS=quantumfsd qfs qparse emptykeys qupload qwalker qloggerdb wsdbhealthcheck
+COMMANDS=quantumfsd qfs qparse emptykeys qupload qloggerdb wsdbhealthcheck
 COMMANDS+=wsdbservice cqlwalker cqlwalkerd
 COMMANDS386=qfs-386 qparse-386
 COMMANDS_STATIC=quantumfsd-static qupload-static
