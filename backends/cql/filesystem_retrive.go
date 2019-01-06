@@ -1,15 +1,13 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-package filesystem
+package cql
 
 import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
-
-	ether "github.com/aristanetworks/quantumfs/backends/cql"
 )
 
 func openFile(fileName string) (*os.File, int64, error) {
@@ -76,7 +74,7 @@ func unmarshallMetadata(data []byte) (map[string]interface{}, map[string]string,
 // check we do is to verify if the size of the data file and the size stored in the
 // blobstore metadata match. If they do not we will return ErrOperationFailed as it is
 // likely a race with a delete operaration. The client can retry the operation.
-func (b *fileStore) Get(c ether.Ctx, key []byte) ([]byte, map[string]string, error) {
+func (b *fileStore) Get(c ctx, key []byte) ([]byte, map[string]string, error) {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn("fs::Get", "key: %s", keyHex).Out()
 
@@ -86,9 +84,9 @@ func (b *fileStore) Get(c ether.Ctx, key []byte) ([]byte, map[string]string, err
 	blobstoreMetadata, metadata, err := retrieveMetadata(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil, ether.NewError(ether.ErrKeyNotFound, "key %s not found in Get", keyHex)
+			return nil, nil, NewError(ErrKeyNotFound, "key %s not found in Get", keyHex)
 		}
-		return nil, nil, ether.NewError(ether.ErrOperationFailed, "error in retrieving metadata in Get %s", err.Error())
+		return nil, nil, NewError(ErrOperationFailed, "error in retrieving metadata in Get %s", err.Error())
 	}
 
 	dataSize := int64(blobstoreMetadata["size"].(float64))
@@ -96,22 +94,22 @@ func (b *fileStore) Get(c ether.Ctx, key []byte) ([]byte, map[string]string, err
 	if dataSize != 0 {
 		df, ds, err := openFile(filePath + ".data")
 		if err != nil {
-			return nil, nil, ether.NewError(ether.ErrOperationFailed, "error in opening data file in Get %s", err.Error())
+			return nil, nil, NewError(ErrOperationFailed, "error in opening data file in Get %s", err.Error())
 		}
 		defer df.Close()
 
 		if ds != dataSize {
-			return nil, nil, ether.NewError(ether.ErrOperationFailed, "incorrect size read in Get")
+			return nil, nil, NewError(ErrOperationFailed, "incorrect size read in Get")
 		}
 		value, err = getFile(df, dataSize)
 		if err != nil {
-			return nil, nil, ether.NewError(ether.ErrOperationFailed, "error in reading data file in Get %s", err.Error())
+			return nil, nil, NewError(ErrOperationFailed, "error in reading data file in Get %s", err.Error())
 		}
 	}
 	return value, metadata, nil
 }
 
-func (b *fileStore) Metadata(c ether.Ctx, key []byte) (map[string]string, error) {
+func (b *fileStore) Metadata(c ctx, key []byte) (map[string]string, error) {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn("fs::Metadata", "key: %s", keyHex).Out()
 
@@ -119,9 +117,9 @@ func (b *fileStore) Metadata(c ether.Ctx, key []byte) (map[string]string, error)
 	_, metadata, err := retrieveMetadata(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, ether.NewError(ether.ErrKeyNotFound, "key %s not found during Metadata", keyHex)
+			return nil, NewError(ErrKeyNotFound, "key %s not found during Metadata", keyHex)
 		}
-		return nil, ether.NewError(ether.ErrOperationFailed, "error in retrieving  metadata file in Metadata %s", err.Error())
+		return nil, NewError(ErrOperationFailed, "error in retrieving  metadata file in Metadata %s", err.Error())
 	}
 
 	return metadata, nil
