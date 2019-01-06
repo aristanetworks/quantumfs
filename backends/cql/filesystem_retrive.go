@@ -39,7 +39,8 @@ func getFile(file *os.File, fileSize int64) ([]byte, error) {
 	return b, nil
 }
 
-func retrieveMetadata(filePath string) (map[string]interface{}, map[string]string, error) {
+func retrieveMetadata(filePath string) (map[string]interface{},
+	map[string]string, error) {
 
 	file, size, err := openFile(filePath + ".mdata")
 	if err != nil {
@@ -58,7 +59,8 @@ func retrieveMetadata(filePath string) (map[string]interface{}, map[string]strin
 	return blobstoreMetadata, metadata, nil
 }
 
-func unmarshallMetadata(data []byte) (map[string]interface{}, map[string]string, error) {
+func unmarshallMetadata(data []byte) (map[string]interface{},
+	map[string]string, error) {
 
 	var allMetadata AllMetadata
 	err := json.Unmarshal(data, &allMetadata)
@@ -72,8 +74,8 @@ func unmarshallMetadata(data []byte) (map[string]interface{}, map[string]string,
 // the key to include the content hash of the value we will not perform any strong
 // checks to verify that the data and metadata are from an atomic Insert. The only
 // check we do is to verify if the size of the data file and the size stored in the
-// blobstore metadata match. If they do not we will return ErrOperationFailed as it is
-// likely a race with a delete operaration. The client can retry the operation.
+// blobstore metadata match. If they do not we will return ErrOperationFailed as it
+// is likely a race with a delete operaration. The client can retry the operation.
 func (b *fileStore) Get(c ctx, key []byte) ([]byte, map[string]string, error) {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn("fs::Get", "key: %s", keyHex).Out()
@@ -84,9 +86,11 @@ func (b *fileStore) Get(c ctx, key []byte) ([]byte, map[string]string, error) {
 	blobstoreMetadata, metadata, err := retrieveMetadata(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil, NewError(ErrKeyNotFound, "key %s not found in Get", keyHex)
+			return nil, nil, NewError(ErrKeyNotFound,
+				"key %s not found in Get", keyHex)
 		}
-		return nil, nil, NewError(ErrOperationFailed, "error in retrieving metadata in Get %s", err.Error())
+		return nil, nil, NewError(ErrOperationFailed,
+			"error in retrieving metadata in Get %s", err.Error())
 	}
 
 	dataSize := int64(blobstoreMetadata["size"].(float64))
@@ -94,16 +98,19 @@ func (b *fileStore) Get(c ctx, key []byte) ([]byte, map[string]string, error) {
 	if dataSize != 0 {
 		df, ds, err := openFile(filePath + ".data")
 		if err != nil {
-			return nil, nil, NewError(ErrOperationFailed, "error in opening data file in Get %s", err.Error())
+			return nil, nil, NewError(ErrOperationFailed,
+				"error in opening data file in Get %s", err.Error())
 		}
 		defer df.Close()
 
 		if ds != dataSize {
-			return nil, nil, NewError(ErrOperationFailed, "incorrect size read in Get")
+			return nil, nil, NewError(ErrOperationFailed,
+				"incorrect size read in Get")
 		}
 		value, err = getFile(df, dataSize)
 		if err != nil {
-			return nil, nil, NewError(ErrOperationFailed, "error in reading data file in Get %s", err.Error())
+			return nil, nil, NewError(ErrOperationFailed,
+				"error in reading data file in Get %s", err.Error())
 		}
 	}
 	return value, metadata, nil
@@ -117,9 +124,12 @@ func (b *fileStore) Metadata(c ctx, key []byte) (map[string]string, error) {
 	_, metadata, err := retrieveMetadata(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, NewError(ErrKeyNotFound, "key %s not found during Metadata", keyHex)
+			return nil, NewError(ErrKeyNotFound,
+				"key %s not found during Metadata", keyHex)
 		}
-		return nil, NewError(ErrOperationFailed, "error in retrieving  metadata file in Metadata %s", err.Error())
+		return nil, NewError(ErrOperationFailed,
+			"error in retrieving  metadata file in Metadata %s",
+			err.Error())
 	}
 
 	return metadata, nil
