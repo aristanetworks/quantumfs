@@ -10,7 +10,10 @@ import (
 )
 
 func init() {
-	registerDatastore("cql.filesystem", cql.NewCqlFilesystemStore)
 	registerDatastore("cql.cql", cql.NewCqlStore)
 	registerWorkspaceDB("cql.cql", cql.NewCqlWorkspaceDB)
+}
+
+func RegisterTestCqlBackend() {
+	registerDatastore("cql.filesystem", cql.NewCqlFilesystemStore)
 }
