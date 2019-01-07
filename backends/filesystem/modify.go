@@ -11,13 +11,14 @@ import (
 	"path/filepath"
 	"time"
 
-	ether "github.com/aristanetworks/quantumfs/backends/cql"
+	"github.com/aristanetworks/quantumfs/backends/cql"
 )
 
 func writeData(fileName string, data []byte) (err error) {
 
-	// We write the data first to a temporary file and then rename it to the passed
-	// fileName. This eliminates the chance of reading a partially written file.
+	// We write the data first to a temporary file and then rename it to the
+	// passed fileName. This eliminates the chance of reading a partially
+	// written file.
 
 	file, err := ioutil.TempFile(filepath.Dir(fileName), filepath.Base(fileName))
 	if err != nil {
@@ -47,22 +48,26 @@ func writeData(fileName string, data []byte) (err error) {
 	return nil
 }
 
-// Insert will first write the value to the data file and then write the metadata file
-// Retrieval operations will access metadata before data. This ordering is imposed
-// so that the existence of the metadata file indicates that the key and its value are
+// Insert will first write the value to the data file and then write the metadata
+// file. Retrieval operations will access metadata before data. This ordering is
+// imposed so that the existence of the metadata file indicates that the key and its
+// value are
 // present in the blobstore.
 // NOTE: The Insert method has an semaphore limiting the number of
 // concurrent Inserts to 100. This limits the number of open files
 // opened by the FS implementation of blobstore.
 // The number 100, has been emperically determined, and can be changed.
-func (b *fileStore) Insert(c ether.Ctx, key []byte, value []byte, metadata map[string]string) error {
+func (b *fileStore) Insert(c cql.Ctx, key []byte,
+	value []byte, metadata map[string]string) error {
+
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn("fs::Insert", "key: %s", keyHex).Out()
 
 	dir, filePath := getDirAndFilePath(b, key)
 	err := os.MkdirAll(dir, 0777)
 	if err != nil {
-		return ether.NewError(ether.ErrOperationFailed, "error in MkdirAll in Insert %s", err.Error())
+		return cql.NewError(cql.ErrOperationFailed,
+			"error in MkdirAll in Insert %s", err.Error())
 	}
 
 	b.sem.P()
@@ -70,7 +75,8 @@ func (b *fileStore) Insert(c ether.Ctx, key []byte, value []byte, metadata map[s
 
 	err = writeData(filePath+".data", value)
 	if err != nil {
-		return ether.NewError(ether.ErrOperationFailed, "error in writing data in Insert %s", err.Error())
+		return cql.NewError(cql.ErrOperationFailed,
+			"error in writing data in Insert %s", err.Error())
 	}
 
 	blobstoreMetadata := make(map[string]interface{})
@@ -79,22 +85,26 @@ func (b *fileStore) Insert(c ether.Ctx, key []byte, value []byte, metadata map[s
 	blobstoreMetadata["mtime"] = t.Unix()
 	blobstoreMetadata["size"] = len(value)
 
-	allMetadata := AllMetadata{BlobStoreMetadata: blobstoreMetadata, Metadata: metadata}
+	allMetadata := AllMetadata{BlobStoreMetadata: blobstoreMetadata,
+		Metadata: metadata}
 
 	jMetaData, err := json.Marshal(allMetadata)
 	if err != nil {
-		return ether.NewError(ether.ErrOperationFailed, "error in json marshalling of metadata in Insert %s", err.Error())
+		return cql.NewError(cql.ErrOperationFailed,
+			"error in json marshalling of metadata in Insert %s",
+			err.Error())
 	}
 
 	err = writeData(filePath+".mdata", jMetaData)
 	if err != nil {
-		return ether.NewError(ether.ErrOperationFailed, "error in writing metadata in Insert %s", err.Error())
+		return cql.NewError(cql.ErrOperationFailed,
+			"error in writing metadata in Insert %s", err.Error())
 	}
 
 	return nil
 }
 
-func (b *fileStore) Delete(c ether.Ctx, key []byte) error {
+func (b *fileStore) Delete(c cql.Ctx, key []byte) error {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn("fs::Delete", "key: %s", keyHex).Out()
 
@@ -102,19 +112,22 @@ func (b *fileStore) Delete(c ether.Ctx, key []byte) error {
 	err := os.Remove(filePath + ".mdata")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return ether.NewError(ether.ErrKeyNotFound, "key %s not found in Delete", keyHex)
+			return cql.NewError(cql.ErrKeyNotFound,
+				"key %s not found in Delete", keyHex)
 		}
-		return ether.NewError(ether.ErrOperationFailed, "error in removing metadata in Delete %s", err.Error())
+		return cql.NewError(cql.ErrOperationFailed,
+			"error in removing metadata in Delete %s", err.Error())
 	}
 
 	err = os.Remove(filePath + ".data")
 	if err != nil {
-		return ether.NewError(ether.ErrOperationFailed, "error in removing data in Delete %s", err.Error())
+		return cql.NewError(cql.ErrOperationFailed,
+			"error in removing data in Delete %s", err.Error())
 	}
 	return nil
 }
 
-func (b *fileStore) Update(c ether.Ctx, key []byte,
+func (b *fileStore) Update(c cql.Ctx, key []byte,
 	metadata map[string]string) error {
 
 	keyHex := hex.EncodeToString(key)
@@ -124,18 +137,22 @@ func (b *fileStore) Update(c ether.Ctx, key []byte,
 	blobstoreMetadata, _, err := retrieveMetadata(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return ether.NewError(ether.ErrKeyNotFound, "key %s not found in Update", keyHex)
+			return cql.NewError(cql.ErrKeyNotFound,
+				"key %s not found in Update", keyHex)
 		}
-		return ether.NewError(ether.ErrOperationFailed, "error in retrieve metadata in Update %s", err.Error())
+		return cql.NewError(cql.ErrOperationFailed,
+			"error in retrieve metadata in Update %s", err.Error())
 	}
 	t := time.Now()
 	blobstoreMetadata["mtime"] = t.Unix()
 
-	allMetadata := AllMetadata{BlobStoreMetadata: blobstoreMetadata, Metadata: metadata}
+	allMetadata := AllMetadata{BlobStoreMetadata: blobstoreMetadata,
+		Metadata: metadata}
 	jMetaData, err := json.Marshal(allMetadata)
 	err = writeData(filePath+".mdata", jMetaData)
 	if err != nil {
-		return ether.NewError(ether.ErrOperationFailed, "error in writing metadata in Update %s", err.Error())
+		return cql.NewError(cql.ErrOperationFailed,
+			"error in writing metadata in Update %s", err.Error())
 	}
 
 	return nil

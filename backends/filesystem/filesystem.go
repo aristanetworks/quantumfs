@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
-// Package filesystem implements an ether.blobstore interface
+// Package filesystem implements an cql.blobstore interface
 // on a locally accessible filesystem
 package filesystem
 
@@ -33,41 +33,20 @@ func getDirAndFilePath(b *fileStore, key []byte) (dir string, filePath string) {
 	return dir, filePath
 }
 
-// TODO(krishna) TTL configuration is specific to CQL blobstore.
-// However due to current blobstore APIs managing store specific
-// metadata in common APIs, TTL metadata is being applied to all
-// blobstores managed by ether adapter.
-// APIs will be refactored to support store specific interfaces
-// for managing store specific metadata
-//
-// Currently, filesystem datastore doesn't accept a configuration file.
-// Hence refreshTTLTimeSecs = refreshTTLValueSecs =  defaultTTLValueSecs = 0
-// Hence the TTL metadata defaults to 0. In filesystem
-// datastore the TTL on the block doesn't count down and hence TTL is
-// actually never refreshed since TTL > refreshTTLTimeSecs (=0) always
-
-func NewEtherFilesystemStore(path string) quantumfs.DataStore {
-	bs, err := NewFilesystemStore(path)
-	if err != nil {
-		fmt.Printf("Failed to init ether.filesystem datastore: %s\n",
-			err.Error())
-		return nil
-	}
-	translator := blobstore.EtherBlobStoreTranslator{Blobstore: bs}
-	return &translator
-}
-
-//NewFilesystemStore allocats a new blobstore.datastore using local FS as backend store
+//NewFilesystemStore allocats a new blobstore.datastore using local FS as
+// backend store
 func NewFilesystemStore(path string) (blobstore.BlobStore, error) {
 	var store fileStore
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "path does not exist: %v", err)
+		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
+			"path does not exist: %v", err)
 	}
 
 	if !fileInfo.Mode().IsDir() {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed, "path is not a dir: %v", path)
+		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
+			"path is not a dir: %v", path)
 	}
 
 	store.root = path
@@ -78,7 +57,7 @@ func NewFilesystemStore(path string) (blobstore.BlobStore, error) {
 // TODO(krishna) TTL configuration is specific to CQL blobstore.
 // However due to current blobstore APIs managing store specific
 // metadata in common APIs, TTL metadata is being applied to all
-// blobstores managed by ether adapter.
+// blobstores managed by cql adapter.
 // APIs will be refactored to support store specific interfaces
 // for managing store specific metadata
 //
@@ -88,13 +67,13 @@ func NewFilesystemStore(path string) (blobstore.BlobStore, error) {
 // datastore the TTL on the block doesn't count down and hence TTL is
 // actually never refreshed since TTL > refreshTTLTimeSecs (=0) always
 
-func NewEtherFilesystemStore(path string) quantumfs.DataStore {
+func NewCqlFilesystemStore(path string) quantumfs.DataStore {
 	bs, err := NewFilesystemStore(path)
 	if err != nil {
-		fmt.Printf("Failed to init ether.filesystem datastore: %s\n",
+		fmt.Printf("Failed to init cql.filesystem datastore: %s\n",
 			err.Error())
 		return nil
 	}
-	translator := blobstore.EtherBlobStoreTranslator{Blobstore: bs}
+	translator := blobstore.CqlBlobStoreTranslator{Blobstore: bs}
 	return &translator
 }
