@@ -253,3 +253,14 @@ current context (Small File, Directory, etc.).
 It is possible for the same block to be referred to from two different contexts
 and interpreted differently. For example, the same data may be both a valid
 Extended Attribute index as well as a Small File within the filesystem.
+
+## Extended Key
+
+The Extended Key is the top-level Object Key for an inode along with the
+additional information necessary to correctly interpret that key.
+
+This key can be retrieved using the quantumfs.key extended attribute. Common
+uses of the Extended Key include as an efficient file digest (unmodified files
+will require no computation) and with the insertInode command to CoW copy the
+file from an original workspace and location to another workspace and/or
+location.
