@@ -192,8 +192,5 @@ func (c *Ctx) newRequestID() *Ctx {
 func (c *Ctx) WriteStatPoint(measurement string,
 	tags []quantumfs.Tag, fields []quantumfs.Field) {
 
-	if c.tsdb == nil {
-		return
-	}
 	c.tsdb.Store(measurement, tags, fields, time.Now())
 }
