@@ -44,7 +44,7 @@ type workspaceState struct {
 // Start the WorkspaceDBd goroutine. This will open a socket and listen on the given
 // port until an error occurs.
 //
-// backend is a string specifying which backend to use, currently ether.cql and
+// backend is a string specifying which backend to use, currently cql and
 // systemlocal are the only supported backends.
 //
 // config is the configuration string to pass to that backend.

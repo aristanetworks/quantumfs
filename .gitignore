@@ -1,3 +1,5 @@
+/cqlwalker
+/cqlwalkerd
 /quantumfsd
 /quantumfsd-static
 /qupload-static
@@ -8,7 +10,7 @@
 /qupload
 /qwalker
 /emptykeys
-/cmd/wsdbservice/wsdbservice
+/wsdbservice
 /contentcheck
 /vendor
 /QuantumFS*.rpm
@@ -18,3 +20,4 @@
 libqfs.*
 libqfs32.*
 /Gopkg.toml
+/longrunningcql.test

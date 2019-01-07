@@ -1,19 +1,17 @@
-// +build ether
-
 // Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
 // Arista Networks, Inc. Confidential and Proprietary.
 
 package daemon
 
-// Smoke tests for the Ether datastores
+// Smoke tests for the cql datastores
 
 import (
 	"testing"
 )
 
-func TestSmokeTestEtherFilesystem(t *testing.T) {
+func TestSmokeTestCqlFilesystem(t *testing.T) {
 	runTestNoQfsExpensiveTest(t, func(test *testHelper) {
-		test.startQuantumFs(test.etherFilesystemConfig(), nil, false)
+		test.startQuantumFs(test.cqlFilesystemConfig(), nil, false)
 		interDirectoryRename(test)
 	})
 }
