@@ -19,6 +19,12 @@ backends
     Contains registration for various supported backends. A backend is an
     implementation of one of the core subsystems, such as the WSDB or datastore.
 
+backends.cql
+    Backends using a CQL (Cassandra or Scylla) cluster for storage.
+
+backends.filesystem
+    Blobstore based test backend.
+
 backends.processlocal
     In-memory backend implementations. Used mostly for tests.
 
@@ -33,6 +39,12 @@ backends.grpc
 
 cmd
     Contains the various binary packages.
+
+cmd.cqlwalker
+    Walk and refresh the TTLs of a workspace backed by a CQL datastore.
+
+cmd.cqlwalkerd
+    Like cmd.cqlwalker but walk all workspaces periodically.
 
 cmd.emptykeys
     A development utility to compute the keys of the empty blocks.
@@ -54,10 +66,6 @@ cmd.quantumfsd
 cmd.qupload
     A utility to quickly upload a filesystem tree directly into the QuantumFS
     datastore without going through FUSE.
-
-cmd.qwalker
-    A utility to walk the blocks of every workspace to ensure they are retained
-    in the datastore.
 
 cmd.wsdbhealthcheck
     A small utility which runs some fast queries against the WSDB to ensure
