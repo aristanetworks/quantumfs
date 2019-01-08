@@ -131,7 +131,7 @@ $(PKGS_TO_TEST): encoding/metadata.capnp.go backends/grpc/rpc/rpc.pb.go
 	sudo -E go test -tags "$(FEATURES)" $(QFS_GO_TEST_ARGS) -gcflags '-e' -count 1 github.com/aristanetworks/$@
 
 $(TEST_PKGS_TO_COMPILE):
-	sudo -E go test -c -tags longrunningtests -gcflags '-e' github.com/aristanetworks/$(subst _longrunningtests,,$@) -o longrunningcql.test
+	sudo -E go test -c -tags longrunningtests -gcflags '-e' github.com/aristanetworks/$(subst _longrunningtests,,$@)
 
 check-fpm:
 	fpm --help &> /dev/null || \
