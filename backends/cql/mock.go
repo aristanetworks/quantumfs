@@ -1,5 +1,6 @@
-// Copyright (c) 2016 Arista Networks, Inc.  All rights reserved.
-// Arista Networks, Inc. Confidential and Proprietary.
+// Copyright (c) 2016 Arista Networks, Inc.
+// Use of this source code is governed by the Apache License 2.0
+// that can be found in the COPYING file.
 
 // NOTE: This file was initially generated using mockery tool but to support
 // certain usecases (look for comments with MANUAL tag) the generated code has

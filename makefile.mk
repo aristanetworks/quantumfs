@@ -1,3 +1,7 @@
+# Copyright (c) 2016 Arista Networks, Inc.
+# Use of this source code is governed by the Apache License 2.0
+# that can be found in the COPYING file.
+
 # Configure which features to build QuantumFS with. If you change these you should
 # run 'make fetch' to ensure that all the necessary dependencies are available.
 #

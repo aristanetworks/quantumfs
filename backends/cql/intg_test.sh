@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Copyright (c) 2017 Arista Networks, Inc.
+# Use of this source code is governed by the Apache License 2.0
+# that can be found in the COPYING file.
+
 # Pull scylla docker, run container
 # docker pull scylladb/scylla
 # docker run --name some-scylla -p 9042:9042 -d scylladb/scylla  --broadcast-address 127.0.0.1  --listen-address 0.0.0.0  --broadcast-rpc-address 127.0.0.1
