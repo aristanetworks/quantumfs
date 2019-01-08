@@ -20,7 +20,7 @@ PKGS_TO_TEST+=quantumfs/utils/aggregatedatastore
 PKGS_TO_TEST+=quantumfs/utils/excludespec quantumfs/backends/grpc
 PKGS_TO_TEST+=quantumfs/backends/grpc/server quantumfs/qlogstats
 PKGS_TO_TEST+=quantumfs/cmd/qupload quantumfs/cmd/cqlwalkerd
-TEST_PKGS_TO_COMPILE=quantumfs/backends/cql
+TEST_PKGS_TO_COMPILE=quantumfs/backends/cql_longrunningtests
 LIBRARIES=libqfs.so libqfs.h libqfs32.so libqfs32.h
 
 # It's common practice to use a 'v' prefix on tags, but the prefix should be
@@ -135,7 +135,7 @@ $(PKGS_TO_TEST): encoding/metadata.capnp.go backends/grpc/rpc/rpc.pb.go
 	sudo -E go test -tags "$(FEATURES)" $(QFS_GO_TEST_ARGS) -gcflags '-e' -count 1 github.com/aristanetworks/$@
 
 $(TEST_PKGS_TO_COMPILE):
-	sudo -E go test -c -tags longrunningtests -gcflags '-e' github.com/aristanetworks/$@ -o longrunningcql.test
+	sudo -E go test -c -tags longrunningtests -gcflags '-e' github.com/aristanetworks/$(subst _longrunningtests,,$@)
 
 check-fpm:
 	fpm --help &> /dev/null || \
