@@ -350,3 +350,9 @@ func TestDelete(t *testing.T) {
 	_, err = os.Stat(dataFile)
 	require.True(t, os.IsNotExist(err), "data file was not deleted")
 }
+
+func TestMain(m *testing.M) {
+	result := m.Run()
+	os.RemoveAll(fileStoreRoot)
+	os.Exit(result)
+}
