@@ -1,8 +1,7 @@
 QuantumFS is a distributed, branchable filesystem built on FUSE and heterogeneous
-object stores. QuantumFS is a core component of Qubit.
+object stores.
 
-For more information on Qubit, please see AID2967 and AID2985.
-For more information on Quantumfs, please see AID3015.
+See the Documentation directory for more information.
 
 
 Dev Environment Setup
@@ -98,5 +97,6 @@ Sending SIGUSR1 to quantumfsd will cause the read cache to be dropped and furthe
 additions disallowed. This puts QuantumFS into a lower memory mode. This is useful,
 for example, when attempting to gracefully upgrade QuantumFS to a newer version
 without forcefully terminating existing users.
+
 Sending SIGUSR2 to quantumfsd will result in it printing debug information to its
 qlog. This information can be used for testing and debugging purposes.

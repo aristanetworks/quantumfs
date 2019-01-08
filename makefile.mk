@@ -87,6 +87,7 @@ vet:
 		-path ./features -prune -o \
 		-path ./backends/cql/cluster_configs -prune -o \
 		-path ./backends/cql/scripts -prune -o \
+		-path ./Documentation -prune -o \
 		-path ./cmd -true -o -type d -print`
 
 lockcheck:
