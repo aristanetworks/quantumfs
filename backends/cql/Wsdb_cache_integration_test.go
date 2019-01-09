@@ -220,7 +220,7 @@ func getWorkspaceTestData(numTs, numNsPerTs, numWsPerNs int) *wsdata {
 	return w
 }
 
-func loadWorkspaceData(c Ctx, db WorkspaceDB, w *wsdata) error {
+func loadWorkspaceData(c ctx, db WorkspaceDB, w *wsdata) error {
 	for _, ws := range w.l {
 		parts := strings.Split(ws, "/")
 		nonceStr := fmt.Sprintf("%s %d", parts[3], 0)
@@ -238,7 +238,7 @@ func loadWorkspaceData(c Ctx, db WorkspaceDB, w *wsdata) error {
 	return nil
 }
 
-func emptyCache(c Ctx, ec *entityCache, w *wsdata) {
+func emptyCache(c ctx, ec *entityCache, w *wsdata) {
 	for _, ws := range w.l {
 		parts := strings.Split(ws, "/")
 		// deleting the typespace removes all cache entities

@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// StdCtx is the default Ctx provided by cql package.
-// Cql clients can either have custom implementation of Ctx or
+// StdCtx is the default ctx provided by cql package.
+// Cql clients can either have custom implementation of ctx or
 // use StdCtx. It logs to standard out based on the logging level.
 type StdCtx struct {
 	RequestID uint64

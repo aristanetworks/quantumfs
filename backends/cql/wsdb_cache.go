@@ -57,25 +57,25 @@ func newCacheWsdb(base WorkspaceDB, cfg WsDBConfig) WorkspaceDB {
 
 // --- workspace DB API implementation ---
 
-func (cw *cacheWsdb) NumTypespaces(c Ctx) (int, error) {
+func (cw *cacheWsdb) NumTypespaces(c ctx) (int, error) {
 	defer c.FuncInName("cacheWsdb::NumTypespaces").Out()
 
 	return cw.cache.CountEntities(c)
 }
 
-func (cw *cacheWsdb) TypespaceList(c Ctx) ([]string, error) {
+func (cw *cacheWsdb) TypespaceList(c ctx) ([]string, error) {
 	defer c.FuncInName("cacheWsdb::TypespaceList").Out()
 
 	return cw.cache.ListEntities(c)
 }
 
-func (cw *cacheWsdb) NumNamespaces(c Ctx, typespace string) (int, error) {
+func (cw *cacheWsdb) NumNamespaces(c ctx, typespace string) (int, error) {
 	defer c.FuncIn("cacheWsdb::NumNamespaces", "%s", typespace).Out()
 
 	return cw.cache.CountEntities(c, typespace)
 }
 
-func (cw *cacheWsdb) NamespaceList(c Ctx,
+func (cw *cacheWsdb) NamespaceList(c ctx,
 	typespace string) ([]string, error) {
 
 	defer c.FuncIn("cacheWsdb::NamespaceList", "%s", typespace).Out()
@@ -83,7 +83,7 @@ func (cw *cacheWsdb) NamespaceList(c Ctx,
 	return cw.cache.ListEntities(c, typespace)
 }
 
-func (cw *cacheWsdb) NumWorkspaces(c Ctx, typespace,
+func (cw *cacheWsdb) NumWorkspaces(c ctx, typespace,
 	namespace string) (int, error) {
 	defer c.FuncIn("cacheWsdb::NumWorkspaces", "%s/%s",
 		typespace, namespace).Out()
@@ -91,7 +91,7 @@ func (cw *cacheWsdb) NumWorkspaces(c Ctx, typespace,
 	return cw.cache.CountEntities(c, typespace, namespace)
 }
 
-func (cw *cacheWsdb) WorkspaceList(c Ctx, typespace string,
+func (cw *cacheWsdb) WorkspaceList(c ctx, typespace string,
 	namespace string) (map[string]WorkspaceNonce, error) {
 
 	defer c.FuncIn("cacheWsdb::WorkspaceList", "%s/%s",
@@ -128,7 +128,7 @@ func (cw *cacheWsdb) WorkspaceList(c Ctx, typespace string,
 	return wsMap, err
 }
 
-func (cw *cacheWsdb) CreateWorkspace(c Ctx, typespace string, namespace string,
+func (cw *cacheWsdb) CreateWorkspace(c ctx, typespace string, namespace string,
 	workspace string, nonce WorkspaceNonce, wsKey ObjectKey) error {
 
 	keyHex := hex.EncodeToString(wsKey)
@@ -143,7 +143,7 @@ func (cw *cacheWsdb) CreateWorkspace(c Ctx, typespace string, namespace string,
 	return nil
 }
 
-func (cw *cacheWsdb) BranchWorkspace(c Ctx, srcTypespace string, srcNamespace string,
+func (cw *cacheWsdb) BranchWorkspace(c ctx, srcTypespace string, srcNamespace string,
 	srcWorkspace string, dstTypespace string,
 	dstNamespace string, dstWorkspace string) (WorkspaceNonce,
 	WorkspaceNonce, error) {
@@ -169,7 +169,7 @@ func (cw *cacheWsdb) BranchWorkspace(c Ctx, srcTypespace string, srcNamespace st
 	return srcNonce, dstNonce, nil
 }
 
-func (cw *cacheWsdb) DeleteWorkspace(c Ctx, typespace string, namespace string,
+func (cw *cacheWsdb) DeleteWorkspace(c ctx, typespace string, namespace string,
 	workspace string) error {
 
 	defer c.FuncIn("cacheWsdb::DeleteWorkspace", "%s/%s/%s", typespace,
@@ -184,7 +184,7 @@ func (cw *cacheWsdb) DeleteWorkspace(c Ctx, typespace string, namespace string,
 	return nil
 }
 
-func (cw *cacheWsdb) WorkspaceLastWriteTime(c Ctx,
+func (cw *cacheWsdb) WorkspaceLastWriteTime(c ctx,
 	typespace string, namespace string,
 	workspace string) (time.Time, error) {
 
@@ -200,7 +200,7 @@ func (cw *cacheWsdb) WorkspaceLastWriteTime(c Ctx,
 	return ts, nil
 }
 
-func (cw *cacheWsdb) Workspace(c Ctx, typespace string, namespace string,
+func (cw *cacheWsdb) Workspace(c ctx, typespace string, namespace string,
 	workspace string) (ObjectKey, WorkspaceNonce, error) {
 
 	defer c.FuncIn("cacheWsdb::Workspace", "%s/%s/%s", typespace, namespace,
@@ -214,7 +214,7 @@ func (cw *cacheWsdb) Workspace(c Ctx, typespace string, namespace string,
 	return key, nonce, nil
 }
 
-func (cw *cacheWsdb) AdvanceWorkspace(c Ctx, typespace string,
+func (cw *cacheWsdb) AdvanceWorkspace(c ctx, typespace string,
 	namespace string, workspace string, nonce WorkspaceNonce,
 	currentRootID ObjectKey,
 	newRootID ObjectKey) (ObjectKey, WorkspaceNonce, error) {
@@ -240,7 +240,7 @@ func (cw *cacheWsdb) AdvanceWorkspace(c Ctx, typespace string,
 	return key, nonce, nil
 }
 
-func (cw *cacheWsdb) SetWorkspaceImmutable(c Ctx, typespace string, namespace string,
+func (cw *cacheWsdb) SetWorkspaceImmutable(c ctx, typespace string, namespace string,
 	workspace string) error {
 
 	defer c.FuncIn("cacheWsdb::SetWorkspaceImmutable", "%s/%s/%s",
@@ -249,7 +249,7 @@ func (cw *cacheWsdb) SetWorkspaceImmutable(c Ctx, typespace string, namespace st
 	return cw.base.SetWorkspaceImmutable(c, typespace, namespace, workspace)
 }
 
-func (cw *cacheWsdb) WorkspaceIsImmutable(c Ctx, typespace string, namespace string,
+func (cw *cacheWsdb) WorkspaceIsImmutable(c ctx, typespace string, namespace string,
 	workspace string) (bool, error) {
 
 	defer c.FuncIn("cacheWsdb::WorkspaceIsImmutable", "%s/%s/%s",
@@ -265,7 +265,7 @@ func (cw *cacheWsdb) WorkspaceIsImmutable(c Ctx, typespace string, namespace str
 // wsdbFetcherImpl implements fetcher interface in entity cache
 // the returned map contains entities inserted on local node or
 // insertions from other nodes in the CQL cluster
-func wsdbFetcherImpl(c Ctx, arg interface{},
+func wsdbFetcherImpl(c ctx, arg interface{},
 	entityPath ...string) (map[string]bool, error) {
 
 	cw, ok := arg.(*cacheWsdb)
@@ -315,7 +315,7 @@ func wsdbFetcherImpl(c Ctx, arg interface{},
 	return m, nil
 }
 
-func (cw *cacheWsdb) ReportAPIStats(c Ctx) {
+func (cw *cacheWsdb) ReportAPIStats(c ctx) {
 	defer c.FuncInName("cacheWsdb::ReportAPIStats").Out()
 
 	cw.branchStats.(stats.OpStatReporter).ReportOpStats()

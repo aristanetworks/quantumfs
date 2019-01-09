@@ -7,11 +7,13 @@ package backends
 
 import (
 	"github.com/aristanetworks/quantumfs/backends/cql"
-	"github.com/aristanetworks/quantumfs/backends/filesystem"
 )
 
 func init() {
-	registerDatastore("cql.filesystem", filesystem.NewCqlFilesystemStore)
 	registerDatastore("cql.cql", cql.NewCqlStore)
 	registerWorkspaceDB("cql.cql", cql.NewCqlWorkspaceDB)
+}
+
+func RegisterTestCqlBackend() {
+	registerDatastore("cql.filesystem", cql.NewCqlFilesystemStore)
 }

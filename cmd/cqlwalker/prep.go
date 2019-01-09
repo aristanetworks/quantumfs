@@ -18,7 +18,7 @@ import (
 	"github.com/aristanetworks/quantumfs/walker"
 )
 
-// Ctx implements both quantumfs.Ctx and cql.Ctx
+// Ctx implements both quantumfs.Ctx and cql.ctx
 type Ctx struct {
 	quantumfs.Ctx
 }

@@ -12,9 +12,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aristanetworks/quantumfs/backends"
 	"github.com/aristanetworks/quantumfs/daemon"
 	"github.com/aristanetworks/quantumfs/testutils"
 )
+
+func init() {
+	backends.RegisterTestCqlBackend()
+}
 
 // This is the normal way to run tests in the most time efficient manner
 func runTest(t *testing.T, test walkerTest) {

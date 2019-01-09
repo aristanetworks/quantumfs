@@ -3,7 +3,7 @@
 
 // Package filesystem implements an cql.blobstore interface
 // on a locally accessible filesystem
-package filesystem
+package cql
 
 import (
 	"crypto/sha1"
@@ -11,12 +11,11 @@ import (
 	"os"
 
 	"github.com/aristanetworks/quantumfs"
-	blobstore "github.com/aristanetworks/quantumfs/backends/cql"
 )
 
 type fileStore struct {
 	root string
-	sem  blobstore.Semaphore
+	sem  Semaphore
 }
 
 // AllMetadata is the blobstore metadata for a block of data
@@ -33,28 +32,25 @@ func getDirAndFilePath(b *fileStore, key []byte) (dir string, filePath string) {
 	return dir, filePath
 }
 
-//NewFilesystemStore allocats a new blobstore.datastore using local FS as
-// backend store
-func NewFilesystemStore(path string) (blobstore.BlobStore, error) {
+//NewFilesystemStore allocats a new blobstore.datastore using local FS as backend store
+func NewFilesystemStore(path string) (BlobStore, error) {
 	var store fileStore
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
-			"path does not exist: %v", err)
+		return nil, NewError(ErrOperationFailed, "path does not exist: %v", err)
 	}
 
 	if !fileInfo.Mode().IsDir() {
-		return nil, blobstore.NewError(blobstore.ErrOperationFailed,
-			"path is not a dir: %v", path)
+		return nil, NewError(ErrOperationFailed, "path is not a dir: %v", path)
 	}
 
 	store.root = path
-	store.sem = make(blobstore.Semaphore, 100)
+	store.sem = make(Semaphore, 100)
 	return &store, nil
 }
 
-// TODO(krishna) TTL configuration is specific to CQL blobstore.
+// TODO(krishna) TTL configuration is specific to CQL
 // However due to current blobstore APIs managing store specific
 // metadata in common APIs, TTL metadata is being applied to all
 // blobstores managed by cql adapter.
@@ -74,6 +70,6 @@ func NewCqlFilesystemStore(path string) quantumfs.DataStore {
 			err.Error())
 		return nil
 	}
-	translator := blobstore.CqlBlobStoreTranslator{Blobstore: bs}
+	translator := CqlBlobStoreTranslator{Blobstore: bs}
 	return &translator
 }
