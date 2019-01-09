@@ -20,23 +20,13 @@ import (
 
 const fileStoreRoot = "./ocean"
 
-//const testKey = "Hello"
 const testKeyShaHash = "f7ff9e8b7bb2e09b70935a5d785e0cc5d9d0abf0"
-
-//const testValue = "W0rld"
 const testKeyDirPath = "./ocean/f7/ff/9"
 
-//const unknownKey = "H3llo"
-
-//const testKey2 = "D@rth"
 const testKey2ShaHash = "d6cefd0925ab07f041135983970231ec7ebdc27d"
-
-//const testValue2 = "Vad3r"
 const testKey2DirPath = "./ocean/d6/ce/f"
 const testKey2BadMetadata = `{"blobstoreMetadata":{"ctime":1,"mtime":1,"size":9},` +
 	`"metadata":{"D@rth":"Vad3r"}}`
-
-//var testKey2Metadata = map[string]string{"D@rth": "Vad3r"}
 
 var envReady = false
 var bls BlobStore
