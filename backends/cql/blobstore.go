@@ -82,7 +82,7 @@ const GoCqlInsertLog = "GoCql::Insert"
 const KeyTTLLog = "Key: %s TTL: %s"
 
 // Insert is the CQL implementation of Insert()
-func (b *cqlBlobStore) Insert(c Ctx, key []byte, value []byte,
+func (b *cqlBlobStore) Insert(c ctx, key []byte, value []byte,
 	metadata map[string]string) error {
 	keyHex := hex.EncodeToString(key)
 	if metadata == nil {
@@ -129,7 +129,7 @@ const GetLog = "Cql::Get"
 const GoCqlGetLog = "GoCql::Get"
 
 // Get is the CQL implementation of Get()
-func (b *cqlBlobStore) Get(c Ctx, key []byte) ([]byte, map[string]string, error) {
+func (b *cqlBlobStore) Get(c ctx, key []byte) ([]byte, map[string]string, error) {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn(GetLog, KeyLog, keyHex).Out()
 
@@ -169,7 +169,7 @@ WHERE key = ?`, b.keyspace, b.cfName)
 const DeleteLog = "Cql::Delete"
 
 // Delete is the CQL implementation of Delete()
-func (b *cqlBlobStore) Delete(c Ctx, key []byte) error {
+func (b *cqlBlobStore) Delete(c ctx, key []byte) error {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn(DeleteLog, KeyLog, keyHex).Out()
 	return NewError(ErrOperationFailed,
@@ -184,7 +184,7 @@ const GoCqlMetadataLog = "GoCql::Metadata"
 
 // Metadata is the CQL implementation of Metadata()
 // Note: retreiving this information does not have performance overhead
-func (b *cqlBlobStore) Metadata(c Ctx, key []byte) (map[string]string, error) {
+func (b *cqlBlobStore) Metadata(c ctx, key []byte) (map[string]string, error) {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn(MetadataLog, KeyLog, keyHex).Out()
 	var ttl int
@@ -223,7 +223,7 @@ WHERE key = ?`, b.keyspace, b.cfName)
 const UpdateLog = "Cql::Update"
 
 // Update is the CQL implementation of Update()
-func (b *cqlBlobStore) Update(c Ctx, key []byte, metadata map[string]string) error {
+func (b *cqlBlobStore) Update(c ctx, key []byte, metadata map[string]string) error {
 	keyHex := hex.EncodeToString(key)
 	defer c.FuncIn(UpdateLog, KeyLog, keyHex).Out()
 	return NewError(ErrOperationFailed,
@@ -252,7 +252,7 @@ const GoGetExtKeyInfoLog = "GoCql::GetExtKeyInfoLog"
 // Note: This API is intended to be used for debugging purposes.
 //       Since this API may be slow in collecting extended information
 //       use it with caution.
-func (b *cqlBlobStore) GetExtKeyInfo(c Ctx,
+func (b *cqlBlobStore) GetExtKeyInfo(c ctx,
 	key []byte) (ExtKeyInfo, error) {
 
 	keyHex := hex.EncodeToString(key)

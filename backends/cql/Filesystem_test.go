@@ -2,7 +2,7 @@
 // Use of this source code is governed by the Apache License 2.0
 // that can be found in the COPYING file.
 
-package filesystem
+package cql
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/backends/cql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,23 +21,16 @@ import (
 
 const fileStoreRoot = "./ocean"
 
-const testKey = "Hello"
 const testKeyShaHash = "f7ff9e8b7bb2e09b70935a5d785e0cc5d9d0abf0"
-const testValue = "W0rld"
 const testKeyDirPath = "./ocean/f7/ff/9"
-const unknownKey = "H3llo"
 
-const testKey2 = "D@rth"
 const testKey2ShaHash = "d6cefd0925ab07f041135983970231ec7ebdc27d"
-const testValue2 = "Vad3r"
 const testKey2DirPath = "./ocean/d6/ce/f"
 const testKey2BadMetadata = `{"blobstoreMetadata":{"ctime":1,"mtime":1,"size":9},` +
 	`"metadata":{"D@rth":"Vad3r"}}`
 
-var testKey2Metadata = map[string]string{"D@rth": "Vad3r"}
-
 var envReady = false
-var bls cql.BlobStore
+var bls BlobStore
 
 func checkSetup(t *testing.T) {
 	if !envReady {
@@ -58,7 +50,7 @@ func TestEnvSetup(t *testing.T) {
 	envReady = true
 }
 
-var testCqlCtx = cql.DefaultCtx
+var testCqlCtx = DefaultCtx
 
 func TestNewFilesystemStore(t *testing.T) {
 
@@ -179,9 +171,9 @@ func TestGet(t *testing.T) {
 	// Verify return value for a non existent key
 	value, metadata, err = bls.Get(testCqlCtx, []byte(unknownKey))
 	require.Error(t, err, "Get returned success")
-	verr, ok := err.(*cql.Error)
+	verr, ok := err.(*Error)
 	require.Equal(t, true, ok, fmt.Sprintf("Get incorrect error type %T", err))
-	assert.Equal(t, cql.ErrKeyNotFound, verr.Code,
+	assert.Equal(t, ErrKeyNotFound, verr.Code,
 		"Get returned incorrect error %s", verr)
 	assert.Nil(t, value, "value was not Nil when error is ErrKeyNotFound")
 	assert.Nil(t, metadata, "value was not Nil when error is ErrKeyNotFound")
@@ -201,9 +193,9 @@ func TestGet(t *testing.T) {
 	os.Truncate(dataFile, int64(len(testValue2)-1))
 	value, metadata, err = bls.Get(testCqlCtx, []byte(testKey2))
 	require.Error(t, err, "Get returned incorrect error")
-	verr, ok = err.(*cql.Error)
+	verr, ok = err.(*Error)
 	require.Equal(t, true, ok, fmt.Sprintf("Get incorrect error type %T", err))
-	assert.Equal(t, cql.ErrOperationFailed, verr.Code,
+	assert.Equal(t, ErrOperationFailed, verr.Code,
 		"Get returned incorrect error code")
 	assert.Nil(t, value, "value was not Nil when error is ErrOperationFailed")
 	assert.Nil(t, metadata, "value was not Nil when error is ErrOperationFailed")
@@ -212,9 +204,9 @@ func TestGet(t *testing.T) {
 	os.Remove(dataFile)
 	value, metadata, err = bls.Get(testCqlCtx, []byte(testKey2))
 	require.Error(t, err, "Get returned incorrect error")
-	verr, ok = err.(*cql.Error)
+	verr, ok = err.(*Error)
 	require.Equal(t, true, ok, fmt.Sprintf("Get incorrect error type %T", err))
-	assert.Equal(t, cql.ErrOperationFailed, verr.Code,
+	assert.Equal(t, ErrOperationFailed, verr.Code,
 		"Get returned incorrect error code")
 	assert.Nil(t, value, "value was not Nil when error is ErrOperationFailed")
 	assert.Nil(t, metadata, "value was not Nil when error is ErrOperationFailed")
@@ -236,9 +228,9 @@ func TestGet(t *testing.T) {
 	f.Close()
 	value, metadata, err = bls.Get(testCqlCtx, []byte(testKey2))
 	require.Error(t, err, "Get returned incorrect error")
-	verr, ok = err.(*cql.Error)
+	verr, ok = err.(*Error)
 	require.Equal(t, true, ok, fmt.Sprintf("Get incorrect error type %T", err))
-	assert.Equal(t, cql.ErrOperationFailed, verr.Code,
+	assert.Equal(t, ErrOperationFailed, verr.Code,
 		"Get returned incorrect error code")
 	assert.Nil(t, value, "value was not Nil when error is ErrOperationFailed")
 	assert.Nil(t, metadata, "value was not Nil when error is ErrOperationFailed")
@@ -264,10 +256,10 @@ func TestMetadata(t *testing.T) {
 	// verify metadata with unknownKey
 	metadata, err = bls.Metadata(testCqlCtx, []byte(unknownKey))
 	require.Error(t, err, "Metadata returned success")
-	verr, ok := err.(*cql.Error)
+	verr, ok := err.(*Error)
 	require.Equal(t, true, ok,
 		fmt.Sprintf("Metadata returned incorrect error type %T", err))
-	assert.Equal(t, cql.ErrKeyNotFound, verr.Code,
+	assert.Equal(t, ErrKeyNotFound, verr.Code,
 		"Metadata returned incorrect error %s", verr)
 	assert.Nil(t, metadata, "value was not Nil when error is ErrKeyNotFound")
 }
@@ -320,10 +312,10 @@ func TestUpdate(t *testing.T) {
 	// verify update with unknownKey
 	err = bls.Update(testCqlCtx, []byte(unknownKey), nil)
 	require.Error(t, err, "Update did not return an error for non existent key")
-	verr, ok := err.(*cql.Error)
+	verr, ok := err.(*Error)
 	require.Equal(t, true, ok,
 		fmt.Sprintf("Update returned incorrect error type %T", err))
-	assert.Equal(t, cql.ErrKeyNotFound, verr.Code,
+	assert.Equal(t, ErrKeyNotFound, verr.Code,
 		"Update returned incorrect error %s", verr)
 }
 
@@ -333,10 +325,10 @@ func TestDelete(t *testing.T) {
 
 	err := bls.Delete(testCqlCtx, []byte(unknownKey))
 	require.Error(t, err, "Delete did not return an error for non existent key")
-	verr, ok := err.(*cql.Error)
+	verr, ok := err.(*Error)
 	require.Equal(t, true, ok,
 		fmt.Sprintf("Delete incorrect error type %T", err))
-	assert.Equal(t, cql.ErrKeyNotFound, verr.Code,
+	assert.Equal(t, ErrKeyNotFound, verr.Code,
 		"Delete returned incorrect error %s", verr)
 
 	err = bls.Delete(testCqlCtx, []byte(testKey))
@@ -348,4 +340,10 @@ func TestDelete(t *testing.T) {
 	dataFile := testKeyDirPath + "/" + testKeyShaHash + ".data"
 	_, err = os.Stat(dataFile)
 	require.True(t, os.IsNotExist(err), "data file was not deleted")
+}
+
+func TestMain(m *testing.M) {
+	result := m.Run()
+	os.RemoveAll(fileStoreRoot)
+	os.Exit(result)
 }

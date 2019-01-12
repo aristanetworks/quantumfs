@@ -16,7 +16,7 @@ type BlobStore interface {
 
 	// Get returns both the value and metadata for the given key or
 	// an error
-	Get(c Ctx, key []byte) ([]byte, map[string]string, error)
+	Get(c ctx, key []byte) ([]byte, map[string]string, error)
 
 	// Insert stores the given value and metadata for the key
 	// Calling Insert with a pre-existing key will overwrite the
@@ -26,18 +26,18 @@ type BlobStore interface {
 	// specific metadata which represents the seconds after which
 	// the blob should be cleaned up by the system. Refer to store
 	// specific documentation to see the store specific metadata items.
-	Insert(c Ctx, key []byte, value []byte,
+	Insert(c ctx, key []byte, value []byte,
 		metadata map[string]string) error
 
 	// Delete removes both the value and metadata for a given key from the
 	// blobstore.
-	Delete(c Ctx, key []byte) error
+	Delete(c ctx, key []byte) error
 
 	// Metadata returns the metadata for the given key or an error
-	Metadata(c Ctx, key []byte) (map[string]string, error)
+	Metadata(c ctx, key []byte) (map[string]string, error)
 
 	// Update updates the metadata for a given key irrespective of its prior
 	// existence. If the key does not exist the value associated with it will
 	// be an empty blob or string.
-	Update(c Ctx, key []byte, metadata map[string]string) error
+	Update(c ctx, key []byte, metadata map[string]string) error
 }

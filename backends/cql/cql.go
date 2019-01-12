@@ -40,7 +40,7 @@ type CqlStore interface {
 	// Keyspace for the store
 	Keyspace() string
 	// Get extended information like TTL, WriteTime etc
-	GetExtKeyInfo(c Ctx, key []byte) (ExtKeyInfo, error)
+	GetExtKeyInfo(c ctx, key []byte) (ExtKeyInfo, error)
 }
 
 // The JSON decoder, by default, doesn't unmarshal time.Duration from a
