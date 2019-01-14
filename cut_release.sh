@@ -1,6 +1,8 @@
 #!/bin/bash
-# Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
-# Arista Networks, Inc. Confidential and Proprietary.
+
+# Copyright (c) 2017 Arista Networks, Inc.
+# Use of this source code is governed by the Apache License 2.0
+# that can be found in the COPYING file.
 
 # This script creates a new QuantumFS release. This includes creating the tag,
 # prompting for release notes and building the RPM.

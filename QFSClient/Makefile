@@ -1,5 +1,6 @@
-# Copyright (c) 2017 Arista Networks, Inc.  All rights reserved.
-# Arista Networks, Inc. Confidential and Proprietary.
+# Copyright (c) 2017 Arista Networks, Inc.
+# Use of this source code is governed by the Apache License 2.0
+# that can be found in the COPYING file.
 
 # this is the directory that this makefile lives in and is used
 # instead of '.' to reference any sources or other files that
