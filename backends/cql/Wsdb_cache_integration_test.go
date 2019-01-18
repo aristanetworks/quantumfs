@@ -229,7 +229,7 @@ func getWorkspaceTestData(numTs, numNsPerTs, numWsPerNs int) *wsdata {
 func loadWorkspaceData(c ctx, db WorkspaceDB, w *wsdata) error {
 	for _, ws := range w.l {
 		parts := strings.Split(ws, "/")
-		nonceStr := fmt.Sprintf("%s %d", parts[3], 0)
+		nonceStr := fmt.Sprintf("(%s : %d)", parts[3], 0)
 		nonce, err := quantumfs.StringToNonce(nonceStr)
 		if err != nil {
 			return err
