@@ -67,21 +67,25 @@ func (s *wsdbCommonUnitTest) TestEmptyDB() {
 	s.req.Equal([]string{quantumfs.NullSpaceName}, tsList,
 		"Empty DB has incorrect list of typespaces")
 
-	nsCount, err1 := s.wsdb.NumNamespaces(unitTestCqlCtx, quantumfs.NullSpaceName)
+	nsCount, err1 := s.wsdb.NumNamespaces(unitTestCqlCtx,
+		quantumfs.NullSpaceName)
 	s.req.NoError(err1, "NumNamespace failed: %s", err1)
 	s.req.Equal(1, nsCount, "Empty DB has incorrect count of namespaces")
 
-	nsList, err2 := s.wsdb.NamespaceList(unitTestCqlCtx, quantumfs.NullSpaceName)
+	nsList, err2 := s.wsdb.NamespaceList(unitTestCqlCtx,
+		quantumfs.NullSpaceName)
 	s.req.NoError(err2, "NamespaceList failed: %s", err2)
 	s.req.Equal([]string{quantumfs.NullSpaceName}, nsList,
 		"Empty DB has incorrect list of namespaces")
 
-	wsCount, err3 := s.wsdb.NumWorkspaces(unitTestCqlCtx, quantumfs.NullSpaceName,
+	wsCount, err3 := s.wsdb.NumWorkspaces(unitTestCqlCtx,
+		quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName)
 	s.req.NoError(err3, "NumWorkspaces failed: %s", err3)
 	s.req.Equal(1, wsCount, "Empty DB has incorrect count of workspaces")
 
-	wsList, err4 := s.wsdb.WorkspaceList(unitTestCqlCtx, quantumfs.NullSpaceName,
+	wsList, err4 := s.wsdb.WorkspaceList(unitTestCqlCtx,
+		quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName)
 	s.req.NoError(err4, "WorkspaceList failed: %s", err4)
 	s.req.Equal(1, len(wsList),
@@ -116,14 +120,17 @@ func (s *wsdbCommonUnitTest) TestBranching() {
 
 	// test branching from namespace and workspace in empty DB
 	mockNonceA := GetUniqueNonce()
-	mockBranchWorkspace(s.mockSess, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, "some", "test", "a", []byte(nil), mockNonceA,
+	mockBranchWorkspace(s.mockSess, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "some", "test", "a", []byte(nil),
+		mockNonceA,
 		gocql.ErrNotFound)
 
-	nonceA, _, err := s.wsdb.BranchWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "some", "test", "a")
-	s.req.NoError(err, "Error branching "+quantumfs.NullSpaceName+" workspace: %v",
-		err)
+	nonceA, _, err := s.wsdb.BranchWorkspace(unitTestCqlCtx,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "some", "test", "a")
+	s.req.NoError(err, "Error branching "+quantumfs.NullSpaceName+
+		" workspace: %v", err)
 	s.req.Equal(mockNonceA, nonceA, "Nonce mismatch for some/test/a")
 
 	// test branching to an existing workspace
@@ -137,7 +144,8 @@ func (s *wsdbCommonUnitTest) TestBranching() {
 		WorkspaceNonceInvalid, nil)
 
 	_, _, err = s.wsdb.BranchWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "some1", "test1", "a1")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "some1", "test1",
+		"a1")
 	s.req.Error(err, "Succeeded branching to existing workspace")
 
 	// test branching from non-null workspace
@@ -218,26 +226,34 @@ func (s *wsdbCommonUnitTest) TestAdvanceNotExist() {
 func (s *wsdbCommonUnitTest) TestLockedBranchWorkspace() {
 
 	_, _, err := s.wsdb.BranchWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ns1", "ws1")
-	s.req.Error(err, "Succeeded in branching to "+quantumfs.NullSpaceName+"/ns1/ws1")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ns1", "ws1")
+	s.req.Error(err, "Succeeded in branching to "+quantumfs.NullSpaceName+
+		"/ns1/ws1")
 
 	_, _, err = s.wsdb.BranchWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName)
 	s.req.Error(err, "Succeeded in branching to the null workspace")
 
-	mockBranchWorkspace(s.mockSess, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, "ts1", quantumfs.NullSpaceName, "ws1", []byte(nil),
+	mockBranchWorkspace(s.mockSess, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1",
+		quantumfs.NullSpaceName, "ws1", []byte(nil),
 		WorkspaceNonceInvalid, gocql.ErrNotFound)
 	_, _, err = s.wsdb.BranchWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", quantumfs.NullSpaceName, "ws1")
-	s.req.NoError(err, "Failed in branching to ts1/"+quantumfs.NullSpaceName+"/ws1")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1",
+		quantumfs.NullSpaceName, "ws1")
+	s.req.NoError(err, "Failed in branching to ts1/"+quantumfs.NullSpaceName+
+		"/ws1")
 
-	mockBranchWorkspace(s.mockSess, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, "ts1", "ns1", quantumfs.NullSpaceName, []byte(nil),
-		WorkspaceNonceInvalid, gocql.ErrNotFound)
+	mockBranchWorkspace(s.mockSess, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1",
+		quantumfs.NullSpaceName, []byte(nil), WorkspaceNonceInvalid,
+		gocql.ErrNotFound)
 	_, _, err = s.wsdb.BranchWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", quantumfs.NullSpaceName)
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1",
+		quantumfs.NullSpaceName)
 	s.req.NoError(err, "Failed in branching to ts1/ns1/"+quantumfs.NullSpaceName)
 }
 
@@ -246,25 +262,28 @@ func (s *wsdbCommonUnitTest) TestLockedAdvanceWorkspace() {
 	_, _, err := s.wsdb.AdvanceWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
 		"ns1", "ws1", WorkspaceNonceInvalid, []byte{1, 2, 3},
 		[]byte{4, 5, 6})
-	s.req.Error(err, "Succeeded in advancing "+quantumfs.NullSpaceName+"/ns1/ws1")
+	s.req.Error(err, "Succeeded in advancing "+
+		quantumfs.NullSpaceName+"/ns1/ws1")
 
 	_, _, err = s.wsdb.AdvanceWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3},
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		WorkspaceNonceInvalid, []byte{1, 2, 3},
 		[]byte{4, 5, 6})
 	s.req.Error(err, "Succeeded in advancing the null workspace")
 
-	mockWsdbKeyGet(s.mockSess, "ts1", quantumfs.NullSpaceName, "ws1", []byte{1, 2,
-		3}, WorkspaceNonceInvalid, nil)
-	mockWsdbKeyPut(s.mockSess, "ts1", quantumfs.NullSpaceName, "ws1", []byte{4, 5,
-		6}, WorkspaceNonceInvalid, nil)
-	_, _, err = s.wsdb.AdvanceWorkspace(unitTestCqlCtx, "ts1", quantumfs.NullSpaceName,
-		"ws1", WorkspaceNonceInvalid, []byte{1, 2, 3}, []byte{4, 5, 6})
+	mockWsdbKeyGet(s.mockSess, "ts1", quantumfs.NullSpaceName, "ws1",
+		[]byte{1, 2, 3}, WorkspaceNonceInvalid, nil)
+	mockWsdbKeyPut(s.mockSess, "ts1", quantumfs.NullSpaceName, "ws1",
+		[]byte{4, 5, 6}, WorkspaceNonceInvalid, nil)
+	_, _, err = s.wsdb.AdvanceWorkspace(unitTestCqlCtx, "ts1",
+		quantumfs.NullSpaceName, "ws1", WorkspaceNonceInvalid,
+		[]byte{1, 2, 3}, []byte{4, 5, 6})
 	s.req.NoError(err, "Failed in advancing ts1/"+quantumfs.NullSpaceName+"/ws1")
 
-	mockWsdbKeyGet(s.mockSess, "ts1", "ns1", quantumfs.NullSpaceName, []byte{1, 2,
-		3}, WorkspaceNonceInvalid, nil)
-	mockWsdbKeyPut(s.mockSess, "ts1", "ns1", quantumfs.NullSpaceName, []byte{4, 5,
-		6}, WorkspaceNonceInvalid, nil)
+	mockWsdbKeyGet(s.mockSess, "ts1", "ns1", quantumfs.NullSpaceName,
+		[]byte{1, 2, 3}, WorkspaceNonceInvalid, nil)
+	mockWsdbKeyPut(s.mockSess, "ts1", "ns1", quantumfs.NullSpaceName,
+		[]byte{4, 5, 6}, WorkspaceNonceInvalid, nil)
 	_, _, err = s.wsdb.AdvanceWorkspace(unitTestCqlCtx, "ts1", "ns1",
 		quantumfs.NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3},
 		[]byte{4, 5, 6})
@@ -278,19 +297,21 @@ func (s *wsdbCommonUnitTest) TestInitialAdvanceWorkspace() {
 	mockWsdbKeyPut(s.mockSess, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, []byte{1, 2, 3}, WorkspaceNonceInvalid, nil)
 	_, _, err := s.wsdb.AdvanceWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, WorkspaceNonceInvalid, nil,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		WorkspaceNonceInvalid, nil,
 		[]byte{1, 2, 3})
 	s.req.NoError(err, "Failed in initial advance of the null workspace")
 
 	_, _, err = s.wsdb.AdvanceWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3},
-		[]byte{4, 5, 6})
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		WorkspaceNonceInvalid, []byte{1, 2, 3}, []byte{4, 5, 6})
 	s.req.Error(err,
 		"Succeeded in advancing null workspace after initial set")
 }
 
 func (s *wsdbCommonUnitTest) TestDeleteNullTypespace() {
-	err := s.wsdb.DeleteWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName, "ns1", "ws1")
+	err := s.wsdb.DeleteWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
+		"ns1", "ws1")
 	s.req.Error(err, "Succeeded in deleting null workspace")
 }
 
@@ -315,11 +336,13 @@ func (s *wsdbCommonUnitTest) TestWorkspaceLastWriteTime() {
 
 func (s *wsdbCommonUnitTest) TestCreateWorkspaceNoKey() {
 	mockWsdbKeyGet(s.mockSess, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, nil, WorkspaceNonceInvalid, gocql.ErrNotFound)
+		quantumfs.NullSpaceName, nil, WorkspaceNonceInvalid,
+		gocql.ErrNotFound)
 	mockWsdbKeyPut(s.mockSess, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, []byte{1, 2, 3}, WorkspaceNonceInvalid, nil)
-	err := s.wsdb.CreateWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3})
+	err := s.wsdb.CreateWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		WorkspaceNonceInvalid, []byte{1, 2, 3})
 	s.req.NoError(err, "Failed in creating workspace")
 }
 
@@ -329,8 +352,9 @@ func (s *wsdbCommonUnitTest) TestCreateWorkspaceDiffKey() {
 	mockWsdbKeyPut(s.mockSess, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, []byte{1, 2, 3}, WorkspaceNonceInvalid, nil)
 
-	err := s.wsdb.CreateWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3})
+	err := s.wsdb.CreateWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		WorkspaceNonceInvalid, []byte{1, 2, 3})
 	s.req.Error(err,
 		"Succeeded in creating workspace even though different key exists")
 }
@@ -341,8 +365,9 @@ func (s *wsdbCommonUnitTest) TestCreateWorkspaceSameKey() {
 	mockWsdbKeyPut(s.mockSess, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, []byte{1, 2, 3}, WorkspaceNonceInvalid, nil)
 
-	err := s.wsdb.CreateWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, WorkspaceNonceInvalid, []byte{1, 2, 3})
+	err := s.wsdb.CreateWorkspace(unitTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		WorkspaceNonceInvalid, []byte{1, 2, 3})
 	s.req.NoError(err, "Failed in creating workspace")
 }
 

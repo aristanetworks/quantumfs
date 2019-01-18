@@ -20,16 +20,27 @@ type BSErrorCode int
 
 // Different error code exported by blobstore package
 const (
-	ErrReserved              BSErrorCode = iota // Reserved since 0
-	ErrOperationFailed       BSErrorCode = iota // The specific operation failed
-	ErrBlobStoreDown         BSErrorCode = iota // The blobstore could not be reached
-	ErrBlobStoreInconsistent BSErrorCode = iota // The blobstore has an internal error
-	ErrBadArguments          BSErrorCode = iota // The passed arguments are incorrect
-	ErrKeyNotFound           BSErrorCode = iota // The key and associated value was not found
+	// Reserved since 0
+	ErrReserved BSErrorCode = iota
+
+	// The specific operation failed
+	ErrOperationFailed BSErrorCode = iota
+
+	// The blobstore could not be reached
+	ErrBlobStoreDown BSErrorCode = iota
+
+	// The blobstore has an internal error
+	ErrBlobStoreInconsistent BSErrorCode = iota
+
+	// The passed arguments are incorrect
+	ErrBadArguments BSErrorCode = iota
+
+	// The key and associated value was not found
+	ErrKeyNotFound BSErrorCode = iota
 )
 
-// Error implements error interface and encapsulates the error returned by ether/blobstore
-// package's APIs
+// Error implements error interface and encapsulates the error returned by
+// cql/blobstore APIs
 type Error struct {
 	Code BSErrorCode // This can be used as a sentinal value
 	Msg  string      // This is for human eyes only

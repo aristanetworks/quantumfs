@@ -23,6 +23,8 @@ func (key ObjectKey) String() string {
 // path, but different lifetimes. For example, if a workspace path were deleted and
 // then recreated, the old workspace and new workspace would have different
 // WorkspaceNonces and therefore be distinguishable.
+// We have to redefine WorkspaceNonce here and not use quantumfs.WorkspaceNonce,
+// since CQL doesn't support uint64 which is the type in quantumfs.WorkspaceNonce
 type WorkspaceNonce struct {
 	Id          int64
 	PublishTime int64

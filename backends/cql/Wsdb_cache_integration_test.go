@@ -45,7 +45,8 @@ func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 
 	suite.cache = cwsdb.cache
 
-	err = nwsdb.CreateWorkspace(integTestCqlCtx, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+	err = nwsdb.CreateWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
@@ -105,7 +106,8 @@ func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteImmutableSet() {
 
 func (suite *wsdbCacheIntegTestSuite) TestCacheIntegDeleteWorkspaceNumOK() {
 	_, _, err := suite.common.db.BranchWorkspace(integTestCqlCtx,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err, "Error branching null workspace: %v", err)
 
 	count, err1 := suite.common.db.NumTypespaces(integTestCqlCtx)
