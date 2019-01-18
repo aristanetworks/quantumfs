@@ -111,7 +111,7 @@ func (s *wsdbCommonUnitTest) TestBranching() {
 	_, _, err := s.wsdb.BranchWorkspace(unitTestCqlCtx, "notype", "notthere",
 		"a", "sometype", "somewhere", "else")
 	s.req.Error(err, "Succeeded branching invalid namespace")
-	s.req.IsType(&Error{}, err, "Invalid error type %T", err)
+	s.req.IsType(&WSDBError{}, err, "Invalid error type %T", err)
 
 	// test branching from namespace and workspace in empty DB
 	mockNonceA := GetUniqueNonce()
@@ -179,7 +179,7 @@ func (s *wsdbCommonUnitTest) TestAdvanceOutOfDateKey() {
 		WorkspaceNonceInvalid, newKey, newKey)
 
 	s.req.Error(err, "Succeeded advancing out-of-date (key) workspace")
-	s.req.IsType(&Error{},
+	s.req.IsType(&WSDBError{},
 		err, "Invalid error type %T", err)
 }
 
@@ -196,7 +196,7 @@ func (s *wsdbCommonUnitTest) TestAdvanceOutOfDateNonce() {
 		WorkspaceNonce{Id: 2, PublishTime: 0}, []byte(nil), newKey)
 
 	s.req.Error(err, "Succeeded advancing out-of-date (nonce) workspace")
-	s.req.IsType(&Error{},
+	s.req.IsType(&WSDBError{},
 		err, "Invalid error type %T", err)
 }
 
@@ -210,7 +210,7 @@ func (s *wsdbCommonUnitTest) TestAdvanceNotExist() {
 		WorkspaceNonceInvalid, []byte(nil), []byte(nil))
 
 	s.req.Error(err, "Succeeded advancing non-existant workspace")
-	s.req.IsType(&Error{},
+	s.req.IsType(&WSDBError{},
 		err, "Invalid error type %T", err)
 }
 
@@ -360,7 +360,7 @@ func (s *wsdbCommonUnitTest) TestSetWorkspaceImmutableError() {
 		fmt.Errorf("some gocql error"))
 	err := s.wsdb.SetWorkspaceImmutable(unitTestCqlCtx, "some", "test", "a")
 	s.req.Error(err, "Success while setting Immutable for some/test/a workspace")
-	s.req.IsType(&Error{},
+	s.req.IsType(&WSDBError{},
 		err, "Invalid error type %T", err)
 }
 
@@ -385,7 +385,7 @@ func (s *wsdbCommonUnitTest) TestWorkspaceIsImmutableError() {
 		fmt.Errorf("gocql error"))
 	_, err := s.wsdb.WorkspaceIsImmutable(unitTestCqlCtx, "some", "test", "a")
 	s.req.Error(err, "Success while getting Immutable for some/test/a workspace")
-	s.req.IsType(&Error{},
+	s.req.IsType(&WSDBError{},
 		err, "Invalid error type %T", err)
 }
 

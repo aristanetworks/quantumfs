@@ -28,76 +28,70 @@ func (key ObjectKey) String() string {
 	return hex.EncodeToString(key)
 }
 
-// ErrCode is error code from workspace DB APIs
-type ErrCode int
+// WSDBErrCode is error code from workspace DB APIs
+type WSDBErrCode int
 
 // NullSpaceName is the string token for each part of the null workspace path
 const NullSpaceName = "_"
 
 const (
 	// ErrReserved should not be used
-	ErrReserved ErrCode = iota
+	ErrWSDBReserved WSDBErrCode = iota
 	// ErrFatal means API has encountered a fatal error
-	ErrFatal ErrCode = iota
+	ErrFatal WSDBErrCode = iota
 	// ErrWorkspaceExists means that the workspace already exists
-	ErrWorkspaceExists ErrCode = iota
+	ErrWorkspaceExists WSDBErrCode = iota
 	// ErrWorkspaceNotFound means that the workspace doesn't exist
-	ErrWorkspaceNotFound ErrCode = iota
+	ErrWorkspaceNotFound WSDBErrCode = iota
 
 	// ErrWorkspaceOutOfDate means the operation was based on
 	// out of date information. This error occurs only when
 	// concurrent updates to same workspace is supported
 	// from different cluster nodes
-	ErrWorkspaceOutOfDate ErrCode = iota
+	ErrWorkspaceOutOfDate WSDBErrCode = iota
 
 	// ErrLocked means that typespace or namespace or workspace
 	// is locked for mutable operations like Branch or Advance.
 	// Example: a Locked typespace implies that it cannot be
 	// use as a destination typespace in Branch operation.
-	ErrLocked ErrCode = iota
-
-	ErrOperationFailed       ErrCode = iota // The specific operation failed
-	ErrBlobStoreDown         ErrCode = iota // The blobstore could not be reached
-	ErrBlobStoreInconsistent ErrCode = iota // The blobstore has an internal err
-	ErrBadArguments          ErrCode = iota // The passed arguments are incorrect
-	ErrKeyNotFound           ErrCode = iota // The key and value was not found
+	ErrLocked WSDBErrCode = iota
 )
 
 // WorkspaceNonceInvalid is an invalid nonce
 var WorkspaceNonceInvalid = WorkspaceNonce{0, 0}
 
-// Error represents the error returned from workspace DB APIs
-type Error struct {
-	Code ErrCode // This can be used as sentinal value
-	Msg  string  // This is for humans
+// WSDBError represents the error returned from workspace DB APIs
+type WSDBError struct {
+	Code WSDBErrCode // This can be used as sentinal value
+	Msg  string      // This is for humans
 }
 
-// NewError returns a new error
-func NewError(code ErrCode, msg string, args ...interface{}) error {
-	return &Error{Code: code, Msg: fmt.Sprintf(msg, args...)}
+// WSDBNewError returns a new error
+func WSDBNewError(code WSDBErrCode, msg string, args ...interface{}) error {
+	return &WSDBError{Code: code, Msg: fmt.Sprintf(msg, args...)}
 }
 
-// // ErrorCode returns a readable string for ErrCode
-// func (err *Error) ErrorCode() string {
-// 	switch err.Code {
-// 	default:
-// 		return "Unknown wsdb error"
-// 	case ErrWorkspaceExists:
-// 		return "Workspace already exists"
-// 	case ErrWorkspaceNotFound:
-// 		return "Workspace not found"
-// 	case ErrFatal:
-// 		return "Fatal workspaceDB error"
-// 	case ErrWorkspaceOutOfDate:
-// 		return "Workspace changed remotely"
-// 	case ErrLocked:
-// 		return "Lock error"
-// 	}
-// }
+// WSDBErrorCode returns a readable string for WSDBErrCode
+func (err *WSDBError) WSDBErrorCode() string {
+	switch err.Code {
+	default:
+		return "Unknown wsdb error"
+	case ErrWorkspaceExists:
+		return "Workspace already exists"
+	case ErrWorkspaceNotFound:
+		return "Workspace not found"
+	case ErrFatal:
+		return "Fatal workspaceDB error"
+	case ErrWorkspaceOutOfDate:
+		return "Workspace changed remotely"
+	case ErrLocked:
+		return "Lock error"
+	}
+}
 
-// func (err *Error) Error() string {
-// 	return fmt.Sprintf("Error: %s: %s", err.ErrorCode(), err.Msg)
-// }
+func (err *WSDBError) Error() string {
+	return fmt.Sprintf("WSDBError: %s: %s", err.WSDBErrorCode(), err.Msg)
+}
 
 // String returns the string representation for WorkspaceNonce
 func (nonce *WorkspaceNonce) String() string {

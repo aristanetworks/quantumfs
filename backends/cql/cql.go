@@ -364,7 +364,7 @@ type etherWsdbTranslator struct {
 
 // convert Error to quantumfs.WorkspaceDbErr
 func convertWsdbError(e error) error {
-	wE, ok := e.(*Error)
+	wE, ok := e.(*WSDBError)
 	if !ok {
 		panic("BUG: Errors from wsdb APIs must be of *wsdb.Error type")
 	}
