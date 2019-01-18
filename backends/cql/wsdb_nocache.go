@@ -138,7 +138,7 @@ func (nc *noCacheWsdb) WorkspaceList(c ctx, typespace string,
 	return list, nil
 }
 
-// All workspaces under the quantumfs.NullSpaceName
+// All workspaces under the NullSpaceName
 // typespace are locked. They cannot be deleted,
 // cannot be advanced or cannot be destination
 // of branch operation
