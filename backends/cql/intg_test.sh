@@ -18,7 +18,9 @@ CFNAME_PREFIX="intg${TESTID}" \
 go test -v  -timeout 200m -p 1 -tags longrunningtests -run Integ github.com/aristanetworks/quantumfs/backends/cql
 
 
-# // Smoke
-# sudo  ./quantumfsd -datastore cql -datastoreconf $QFS_CONFIG -workspaceDB cql -workspaceDBconf $QFS_CONFIG
+# // Smoke TEST
+# CQLSH into the scylla container and setup the schema from backends/cql/scripts/sampleschema.cql
+# export QFS_CONFIG="${GOPATH}/src/github.com/aristanetworks/quantumfs/backends/cql/cluster_configs/smoke_test_config"
+# sudo  ./quantumfsd -datastore "cql.cql" -datastoreconf $QFS_CONFIG -workspaceDB "cql.cql" -workspaceDBconf $QFS_CONFIG
 
 

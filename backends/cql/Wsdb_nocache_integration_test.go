@@ -12,6 +12,7 @@ package cql
 import (
 	"testing"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -36,8 +37,8 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 	wsdb, err = newNoCacheWsdb(cluster, cfg)
 	suite.Require().NoError(err, "Error during configuration read")
 
-	err = wsdb.CreateWorkspace(integTestCqlCtx, NullSpaceName,
-		NullSpaceName, NullSpaceName,
+	err = wsdb.CreateWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 

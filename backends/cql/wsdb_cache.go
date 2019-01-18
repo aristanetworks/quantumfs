@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/aristanetworks/quantumfs/backends/cql/stats"
 	"github.com/aristanetworks/quantumfs/backends/cql/stats/inmem"
 )
@@ -50,8 +51,8 @@ func newCacheWsdb(base WorkspaceDB, cfg WsDBConfig) WorkspaceDB {
 
 	ce := newEntityCache(4, cacheTimeout, cwsdb, wsdbFetcherImpl)
 	nonce := WorkspaceNonceInvalid
-	ce.InsertEntities(DefaultCtx, NullSpaceName, NullSpaceName,
-		NullSpaceName, nonce.String())
+	ce.InsertEntities(DefaultCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, nonce.String())
 	cwsdb.cache = ce
 	return cwsdb
 }
