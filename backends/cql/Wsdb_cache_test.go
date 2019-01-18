@@ -138,8 +138,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithoutExpiry() {
 	// namespaces and workspaces are also entityGroups and hence
 	// separate test isn't needed to test for their expiry
 	cwsdb.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour,
-		quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName)
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 
 	cwsdb.cache.CountEntities(unitTestCqlCtx)
 	group = cwsdb.cache.getLastEntityGroup(unitTestCqlCtx, cwsdb.cache.root)
@@ -284,8 +283,7 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterEmptyDB() {
 		"Incorrect namespaces in cache")
 
 	wsCount, err3 := suite.common.wsdb.NumWorkspaces(unitTestCqlCtx,
-		quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName)
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 	suite.Require().NoError(err3,
 		"NumWorkspaces failed: %s", err3)
 	suite.Require().Equal(1, wsCount,
@@ -301,8 +299,7 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterEmptyDB() {
 		WorkspaceNonceInvalid, nil)
 
 	wsMap, err4 := suite.common.wsdb.WorkspaceList(unitTestCqlCtx,
-		quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName)
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 	suite.Require().NoError(err4,
 		"WorkspaceList failed: %s", err4)
 	suite.Require().Equal(map[string]WorkspaceNonce{

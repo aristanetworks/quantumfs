@@ -52,8 +52,7 @@ func newCacheWsdb(base WorkspaceDB, cfg WsDBConfig) WorkspaceDB {
 	ce := newEntityCache(4, cacheTimeout, cwsdb, wsdbFetcherImpl)
 	nonce := WorkspaceNonceInvalid
 	ce.InsertEntities(DefaultCtx, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, nonce.String())
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, nonce.String())
 	cwsdb.cache = ce
 	return cwsdb
 }

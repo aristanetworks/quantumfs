@@ -79,14 +79,12 @@ func (s *wsdbCommonUnitTest) TestEmptyDB() {
 		"Empty DB has incorrect list of namespaces")
 
 	wsCount, err3 := s.wsdb.NumWorkspaces(unitTestCqlCtx,
-		quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName)
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 	s.req.NoError(err3, "NumWorkspaces failed: %s", err3)
 	s.req.Equal(1, wsCount, "Empty DB has incorrect count of workspaces")
 
 	wsList, err4 := s.wsdb.WorkspaceList(unitTestCqlCtx,
-		quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName)
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 	s.req.NoError(err4, "WorkspaceList failed: %s", err4)
 	s.req.Equal(1, len(wsList),
 		"Empty DB has incorrect number of workspaces")
@@ -121,10 +119,8 @@ func (s *wsdbCommonUnitTest) TestBranching() {
 	// test branching from namespace and workspace in empty DB
 	mockNonceA := GetUniqueNonce()
 	mockBranchWorkspace(s.mockSess, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, "some", "test", "a", []byte(nil),
-		mockNonceA,
-		gocql.ErrNotFound)
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		"some", "test", "a", []byte(nil), mockNonceA, gocql.ErrNotFound)
 
 	nonceA, _, err := s.wsdb.BranchWorkspace(unitTestCqlCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
