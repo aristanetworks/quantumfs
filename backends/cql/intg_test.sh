@@ -15,7 +15,8 @@ TESTID=`echo $$$$`
 # Run the test
 CQL_CONFIG="${CFG_DIR}/dkr_CqlIntegTest"  \
 CFNAME_PREFIX="intg${TESTID}" \
-go test -v  -timeout 200m -p 1 -tags longrunningtests -run Integ github.com/aristanetworks/quantumfs/backends/cql
+cql.test  -test.timeout 200m -test.parallel 1 
+# go test -v  -timeout 200m -p 1 -tags longrunningtests -run Integ github.com/aristanetworks/quantumfs/backends/cql
 
 
 # // Smoke

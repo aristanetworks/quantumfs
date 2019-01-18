@@ -364,28 +364,29 @@ type etherWsdbTranslator struct {
 
 // convert Error to quantumfs.WorkspaceDbErr
 func convertWsdbError(e error) error {
-	wE, ok := e.(*WSDBError)
-	if !ok {
-		panic("BUG: Errors from wsdb APIs must be of *wsdb.Error type")
-	}
+	return e
+	// wE, ok := e.(*WSDBError)
+	// if !ok {
+	// 	panic("BUG: Errors from wsdb APIs must be of *wsdb.Error type")
+	// }
 
-	var errCode quantumfs.WsdbErrCode
-	switch wE.Code {
-	case ErrWorkspaceExists:
-		errCode = quantumfs.WSDB_WORKSPACE_EXISTS
-	case ErrWorkspaceNotFound:
-		errCode = quantumfs.WSDB_WORKSPACE_NOT_FOUND
-	case ErrFatal:
-		errCode = quantumfs.WSDB_FATAL_DB_ERROR
-	case ErrWorkspaceOutOfDate:
-		errCode = quantumfs.WSDB_OUT_OF_DATE
-	case ErrLocked:
-		errCode = quantumfs.WSDB_LOCKED
-	default:
-		panic(fmt.Sprintf("Bug: Unsupported error %s", e.Error()))
-	}
+	// var errCode quantumfs.WsdbErrCode
+	// switch wE.Code {
+	// case ErrWorkspaceExists:
+	// 	errCode = quantumfs.WSDB_WORKSPACE_EXISTS
+	// case ErrWorkspaceNotFound:
+	// 	errCode = quantumfs.WSDB_WORKSPACE_NOT_FOUND
+	// case ErrFatal:
+	// 	errCode = quantumfs.WSDB_FATAL_DB_ERROR
+	// case ErrWorkspaceOutOfDate:
+	// 	errCode = quantumfs.WSDB_OUT_OF_DATE
+	// case ErrLocked:
+	// 	errCode = quantumfs.WSDB_LOCKED
+	// default:
+	// 	panic(fmt.Sprintf("Bug: Unsupported error %s", e.Error()))
+	// }
 
-	return quantumfs.NewWorkspaceDbErr(errCode, wE.Msg)
+	// return quantumfs.NewWorkspaceDbErr(errCode, wE.Msg)
 }
 
 func NewEtherWorkspaceDB(path string) quantumfs.WorkspaceDB {

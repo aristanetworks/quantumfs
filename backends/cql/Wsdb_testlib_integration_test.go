@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"time"
 
+	"github.com/aristanetworks/quantumfs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,39 +29,39 @@ func (s *wsdbCommonIntegTest) TestIntegEmptyDB() {
 
 	tsList, err2 := s.db.TypespaceList(integTestCqlCtx)
 	s.req.NoError(err2, "TypespaceList failed %s", err2)
-	s.req.Equal([]string{NullSpaceName}, tsList,
+	s.req.Equal([]string{quantumfs.NullSpaceName}, tsList,
 		"Empty DB has incorrect list of typespaces")
 
-	nsCount, err2 := s.db.NumNamespaces(integTestCqlCtx, NullSpaceName)
+	nsCount, err2 := s.db.NumNamespaces(integTestCqlCtx, quantumfs.NullSpaceName)
 	s.req.NoError(err2, "NumNamespaces failed %s", err2)
 	s.req.Equal(1, nsCount, "Empty DB has incorrect count of namespaces")
 
-	nsList, err4 := s.db.NamespaceList(integTestCqlCtx, NullSpaceName)
+	nsList, err4 := s.db.NamespaceList(integTestCqlCtx, quantumfs.NullSpaceName)
 	s.req.NoError(err4, "NamespaceList failed %s", err4)
-	s.req.Equal([]string{NullSpaceName}, nsList,
+	s.req.Equal([]string{quantumfs.NullSpaceName}, nsList,
 		"Empty DB has incorrect list of namespaces")
 
-	wsCount, err5 := s.db.NumWorkspaces(integTestCqlCtx, NullSpaceName,
-		NullSpaceName)
+	wsCount, err5 := s.db.NumWorkspaces(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName)
 	s.req.NoError(err5, "NumWorkspaces failed %s", err5)
 	s.req.Equal(1, wsCount, "Empty DB has incorrect count of workspaces")
 
-	wsList, err6 := s.db.WorkspaceList(integTestCqlCtx, NullSpaceName,
-		NullSpaceName)
+	wsList, err6 := s.db.WorkspaceList(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName)
 	s.req.NoError(err6, "WorkspaceList failed %s", err6)
 	s.req.Equal(1, len(wsList),
 		"Empty DB has incorrect number of workspaces")
-	s.req.Contains(wsList, NullSpaceName,
+	s.req.Contains(wsList, quantumfs.NullSpaceName,
 		"Empty DB has incorrect list of workspaces")
-	s.req.Equal(wsList[NullSpaceName], WorkspaceNonceInvalid,
+	s.req.Equal(wsList[quantumfs.NullSpaceName], WorkspaceNonceInvalid,
 		"Incorect Nonce value for _/_/_")
 }
 
 func (s *wsdbCommonIntegTest) TestIntegBranching() {
 
 	nonceNull, nonceWS1, err := s.db.BranchWorkspace(integTestCqlCtx,
-		NullSpaceName, NullSpaceName,
-		NullSpaceName, "ts1", "ns1", "ws1")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 	s.req.NotEqual(nonceNull, nonceWS1,
 		"Same nonce for src and dst after branching workspace")
@@ -72,7 +73,7 @@ func (s *wsdbCommonIntegTest) TestIntegBranching() {
 
 	tsList, err2 := s.db.TypespaceList(integTestCqlCtx)
 	s.req.NoError(err2, "TypespaceList failed %s", err2)
-	s.req.Contains(tsList, NullSpaceName,
+	s.req.Contains(tsList, quantumfs.NullSpaceName,
 		"Expected null typespace not found")
 	s.req.Contains(tsList, "ts1",
 		"Expected typespace ts1 not found")
@@ -105,8 +106,8 @@ func (s *wsdbCommonIntegTest) TestIntegAdvanceOk() {
 	emptyKey := []byte(nil)
 	newKey := []byte{1, 2, 3}
 
-	_, nonce, e := s.db.BranchWorkspace(integTestCqlCtx, NullSpaceName,
-		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
+	_, nonce, e := s.db.BranchWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(e, "Error branching null workspace: %v", e)
 
 	key, nonceBefore, err1 := s.db.Workspace(integTestCqlCtx,
@@ -136,7 +137,7 @@ func (s *wsdbCommonIntegTest) TestIntegAdvanceOk() {
 }
 
 func (s *wsdbCommonIntegTest) TestIntegDeleteNullTypespace() {
-	err := s.db.DeleteWorkspace(integTestCqlCtx, NullSpaceName, "ns1", "ws1")
+	err := s.db.DeleteWorkspace(integTestCqlCtx, quantumfs.NullSpaceName, "ns1", "ws1")
 	s.req.Error(err, "Succeeded in deleting null workspace")
 }
 
@@ -147,8 +148,8 @@ func (s *wsdbCommonIntegTest) TestIntegDeleteWorkspaceOK() {
 
 func (s *wsdbCommonIntegTest) TestIntegWorkspaceLastWriteTime() {
 	currentTime := time.Now().UTC()
-	_, _, e := s.db.BranchWorkspace(integTestCqlCtx, NullSpaceName,
-		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
+	_, _, e := s.db.BranchWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(e, "Error branching null workspace: %v", e)
 	ts, err := s.db.WorkspaceLastWriteTime(integTestCqlCtx,
 		"ts1", "ns1", "ws1")
@@ -163,14 +164,14 @@ func (s *wsdbCommonIntegTest) TestIntegWorkspaceLastWriteTime() {
 func (s *wsdbCommonIntegTest) TestIntegWorkspaceReCreateWithNewNonce() {
 
 	_, nonceBefore, err := s.db.BranchWorkspace(integTestCqlCtx,
-		NullSpaceName, NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	err = s.db.DeleteWorkspace(integTestCqlCtx, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Failed in deleting ts1/ns1/ws1 workspace")
 
 	_, nonceAfter, err := s.db.BranchWorkspace(integTestCqlCtx,
-		NullSpaceName, NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	s.req.NotEqual(nonceBefore, nonceAfter,
@@ -181,12 +182,12 @@ func (s *wsdbCommonIntegTest) TestIntegWorkspaceReCreateWithNewNonce() {
 // Has the correct nonces when the map has multiple keys.
 func (s *wsdbCommonIntegTest) TestIntegWorkspaceNonce() {
 
-	_, nonceWS1, err := s.db.BranchWorkspace(integTestCqlCtx, NullSpaceName,
-		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
+	_, nonceWS1, err := s.db.BranchWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
-	_, nonceWS2, err := s.db.BranchWorkspace(integTestCqlCtx, NullSpaceName,
-		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws2")
+	_, nonceWS2, err := s.db.BranchWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws2")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	wsList, err6 := s.db.WorkspaceList(integTestCqlCtx, "ts1", "ns1")
@@ -204,8 +205,8 @@ func (s *wsdbCommonIntegTest) TestIntegWorkspaceNonce() {
 }
 
 func (s *wsdbCommonIntegTest) TestIntegSetWorkspaceImmutable() {
-	_, _, err := s.db.BranchWorkspace(integTestCqlCtx, NullSpaceName,
-		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
+	_, _, err := s.db.BranchWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	err = s.db.SetWorkspaceImmutable(integTestCqlCtx, "ts1", "ns1", "ws1")
@@ -218,8 +219,8 @@ func (s *wsdbCommonIntegTest) TestIntegSetWorkspaceImmutableError() {
 }
 
 func (s *wsdbCommonIntegTest) TestIntegWorkspaceIsImmutable() {
-	_, _, err := s.db.BranchWorkspace(integTestCqlCtx, NullSpaceName,
-		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
+	_, _, err := s.db.BranchWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	immutable, err := s.db.WorkspaceIsImmutable(integTestCqlCtx,
@@ -242,8 +243,8 @@ func (s *wsdbCommonIntegTest) TestIntegWorkspaceIsImmutableError() {
 }
 
 func (s *wsdbCommonIntegTest) TestIntegDeleteImmutableSet() {
-	_, _, err := s.db.BranchWorkspace(integTestCqlCtx, NullSpaceName,
-		NullSpaceName, NullSpaceName, "ts1", "ns1", "ws1")
+	_, _, err := s.db.BranchWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	s.req.NoError(err, "Error branching null workspace: %v", err)
 
 	err = s.db.SetWorkspaceImmutable(integTestCqlCtx, "ts1", "ns1", "ws1")
