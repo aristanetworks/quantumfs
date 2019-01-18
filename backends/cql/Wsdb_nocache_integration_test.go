@@ -39,7 +39,7 @@ func (suite *wsdbNoCacheIntegTestSuite) SetupTest() {
 
 	err = wsdb.CreateWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		WorkspaceNonceInvalid, []byte(nil))
+		quantumfs.WorkspaceNonceInvalid, []byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{

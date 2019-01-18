@@ -53,7 +53,7 @@ func (s *wsdbCommonIntegTest) TestIntegEmptyDB() {
 		"Empty DB has incorrect number of workspaces")
 	s.req.Contains(wsList, quantumfs.NullSpaceName,
 		"Empty DB has incorrect list of workspaces")
-	s.req.Equal(wsList[quantumfs.NullSpaceName], WorkspaceNonceInvalid,
+	s.req.Equal(wsList[quantumfs.NullSpaceName], quantumfs.WorkspaceNonceInvalid,
 		"Incorect Nonce value for _/_/_")
 }
 

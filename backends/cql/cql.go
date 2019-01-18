@@ -374,7 +374,7 @@ func NewCqlWorkspaceDB(path string) quantumfs.WorkspaceDB {
 	// initializing the backends, this can be solved.
 	err := eWsdb.wsdb.CreateWorkspace(DefaultCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, WorkspaceNonceInvalid,
+		quantumfs.NullSpaceName, quantumfs.WorkspaceNonceInvalid,
 		quantumfs.EmptyWorkspaceKey.Value())
 	if err != nil {
 		panic(fmt.Sprintf("Failed wsdb setup: %s", err.Error()))
@@ -573,7 +573,7 @@ func (w *cqlWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		"%s/%s/%s %s -> %s", typespace, namespace, workspace,
 		currentRootId.String(), newRootId.String())
 
-	wsdbNonce := WorkspaceNonce{
+	wsdbNonce := quantumfs.WorkspaceNonce{
 		Id:          nonce.Id,
 		PublishTime: nonce.PublishTime,
 	}

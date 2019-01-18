@@ -26,6 +26,9 @@ type WorkspaceNonce struct {
 	PublishTime uint64
 }
 
+// WorkspaceNonceInvalid is an invalid nonce
+var WorkspaceNonceInvalid = WorkspaceNonce{0, 0}
+
 func (lhs *WorkspaceNonce) SameIncarnation(rhs *WorkspaceNonce) bool {
 	return lhs.Id == rhs.Id
 }
@@ -47,6 +50,19 @@ func (lhs *WorkspaceNonce) GetAdvanceNonce() WorkspaceNonce {
 
 func (v *WorkspaceNonce) String() string {
 	return fmt.Sprintf("(%d : %d)", v.Id, v.PublishTime)
+}
+
+// StringToNonce returns WorkspaceNonce for a given string
+func StringToNonce(nonceStr string) (WorkspaceNonce, error) {
+	var id, publishTime uint64
+	n, err := fmt.Sscanf(nonceStr, "(%d : %d)", &id, &publishTime)
+	if err != nil {
+		return WorkspaceNonceInvalid, err
+	}
+	if n != 2 {
+		return WorkspaceNonceInvalid, fmt.Errorf("Parsed %d elements", n)
+	}
+	return WorkspaceNonce{uint64(id), uint64(publishTime)}, nil
 }
 
 type WorkspaceState struct {
