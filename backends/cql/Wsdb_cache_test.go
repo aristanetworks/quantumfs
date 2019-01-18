@@ -137,7 +137,8 @@ func (suite *wsdbCacheTestSuite) TestCacheWithoutExpiry() {
 	// so disable refresh of workspace and namespace
 	// namespaces and workspaces are also entityGroups and hence
 	// separate test isn't needed to test for their expiry
-	cwsdb.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour, quantumfs.NullSpaceName,
+	cwsdb.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour,
+		quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName)
 
 	cwsdb.cache.CountEntities(unitTestCqlCtx)
@@ -167,7 +168,8 @@ func (suite *wsdbCacheTestSuite) TestCacheTimeout() {
 	mockCluster.On("CreateSession").Return(suite.common.mockSess, nil)
 
 	// setup typespace info in mockDB
-	tsRows := mockDbRows{[]interface{}{"ts1"}, []interface{}{quantumfs.NullSpaceName}}
+	tsRows := mockDbRows{[]interface{}{"ts1"},
+		[]interface{}{quantumfs.NullSpaceName}}
 	tsIter := new(MockIter)
 	tsVals := []interface{}(nil)
 	mockWsdbCacheTypespaceFetch(suite.common.mockSess, tsRows, tsVals,
@@ -199,8 +201,8 @@ func (suite *wsdbCacheTestSuite) TestCacheTimeout() {
 	// so disable refresh of workspace and namespace
 	// namespaces and workspaces are also entityGroups and hence
 	// separate test isn't needed to test for their expiry
-	cwsdb.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName)
+	cwsdb.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 
 	// causes refresh and next expiry to be setup based on cache timeout
 	cwsdb.cache.CountEntities(unitTestCqlCtx)
@@ -262,9 +264,10 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterEmptyDB() {
 
 	// disable fetches from DB so that cache state is unchanged
 	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour)
-	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour, quantumfs.NullSpaceName)
-	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour, quantumfs.NullSpaceName,
+	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour,
 		quantumfs.NullSpaceName)
+	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 
 	nsCount, err1 := suite.common.wsdb.NumNamespaces(unitTestCqlCtx,
 		quantumfs.NullSpaceName)
@@ -450,17 +453,21 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterBranching() {
 
 	// newly branched workspace must be in cache
 	mockBranchWorkspace(suite.common.mockSess, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1",
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		"ts1", "ns1", "ws1",
 		[]byte(nil), WorkspaceNonceInvalid, gocql.ErrNotFound)
 	_, n1, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	mockBranchWorkspace(suite.common.mockSess, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws2",
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		"ts1", "ns1", "ws2",
 		[]byte(nil), WorkspaceNonceInvalid, gocql.ErrNotFound)
 	_, n2, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws2")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts1", "ns1", "ws2")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	// disable fetches from DB so that cache state is unchanged
@@ -552,12 +559,14 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 	// data fetched from db contains null and specialWS workspaces for the null
 	// namespace
 	mockBranchWorkspace(suite.common.mockSess, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1",
-		[]byte(nil), WorkspaceNonceInvalid, gocql.ErrNotFound)
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		"ts1", "ns1", "ws1", []byte(nil),
+		WorkspaceNonceInvalid, gocql.ErrNotFound)
 
 	// causes a local insert of ws1 workspace for the null namespace
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	// Since we want the nonce refresh to hit the cache.
@@ -591,7 +600,8 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 	suite.cache.InsertEntities(unitTestCqlCtx, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, "specialWS", "7")
 
-	wsRows := mockDbRows{{quantumfs.NullSpaceName}, {"specialWS", int64(0), int64(0)}}
+	wsRows := mockDbRows{{quantumfs.NullSpaceName},
+		{"specialWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{quantumfs.NullSpaceName, quantumfs.NullSpaceName}
 
@@ -603,11 +613,13 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, wsFetchPause)
-	mockWsdbKeyGet(suite.common.mockSess, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, []byte(nil), WorkspaceNonceInvalid, nil)
+	mockWsdbKeyGet(suite.common.mockSess, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName, []byte(nil),
+		WorkspaceNonceInvalid, nil)
 
 	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour)
-	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour, quantumfs.NullSpaceName)
+	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour,
+		quantumfs.NullSpaceName)
 	suite.cache.enableCqlRefresh(unitTestCqlCtx, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName)
 
@@ -629,8 +641,8 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 
 	// TODO: currently workspaceDB API doesn't contain deletes
 	//       so do a cache delete here
-	suite.cache.DeleteEntities(unitTestCqlCtx, quantumfs.NullSpaceName, quantumfs.NullSpaceName,
-		"specialWS")
+	suite.cache.DeleteEntities(unitTestCqlCtx, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "specialWS")
 
 	// unpause the DB fetch
 	wsFetchPause <- true
@@ -656,7 +668,8 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 	// 4. Check that cache does not have the locally inserted and deleted WS,
 	//    but should have the new ws received from the db.
 
-	wsRows := mockDbRows{{quantumfs.NullSpaceName}, {"specialWS", int64(0), int64(0)}}
+	wsRows := mockDbRows{{quantumfs.NullSpaceName},
+		{"specialWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{quantumfs.NullSpaceName, quantumfs.NullSpaceName}
 	var wsMap map[string]WorkspaceNonce
@@ -675,7 +688,8 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 		quantumfs.NullSpaceName, "specialWS", []byte(nil), nonce, nil)
 
 	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour)
-	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour, quantumfs.NullSpaceName)
+	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour,
+		quantumfs.NullSpaceName)
 	suite.cache.enableCqlRefresh(unitTestCqlCtx, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName)
 
@@ -741,11 +755,13 @@ func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 		[]byte(nil), nonceB, gocql.ErrNotFound)
 
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts2", "ns2", "a")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts2", "ns2", "a")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	_, _, err = suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts2", "ns2", "b")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts2", "ns2", "b")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	wsRows := mockDbRows{{"a", int64(0), int64(0)}, {"b", int64(0), int64(0)}}
@@ -803,8 +819,8 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 		"childWS", []byte(nil), nonceChildWS, gocql.ErrNotFound)
 
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts", "parentNS",
-		"childWS")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts", "parentNS", "childWS")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	wsRows := mockDbRows{[]interface{}{"childWS", int64(0), int64(0)}}
@@ -858,7 +874,8 @@ func (suite *wsdbCacheTestSuite) TestCacheAncestorDeleteDuringRefresh() {
 		"childWS", []byte(nil), nonceChildWS, gocql.ErrNotFound)
 
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts", "parentNS",
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts", "parentNS",
 		"childWS")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
@@ -913,8 +930,8 @@ func (suite *wsdbCacheTestSuite) TestCacheChildDeleteDuringRefresh() {
 		"childWS", []byte(nil), nonceChildWS, gocql.ErrNotFound)
 
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts", "parentNS",
-		"childWS")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts", "parentNS", "childWS")
 	suite.Require().NoError(err, "Error rebranching workspace: %v", err)
 
 	nsRows := mockDbRows{[]interface{}{"parentNS"}}
@@ -1027,15 +1044,17 @@ func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceNumOK() {
 		quantumfs.NullSpaceName, "ts1", "ns1", "ws1", []byte(nil),
 		WorkspaceNonceInvalid, gocql.ErrNotFound)
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
-		quantumfs.NullSpaceName, quantumfs.NullSpaceName, quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
+		quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
 	suite.Require().NoError(err,
 		"Error branching "+quantumfs.NullSpaceName+" workspace: %v", err)
 
 	// disable fetches from DB so that cache state is unchanged
 	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour)
-	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour, quantumfs.NullSpaceName)
-	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour, quantumfs.NullSpaceName,
+	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour,
 		quantumfs.NullSpaceName)
+	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour,
+		quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour, "ts1")
 	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour, "ts1", "ns1")
 
