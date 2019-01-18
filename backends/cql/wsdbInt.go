@@ -77,27 +77,27 @@ func NewError(code ErrCode, msg string, args ...interface{}) error {
 	return &Error{Code: code, Msg: fmt.Sprintf(msg, args...)}
 }
 
-// ErrorCode returns a readable string for ErrCode
-func (err *Error) ErrorCode() string {
-	switch err.Code {
-	default:
-		return "Unknown wsdb error"
-	case ErrWorkspaceExists:
-		return "Workspace already exists"
-	case ErrWorkspaceNotFound:
-		return "Workspace not found"
-	case ErrFatal:
-		return "Fatal workspaceDB error"
-	case ErrWorkspaceOutOfDate:
-		return "Workspace changed remotely"
-	case ErrLocked:
-		return "Lock error"
-	}
-}
+// // ErrorCode returns a readable string for ErrCode
+// func (err *Error) ErrorCode() string {
+// 	switch err.Code {
+// 	default:
+// 		return "Unknown wsdb error"
+// 	case ErrWorkspaceExists:
+// 		return "Workspace already exists"
+// 	case ErrWorkspaceNotFound:
+// 		return "Workspace not found"
+// 	case ErrFatal:
+// 		return "Fatal workspaceDB error"
+// 	case ErrWorkspaceOutOfDate:
+// 		return "Workspace changed remotely"
+// 	case ErrLocked:
+// 		return "Lock error"
+// 	}
+// }
 
-func (err *Error) Error() string {
-	return fmt.Sprintf("Error: %s: %s", err.ErrorCode(), err.Msg)
-}
+// func (err *Error) Error() string {
+// 	return fmt.Sprintf("Error: %s: %s", err.ErrorCode(), err.Msg)
+// }
 
 // String returns the string representation for WorkspaceNonce
 func (nonce *WorkspaceNonce) String() string {

@@ -11,6 +11,39 @@
 // being stored in there and treats them as bytes and strings respectively.
 package cql
 
+import (
+	"fmt"
+)
+
+// BSErrorCode are integer codes for error responses from ether/blobstore package
+type BSErrorCode int
+
+// Different error code exported by blobstore package
+const (
+	ErrReserved              BSErrorCode = iota // Reserved since 0
+	ErrOperationFailed       BSErrorCode = iota // The specific operation failed
+	ErrBlobStoreDown         BSErrorCode = iota // The blobstore could not be reached
+	ErrBlobStoreInconsistent BSErrorCode = iota // The blobstore has an internal error
+	ErrBadArguments          BSErrorCode = iota // The passed arguments are incorrect
+	ErrKeyNotFound           BSErrorCode = iota // The key and associated value was not found
+)
+
+// Error implements error interface and encapsulates the error returned by ether/blobstore
+// package's APIs
+type Error struct {
+	Code BSErrorCode // This can be used as a sentinal value
+	Msg  string      // This is for human eyes only
+}
+
+func (err Error) Error() string {
+	return fmt.Sprintf("blobstore.Error %d (%s)", err.Code, err.Msg)
+}
+
+// NewError returns a new error
+func NewError(code BSErrorCode, msg string, a ...interface{}) error {
+	return &Error{Code: code, Msg: fmt.Sprintf(msg, a...)}
+}
+
 // BlobStore interface
 type BlobStore interface {
 
