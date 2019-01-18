@@ -26,12 +26,12 @@ func (key ObjectKey) String() string {
 // We have to redefine WorkspaceNonce here and not use quantumfs.WorkspaceNonce,
 // since CQL doesn't support uint64 which is the type in quantumfs.WorkspaceNonce
 type WorkspaceNonce struct {
-	Id          int64
-	PublishTime int64
+	Id          uint64
+	PublishTime uint64
 }
 
 // WorkspaceNonceInvalid is an invalid nonce
-var WorkspaceNonceInvalid = WorkspaceNonce{0, 0}
+var WorkspaceNonceInvalid = WorkspaceNonce{uint64(0), uint64(0)}
 
 // String returns the string representation for WorkspaceNonce
 func (nonce *WorkspaceNonce) String() string {
@@ -54,7 +54,7 @@ func StringToNonce(nonceStr string) (WorkspaceNonce, error) {
 	if n != 2 {
 		return WorkspaceNonceInvalid, fmt.Errorf("Parsed %d elements", n)
 	}
-	return WorkspaceNonce{id, publishTime}, nil
+	return WorkspaceNonce{uint64(id), uint64(publishTime)}, nil
 }
 
 // WorkspaceDB provides a cluster-wide and consistent mapping between names

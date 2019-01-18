@@ -1097,7 +1097,8 @@ VALUES (?,?,?,?,?,?)`
 	query := suite.common.mockSess.Query(`
 INSERT INTO cql.workspacedb
 (typespace, namespace, workspace, key, ignore)
-VALUES (?,?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), nonce.Id, nonce.PublishTime)
+VALUES (?,?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), int64(nonce.Id),
+		int64(nonce.PublishTime))
 
 	err := query.Exec()
 	suite.Require().NoError(err, "Insert failed with %s", err)

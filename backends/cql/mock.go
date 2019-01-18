@@ -468,8 +468,8 @@ func newMockQueryScanByteSlice(err error,
 			// byte slice pointed by val is copied
 			// into dest[0]
 			assignValToDest(val, dest[0])
-			assignValToDest(nonce.Id, dest[1])
-			assignValToDest(nonce.PublishTime, dest[2])
+			assignValToDest(int64(nonce.Id), dest[1])
+			assignValToDest(int64(nonce.PublishTime), dest[2])
 		}
 		return err
 	}

@@ -574,8 +574,8 @@ func (w *cqlWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		currentRootId.String(), newRootId.String())
 
 	wsdbNonce := WorkspaceNonce{
-		Id:          int64(nonce.Id),
-		PublishTime: int64(nonce.PublishTime),
+		Id:          nonce.Id,
+		PublishTime: nonce.PublishTime,
 	}
 	key, wsdbNonce, err := w.wsdb.AdvanceWorkspace((*wsApiCtx)(c), typespace,
 		namespace, workspace, wsdbNonce, currentRootId.Value(),
@@ -584,7 +584,7 @@ func (w *cqlWsdbTranslator) AdvanceWorkspace(c *quantumfs.Ctx, typespace string,
 		return quantumfs.ZeroKey, quantumfs.WorkspaceNonce{},
 			err
 	}
-	nonce.PublishTime = uint64(wsdbNonce.PublishTime)
+	nonce.PublishTime = wsdbNonce.PublishTime
 
 	return quantumfs.NewObjectKeyFromBytes(key), nonce, nil
 }

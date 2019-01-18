@@ -554,8 +554,8 @@ WHERE typespace = ? AND namespace = ?`, nc.keyspace, nc.cfName)
 	var publishTime int64
 	workspaceList := make(map[string]WorkspaceNonce)
 	for iter.Scan(&tempWorkspace, &nonceID, &publishTime) {
-		workspaceList[tempWorkspace] = WorkspaceNonce{Id: nonceID,
-			PublishTime: publishTime}
+		workspaceList[tempWorkspace] = WorkspaceNonce{Id: uint64(nonceID),
+			PublishTime: uint64(publishTime)}
 		count++
 	}
 	if err := iter.Close(); err != nil {
@@ -591,8 +591,8 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace, nc.cfName
 		}
 	} else {
 		nonce := WorkspaceNonce{
-			Id:          nonceID,
-			PublishTime: publishTime,
+			Id:          uint64(nonceID),
+			PublishTime: uint64(publishTime),
 		}
 		return key, nonce, true, nil
 	}
@@ -629,7 +629,7 @@ INSERT INTO %s.%s
 VALUES (?,?,?,?,?,?)`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace,
-		namespace, workspace, key, nonce.Id, nonce.PublishTime)
+		namespace, workspace, key, int64(nonce.Id), int64(nonce.PublishTime))
 
 	return query.Exec()
 }

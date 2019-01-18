@@ -50,7 +50,7 @@ var GetUniqueNonce = getTimeBasedNonce
 
 func getTimeBasedNonce() WorkspaceNonce {
 	return WorkspaceNonce{
-		Id:          time.Now().UnixNano(),
-		PublishTime: time.Now().UnixNano(),
+		Id:          uint64(time.Now().UnixNano()),
+		PublishTime: uint64(time.Now().UnixNano()),
 	}
 }
