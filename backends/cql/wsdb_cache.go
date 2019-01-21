@@ -50,7 +50,7 @@ func newCacheWsdb(base WorkspaceDB, cfg WsDBConfig) WorkspaceDB {
 	}
 
 	ce := newEntityCache(4, cacheTimeout, cwsdb, wsdbFetcherImpl)
-	nonce := WorkspaceNonceInvalid
+	nonce := quantumfs.WorkspaceNonceInvalid
 	ce.InsertEntities(DefaultCtx, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName, nonce.String())
 	cwsdb.cache = ce
@@ -94,12 +94,12 @@ func (cw *cacheWsdb) NumWorkspaces(c ctx, typespace,
 }
 
 func (cw *cacheWsdb) WorkspaceList(c ctx, typespace string,
-	namespace string) (map[string]WorkspaceNonce, error) {
+	namespace string) (map[string]quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncIn("cacheWsdb::WorkspaceList", "%s/%s",
 		typespace, namespace).Out()
 
-	wsMap := make(map[string]WorkspaceNonce)
+	wsMap := make(map[string]quantumfs.WorkspaceNonce)
 	wsList, err := cw.cache.ListEntities(c, typespace, namespace)
 	if err != nil {
 		return nil, err
@@ -111,16 +111,16 @@ func (cw *cacheWsdb) WorkspaceList(c ctx, typespace string,
 			return nil, err
 		}
 
-		var nonce WorkspaceNonce
+		var nonce quantumfs.WorkspaceNonce
 		// There should be exactlty 1 nonce for a ts/ns/ws
 		if len(nonceStr) != 1 {
-			nonce = WorkspaceNonceInvalid
+			nonce = quantumfs.WorkspaceNonceInvalid
 			c.Elog("cacheWsdb::WorkspaceList %d nonces for %s/%s/%s",
 				len(nonceStr), typespace, namespace, ws)
 		} else {
-			nonce, err = StringToNonce(nonceStr[0])
+			nonce, err = quantumfs.StringToNonce(nonceStr[0])
 			if err != nil {
-				panic(fmt.Sprintf("Nonce is not a valid int64: %s",
+				panic(fmt.Sprintf("Nonce is not a valid uint64: %s",
 					err.Error()))
 			}
 		}
@@ -131,7 +131,7 @@ func (cw *cacheWsdb) WorkspaceList(c ctx, typespace string,
 }
 
 func (cw *cacheWsdb) CreateWorkspace(c ctx, typespace string, namespace string,
-	workspace string, nonce WorkspaceNonce, wsKey ObjectKey) error {
+	workspace string, nonce quantumfs.WorkspaceNonce, wsKey ObjectKey) error {
 
 	keyHex := hex.EncodeToString(wsKey)
 	defer c.FuncIn("cacheWsdb::CreateWorkspace", "%s/%s/%s(%s)(%s)",
@@ -147,8 +147,8 @@ func (cw *cacheWsdb) CreateWorkspace(c ctx, typespace string, namespace string,
 
 func (cw *cacheWsdb) BranchWorkspace(c ctx, srcTypespace string, srcNamespace string,
 	srcWorkspace string, dstTypespace string,
-	dstNamespace string, dstWorkspace string) (WorkspaceNonce,
-	WorkspaceNonce, error) {
+	dstNamespace string, dstWorkspace string) (quantumfs.WorkspaceNonce,
+	quantumfs.WorkspaceNonce, error) {
 
 	start := time.Now()
 	defer func() { cw.branchStats.RecordOp(time.Since(start)) }()
@@ -160,7 +160,8 @@ func (cw *cacheWsdb) BranchWorkspace(c ctx, srcTypespace string, srcNamespace st
 	srcNonce, dstNonce, err := cw.base.BranchWorkspace(c, srcTypespace,
 		srcNamespace, srcWorkspace, dstTypespace, dstNamespace, dstWorkspace)
 	if err != nil {
-		return WorkspaceNonceInvalid, WorkspaceNonceInvalid, err
+		return quantumfs.WorkspaceNonceInvalid,
+			quantumfs.WorkspaceNonceInvalid, err
 	}
 
 	cw.cache.InsertEntities(c, srcTypespace, srcNamespace, srcWorkspace,
@@ -203,23 +204,23 @@ func (cw *cacheWsdb) WorkspaceLastWriteTime(c ctx,
 }
 
 func (cw *cacheWsdb) Workspace(c ctx, typespace string, namespace string,
-	workspace string) (ObjectKey, WorkspaceNonce, error) {
+	workspace string) (ObjectKey, quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncIn("cacheWsdb::Workspace", "%s/%s/%s", typespace, namespace,
 		workspace).Out()
 
 	key, nonce, err := cw.base.Workspace(c, typespace, namespace, workspace)
 	if err != nil {
-		return ObjectKey{}, WorkspaceNonceInvalid, err
+		return ObjectKey{}, quantumfs.WorkspaceNonceInvalid, err
 	}
 	cw.cache.InsertEntities(c, typespace, namespace, workspace, nonce.String())
 	return key, nonce, nil
 }
 
 func (cw *cacheWsdb) AdvanceWorkspace(c ctx, typespace string,
-	namespace string, workspace string, nonce WorkspaceNonce,
+	namespace string, workspace string, nonce quantumfs.WorkspaceNonce,
 	currentRootID ObjectKey,
-	newRootID ObjectKey) (ObjectKey, WorkspaceNonce, error) {
+	newRootID ObjectKey) (ObjectKey, quantumfs.WorkspaceNonce, error) {
 
 	currentKeyHex := hex.EncodeToString(currentRootID)
 	newKeyHex := hex.EncodeToString(newRootID)

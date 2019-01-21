@@ -7,6 +7,8 @@ package cql
 import (
 	"fmt"
 	"time"
+
+	"github.com/aristanetworks/quantumfs"
 )
 
 // The workspace DB API endpoint is instantiated here.
@@ -48,9 +50,9 @@ func NewWorkspaceDB(confName string) WorkspaceDB {
 // GetUniqueNonce provides a unique nonce
 var GetUniqueNonce = getTimeBasedNonce
 
-func getTimeBasedNonce() WorkspaceNonce {
-	return WorkspaceNonce{
-		Id:          time.Now().UnixNano(),
-		PublishTime: time.Now().UnixNano(),
+func getTimeBasedNonce() quantumfs.WorkspaceNonce {
+	return quantumfs.WorkspaceNonce{
+		Id:          uint64(time.Now().UnixNano()),
+		PublishTime: uint64(time.Now().UnixNano()),
 	}
 }

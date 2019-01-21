@@ -47,7 +47,8 @@ func (suite *wsdbCacheIntegTestSuite) SetupTest() {
 
 	err = nwsdb.CreateWorkspace(integTestCqlCtx, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName,
-		quantumfs.NullSpaceName, WorkspaceNonceInvalid, []byte(nil))
+		quantumfs.NullSpaceName, quantumfs.WorkspaceNonceInvalid,
+		[]byte(nil))
 	suite.Require().NoError(err, "Error during CreateWorkspace")
 
 	suite.common = &wsdbCommonIntegTest{
@@ -228,8 +229,8 @@ func getWorkspaceTestData(numTs, numNsPerTs, numWsPerNs int) *wsdata {
 func loadWorkspaceData(c ctx, db WorkspaceDB, w *wsdata) error {
 	for _, ws := range w.l {
 		parts := strings.Split(ws, "/")
-		nonceStr := fmt.Sprintf("%s %d", parts[3], 0)
-		nonce, err := StringToNonce(nonceStr)
+		nonceStr := fmt.Sprintf("(%s : %d)", parts[3], 0)
+		nonce, err := quantumfs.StringToNonce(nonceStr)
 		if err != nil {
 			return err
 		}
@@ -263,7 +264,7 @@ func listEqual(l1 []string, l2 []string) bool {
 func countListChecker(c *testCtx, db WorkspaceDB, w *wsdata) error {
 	var err error
 	var l []string
-	var m map[string]WorkspaceNonce
+	var m map[string]quantumfs.WorkspaceNonce
 	var count int
 
 	apiCount := 6
@@ -316,7 +317,7 @@ func countListChecker(c *testCtx, db WorkspaceDB, w *wsdata) error {
 			}
 			wslist := make([]string, 0)
 			for w, n := range m {
-				if n == WorkspaceNonceInvalid {
+				if n == quantumfs.WorkspaceNonceInvalid {
 					return fmt.Errorf("Found 0 nonce for "+
 						"Workspace(%s/%s/%s)", ts, ns, w)
 				}

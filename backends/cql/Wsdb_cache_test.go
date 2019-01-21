@@ -296,14 +296,14 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterEmptyDB() {
 		wsIter, nil)
 	mockWsdbKeyGet(suite.common.mockSess, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName, []byte(nil),
-		WorkspaceNonceInvalid, nil)
+		quantumfs.WorkspaceNonceInvalid, nil)
 
 	wsMap, err4 := suite.common.wsdb.WorkspaceList(unitTestCqlCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName)
 	suite.Require().NoError(err4,
 		"WorkspaceList failed: %s", err4)
-	suite.Require().Equal(map[string]WorkspaceNonce{
-		quantumfs.NullSpaceName: WorkspaceNonceInvalid}, wsMap,
+	suite.Require().Equal(map[string]quantumfs.WorkspaceNonce{
+		quantumfs.NullSpaceName: quantumfs.WorkspaceNonceInvalid}, wsMap,
 		"Incorrect workspaces in cache")
 
 }
@@ -331,7 +331,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteInserts() {
 		nsIter, nil)
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, nil)
-	nonce := WorkspaceNonce{Id: 5, PublishTime: 0xbeef}
+	nonce := quantumfs.WorkspaceNonce{Id: 5, PublishTime: 0xbeef}
 	mockWsdbKeyGet(suite.common.mockSess, "remoteTS", "remoteNS", "remoteWS",
 		[]byte(nil), nonce, nil)
 
@@ -397,7 +397,7 @@ func (suite *wsdbCacheTestSuite) TestCacheWithRemoteDeletes() {
 		nsIter, nil)
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, nil)
-	nonce := WorkspaceNonce{Id: 5, PublishTime: 0xbeef}
+	nonce := quantumfs.WorkspaceNonce{Id: 5, PublishTime: 0xbeef}
 	mockWsdbKeyGet(suite.common.mockSess, "remoteTS", "remoteNS", "remoteWS2",
 		[]byte(nil), nonce, nil)
 
@@ -452,7 +452,7 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterBranching() {
 	mockBranchWorkspace(suite.common.mockSess, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		"ts1", "ns1", "ws1",
-		[]byte(nil), WorkspaceNonceInvalid, gocql.ErrNotFound)
+		[]byte(nil), quantumfs.WorkspaceNonceInvalid, gocql.ErrNotFound)
 	_, n1, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
@@ -461,7 +461,7 @@ func (suite *wsdbCacheTestSuite) TestCacheAfterBranching() {
 	mockBranchWorkspace(suite.common.mockSess, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		"ts1", "ns1", "ws2",
-		[]byte(nil), WorkspaceNonceInvalid, gocql.ErrNotFound)
+		[]byte(nil), quantumfs.WorkspaceNonceInvalid, gocql.ErrNotFound)
 	_, n2, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, "ts1", "ns1", "ws2")
@@ -524,7 +524,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"ts1", "ns1"}
 
-	var wsMap map[string]WorkspaceNonce
+	var wsMap map[string]quantumfs.WorkspaceNonce
 	var wsWg sync.WaitGroup
 	// buffered chan since db will be queried twice and we want it to block
 	// on the second query.
@@ -532,7 +532,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, wsFetchPause)
-	nonce := WorkspaceNonce{Id: 7, PublishTime: 0xbeef}
+	nonce := quantumfs.WorkspaceNonce{Id: 7, PublishTime: 0xbeef}
 	mockWsdbKeyGet(suite.common.mockSess, "ts1", "ns1", "specialWS",
 		[]byte(nil), nonce, nil)
 
@@ -558,7 +558,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcInsertsRefresh() {
 	mockBranchWorkspace(suite.common.mockSess, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		"ts1", "ns1", "ws1", []byte(nil),
-		WorkspaceNonceInvalid, gocql.ErrNotFound)
+		quantumfs.WorkspaceNonceInvalid, gocql.ErrNotFound)
 
 	// causes a local insert of ws1 workspace for the null namespace
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
@@ -602,7 +602,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 	wsIter := new(MockIter)
 	wsVals := []interface{}{quantumfs.NullSpaceName, quantumfs.NullSpaceName}
 
-	var wsMap map[string]WorkspaceNonce
+	var wsMap map[string]quantumfs.WorkspaceNonce
 	var wsWg sync.WaitGroup
 	// buffered chan since db will be queried twice and we want it to block
 	// on the second query.
@@ -612,7 +612,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcDeletesRefresh() {
 		wsIter, wsFetchPause)
 	mockWsdbKeyGet(suite.common.mockSess, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName, []byte(nil),
-		WorkspaceNonceInvalid, nil)
+		quantumfs.WorkspaceNonceInvalid, nil)
 
 	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour)
 	suite.cache.disableCqlRefresh(unitTestCqlCtx, 1*time.Hour,
@@ -669,7 +669,7 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 		{"specialWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{quantumfs.NullSpaceName, quantumfs.NullSpaceName}
-	var wsMap map[string]WorkspaceNonce
+	var wsMap map[string]quantumfs.WorkspaceNonce
 	var wsWg sync.WaitGroup
 	// buffered chan since db will be queried twice and we want it to block
 	// on the second query.
@@ -679,8 +679,8 @@ func (suite *wsdbCacheTestSuite) TestCacheSameInsDelDuringRefresh() {
 		wsIter, wsFetchPause)
 	mockWsdbKeyGet(suite.common.mockSess, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName, []byte(nil),
-		WorkspaceNonceInvalid, nil)
-	nonce := WorkspaceNonce{Id: 9, PublishTime: 0xbeef}
+		quantumfs.WorkspaceNonceInvalid, nil)
+	nonce := quantumfs.WorkspaceNonce{Id: 9, PublishTime: 0xbeef}
 	mockWsdbKeyGet(suite.common.mockSess, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, "specialWS", []byte(nil), nonce, nil)
 
@@ -764,7 +764,7 @@ func (suite *wsdbCacheTestSuite) TestCacheGroupDeleteDuringRefresh() {
 	wsRows := mockDbRows{{"a", int64(0), int64(0)}, {"b", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"ts2", "ns2"}
-	var wsMap map[string]WorkspaceNonce
+	var wsMap map[string]quantumfs.WorkspaceNonce
 	var wsWg sync.WaitGroup
 	// buffered chan since db will be queried twice and we want it to block
 	// on the second query.
@@ -823,7 +823,7 @@ func (suite *wsdbCacheTestSuite) TestCacheParentDeleteDuringRefresh() {
 	wsRows := mockDbRows{[]interface{}{"childWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"ts", "parentNS"}
-	var wsMap map[string]WorkspaceNonce
+	var wsMap map[string]quantumfs.WorkspaceNonce
 	var wsWg sync.WaitGroup
 	wsFetchPause := make(chan bool)
 
@@ -879,7 +879,7 @@ func (suite *wsdbCacheTestSuite) TestCacheAncestorDeleteDuringRefresh() {
 	wsRows := mockDbRows{[]interface{}{"childWS", int64(0), int64(0)}}
 	wsIter := new(MockIter)
 	wsVals := []interface{}{"ts", "parentNS"}
-	var wsMap map[string]WorkspaceNonce
+	var wsMap map[string]quantumfs.WorkspaceNonce
 	var wsWg sync.WaitGroup
 	wsFetchPause := make(chan bool)
 
@@ -1039,7 +1039,7 @@ func (suite *wsdbCacheTestSuite) TestCacheDeleteWorkspaceNumOK() {
 	mockBranchWorkspace(suite.common.mockSess,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, "ts1", "ns1", "ws1", []byte(nil),
-		WorkspaceNonceInvalid, gocql.ErrNotFound)
+		quantumfs.WorkspaceNonceInvalid, gocql.ErrNotFound)
 	_, _, err := suite.common.wsdb.BranchWorkspace(unitTestCqlCtx,
 		quantumfs.NullSpaceName, quantumfs.NullSpaceName,
 		quantumfs.NullSpaceName, "ts1", "ns1", "ws1")
@@ -1097,7 +1097,8 @@ VALUES (?,?,?,?,?,?)`
 	query := suite.common.mockSess.Query(`
 INSERT INTO cql.workspacedb
 (typespace, namespace, workspace, key, ignore)
-VALUES (?,?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), nonce.Id, nonce.PublishTime)
+VALUES (?,?,?,?,?,?)`, "ts", "ns", "ws", []byte(nil), int64(nonce.Id),
+		int64(nonce.PublishTime))
 
 	err := query.Exec()
 	suite.Require().NoError(err, "Insert failed with %s", err)
@@ -1294,7 +1295,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcWsListWhenEmpty() {
 	suite.cache.InsertEntities(unitTestCqlCtx, "t1", "n1")
 
 	var wsWg sync.WaitGroup
-	var wsMap1, wsMap2 map[string]WorkspaceNonce
+	var wsMap1, wsMap2 map[string]quantumfs.WorkspaceNonce
 	wsFetchPause := make(chan bool)
 
 	wsRows := mockDbRows{{"w1", int64(0), int64(0)}}
@@ -1302,7 +1303,7 @@ func (suite *wsdbCacheTestSuite) TestCacheConcWsListWhenEmpty() {
 	wsVals := []interface{}{"t1", "n1"}
 	mockWsdbCacheWorkspaceFetch(suite.common.mockSess, wsRows, wsVals,
 		wsIter, wsFetchPause)
-	nonce := WorkspaceNonce{Id: 7, PublishTime: 0xbeef}
+	nonce := quantumfs.WorkspaceNonce{Id: 7, PublishTime: 0xbeef}
 	mockWsdbKeyGet(suite.common.mockSess, "t1", "n1", "w1",
 		[]byte(nil), nonce, nil)
 

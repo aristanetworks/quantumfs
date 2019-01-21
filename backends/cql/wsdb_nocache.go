@@ -123,7 +123,7 @@ func (nc *noCacheWsdb) NumWorkspaces(c ctx, typespace string,
 }
 
 func (nc *noCacheWsdb) WorkspaceList(c ctx, typespace string,
-	namespace string) (map[string]WorkspaceNonce, error) {
+	namespace string) (map[string]quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncIn("noCacheWsdb::WorkspaceList", "%s/%s",
 		typespace, namespace).Out()
@@ -149,7 +149,7 @@ func isTypespaceLocked(typespace string) bool {
 // CreateWorkspace is exclusively used in the cql adapter to create a
 // _/_/_ workspace.
 func (nc *noCacheWsdb) CreateWorkspace(c ctx, typespace string, namespace string,
-	workspace string, nonce WorkspaceNonce, wsKey ObjectKey) error {
+	workspace string, nonce quantumfs.WorkspaceNonce, wsKey ObjectKey) error {
 
 	keyHex := hex.EncodeToString(wsKey)
 	defer c.FuncIn("noCacheWsdb::CreateWorkspace", "%s/%s/%s(%s)(%d)",
@@ -181,16 +181,17 @@ func (nc *noCacheWsdb) CreateWorkspace(c ctx, typespace string, namespace string
 
 // Add new Nonce here.
 func (nc *noCacheWsdb) BranchWorkspace(c ctx, srcTypespace string,
-	srcNamespace string, srcWorkspace string,
-	dstTypespace string, dstNamespace string,
-	dstWorkspace string) (WorkspaceNonce, WorkspaceNonce, error) {
+	srcNamespace string, srcWorkspace string, dstTypespace string,
+	dstNamespace string, dstWorkspace string) (quantumfs.WorkspaceNonce,
+	quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncIn("noCacheWsdb::BranchWorkspace", "%s/%s/%s -> %s/%s/%s)",
 		srcTypespace, srcNamespace, srcWorkspace, dstTypespace, dstNamespace,
 		dstWorkspace).Out()
 
 	if isTypespaceLocked(dstTypespace) {
-		return WorkspaceNonceInvalid, WorkspaceNonceInvalid,
+		return quantumfs.WorkspaceNonceInvalid,
+			quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_LOCKED,
 				"Branch failed: "+quantumfs.NullSpaceName+
 					" typespace is locked")
@@ -198,7 +199,8 @@ func (nc *noCacheWsdb) BranchWorkspace(c ctx, srcTypespace string,
 	key, srcNonce, present, err := nc.wsdbKeyGet(c, srcTypespace, srcNamespace,
 		srcWorkspace)
 	if err != nil {
-		return WorkspaceNonceInvalid, WorkspaceNonceInvalid,
+		return quantumfs.WorkspaceNonceInvalid,
+			quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 				"during Get in BranchWorkspace %s/%s/%s : %s ",
 				srcTypespace, srcNamespace, srcWorkspace,
@@ -206,7 +208,8 @@ func (nc *noCacheWsdb) BranchWorkspace(c ctx, srcTypespace string,
 	}
 
 	if !present {
-		return WorkspaceNonceInvalid, WorkspaceNonceInvalid,
+		return quantumfs.WorkspaceNonceInvalid,
+			quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 				"cannot branch workspace: %s/%s/%s",
@@ -217,7 +220,8 @@ func (nc *noCacheWsdb) BranchWorkspace(c ctx, srcTypespace string,
 	_, _, present, err = nc.wsdbKeyGet(c, dstTypespace, dstNamespace,
 		dstWorkspace)
 	if err != nil {
-		return WorkspaceNonceInvalid, WorkspaceNonceInvalid,
+		return quantumfs.WorkspaceNonceInvalid,
+			quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 				"during Get in BranchWorkspace %s/%s/%s : %s",
 				dstTypespace, dstNamespace, dstWorkspace,
@@ -225,7 +229,8 @@ func (nc *noCacheWsdb) BranchWorkspace(c ctx, srcTypespace string,
 	}
 
 	if present {
-		return WorkspaceNonceInvalid, WorkspaceNonceInvalid,
+		return quantumfs.WorkspaceNonceInvalid,
+			quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_WORKSPACE_EXISTS,
 				"cannot branch workspace: %s/%s/%s",
 				dstTypespace, dstNamespace, dstWorkspace)
@@ -236,7 +241,8 @@ func (nc *noCacheWsdb) BranchWorkspace(c ctx, srcTypespace string,
 		dstTypespace, dstNamespace, dstWorkspace, dstNonce)
 	if err = nc.wsdbKeyPut(c, dstTypespace, dstNamespace,
 		dstWorkspace, key, dstNonce); err != nil {
-		return WorkspaceNonceInvalid, WorkspaceNonceInvalid,
+		return quantumfs.WorkspaceNonceInvalid,
+			quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 				"during Put in BranchWorkspace %s/%s/%s "+
 					"dstNonce:(%d): %s",
@@ -248,21 +254,21 @@ func (nc *noCacheWsdb) BranchWorkspace(c ctx, srcTypespace string,
 }
 
 func (nc *noCacheWsdb) Workspace(c ctx, typespace string, namespace string,
-	workspace string) (ObjectKey, WorkspaceNonce, error) {
+	workspace string) (ObjectKey, quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncIn("noCacheWsdb::Workspace", "%s/%s/%s", typespace, namespace,
 		workspace).Out()
 
 	key, nonce, present, err := nc.wsdbKeyGet(c, typespace, namespace, workspace)
 	if err != nil {
-		return ObjectKey{}, WorkspaceNonceInvalid,
+		return ObjectKey{}, quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 				"during Get in Workspace %s/%s/%s : %s",
 				typespace, namespace, workspace, err.Error())
 	}
 
 	if !present {
-		return ObjectKey{}, WorkspaceNonceInvalid,
+		return ObjectKey{}, quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 				"during Workspace %s/%s/%s",
@@ -295,9 +301,9 @@ func (nc *noCacheWsdb) DeleteWorkspace(c ctx, typespace string, namespace string
 }
 
 func (nc *noCacheWsdb) AdvanceWorkspace(c ctx, typespace string,
-	namespace string, workspace string, currentNonce WorkspaceNonce,
+	namespace string, workspace string, currentNonce quantumfs.WorkspaceNonce,
 	currentRootID ObjectKey,
-	newRootID ObjectKey) (ObjectKey, WorkspaceNonce, error) {
+	newRootID ObjectKey) (ObjectKey, quantumfs.WorkspaceNonce, error) {
 
 	currentKeyHex := hex.EncodeToString(currentRootID)
 	newKeyHex := hex.EncodeToString(newRootID)
@@ -306,7 +312,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ctx, typespace string,
 		typespace, namespace, workspace, currentKeyHex, newKeyHex).Out()
 
 	if isTypespaceLocked(typespace) && currentRootID != nil {
-		return ObjectKey{}, WorkspaceNonceInvalid,
+		return ObjectKey{}, quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_LOCKED,
 				"Branch failed: "+quantumfs.NullSpaceName+
 					" typespace is locked")
@@ -314,7 +320,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ctx, typespace string,
 
 	key, nonce, present, err := nc.wsdbKeyGet(c, typespace, namespace, workspace)
 	if err != nil {
-		return ObjectKey{}, WorkspaceNonceInvalid,
+		return ObjectKey{}, quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 				"during Get in AdvanceWorkspace %s/%s/%s : %s",
 				typespace, namespace, workspace, err.Error())
@@ -327,7 +333,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ctx, typespace string,
 				currentNonce.String(), nonce.String())
 	}
 	if !present {
-		return ObjectKey{}, WorkspaceNonceInvalid,
+		return ObjectKey{}, quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(
 				quantumfs.WSDB_WORKSPACE_NOT_FOUND,
 				"cannot advance workspace %s/%s/%s", typespace,
@@ -335,7 +341,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ctx, typespace string,
 	}
 
 	if !bytes.Equal(currentRootID, key) {
-		return key, WorkspaceNonceInvalid,
+		return key, quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_OUT_OF_DATE,
 				"cannot advance workspace expected:%s found:%s",
 				currentKeyHex, hex.EncodeToString(key))
@@ -344,7 +350,7 @@ func (nc *noCacheWsdb) AdvanceWorkspace(c ctx, typespace string,
 	if err := nc.wsdbKeyPut(c, typespace, namespace, workspace,
 		newRootID, currentNonce); err != nil {
 
-		return ObjectKey{}, WorkspaceNonceInvalid,
+		return ObjectKey{}, quantumfs.WorkspaceNonceInvalid,
 			quantumfs.NewWorkspaceDbErr(quantumfs.WSDB_FATAL_DB_ERROR,
 				"during Put in AdvanceWorkspace %s/%s/%s : %s",
 				typespace, namespace, workspace, err.Error())
@@ -534,7 +540,7 @@ WHERE typespace = ?`, nc.keyspace, nc.cfName)
 }
 
 func (nc *noCacheWsdb) fetchDBWorkspaces(c ctx, typespace string,
-	namespace string) (int, map[string]WorkspaceNonce, error) {
+	namespace string) (int, map[string]quantumfs.WorkspaceNonce, error) {
 
 	defer c.FuncIn("noCacheWsdb::fetchDBWorkspaces", "%s/%s", typespace,
 		namespace).Out()
@@ -552,10 +558,13 @@ WHERE typespace = ? AND namespace = ?`, nc.keyspace, nc.cfName)
 	var tempWorkspace string
 	var nonceID int64
 	var publishTime int64
-	workspaceList := make(map[string]WorkspaceNonce)
+	workspaceList := make(map[string]quantumfs.WorkspaceNonce)
 	for iter.Scan(&tempWorkspace, &nonceID, &publishTime) {
-		workspaceList[tempWorkspace] = WorkspaceNonce{Id: nonceID,
-			PublishTime: publishTime}
+		workspaceList[tempWorkspace] =
+			quantumfs.WorkspaceNonce{
+				Id:          uint64(nonceID),
+				PublishTime: uint64(publishTime),
+			}
 		count++
 	}
 	if err := iter.Close(); err != nil {
@@ -566,8 +575,8 @@ WHERE typespace = ? AND namespace = ?`, nc.keyspace, nc.cfName)
 }
 
 func (nc *noCacheWsdb) wsdbKeyGet(c ctx, typespace string,
-	namespace string, workspace string) (key []byte, nonce WorkspaceNonce,
-	present bool, err error) {
+	namespace string, workspace string) (key []byte,
+	nonce quantumfs.WorkspaceNonce, present bool, err error) {
 
 	defer c.FuncIn("noCacheWsdb::wsdbKeyGet", "%s/%s/%s", typespace,
 		namespace, workspace).Out()
@@ -585,14 +594,14 @@ WHERE typespace = ? AND namespace = ? AND workspace = ?`, nc.keyspace, nc.cfName
 	if err != nil {
 		switch err {
 		case gocql.ErrNotFound:
-			return nil, WorkspaceNonceInvalid, false, nil
+			return nil, quantumfs.WorkspaceNonceInvalid, false, nil
 		default:
-			return nil, WorkspaceNonceInvalid, false, err
+			return nil, quantumfs.WorkspaceNonceInvalid, false, err
 		}
 	} else {
-		nonce := WorkspaceNonce{
-			Id:          nonceID,
-			PublishTime: publishTime,
+		nonce := quantumfs.WorkspaceNonce{
+			Id:          uint64(nonceID),
+			PublishTime: uint64(publishTime),
 		}
 		return key, nonce, true, nil
 	}
@@ -617,7 +626,7 @@ WHERE typespace=? AND namespace=? AND workspace=?`, nc.keyspace, nc.cfName)
 
 func (nc *noCacheWsdb) wsdbKeyPut(c ctx, typespace string,
 	namespace string, workspace string,
-	key []byte, nonce WorkspaceNonce) error {
+	key []byte, nonce quantumfs.WorkspaceNonce) error {
 
 	defer c.FuncIn("noCacheWsdb::wsdbKeyPut", "%s/%s/%s key: %s nonce: %s",
 		typespace, namespace, workspace, hex.EncodeToString(key),
@@ -629,7 +638,7 @@ INSERT INTO %s.%s
 VALUES (?,?,?,?,?,?)`, nc.keyspace, nc.cfName)
 
 	query := nc.store.session.Query(qryStr, typespace,
-		namespace, workspace, key, nonce.Id, nonce.PublishTime)
+		namespace, workspace, key, int64(nonce.Id), int64(nonce.PublishTime))
 
 	return query.Exec()
 }
