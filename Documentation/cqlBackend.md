@@ -68,7 +68,7 @@ refresh the TTL values of the blocks in the database we want to keep.
 
 The config file has 3 TTL values as explained below:
 ```
-"adapter":
+"walker":
 {
   "ttlrefreshtime" : "72h",   // If the TTL is less than this, we do not refresh TTL.
   "ttlrefreshvalue": "192h",  // The is the TTL value when a TTL value is refreshed.
