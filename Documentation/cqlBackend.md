@@ -54,9 +54,9 @@ backends/cql/cluster_configs/smoke_test_config
 To start QuamtumFS with a CQL backend the command would be:
 ```
 QFS_CONFIG=/path/to/config/file \
-sudo quantumfsd -datastore cql.cql \
+sudo quantumfsd -datastore cql \
                 -datastoreconf $QFS_CONFIG \
-                -workspaceDB cql.cql \
+                -workspaceDB cql \
                 -workspaceDBconf $QFS_CONFIG
 ```
 

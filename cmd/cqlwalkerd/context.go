@@ -82,7 +82,7 @@ func getWalkerDaemonContext(name string, timeSeriesDB string,
 	}
 
 	// Connect to cql backed quantumfs DataStore
-	quantumfsDS, err := backends.ConnectDatastore("cql.cql", cqlCfgFile)
+	quantumfsDS, err := backends.ConnectDatastore("cql", cqlCfgFile)
 	if err != nil {
 		fmt.Printf("Connection to DataStore failed")
 		os.Exit(exitBadConfig)
@@ -119,8 +119,7 @@ func getWalkerDaemonContext(name string, timeSeriesDB string,
 		}
 
 	} else {
-		quantumfsWSDB, err = backends.ConnectWorkspaceDB("cql.cql",
-			cqlCfgFile)
+		quantumfsWSDB, err = backends.ConnectWorkspaceDB("cql", cqlCfgFile)
 		if err != nil {
 			fmt.Printf("Connection to workspaceDB failed err: %v\n", err)
 			os.Exit(exitBadConfig)

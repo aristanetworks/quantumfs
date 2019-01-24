@@ -11,8 +11,8 @@ import (
 )
 
 func init() {
-	registerDatastore("cql.cql", cql.NewCqlStore)
-	registerWorkspaceDB("cql.cql", cql.NewCqlWorkspaceDB)
+	registerDatastore("cql", cql.NewCqlStore)
+	registerWorkspaceDB("cql", cql.NewCqlWorkspaceDB)
 }
 
 func RegisterTestCqlBackend() {
