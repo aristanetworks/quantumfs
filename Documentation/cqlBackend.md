@@ -9,7 +9,7 @@ compatible database. It has been verified to work with
 In order to use QuantumFS with the cql backend the CQL database needs to be setup
 with the following schema:
 
-```
+```sql
 CONSISTENCY ALL;
 -- Setup keyspace and table for data blocks.
 -- Keyspace: cqlKS
@@ -78,12 +78,12 @@ The config file has 3 TTL values as explained below:
 The cqlwalkerd cmd walks all the workspaces in QuantumFS and refreshes their
 TTL based on the values above.
 
-# Long Running Tests
+## Long Running Tests
 The CQL backend has a few long running tests which run against a docker
-instance of the ScyllaDB. These tests take ~20mins to complete and can be run as 
+instance of the ScyllaDB. These tests take ~20mins to complete and can be run as
 follows:
 
-```
+```bash
 # Pull scylla docker, run container
 docker pull scylladb/scylla
 docker run --name some-scylla -p 9042:9042 -d scylladb/scylla \
@@ -99,5 +99,3 @@ CFNAME_PREFIX="intg`echo $$$$`" \
 go test -v  -timeout 200m -p 1 -tags longrunningtests -run Integ \
             github.com/aristanetworks/quantumfs/backends/cql
 ```
-
-
