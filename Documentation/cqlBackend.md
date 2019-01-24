@@ -95,8 +95,8 @@ docker run --name some-scylla -p 9042:9042 -d scylladb/scylla \
 
 
 # Run the test
-cd ${GOPATH}/src/github.com/aristanetworks/quantumfs
-CQL_CONFIG="backends/cql/cluster_configs/dkr_CqlIntegTest" \
+QFS_ROOT="${GOPATH}/src/github.com/aristanetworks/quantumfs" \
+CQL_CONFIG="${QFS_ROOT}/backends/cql/cluster_configs/dkr_CqlIntegTest" \
 CFNAME_PREFIX="intg`echo $$$$`" \
 go test -v  -timeout 200m -p 1 -tags longrunningtests -run Integ \
             github.com/aristanetworks/quantumfs/backends/cql
