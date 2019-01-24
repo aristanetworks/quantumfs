@@ -33,17 +33,20 @@ func getDirAndFilePath(b *fileStore, key []byte) (dir string, filePath string) {
 	return dir, filePath
 }
 
-//NewFilesystemStore allocats a new blobstore.datastore using local FS as backend store
+//NewFilesystemStore allocats a new blobstore.datastore using local FS as
+// backend store
 func NewFilesystemStore(path string) (BlobStore, error) {
 	var store fileStore
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return nil, NewError(ErrOperationFailed, "path does not exist: %v", err)
+		return nil, NewError(ErrOperationFailed,
+			"path does not exist: %v", err)
 	}
 
 	if !fileInfo.Mode().IsDir() {
-		return nil, NewError(ErrOperationFailed, "path is not a dir: %v", path)
+		return nil, NewError(ErrOperationFailed,
+			"path is not a dir: %v", path)
 	}
 
 	store.root = path

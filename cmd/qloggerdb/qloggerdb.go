@@ -141,31 +141,33 @@ func init() {
 	extractors = append(extractors, quantumFS...)
 
 	cql := []qlogstats.StatExtractor{
-		qlogstats.NewExtPointStats(cql.EtherTtlCacheHit,
-			"ether_setcache_hit"),
-		qlogstats.NewExtPointStats(cql.EtherTtlCacheMiss,
-			"ether_setcache_miss"),
-		qlogstats.NewExtPointStats(cql.EtherTtlCacheEvict,
-			"ether_setcache_evict"),
+		qlogstats.NewExtPointStats(cql.CqlTtlCacheHit,
+			"cql_setcache_hit"),
+		qlogstats.NewExtPointStats(cql.CqlTtlCacheMiss,
+			"cql_setcache_miss"),
+		qlogstats.NewExtPointStats(cql.CqlTtlCacheEvict,
+			"cql_setcache_evict"),
 
 		// Data store latency
-		newQfsExtPair(cql.EtherGetLog, cql.KeyLog),
-		newQfsExtPair(cql.EtherSetLog, cql.KeyLog),
+		newQfsExtPair(cql.CqlGetLog,
+			cql.KeyLog),
+		newQfsExtPair(cql.CqlSetLog,
+			cql.KeyLog),
 
 		// Workspace DB latency
-		newQfsExtPair(cql.EtherTypespaceLog, ""),
-		newQfsExtPair(cql.EtherNamespaceLog,
-			cql.EtherNamespaceDebugLog),
-		newQfsExtPair(cql.EtherWorkspaceListLog,
-			cql.EtherWorkspaceListDebugLog),
-		newQfsExtPair(cql.EtherWorkspaceLog,
-			cql.EtherWorkspaceDebugLog),
-		newQfsExtPair(cql.EtherBranchLog,
-			cql.EtherBranchDebugLog),
-		newQfsExtPair(cql.EtherAdvanceLog,
-			cql.EtherAdvanceDebugLog),
+		newQfsExtPair(cql.CqlTypespaceLog, ""),
+		newQfsExtPair(cql.CqlNamespaceLog,
+			cql.CqlNamespaceDebugLog),
+		newQfsExtPair(cql.CqlWorkspaceListLog,
+			cql.CqlWorkspaceListDebugLog),
+		newQfsExtPair(cql.CqlWorkspaceLog,
+			cql.CqlWorkspaceDebugLog),
+		newQfsExtPair(cql.CqlBranchLog,
+			cql.CqlBranchDebugLog),
+		newQfsExtPair(cql.CqlAdvanceLog,
+			cql.CqlAdvanceDebugLog),
 
-		// Ether.CQL internal statistics
+		// CQL internal statistics
 		newQfsExtPair(cql.DeleteLog, cql.KeyLog),
 		newQfsExtPair(cql.GetLog, cql.KeyLog),
 		newQfsExtPair(cql.InsertLog, cql.KeyTTLLog),
