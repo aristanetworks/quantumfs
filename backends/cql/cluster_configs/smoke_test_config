@@ -2,7 +2,7 @@
     "cluster":
     {
     "nodes":[ "0.0.0.0"],
-    "keyspace":"cqlks",
+    "keyspace":"cqlKS",
     "conntimeoutsec":300,
     "checkschemaretries":20
     },
