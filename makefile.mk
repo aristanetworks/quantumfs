@@ -146,7 +146,7 @@ check-fpm:
 
 define RPM_COMMON_CONTACT
 -m 'quantumfs-dev@arista.com' \
---license='Arista Proprietary' \
+--license='Apache 2.0' \
 --vendor='Arista Networks' \
 --url http://gut/repos/quantumfs
 endef
