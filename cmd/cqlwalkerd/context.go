@@ -119,8 +119,7 @@ func getWalkerDaemonContext(name string, timeSeriesDB string,
 		}
 
 	} else {
-		quantumfsWSDB, err = backends.ConnectWorkspaceDB("cql",
-			cqlCfgFile)
+		quantumfsWSDB, err = backends.ConnectWorkspaceDB("cql", cqlCfgFile)
 		if err != nil {
 			fmt.Printf("Connection to workspaceDB failed err: %v\n", err)
 			os.Exit(exitBadConfig)

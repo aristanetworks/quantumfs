@@ -54,9 +54,9 @@ backends/cql/cluster_configs/smoke_test_config
 To start QuamtumFS with a CQL backend the command would be:
 ```
 QFS_CONFIG=/path/to/config/file \
-sudo quantumfsd -datastore cql.cql \
+sudo quantumfsd -datastore cql \
                 -datastoreconf $QFS_CONFIG \
-                -workspaceDB cql.cql \
+                -workspaceDB cql \
                 -workspaceDBconf $QFS_CONFIG
 ```
 
@@ -68,7 +68,7 @@ refresh the TTL values of the blocks in the database we want to keep.
 
 The config file has 3 TTL values as explained below:
 ```
-"adapter":
+"walker":
 {
   "ttlrefreshtime" : "72h",   // If the TTL is less than this, we do not refresh TTL.
   "ttlrefreshvalue": "192h",  // The is the TTL value when a TTL value is refreshed.
