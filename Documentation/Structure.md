@@ -7,106 +7,106 @@ implementation.
 
 Here is a brief description of each of the packages and their intended use:
 
-quantumfs
+quantumfs:
     Top level package which contains definitions intended to be used by third
     party tools. This includes a golang implementation of the qfs API helpers
     and APIs to interpret data blocks.
 
-QFSClient
+QFSClient:
     C++ implementation of the qfs API helpers.
 
-backends
+backends:
     Contains registration for various supported backends. A backend is an
     implementation of one of the core subsystems, such as the WSDB or datastore.
 
-backends.cql
+backends.cql:
     Backends using a CQL (Cassandra or Scylla) cluster for storage.
 
-backends.filesystem
+backends.filesystem:
     Blobstore based test backend.
 
-backends.processlocal
+backends.processlocal:
     In-memory backend implementations. Used mostly for tests.
 
-backends.systemlocal
+backends.systemlocal:
     File-based backend implementations. Used mostly for local testing or
     non-cluster configurations.
 
-backends.grpc
+backends.grpc:
     A grpc proxy backend for the WSDB. This is used as a simple,
     single-point-of-failure WSDB implementation which is accessible via the
     network.
 
-cmd
+cmd:
     Contains the various binary packages.
 
-cmd.cqlwalker
+cmd.cqlwalker:
     Walk and refresh the TTLs of a workspace backed by a CQL datastore.
 
-cmd.cqlwalkerd
+cmd.cqlwalkerd:
     Like cmd.cqlwalker but walk all workspaces periodically.
 
-cmd.emptykeys
+cmd.emptykeys:
     A development utility to compute the keys of the empty blocks.
 
-cmd.qfs
+cmd.qfs:
     The primary user utility to access the non-filesystem capabilities of
     QuantumFS. This command implements a shell callable API bridge.
 
-cmd.qloggerdb
+cmd.qloggerdb:
     A utility to extract statistics from the binary tracing for offline
     analysis.
 
-cmd.qparse
+cmd.qparse:
     A utility to parse the binary tracing for human consumption.
 
-cmd.quantumfsd
+cmd.quantumfsd:
     The QuantumFS daemon.
 
-cmd.qupload
+cmd.qupload:
     A utility to quickly upload a filesystem tree directly into the QuantumFS
     datastore without going through FUSE.
 
-cmd.wsdbhealthcheck
+cmd.wsdbhealthcheck:
     A small utility which runs some fast queries against the WSDB to ensure
     basic healthiness. Useful for monitoring tools.
 
-cmd.wsdbservice
+cmd.wsdbservice:
     The daemon for the grpc WSDB server. This uses any of the WSDB backends to
     store the data.
 
-daemon
+daemon:
     The primary implementation of the QuantumFS internals.
 
-encoding
+encoding:
     Cap'n'Proto files for encoding and decoding the block formats.
 
-features
+features:
     Not a golang package. This supplies build configuration when enabling
     various optional build features.
 
-hash
+hash:
     Contains golang adapters to the CityHash hash function used as the content
     hash in QuantumFS.
 
-libqfs
+libqfs:
     API helper code shared between quantumfs and QFSClient.
 
-qfsclientc
+qfsclientc:
     Adapter code which allows exercising C++ QFSClient code from golang. This is
     used to run QFSClient tests against a test QuantumFS instance.
 
-qlog
+qlog:
     A fast binary tracing system.
 
-qlogstats
+qlogstats:
     The core implementation of qloggerdb.
 
-testutils
+testutils:
     Common test utilities, including the generic test framework definitions.
 
-utils
+utils:
     Various miscelaneous utilities.
 
-walker
+walker:
     A libary for walking QuantumFS block structures without running QuantumFS.
