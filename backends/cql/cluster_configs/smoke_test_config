@@ -2,7 +2,7 @@
     "cluster":
     {
     "nodes":[ "0.0.0.0"],
-    "keyspace":"cqlKS",
+    "keyspace":"cqlks",
     "conntimeoutsec":300,
     "checkschemaretries":20
     },
@@ -19,6 +19,12 @@
 	"someconfig": "DEADBEEF 3"
     },
     "adapter":
+    {
+	"ttlrefreshtime" : "24h",
+	"ttlrefreshvalue": "192h",
+	"ttldefaultvalue": "192h"
+    },
+    "walker":
     {
 	"ttlrefreshtime" : "24h",
 	"ttlrefreshvalue": "192h",

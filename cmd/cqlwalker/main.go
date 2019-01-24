@@ -51,7 +51,7 @@ func setupCommonState() error {
 		return NewPreCmdExitErr("Failed to load TTL values: %s", err)
 	}
 
-	cs.qfsds, err = backends.ConnectDatastore("cql", co.config)
+	cs.qfsds, err = backends.ConnectDatastore("cql.cql", co.config)
 	if err != nil {
 		return NewPreCmdExitErr("Connection to DataStore failed: %s",
 			err)
@@ -63,7 +63,7 @@ func setupCommonState() error {
 	v.ApplyTTLPolicy = false
 	cs.cqlds = v.Blobstore
 
-	cs.qfsdb, err = backends.ConnectWorkspaceDB("cql", co.config)
+	cs.qfsdb, err = backends.ConnectWorkspaceDB("cql.cql", co.config)
 	if err != nil {
 		return NewPreCmdExitErr("Connection to workspaceDB "+
 			"failed: %s", err)

@@ -15,7 +15,8 @@ import (
 func ConnectDatastore(name string,
 	config string) (quantumfs.DataStore, error) {
 
-	for _, datastore := range datastores {
+	for idx, datastore := range datastores {
+		fmt.Println(idx, datastore)
 		if datastore.Name != name {
 			continue
 		}
