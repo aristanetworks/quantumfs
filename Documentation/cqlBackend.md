@@ -53,10 +53,11 @@ backends/cql/cluster_configs/smoke_test_config
 
 To start QuamtumFS with a CQL backend the command would be:
 ```
-QFS_CONFIG=/path/to/config/file sudo quantumfsd -datastore "cql.cql" \
-                                                -datastoreconf $QFS_CONFIG \
-                                                -workspaceDB "cql.cql" \
-                                                -workspaceDBconf $QFS_CONFIG
+QFS_CONFIG=/path/to/config/file \
+sudo quantumfsd -datastore cql.cql \
+                -datastoreconf $QFS_CONFIG \
+                -workspaceDB cql.cql \
+                -workspaceDBconf $QFS_CONFIG
 ```
 
 ## Garbage Collection
@@ -70,13 +71,14 @@ The config file has 3 TTL values as explained below:
 "adapter":
 {
   "ttlrefreshtime" : "72h",   // If the TTL is less than this, we do not refresh TTL.
-  "ttlrefreshvalue": "192h",  // This is the TTL for a new block.
-  "ttldefaultvalue": "192h"   // The is the TTL value when a TTL value is refreshed.
+  "ttlrefreshvalue": "192h",  // The is the TTL value when a TTL value is refreshed.
+  "ttldefaultvalue": "192h"   // This is the TTL for a new block.
 }
 ```
 
-The cqlwalkerd cmd walks all the workspaces in QuantumFS and refreshes their
-TTL based on the values above.
+The cqlwalkerd command/tool walks all the workspaces in QuantumFS and refreshes their
+TTL based on the values above. In other words, all reachable blocks with a TTL less 
+than ttlrefreshtime will have their TTL updated to ttlrefreshvalue.
 
 ## Long Running Tests
 The CQL backend has a few long running tests which run against a docker
