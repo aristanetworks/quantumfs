@@ -2,7 +2,7 @@
 
 Package `github.com/aristanetworks/quantumfs/backends/cql` provides
 a backend to store QuantumFS’ data blocks and workspaceDB info in a CQL
-compatible backend. It has been verified to work with
+compatible database. It has been verified to work with
 [ScyllaDB](https://www.scylladb.com/) and
 [Apache-Cassandra](https://cassandra.apache.org/).
 
@@ -80,7 +80,8 @@ TTL based on the values above.
 
 # Long Running Tests
 The CQL backend has a few long running tests which run against a docker
-instance of the ScyllaDB. These tests take ~20mins to complete and be run as follows:
+instance of the ScyllaDB. These tests take ~20mins to complete and can be run as 
+follows:
 
 ```
 # Pull scylla docker, run container
@@ -88,7 +89,7 @@ docker pull scylladb/scylla
 docker run --name some-scylla -p 9042:9042 -d scylladb/scylla \
            --broadcast-address 127.0.0.1  \
            --listen-address 0.0.0.0       \
-	       --broadcast-rpc-address 127.0.0.1
+           --broadcast-rpc-address 127.0.0.1
 
 
 # Run the test
@@ -96,7 +97,7 @@ cd ${GOPATH}/src/github.com/aristanetworks/quantumfs
 CQL_CONFIG="backends/cql/cluster_configs/dkr_CqlIntegTest" \
 CFNAME_PREFIX="intg`echo $$$$`" \
 go test -v  -timeout 200m -p 1 -tags longrunningtests -run Integ \
-github.com/aristanetworks/quantumfs/backends/cql
+            github.com/aristanetworks/quantumfs/backends/cql
 ```
 
 
