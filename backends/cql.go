@@ -4,8 +4,6 @@
 
 package backends
 
-// Please see FEATURES in makefile.mk for details on how to toggle this feature.
-
 import (
 	"github.com/aristanetworks/quantumfs/backends/cql"
 )
