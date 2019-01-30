@@ -10,13 +10,6 @@
 # Both constraints and overrides are needed so  that these are
 # used to resolve direct and transitive dependencies.
 #
-# In order to resolve any packages that are hosted on gerrit,
-# please also run a one-off git configuration change which is
-# currently required to work around a gerrit plugin issue which
-# returns an authentication request for the "go-get" check.
-#
-# $ git config --global url."https://gerrit.corp.arista.io/".insteadOf "https://gerrit.corp.arista.io/a/"
-#
 # For backgrounder on "go get"-able repositories, see
 # https://golang.org/cmd/go/#hdr-Remote_import_paths
 
