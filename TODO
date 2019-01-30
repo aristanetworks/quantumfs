@@ -27,8 +27,9 @@ BUG251429
         fails with a type assertion in writeArg() and computePacketSize() because the
         dynamic type is "S" and not "string".
 
-Workspace refresh is flaky and slow
-        Workspace refresh is flaky and slow in some poorly understood scenario.
+BUG237433
+        Workspace refresh is flaky and slow in some poorly understood scenario. It
+        has been disabled for mutable workspace.
 
 BUG245174
         One form of consistency not yet considered is consistency between a directory
@@ -69,6 +70,11 @@ BUG229575
         Hardlink legs currently only ever accumulate in the accesslist. This is a
         slow leak. We should remove the hardlink leg from the hardlink accesslist
         when it is deleted.
+
+BUG209056
+        IO on the API file (which uses direct IO) the C++ API library test sometime
+        fail with EIO. This may be because the tests perform the IO and fork
+        concurrently.
 
 Features
 #############################################
