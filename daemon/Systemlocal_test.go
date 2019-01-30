@@ -1,5 +1,3 @@
-// +build never
-
 // Copyright (c) 2016 Arista Networks, Inc.
 // Use of this source code is governed by the Apache License 2.0
 // that can be found in the COPYING file.
@@ -12,29 +10,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aristanetworks/quantumfs/backends/processlocal"
 	"github.com/aristanetworks/quantumfs/backends/systemlocal"
 )
 
 func (th *testHelper) systemlocalConfig() QuantumFsConfig {
-	mountPath := th.tempDir + "/mnt"
+	mountPath := th.TempDir + "/mnt"
 
-	th.log("Starting initialization of workspaceDB")
-	workspaceDbPath := th.tempDir + "/workspaceDB"
+	th.Log("Starting initialization of workspaceDB")
+	workspaceDbPath := th.TempDir + "/workspaceDB"
 	workspaceDB := systemlocal.NewWorkspaceDB(workspaceDbPath)
-	th.log("Finished initialization of workspaceDB")
+	th.Log("Finished initialization of workspaceDB")
 
-	th.log("Starting initialization of datastore")
-	datastorePath := th.tempDir + "/datastore"
-	datastore := systemlocal.NewDatastore(datastorePath)
-	th.log("Finished initialization of datastore")
+	th.Log("Starting initialization of datastore")
+	datastorePath := th.TempDir + "/datastore"
+	datastore := systemlocal.NewDataStore(datastorePath)
+	th.Log("Finished initialization of datastore")
 
 	config := QuantumFsConfig{
-		CachePath:        th.tempDir + "/ramfs",
+		CachePath:        th.TempDir + "/ramfs",
 		CacheSize:        1 * 1024 * 1024,
 		CacheTimeSeconds: 1,
 		CacheTimeNsecs:   0,
-		DirtyFlushDelay:  30 * time.Second,
+		DirtyFlushDelay:  Duration{Duration: 30 * time.Second},
 		MountPath:        mountPath,
 		WorkspaceDB:      workspaceDB,
 		DurableStore:     datastore,
@@ -44,7 +41,7 @@ func (th *testHelper) systemlocalConfig() QuantumFsConfig {
 
 func TestSmokeTestSystemlocal(t *testing.T) {
 	runTestNoQfs(t, func(test *testHelper) {
-		test.startQuantumFs(test.systemlocalConfig())
+		test.startQuantumFs(test.systemlocalConfig(), nil, false)
 		interDirectoryRename(test)
 	})
 }
