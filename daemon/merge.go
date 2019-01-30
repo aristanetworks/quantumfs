@@ -237,7 +237,7 @@ func panicRecovery(c *ctx, output *quantumfs.ObjectKey, base quantumfs.ObjectKey
 		err = addBreadcrumb(err.(string), wsr)
 
 		c.elog(panicLog, err)
-		data := "Please contact quantumfs-dev@arista.com as soon as " +
+		data := "Please dig into your datastore as soon as " +
 			"possible to recover your data.\n\n"
 		data += fmt.Sprintf("Fatal error during merge: %s\n", err)
 		data += fmt.Sprintf("Base rootID: %s\n", base.String())
