@@ -1,0 +1,208 @@
+Bugs
+#############################################
+
+BUG292057
+        The node.js test-fs-utimes.js test fails when running in a 32bit containers
+        because it attempts to set a file time to after the 32bit Unix time rollover.
+        It expects to get a time in the future, but FUSE/QuantumFS interprets the
+        time as a negative value and receives a time in the past.
+
+BUG291480
+        Access list caches in the Inodes are not cleared during the clearAccessLists
+        API command. Consequently accessed inodes will fail to mark themselves again
+        after the list is cleared.
+
+BUG290861
+        Add tests that ensures created and existing workspaces can be listed with ls.
+        All the existing tests access the workspace name directly and so miss the
+        listing code paths.
+
+BUG251429
+        qlog doesn't support types strings. ie:
+
+        type S string
+        s := S("this is a string")
+        Log(.., "%s", s)
+
+        fails with a type assertion in writeArg() and computePacketSize() because the
+        dynamic type is "S" and not "string".
+
+BUG237433
+        Workspace refresh is flaky and slow in some poorly understood scenario. It
+        has been disabled for mutable workspace.
+
+BUG245174
+        One form of consistency not yet considered is consistency between a directory
+        and its parent. Consider the scenario where there are four inodes:
+
+                          (file1)
+                         /
+        (parent) - (dir1)
+                         \
+                          (file2)
+
+        If both file1 and file2 two are newly created, they'll have effective views
+        in dir1. Parent will have a publishable size for dir1 of zero and an
+        effective size of two. Now if file1 publishes it will cause dir1 to publish.
+        Afterwards parent has a publishable size for dir1 of two and no separate
+        effective size. Should this state be transferred to another instance, dir1
+        will not contain file2 and therefore the size in the metadata for dir1 will
+        be incorrect.
+
+Renaming files between directories may result in an inconsistent published state
+        It is possible to rename a file between different levels in the workspace
+        directory structure such that the published view has the renamed file in
+        neither, either or both the locations. This inconsistent state should be
+        prevented as it may break merge or refresh.
+
+FUSE incorrectly checks directory permissions without default_permissions
+        When a FUSE filesystem isn't using default_permissions the kernel should
+        check the directory executable bit for search permissions. The kernel doesn't
+        do this and allows directory search when it should not.
+
+
+On Linux, nlink of directories is the number of subdirectories
+        In ext4 on Linux the nlink of directories appears to be the number of
+        subdirectories (including . and ..) which are within that directory.
+        QuantumFS currently returns the nlink as the total number of children.
+
+BUG229575
+        Hardlink legs currently only ever accumulate in the accesslist. This is a
+        slow leak. We should remove the hardlink leg from the hardlink accesslist
+        when it is deleted.
+
+BUG209056
+        IO on the API file (which uses direct IO) the C++ API library test sometime
+        fail with EIO. This may be because the tests perform the IO and fork
+        concurrently.
+
+Features
+#############################################
+
+Add API to fetch file attributes for files in access list
+        Build systems may need to retrieve the file attributes of modified files
+        before they can be inserted into another workspace. It may be more efficient
+        if QuantumFS provided an API to do so in place of using repeated calls to
+        stat().
+
+Rework hardlink normalization
+        Normalizing hardlinks back to a normal file may be racy and the code is
+        difficult to understand. It would be nice to rework it to be simpler.
+
+InsertInode should support timestamps
+        Build systems may want to insert inodes with a given timestamp. Currently
+        they must set the time manually after InsertInode, which is racy against the
+        API commands. It would be easier if InsertInode supported this directly.
+
+Add qfs command to show running quantumfsd version
+        Discovering the running quantmufsd version is difficult. It would also be
+        nice if this command included the FUSE connection as well.
+
+AdvanceWorkspace() should fail on immutable workspaces
+        It is possible to start modifying a workspace to later have it be marked as
+        immutable. AdvanceWorkspace() would then be called on the now immutable
+        workspace and the modification accepted. Immutable workspaces should reject
+        those modifications, but the user should also be notified in some way that
+        their changes will be lost.
+
+Limited Quota support
+        Currently it is possible for a script to continually
+        write/create-delete/modify the contents of a workspace until the datastore is
+        completely filled with useless blocks. Some limited quota support would be
+        nice to protect against such accidents.
+
+Write backpressure
+        Without write backpressure it's possible for a tool to write into QuantumFS
+        faster than QuantumFS can flush to the datastore. The excess will bloat the
+        memory use of QuantumFS until the system runs short on memory. A fair
+        backpressure system would resolve this issue.
+
+qlog should have dynamic subsystem identifiers
+        Using fixed subsystem identifiers and special request ID ranges which are
+        defined in the source code is less than ideal. If subystems and ranges could
+        be defined dynamically it would make qlog easier to use and more useful
+        outside QuantumFS.
+
+Implement zero-copy encoding
+        Cap'n'Proto was supposed to give us efficient zero-copy encoding, but it
+        hasn't worked out in practice. The costs of Cap'n'Proto are significant and
+        trying again for zero-copy encoding would be ideal.
+
+Performance improvements
+#############################################
+
+Consider moving released files to the front of the dirty queue
+        Today when a file is dirtied we place it at the back of the dirty queue
+        with a 30 second expiry time. This can result in publishing the parent
+        twice should the parent have already be dirty. We work this way to allow
+        time for changes to accumulate.
+
+        When the kernel releases a file handle the file can no longer be modified
+        using that handle. If there no other file handles then we know the file can
+        be modified no further. It should thus be safe to move the file from the
+        middle of the dirty queue to the head of the dirty queue with an immediate
+        expiry time.
+
+        I don't think this would help any of the distributed run cases, but may
+        reduce the amount we publish in persistent workspaces by as much as 50%.
+
+Refresh creates too much garbage
+        There are scenarios where refresh on a workspace, even a read-only workspace,
+        creates an unreasonable amount of garbage.
+
+Extend FUSE to pass up supplementary groups with request
+        One major performance bottleneck with magic ownership is the necessity to
+        fetch the list of process supplementary groups from /proc/<pid> in
+        hasMatchingGid(). If FUSE were to pass up a (sub)set of the supplementary
+        groups with the request this overhead could be avoided.
+
+Extend FUSE to support page cache CoW/deduping
+        One use-case of QuantumFS is to run one workspace per build operation. Since
+        each of these workspaces appear to the kernel as a separate directory with
+        distinct files the kernel has no way of knowing that the contents are the
+        same and QuantumFS spends significant time repeatedly transferring common
+        file contents (ie. the C library or language compiler) to the kernel when
+        that data already exists in the page cache. A way of notifying the kernel
+        that a certain data range in a file is the same as another file would help
+        with this.
+
+InsertInode is serialized per-workspace
+        Large insert jobs would go faster if multiple InsertInode calls could happen
+        in parallel. This may include work to allow a bulk InsertInode variant.
+
+Fetching extended keys is serialized per-workspace
+        Large retrieval of extended keys may benefit from parallelism within a single
+        workspace.
+
+Link shouldn't sync source file
+        There seems to be no reason that linking a hardlink should require syncing
+        the source file first. It may be a historical artifact and would improve the
+        performance of common build tools to skip the unnecessary latency.
+
+Use the kernel writeback cache
+        FUSE currently provides no mechanism to reliably request that a subset of
+        files within the filesystem be fully flushed to the filesystem itself. Thus
+        QuantumFS is unable to use the kernel write-back cache because it cannot
+        ensure consistency between the contents in the kernel cache and its view of
+        those contents when it comes time to branch or sync a workspace. Resolving
+        this would greatly help the performance of tools which make numerous small
+        writes, such as linkers.
+
+More efficient qlog barrier
+        Currently qlog uses an atomic write to one element of an array of atomic
+        integers as a compiler and memory barrier. This could be more efficient if a
+        lower overhead compiler and memory barrier mechanism could be found.
+
+qparse -stat is slow
+        Using qparse to evaluate the execution trace takes a long time to process. It
+        should be sped up if possible.
+
+Code improvements
+#############################################
+
+Look into splitting the Inode interface
+        The Inode interface is large and results in the leaf node types (ie files)
+        having several dummy methods implementations. It may be feasible to split
+        Inode into Inode and an interface for InodeContainers (ideally supplanting
+        the concept of inodeHolder). If this is feasible and make the code simpler
+        it would be a nice code improvement.
