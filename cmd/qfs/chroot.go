@@ -170,7 +170,7 @@ func setArchitecture(arch string) error {
 
 func setupBindMounts(rootdir string, quantumFsMount string) error {
 	paths := []string{"/proc", "/selinux", "/sys", "/dev/pts", "/tmp/.X11-unix",
-		"/tmp/ArosTest.SimulatedDut", quantumFsMount}
+		quantumFsMount}
 	homes := homedirs()
 	paths = append(paths, homes...)
 
