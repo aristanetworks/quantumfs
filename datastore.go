@@ -602,7 +602,7 @@ func createEmptyDirectory() ObjectKey {
 
 	bytes := emptyDir.Bytes()
 
-	hash := decodeHashConstant("04af2edd59440588f8f8f4db277a8b8d7d296d02")
+	hash := decodeHashConstant("624663aff4df1337c560e0a1f083bdfb65c50065")
 	emptyDirKey := NewObjectKey(KeyTypeMetadata, hash)
 	constStore.store[emptyDirKey.String()] = bytes
 	return emptyDirKey
@@ -876,7 +876,7 @@ func createEmptyWorkspace(emptyDirKey ObjectKey) ObjectKey {
 
 	bytes := emptyWorkspace.Bytes()
 
-	hash := decodeHashConstant("36235f5d026a70d0017afd1dd20a4d974b56e289")
+	hash := decodeHashConstant("09457b94d488d65fbc7e901d3a79548653f0bc42")
 	emptyWorkspaceKey := NewObjectKey(KeyTypeMetadata, hash)
 	constStore.store[emptyWorkspaceKey.String()] = bytes
 	return emptyWorkspaceKey
