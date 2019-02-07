@@ -11,12 +11,6 @@ Dev Environment Setup
 README's folder path is $GOPATH/src/github.com/aristanetworks/quantumfs/README
 
 2) Fetch vendored dependencies.
-   Make a once-off change to your git configuration so that `dep` can
-   resolve references to gerrit-hosted dependencies.
-
-      git config --global \
-         url."https://gerrit.corp.arista.io/".insteadOf \
-         "https://gerrit.corp.arista.io/a/"
 
    Populate the vendor subdirectory with the required dependency versions,
    independent of any present in $GOPATH/src.
@@ -89,7 +83,7 @@ Limits
 
 * Maximum supported file size is 28.4 terabytes
 * Maximum size of an atomic DIRECT_IO write is 128KB. Writes larger than 128KB
-  are split into a set of 128KB writes by the kernel. See BUG230026 for details.
+  are split into a set of 128KB writes by the kernel.
 
 Signals
 -------
