@@ -1,4 +1,0 @@
-REVIEWBOARD_URL = "http://gut/review"
-REPOSITORY = "quantumfs"
-BRANCH = "master"
-LAND_DEST_BRANCH = "master"
